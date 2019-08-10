@@ -1,0 +1,10 @@
+# Byte-compiled, optimized, or DLL files
+*.py[cod]
+
+# setuptools artifacts
+build/
+dis/
+*.egg-info
+
+# pyenv versioning file
+.python-version
