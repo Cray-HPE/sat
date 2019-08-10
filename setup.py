@@ -14,7 +14,7 @@ setup(
     version='0.1.0',
     description="Shasta Admin Toolkit",
     long_description=long_description,
-    long_description_type='text/markdown',
+    long_description_content_type='text/markdown',
     url='https://stash.us.cray.com/projects/SAT/repos/sat',
     author='Cray, Inc.',
     packages=find_packages(exclude=['tests']),
