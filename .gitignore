@@ -11,3 +11,6 @@ dis/
 
 # Typical virtual env directory
 venv
+
+# Other files
+*.swp
