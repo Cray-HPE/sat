@@ -8,3 +8,6 @@ dis/
 
 # pyenv versioning file
 .python-version
+
+# Typical virtual env directory
+venv
