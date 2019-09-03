@@ -1,0 +1,11 @@
+---
+# Main task file for cray_sat role to install the Shasta Admin Toolkit (SAT)
+# Copyright 2019 Cray Inc. All Rights Reserved.
+- name: Install the cray-sat package
+  zypper:
+    name: cray-sat
+    state: latest
+    # The following options were copied from craycli's ansible role
+    disable_recommends: no
+    disable_gpg_check: yes
+    update_cache: yes
