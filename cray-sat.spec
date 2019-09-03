@@ -2,9 +2,8 @@
 # Copyright 2019, Cray Inc. All Rights Reserved
 
 Name: cray-sat
-# TODO: Determine if this is the correct way to version in DST
-Version: 0.1.%(echo $BUILD_NUMBER)
-Release: 0
+Version: 0.1.2
+Release: %(echo ${BUILD_METADATA})
 # TODO: Determine the correct license to use for SAT
 License: Cray Proprietary
 Source: %{name}-%{version}.tar.gz
