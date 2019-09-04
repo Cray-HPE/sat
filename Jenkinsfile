@@ -6,6 +6,6 @@ rpmBuild(
     product: "shasta-standard,shasta-premium",
     target_node: "ncn",
     specfile: "cray-sat.spec",
-    channel: "shasta_admin_toolkit"
+    channel: "sat-ci"
 )
 
