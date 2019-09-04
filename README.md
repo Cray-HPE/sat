@@ -32,29 +32,16 @@ software.
 
 ## Installation via pip
 
-For development purposes, this python package can be installed either by
-invoking `setup.py` directly or by installing with `pip`. It is recommended to
-use `pip` as it allows for easy uninstallation. The package can be installed
-with pip in editable mode, which is preferable for development as you will be
-able to edit code in its checkout directory and immediately see the effects of
-your changes.
-
-To install use the following pip command:
+To install, use `pip3`:
 
 ```
-pip install -e $CHECKOUT_DIR
+pip3 install $CHECKOUT_DIR
 ```
 
-Where `$CHECKOUT_DIR` is the directory where the SAT repo is checked out. I.e.,
-if running while your current directory is the top-level of the SAT repo, you
-can use:
-
-```
-pip install -e .
-```
+Where `$CHECKOUT_DIR` is the directory where the SAT repo is checked out.
 
 To uninstall, use the following command:
 
 ```
-pip uninstall sat
+pip3 uninstall sat
 ```
