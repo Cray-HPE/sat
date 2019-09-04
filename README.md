@@ -9,11 +9,11 @@ for human consumption.
 
 This repository contains the python code implementing this CLI or set of CLIs.
 
-# Installation
+# Installation with pip/setuptools
 
-This repository uses setuptools for installation in a `setup.py` script. We
-intend to deliver SAT through an RPM, so `setup.py` will be called in the build
-and install sections of the spec file.
+This repository uses setuptools for installation in a `setup.py` script. SAT is
+delivered as an RPM. The spec file in this repository uses the `setup.py` script
+in its build and install sections to build and install in the RPM buildroot.
 
 For development purposes, this python package can be installed either by invoking
 `setup.py` directly or by installing with `pip`. It is recommended to use `pip` as
@@ -39,3 +39,13 @@ To uninstall, use the following command:
 ```
 pip uninstall sat
 ```
+
+# cray_sat Ansible Role
+
+This repository defines an Ansible role named `cray_sat`. This role is
+responsible for installing and configuring the SAT software on a Shasta system.
+This role is packaged into a crayctldeploy subpackage of cray-sat. This package
+will be installed automatically by the Shasta installer, named `crayctl`. The
+`crayctl` installer will then include the `cray_sat` role at an appropriate
+stage of the installer, which will result in the installation and configuration
+of the SAT software.

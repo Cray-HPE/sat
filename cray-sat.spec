@@ -60,4 +60,3 @@ cat INSTALLED_FILES | grep __pycache__ | xargs dirname | xargs dirname | uniq >>
 
 %files crayctldeploy
 %{ansible_framework_dir}/roles/cray_sat
-
