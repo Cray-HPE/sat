@@ -30,9 +30,6 @@ command will then include the `cray_sat` role at an appropriate stage of the
 installer, which will result in the installation and configuration of the SAT
 software.
 
-The subsection below describes how to install this software in a development
-environment with pip.
-
 ## Installation via pip
 
 For development purposes, this python package can be installed either by
