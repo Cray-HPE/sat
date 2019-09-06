@@ -6,14 +6,21 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 import sys
 
 from sat.parser import create_parent_parser
+from sat.cablecheck.main import do_cablecheck
 from sat.showrev.main import showrev
 
 SUBCOMMAND_FUNCS = {
+    'cablecheck': do_cablecheck,
     'showrev': showrev
 }
 
 
 def main():
+    """SAT Main.
+
+    Returns:
+        None. Calls sys.exit().
+    """
     parser = create_parent_parser()
     args = parser.parse_args()
 
