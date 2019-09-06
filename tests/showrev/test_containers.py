@@ -1,0 +1,110 @@
+"""
+Unit tests for the sat.showrev.containers .
+
+Copyright 2019 Cray Inc. All Rights Reserved.
+"""
+
+
+import unittest
+from unittest import mock
+
+import sat.showrev
+
+
+class FakeDockerImage:
+    def __init__(self, id, short_id, tags):
+        self.id = id
+        self.short_id = short_id
+        self.tags = tags
+
+
+# Output grabbed from docker.from_env().images.list() .
+fakeimagelist = [
+    FakeDockerImage(
+        'sha256:304735eab4e4df55b236f9835104cb1058bc50cb5ff7f4ee7d719cb56d2a718b',
+        'sha256:304735eab4',
+        [   'sms.local:5000/kf033/prom/statsd-exporter:latest',
+            'sms.local:5000/kf033/prom/statsd-exporter:v0.6.0']),
+    FakeDockerImage(
+        'sha256:56d414270ae3ca3b4bd09b8ec7971895360427bb71047c04e9c6313cb22cfcff',
+        'sha256:56d414270a',
+        ['cache/zookeeper:latest']),
+    FakeDockerImage(
+        'sha256:c2ce1ffb51ed60c54057f53b8756231f5b4b792ce04113c6755339a1beb25943',
+        'sha256:c2ce1ffb51',
+        [   'cache/k8s-dns-dnsmasq-nanny-amd64:1.14.8',
+            'sms.local:5000/cache/k8s-dns-dnsmasq-nanny-amd64:1.14.8',
+            'sms.local:5000/cache/k8s-dns-dnsmasq-nanny-amd64:latest']),
+    FakeDockerImage(
+        'sha256:6f7f2dc7fab5d7e7f99dc4ac176683a981a9ff911d643b9f29ffa146838deda3',
+        'sha256:6f7f2dc7fa',
+        [   'cache/k8s-dns-sidecar-amd64:1.14.8',
+            'sms.local:5000/cache/k8s-dns-sidecar-amd64:1.14.8',
+            'sms.local:5000/cache/k8s-dns-sidecar-amd64:latest']),
+    FakeDockerImage(
+        'sha256:80cc5ea4b547abe174d7550b82825ace40769e977cde90495df3427b3a0f4e75',
+        'sha256:80cc5ea4b5',
+        [   'cache/k8s-dns-kube-dns-amd64:1.14.8',
+            'sms.local:5000/cache/k8s-dns-kube-dns-amd64:1.14.8',
+            'sms.local:5000/cache/k8s-dns-kube-dns-amd64:latest']),
+    FakeDockerImage(
+        'sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e',
+        'sha256:da86e6ba6c',
+        [   'cache/pause-amd64:3.1',
+            'k8s.gcr.io/pause-amd64:3.1',
+            'sms.local:5000/cache/pause-amd64:3.1',
+            'sms.local:5000/cache/pause-amd64:latest',
+            'sms.local:5000/cache/pause:3.1',
+            'sms.local:5000/cache/pause:latest']),
+]
+
+
+# used to mock docker.from_env().images.list .
+class FakeLister:
+    def list(self):
+        return fakeimagelist
+
+
+# used to mock return from docker.from_env as used in showrev.containers.
+class FakeDockerEnv:
+    def __init__(self):
+        self.images = FakeLister()
+
+
+class TestContainers(unittest.TestCase):
+
+    @mock.patch('sat.showrev.containers.docker.from_env', FakeDockerEnv)
+    def test_get_dockers(self):
+        """Positive test case for get_dockers. Verifies a sorted list of returns.
+        """
+        result = sat.showrev.containers.get_dockers()
+        self.assertEqual(result, sorted(result))
+        self.assertGreater(len(result), 0)
+
+
+    @mock.patch('sat.showrev.containers.docker.from_env', FakeDockerEnv)
+    def test_get_dockers_no_match(self):
+        """get_dockers should return empty list if there was no match.
+        """
+        result = sat.showrev.containers.get_dockers('idontexist')
+        self.assertEqual(result, [])
+
+
+    @mock.patch('sat.showrev.containers.docker.from_env', FakeDockerEnv)
+    def test_get_docker_id_substring(self):
+        """get_dockers should return images whose full id contains the substr.
+        """
+        result = sat.showrev.containers.get_dockers('304735eab4e4df55b236f')
+        self.assertEqual(result[0], ['statsd-exporter', '304735eab4', 'v0.6.0'])
+
+
+    @mock.patch('sat.showrev.containers.docker.from_env', FakeDockerEnv)
+    def test_get_docker_name_substring(self):
+        """get_dockers should return images whose name contains the substr.
+        """
+        result = sat.showrev.containers.get_dockers('statsd-export')
+        self.assertEqual(result[0], ['statsd-exporter', '304735eab4', 'v0.6.0'])
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -31,6 +31,7 @@ def add_showrev_subparser(subparsers):
     Returns:
         None
     """
+
     showrev_parser = subparsers.add_parser('showrev', help='Show Shasta revision information')
     showrev_parser.add_argument(
         '--all',
@@ -38,14 +39,24 @@ def add_showrev_subparser(subparsers):
         action='store_true')
     showrev_parser.add_argument(
         '--system',
-        help='Print general Shasta version information. This is the default',
+        help='Print general Shasta version information. This is the default.',
         action='store_true')
-    showrev_parser.add_argument('--docker', help='Print running docker image versions.',
-                                action='store_true')
-    showrev_parser.add_argument('--packages', help='Print installed rpm versions.',
-                                action='store_true')
-    showrev_parser.add_argument('-e', '--substr', help='Print lines that contain the substring',
-                                default='')
+    showrev_parser.add_argument(
+        '--docker',
+        help='Print running docker image versions.',
+        action='store_true')
+    showrev_parser.add_argument(
+        '--packages', help='Print installed rpm versions.', action='store_true')
+    showrev_parser.add_argument(
+        '-s',
+        '--substr',
+        help='Show version information for components whose names or IDs contain the substring',
+        default='')
+    showrev_parser.add_argument(
+        '-p',
+        '--plain',
+        help='If applicable, do not pretty-print output.',
+        action='store_true')
 
 
 def create_parent_parser():

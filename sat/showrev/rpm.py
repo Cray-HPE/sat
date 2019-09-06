@@ -1,8 +1,10 @@
 """
-Functions for obtaining version information about docker containers/images.
+sat showrev uses the functions in this module to display information about
+rpms that are available to Shasta.
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
+
 import shlex
 import subprocess
 
@@ -29,7 +31,6 @@ def get_rpms(substr=''):
     try:
         packages = subprocess.check_output(toks).decode('utf-8').splitlines()
     except Exception as e:
-        print('ERROR: Command {} failed - subprocess raised {}'.format(cmd, str(e)))
         return None
 
     rpms = []
@@ -39,4 +40,5 @@ def get_rpms(substr=''):
     if substr:
         rpms[:] = [x for x in rpms if substr in x[0]]
 
+    rpms.sort()
     return rpms

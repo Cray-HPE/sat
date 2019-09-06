@@ -1,2 +1,3 @@
 # Add top-level requirements here and any other requirements which have version constraints
 docker
+PrettyTable>=0.7.2,<1.0
