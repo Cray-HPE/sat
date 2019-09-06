@@ -1,7 +1,7 @@
 """
 Contains structures and code that is generally useful across all of SAT.
 
-Copyright 2019, Cray Inc. All Rights Reserved.
+Copyright 2019 Cray Inc. All Rights Reserved.
 """
 
 

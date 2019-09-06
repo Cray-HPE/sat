@@ -25,7 +25,7 @@ setup(
     # This makes setuptools generate our executable script automatically for us.
     entry_points={
         'console_scripts': [
-            'sat=sat.cli:main'
+            'sat=sat.main:main'
         ]
     },
 )
