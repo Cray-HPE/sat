@@ -1,17 +1,12 @@
 """
-Contains functions for the 'showrev' subcommand.
+Functions for obtaining system-level version information.
 
-Copyright 2019, Cray Inc. All Rights Reserved.
+Copyright 2019 Cray Inc. All Rights Reserved.
 """
-
+import configparser
 import os
 import socket
-import configparser
-import subprocess
-import shlex
 from collections import OrderedDict
-
-import docker
 
 
 def get_lustre_version():
@@ -113,79 +108,3 @@ def get_system_version(substr=''):
                 return None
 
     return sysvers
-
-
-def get_dockers(substr=''):
-    """Return names and version info from installed images.
-
-    Args:
-        substr: Only return information about docker images whose name or id
-            contains the substr.
-    Returns:
-        A list of lists; each containing 3+ entries. The first entry contains
-        the docker image id. The second contains the image's base-name. The
-        third on to the end contain the image's versions.
-    """
-
-    client = docker.from_env()
-
-    ret = []
-    for image in client.images.list():
-        tags = image.tags
-        if len(tags) > 0:
-
-            # Docker id is returned like 'sha256:fffffff'
-            full_id = image.id.split(':')[-1]
-            short_id = image.short_id.split(':')[-1]
-            fields = tags[0].split(':')
-            name = fields[-2].split('/')[-1]
-
-            if not substr or substr in name or substr in full_id:
-                versions = []
-                for tag in tags:
-                    version = tag.split(':')[-1]
-                    if version not in versions and version != 'latest':
-                        versions.append(version)
-
-                if not versions:
-                    versions.append('latest')
-
-                ret.append([short_id, name] + versions)
-
-    return ret
-
-
-def get_rpms(substr=''):
-    """Collect version information about installed rpms.
-
-    Returns a list of all rpms and their versions that are installed on
-    the system.
-
-    Args:
-        substr: Only return packages that contain the substr.
-    Returns:
-        List of lists where each entry contains the name of an rpm and its
-        associated version.
-
-        Returns None if an error occurred.
-    """
-
-    format = '"%{NAME} %{VERSION}\n"'
-    cmd = 'rpm -qa --queryformat {}'.format(format)
-    toks = shlex.split(cmd)
-
-    packages = []
-    try:
-        packages = subprocess.check_output(toks).decode('utf-8').splitlines()
-    except Exception as e:
-        print('ERROR: Command {} failed - subprocess raised {}'.format(cmd, str(e)))
-        return None
-
-    rpms = []
-    for line in packages:
-        rpms.append(line.split())
-
-    if substr:
-        rpms[:] = [x for x in rpms if substr in x[0]]
-
-    return rpms
