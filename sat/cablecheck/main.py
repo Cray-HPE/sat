@@ -11,6 +11,7 @@ import subprocess
 COMMAND_LOC = "/usr/bin/"
 COMMAND_NAME = "check_hsn_cables.py"
 
+
 def do_cablecheck(args):
     """Runs the do_cablecheck command with the given arguments.
 
