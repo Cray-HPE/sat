@@ -37,8 +37,8 @@ def create_parent_parser():
 
     # Add the subparsers for the individual subcommands here
     add_cable_check_subparser(subparsers)
+    add_hwinv_subparser(subparsers)
     add_showrev_subparser(subparsers)
     add_status_subparser(subparsers)
-    add_hwinv_subparser(subparsers)
 
     return parser

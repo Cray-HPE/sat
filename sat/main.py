@@ -20,9 +20,9 @@ LOGGER = logging.getLogger(__name__)
 
 SUBCOMMAND_FUNCS = {
     'cablecheck': do_cablecheck,
+    'hwinv': do_hwinv,
     'showrev': showrev,
     'status':  do_status,
-    'hwinv': do_hwinv,
 }
 
 
