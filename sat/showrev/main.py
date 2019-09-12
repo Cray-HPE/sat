@@ -10,6 +10,9 @@ from sat import util
 from sat.showrev import containers, rpm, system
 
 
+LOGGER = logging.getLogger(__name__)
+
+
 def showrev(args):
     """Run the showrev comand with the given arguments.
 
@@ -31,14 +34,14 @@ def showrev(args):
     if args.system:
         sysvers = system.get_system_version(args.substr)
         if sysvers is None:
-            logging.error('Could not print system version information.')
+            LOGGER.error('Could not print system version information.')
             exit(1)
 
         util.pretty_print_dict(sysvers)
     if args.docker:
         dockers = containers.get_dockers(args.substr)
         if dockers is None:
-            logging.error('Could not retrieve list of running docker containers.')
+            LOGGER.error('Could not retrieve list of running docker containers.')
             exit(1)
 
         headings = None
@@ -50,7 +53,7 @@ def showrev(args):
     if args.packages:
         rpms = rpm.get_rpms(args.substr)
         if rpms is None:
-            logging.error('Could not retrieve list of installed rpms.')
+            LOGGER.error('Could not retrieve list of installed rpms.')
             exit(1)
 
         headings = None

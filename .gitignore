@@ -14,3 +14,5 @@ venv
 
 # Other files
 *.swp
+
+nosetests.xml
