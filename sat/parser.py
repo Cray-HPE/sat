@@ -68,6 +68,18 @@ def create_parent_parser():
     """
 
     parser = ArgumentParser(description='SAT - The Shasta Admin Toolkit')
+
+    parser.add_argument(
+        '--logfile',
+        help='Set location of logs for this run',
+        default='/var/log/sat/sat.log')
+
+    parser.add_argument(
+        '--loglevel',
+        help='Set minimum log severity to report for this run.',
+        choices=['debug', 'info', 'warning', 'error', 'critical'],
+        default='debug')
+
     subparsers = parser.add_subparsers(metavar='command', dest='command')
 
     # Add the subparsers for the individual subcommands here

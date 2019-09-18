@@ -3,11 +3,14 @@ Entry point for the command-line interface.
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
+
+import logging
 import sys
 
 from sat.parser import create_parent_parser
 from sat.cablecheck.main import do_cablecheck
 from sat.showrev.main import showrev
+
 
 SUBCOMMAND_FUNCS = {
     'cablecheck': do_cablecheck,
@@ -31,6 +34,19 @@ def main():
 
     # parse_args will catch any invalid values of arg.command
     subcommand = SUBCOMMAND_FUNCS[args.command]
+
+    # Initialize logging for sat
+    logging.basicConfig(
+        filename=args.logfile,
+        level=args.loglevel.upper(),
+        format='%(levelname)s %(asctime)s %(message)s')
+
+    logformatter = logging.Formatter('%(levelname)s %(asctime)s %(message)s')
+    rootlogger = logging.getLogger()
+
+    consolehandler = logging.StreamHandler(sys.stderr)
+    consolehandler.setFormatter(logformatter)
+    rootlogger.addHandler(consolehandler)
 
     subcommand(args)
 
