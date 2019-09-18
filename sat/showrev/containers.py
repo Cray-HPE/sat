@@ -3,6 +3,7 @@ Functions for obtaining version information about docker containers/images.
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
+
 import docker
 
 
@@ -41,6 +42,7 @@ def get_dockers(substr=''):
                 if not versions:
                     versions.append('latest')
 
-                ret.append([short_id, name] + versions)
+                ret.append([name, short_id] + versions)
 
+    ret.sort()
     return ret

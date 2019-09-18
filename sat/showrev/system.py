@@ -3,6 +3,7 @@ Functions for obtaining system-level version information.
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
+
 import configparser
 import os
 import socket
@@ -79,32 +80,32 @@ def get_system_version(substr=''):
         substr: Only return information about docker images whose name or id
             contains the substr.
     Returns:
-        An ordered dictionary that contains version information about the
-        various Shasta system components.
+        A list that contains version information about the various Shasta
+        system components.
 
         Returns None if an error occurred.
     """
     sysvers = OrderedDict()
-    funcs = OrderedDict()
+    fields = OrderedDict()
 
-    funcs['Lustre'] = get_lustre_version
-    funcs['Kernel'] = get_kernel_version
-    funcs['Site name'] = get_site_name
-    funcs['System type'] = get_system_type
-    funcs['Interconnect'] = get_interconnect
-    funcs['Install date'] = get_install_date
-    funcs['System name'] = get_system_name
-    funcs['Build version'] = get_build_version
-    funcs['SLES version'] = get_sles_version
-    funcs['CLE version'] = get_cle_version
-    funcs['WLM version'] = get_wlm_version
+    fields['Lustre'] = get_lustre_version
+    fields['Kernel'] = get_kernel_version
+    fields['Site name'] = get_site_name
+    fields['System type'] = get_system_type
+    fields['Interconnect'] = get_interconnect
+    fields['Install date'] = get_install_date
+    fields['System name'] = get_system_name
+    fields['Build version'] = get_build_version
+    fields['SLES version'] = get_sles_version
+    fields['CLE version'] = get_cle_version
+    fields['WLM version'] = get_wlm_version
 
-    for func in funcs:
-        if not substr or substr in func:
+    for field in fields:
+        if not substr or substr in field:
             try:
-                sysvers[func] = funcs[func]()
+                sysvers[field] = fields[field]()
             except Exception as e:
-                print('ERROR: Function {} raised {}'.format(func, str(e)))
+                print('ERROR: Function {} raised {}'.format(field, str(e)))
                 return None
 
     return sysvers
