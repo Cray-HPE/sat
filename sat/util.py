@@ -25,18 +25,23 @@ def pretty_print_list(lists, headings=None):
             this argument is not None.
     """
 
+    pt = PrettyTable()
+    pt.border = False
+
     if headings:
-        pt = PrettyTable()
-
         pt.field_names = headings
-        for l in lists:
-            pt.add_row(l)
-
-        print(pt)
     else:
-        for l in lists:
-            s = ''
-            for i in l:
-                s += '{:<40} '.format(str(i))
+        pt.header = False
 
-            print(s)
+        # field_names needs to be populated for the alignment to work
+        if len(lists[0]) > 0:
+            pt.field_names = lists[0]
+
+    # align left
+    for x in pt.align:
+        pt.align[x] = 'l'
+
+    for l in lists:
+        pt.add_row(l)
+
+    print(pt)

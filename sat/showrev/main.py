@@ -40,7 +40,7 @@ def showrev(args):
             exit(1)
 
         headings = None
-        if not args.plain:
+        if not args.no_headings:
             headings = ['name', 'short-id', 'version']
 
         util.pretty_print_list(dockers, headings)
@@ -52,7 +52,7 @@ def showrev(args):
             exit(1)
 
         headings = None
-        if not args.plain:
+        if not args.no_headings:
             headings = ['name', 'version']
 
         util.pretty_print_list(rpms, headings)
