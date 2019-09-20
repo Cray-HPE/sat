@@ -53,9 +53,9 @@ def add_showrev_subparser(subparsers):
         help='Show version information for components whose names or IDs contain the substring',
         default='')
     showrev_parser.add_argument(
-        '-p',
-        '--plain',
-        help='If applicable, do not pretty-print output.',
+        '-n',
+        '--no-headings',
+        help='If applicable, do not print table headings.',
         action='store_true')
 
 
