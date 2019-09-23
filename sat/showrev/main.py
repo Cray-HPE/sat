@@ -4,6 +4,8 @@ The main entry point for the showrev subcommand.
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
 
+import logging
+
 from sat import util
 from sat.showrev import containers, rpm, system
 
@@ -29,14 +31,14 @@ def showrev(args):
     if args.system:
         sysvers = system.get_system_version(args.substr)
         if sysvers is None:
-            print('ERROR: Could not print system version information.')
+            logging.error('Could not print system version information.')
             exit(1)
 
         util.pretty_print_dict(sysvers)
     if args.docker:
         dockers = containers.get_dockers(args.substr)
         if dockers is None:
-            print('ERROR: Could not retrieve list of running docker containers.')
+            logging.error('Could not retrieve list of running docker containers.')
             exit(1)
 
         headings = None
@@ -48,7 +50,7 @@ def showrev(args):
     if args.packages:
         rpms = rpm.get_rpms(args.substr)
         if rpms is None:
-            print('ERROR: Could not retrieve list of installed rpms.')
+            logging.error('Could not retrieve list of installed rpms.')
             exit(1)
 
         headings = None
