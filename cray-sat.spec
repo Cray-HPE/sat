@@ -1,6 +1,7 @@
 # Spec file for Shasta Admin Toolkit (SAT)
 # Copyright 2019, Cray Inc. All Rights Reserved
 %define ansible_framework_dir /opt/cray/crayctl/ansible_framework
+%define satmandir %{_mandir}/man8
 
 Name: cray-sat
 Version: 0.3.0
@@ -16,6 +17,7 @@ Requires: python3-docker
 Requires: python3-requests < 3.0
 Requires: python3-PrettyTable == 0.7.2, python3-PrettyTable < 1.0
 Requires: python3-inflect < 3.0
+BuildRequires: python3-docutils
 
 %description
 The Shasta Admin Toolkit (SAT) is a command-line utility to perform various
@@ -40,6 +42,9 @@ Admin Toolkit (SAT).
 
 %build
 python3 setup.py build
+cd docs/man
+make
+cd -
 
 %install
 python3 setup.py install -O1 --root="$RPM_BUILD_ROOT" --record=INSTALLED_FILES \
@@ -53,6 +58,9 @@ install -m 644 etc/sat.ini %{buildroot}/etc/sat.ini
 # Install ansible content for crayctldeploy subpackage
 install -m 755 -d %{buildroot}/%{ansible_framework_dir}/roles
 cp -r ansible/roles/cray_sat %{buildroot}/%{ansible_framework_dir}/roles/
+
+install -m 755 -d %{buildroot}%{satmandir}/
+cp docs/man/*.8 %{buildroot}%{satmandir}/
 
 # This is a hack taken from the DST-EXAMPLES / example-rpm-python repo to get
 # the package directory, i.e. /usr/lib/python3.6/site-packages/sat which is not
@@ -68,6 +76,7 @@ cat INSTALLED_FILES | grep __pycache__ | xargs dirname | xargs dirname | uniq >>
 %files -f INSTALLED_FILES
 %dir /var/log/cray
 %config(noreplace) /etc/sat.ini
+%{satmandir}/*.8.gz
 
 %files crayctldeploy
 %{ansible_framework_dir}/roles/cray_sat
