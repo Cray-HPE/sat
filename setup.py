@@ -20,7 +20,7 @@ setup(
     packages=find_packages(exclude=['tests']),
     python_requires='>=3, <4',
     # Add top-level dependencies (e.g. requests) for this package
-    install_requires=['docker', 'PrettyTable>=0.7.2'],
+    install_requires=['docker', 'requests < 3.0', 'prettytable >= 0.7.2, < 1.0'],
 
     # This makes setuptools generate our executable script automatically for us.
     entry_points={
