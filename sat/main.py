@@ -10,11 +10,13 @@ import sys
 from sat.parser import create_parent_parser
 from sat.cablecheck.main import do_cablecheck
 from sat.showrev.main import showrev
+from sat.status.main import do_status
 
 
 SUBCOMMAND_FUNCS = {
     'cablecheck': do_cablecheck,
-    'showrev': showrev
+    'showrev': showrev,
+    'status':  do_status,
 }
 
 
