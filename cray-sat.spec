@@ -3,7 +3,7 @@
 %define ansible_framework_dir /opt/cray/crayctl/ansible_framework
 
 Name: cray-sat
-Version: 0.2.0
+Version: 0.3.0
 Release: %(echo ${BUILD_METADATA})
 # TODO: Determine the correct license to use for SAT
 License: Cray Proprietary
