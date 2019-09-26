@@ -14,7 +14,7 @@ BuildRoot: %{_topdir}
 Vendor: Cray Inc.
 Requires: python3-docker
 Requires: python3-requests < 3.0
-Requires: python3-PrettyTable == 0.7.2, < 1.0
+Requires: python3-PrettyTable == 0.7.2, python3-PrettyTable < 1.0
 
 %description
 The Shasta Admin Toolkit (SAT) is a command-line utility to perform various
