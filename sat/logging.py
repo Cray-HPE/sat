@@ -3,12 +3,13 @@ Sets up logging for SAT.
 Copyright 2019 Cray Inc. All Rights Reserved
 """
 import logging
+import os
 
 from sat.config import get_config_value
 
 CONSOLE_LOG_FORMAT = '%(levelname)s: %(message)s'
 FILE_LOG_FORMAT = '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
-
+LOGGER = logging.getLogger(__name__)
 
 def _add_console_handler(logger, log_level):
     """Adds a handler that prints to stderr to the given logger
@@ -84,6 +85,13 @@ def configure_logging(args):
     root_logger.handlers = []
 
     _add_console_handler(root_logger, log_stderr_level)
+
+    log_dir = os.path.dirname(log_file_name)
+    try:
+        os.makedirs(log_dir, exist_ok=True)
+    except OSError as err:
+        LOGGER.error("Unable to create log directory '%s': %s", log_dir, err)
+        return
 
     file_handler = logging.FileHandler(filename=log_file_name)
     file_handler.setLevel(log_file_level)

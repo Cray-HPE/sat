@@ -4,6 +4,7 @@ Unit tests for sat.logging
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
 import logging
+import os
 import unittest
 from unittest import mock
 
@@ -26,7 +27,7 @@ class TestLogging(unittest.TestCase):
         self.get_logger_patcher.start()
 
         config_values = self.config_values = {
-            'log_file_name': '/var/log/sat/sat.log',
+            'log_file_name': '/var/log/cray/sat.log',
             'log_file_level': 'debug',
             'log_stderr_level': 'warning'
         }
@@ -93,19 +94,23 @@ class TestLogging(unittest.TestCase):
                          'WARNING: {}'.format(warning_message))
 
     @mock.patch('logging.open', mock.MagicMock)
-    def test_configure_logging_no_args(self):
+    @mock.patch('os.makedirs')
+    def test_configure_logging_no_args(self, mock_makedirs):
         """Test configure_logging function."""
         args = mock.Mock()
         args.logfile = None
         args.loglevel = None
         configure_logging(args)
 
+        log_dir = os.path.dirname(self.config_values['log_file_name'])
+        mock_makedirs.assert_called_once_with(log_dir, exist_ok=True)
+
         stream_handler, file_handler = self.assert_configured_handlers()
 
         self.assertEqual(stream_handler.level, logging.WARNING)
 
         self.assertEqual(file_handler.level, logging.DEBUG)
-        self.assertEqual(file_handler.baseFilename, '/var/log/sat/sat.log')
+        self.assertEqual(file_handler.baseFilename, self.config_values['log_file_name'])
 
         warning_message = 'This is a warning'
         with self.assertLogs(self.logger, logging.WARNING) as cm:
@@ -119,12 +124,16 @@ class TestLogging(unittest.TestCase):
             file_handler.format(cm.records[0]))
 
     @mock.patch('logging.open', mock.MagicMock)
-    def test_configure_logging_with_args(self):
+    @mock.patch('os.makedirs')
+    def test_configure_logging_with_args(self, mock_makedirs):
         """Test configure_logging function."""
         args = mock.Mock()
         args.logfile = '/my/custom/log/location'
         args.loglevel = 'info'
         configure_logging(args)
+
+        log_dir = os.path.dirname(args.logfile)
+        mock_makedirs.assert_called_once_with(log_dir, exist_ok=True)
 
         stream_handler, file_handler = self.assert_configured_handlers()
 
@@ -132,6 +141,21 @@ class TestLogging(unittest.TestCase):
 
         self.assertEqual(file_handler.level, logging.INFO)
         self.assertEqual(file_handler.baseFilename, args.logfile)
+
+    @mock.patch('os.makedirs', side_effect=OSError)
+    def test_configure_logging_directory_fail(self, _):
+        """Test configure_logging with a failure to create the log directory"""
+        args = mock.Mock()
+        args.logfile = None
+        args.loglevel = None
+        configure_logging(args)
+
+        # Exactly one handler of type StreamHandler should have been added.
+        self.assertEqual(len(self.logger.handlers), 1)
+        handler = self.logger.handlers[0]
+        self.assertIsInstance(handler, logging.StreamHandler)
+        self.assertEqual(handler.level, logging.WARNING)
+
 
 
 if __name__ == '__main__':
