@@ -47,7 +47,11 @@ SAT_CONFIG_SPEC = {
         'log_file_name': OptionSpec(str, '/var/log/cray/sat.log', None),
         'log_file_level': OptionSpec(str, 'INFO', validate_log_level),
         'log_stderr_level': OptionSpec(str, 'WARNING', validate_log_level),
-        'site_info': OptionSpec(str, '/opt/cray/etc/site_info.yml', None),
+        'site_info': OptionSpec(str, '/opt/cray/etc/site_info.yml', None)
+    },
+    'redfish': {
+        'username': OptionSpec(str, 'user', None),
+        'password': OptionSpec(str, 'pass', None)
     }
 }
 
