@@ -92,14 +92,14 @@ def create_parent_parser():
 
     parser.add_argument(
         '--logfile',
-        help='Set location of logs for this run',
-        default='/var/log/sat/sat.log')
+        help='Set location of logs for this run. Overrides value set in config file.')
 
     parser.add_argument(
         '--loglevel',
-        help='Set minimum log severity to report for this run.',
-        choices=['debug', 'info', 'warning', 'error', 'critical'],
-        default='debug')
+        help='Set minimum log severity to report for this run. This level applies to '
+             'messages logged to stderr and to the log file. Overrides values set in '
+             'config file.',
+        choices=['debug', 'info', 'warning', 'error', 'critical'])
 
     subparsers = parser.add_subparsers(metavar='command', dest='command')
 

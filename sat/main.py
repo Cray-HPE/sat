@@ -9,9 +9,13 @@ import sys
 
 from sat.parser import create_parent_parser
 from sat.cablecheck.main import do_cablecheck
+from sat.config import load_config
+from sat.logging import bootstrap_logging, configure_logging
 from sat.showrev.main import showrev
 from sat.status.main import do_status
 
+
+LOGGER = logging.getLogger(__name__)
 
 SUBCOMMAND_FUNCS = {
     'cablecheck': do_cablecheck,
@@ -26,8 +30,13 @@ def main():
     Returns:
         None. Calls sys.exit().
     """
+    bootstrap_logging()
+
     parser = create_parent_parser()
     args = parser.parse_args()
+
+    load_config()
+    configure_logging(args)
 
     # Print help info if executed without a subcommand
     if args.command is None:
@@ -36,19 +45,6 @@ def main():
 
     # parse_args will catch any invalid values of arg.command
     subcommand = SUBCOMMAND_FUNCS[args.command]
-
-    # Initialize logging for sat
-    logging.basicConfig(
-        filename=args.logfile,
-        level=args.loglevel.upper(),
-        format='%(levelname)s %(asctime)s %(message)s')
-
-    logformatter = logging.Formatter('%(levelname)s %(asctime)s %(message)s')
-    rootlogger = logging.getLogger()
-
-    consolehandler = logging.StreamHandler(sys.stderr)
-    consolehandler.setFormatter(logformatter)
-    rootlogger.addHandler(consolehandler)
 
     subcommand(args)
 
