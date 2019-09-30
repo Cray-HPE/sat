@@ -3,3 +3,4 @@ docker
 requests < 3.0
 prettytable >= 0.7.2, < 1.0
 inflect >= 2.1.0, < 3.0
+docutils
