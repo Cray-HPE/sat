@@ -3,21 +3,11 @@ Unit tests for sat.status
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
+from copy import deepcopy
 
 import unittest
-from unittest import mock
-
 
 import sat.status.main
-
-
-# substitute for the parsed json API response
-class FakeResponse:
-    def __init__(self, rsp):
-        self._rsp = dict(Components=rsp)
-
-    def json(self):
-        return self._rsp
 
 
 # a fake table row, representing a fake node
@@ -31,8 +21,8 @@ def row(**kwargs):
 
 
 def sample_nodes():
-    return (row(ID='z0'), row(ID='aa0', NID=42),
-            row(ID='q0', NID=9), row(ID='ab0', NID=20))
+    return [row(ID='z0'), row(ID='aa0', NID=42),
+            row(ID='q0', NID=9), row(ID='ab0', NID=20)]
 
 
 def sample_nodes_sorted(sort_key='ID', reverse=False):
@@ -44,45 +34,39 @@ TEST_HDRS = ('abc', 'bcd', 'bde', 'xyz')
 
 
 class TestStatusBase(unittest.TestCase):
-    @mock.patch('sat.status.main.api_query', return_value=FakeResponse([]))
-    def test_empty(self, _):
+
+    def test_empty(self):
         """make_raw_table() with an empty list of nodes
 
         make_raw_table() should return an empty table when the list of nodes
         is empty
         """
-
-        raw_table = sat.status.main.make_raw_table(0, False, {})
+        raw_table = sat.status.main.make_raw_table([], 0, False, {})
         self.assertEqual(raw_table, [])
 
-    @mock.patch('sat.status.main.api_query', return_value=FakeResponse([row()]))
-    def test_one(self, _):
+    def test_one(self):
         """make_raw_table() with a single node
 
         make_raw_table() should return a table with a single row and the same
         number of columns as there are column headers
         """
-
-        raw_table = sat.status.main.make_raw_table(0, False, {})
+        raw_table = sat.status.main.make_raw_table([row()], 0, False, {})
         self.assertEqual(len(raw_table), 1)
         self.assertEqual(len(raw_table[0]), len(sat.status.main.HEADERS))
 
-    @mock.patch('sat.status.main.api_query', return_value=FakeResponse(sample_nodes()))
-    def test_many_default(self, _):
+    def test_many_default(self):
         """make_raw_table() with many nodes, default sorting
 
         make_raw_table() should return a table with the same number of rows as
         nodes, each row should have the same number of columns as the column
         headers, and sorted according to the first column, ascending order.
         """
-
         nodes = sample_nodes()
-        raw_table = sat.status.main.make_raw_table(0, False, {})
-
+        raw_table = sat.status.main.make_raw_table(deepcopy(nodes), 0, False, {})
         self.assertEqual(len(raw_table), len(nodes))
 
         self.assertTrue(
-            all((len(row) == len(sat.status.main.HEADERS) for row in raw_table)))
+            all(len(row) == len(sat.status.main.HEADERS) for row in raw_table))
 
         self.assertEqual(tuple(zip(*raw_table))[0], tuple(
             [row['ID'] for row in sample_nodes_sorted()]))
@@ -91,18 +75,15 @@ class TestStatusBase(unittest.TestCase):
             for i, key in enumerate(sat.status.main.APIKEYS):
                 self.assertEqual(node[key], row[i])
 
-    @mock.patch('sat.status.main.api_query', return_value=FakeResponse(sample_nodes()))
-    def test_many_reverse(self, _):
+    def test_many_reverse(self):
         """make_raw_table() with many nodes, default sort column, reversed
 
         make_raw_table() should return a table with the same number of rows as
         nodes, each row should have the same number of columns as the column
         headers, and sorted according to the first column, descending order.
         """
-
         nodes = sample_nodes()
-        raw_table = sat.status.main.make_raw_table(0, True, {})
-
+        raw_table = sat.status.main.make_raw_table(deepcopy(nodes), 0, True, {})
         self.assertEqual(len(raw_table), len(nodes))
 
         self.assertTrue(
@@ -115,22 +96,19 @@ class TestStatusBase(unittest.TestCase):
             for i, key in enumerate(sat.status.main.APIKEYS):
                 self.assertEqual(node[key], row[i])
 
-    @mock.patch('sat.status.main.api_query', return_value=FakeResponse(sample_nodes()))
-    def test_many_sort_other(self, _):
+    def test_many_sort_other(self):
         """make_raw_table() with many nodes, sort by NID
 
         make_raw_table() should return a table with the same number of rows as
         nodes, each row should have the same number of columns as the column
         headers, and sorted according to the second column, ascending order.
         """
-
         nodes = sample_nodes()
-        raw_table = sat.status.main.make_raw_table(1, False, {})
-
+        raw_table = sat.status.main.make_raw_table(deepcopy(nodes), 1, False, {})
         self.assertEqual(len(raw_table), len(nodes))
 
         self.assertTrue(
-            all((len(row) == len(sat.status.main.HEADERS) for row in raw_table)))
+            all(len(row) == len(sat.status.main.HEADERS) for row in raw_table))
 
         self.assertEqual(tuple(zip(*raw_table))[1], tuple(
             [row['NID'] for row in sample_nodes_sorted(sort_key='NID')]))
@@ -139,44 +117,38 @@ class TestStatusBase(unittest.TestCase):
             for i, key in enumerate(sat.status.main.APIKEYS):
                 self.assertEqual(node[key], row[i])
 
-    @mock.patch('sat.status.main.api_query', return_value=FakeResponse(sample_nodes()))
-    def test_filter_no_match(self, _):
+    def test_filter_no_match(self):
         """make_raw_table() filtered with no matches
 
         make_raw_table() should return an empty table.
         """
-
-        nodes = sample_nodes()
         raw_table = sat.status.main.make_raw_table(
+            sample_nodes(),
             0, False, dict(ID=frozenset([('q', 99)])))
 
         self.assertEqual(len(raw_table), 0)
 
-    @mock.patch('sat.status.main.api_query', return_value=FakeResponse(sample_nodes()))
-    def test_filter_xname(self, _):
+    def test_filter_xname(self):
         """make_raw_table() filtered by a single xname
 
         make_raw_table() should return a table with a single row matching the xname
         filter.
         """
-
-        nodes = sample_nodes()
         raw_table = sat.status.main.make_raw_table(
+            sample_nodes(),
             0, False, dict(ID=frozenset([('q', 0)])))
 
         self.assertEqual(len(raw_table), 1)
         self.assertEqual(raw_table[0][0], 'q0')
 
-    @mock.patch('sat.status.main.api_query', return_value=FakeResponse(sample_nodes()))
-    def test_filter_xnames(self, _):
+    def test_filter_xnames(self):
         """make_raw_table() filtered by multiple xnames
 
         make_raw_table() should return a table with rows matching the xname
         filter.
         """
-
-        nodes = sample_nodes()
         raw_table = sat.status.main.make_raw_table(
+            sample_nodes(),
             0, False, dict(ID=frozenset([('q', 0), ('aa', 0)])))
 
         self.assertEqual(len(raw_table), 2)
@@ -184,31 +156,28 @@ class TestStatusBase(unittest.TestCase):
         self.assertEqual(
             frozenset(tuple(zip(*raw_table))[0]), frozenset(['aa0', 'q0']))
 
-    @mock.patch('sat.status.main.api_query', return_value=FakeResponse(sample_nodes()))
-    def test_filter_nid(self, _):
+    def test_filter_nid(self):
         """make_raw_table() filtered by a single nid
 
         make_raw_table() should return a table with a single row matching the nid
         filter.
         """
-
-        nodes = sample_nodes()
         raw_table = sat.status.main.make_raw_table(
+            sample_nodes(),
             0, False, dict(NID=frozenset(['42'])))
 
         self.assertEqual(len(raw_table), 1)
         self.assertEqual(raw_table[0][1], 42)
 
-    @mock.patch('sat.status.main.api_query', return_value=FakeResponse(sample_nodes()))
-    def test_filter_nids(self, _):
+    def test_filter_nids(self):
         """make_raw_table() filtered by multiple nids
 
         make_raw_table() should return a table with rows matching the nid
         filter.
         """
 
-        nodes = sample_nodes()
         raw_table = sat.status.main.make_raw_table(
+            sample_nodes(),
             0, False, dict(NID=frozenset(['42', '1'])))
 
         self.assertEqual(len(raw_table), 2)
@@ -216,17 +185,18 @@ class TestStatusBase(unittest.TestCase):
         self.assertEqual(
             frozenset(tuple(zip(*raw_table))[1]), frozenset([1, 42]))
 
-    @mock.patch('sat.status.main.api_query', return_value=FakeResponse(sample_nodes()))
-    def test_filter_both(self, _):
+    def test_filter_both(self):
         """make_raw_table() filtered by xname and nid
 
         make_raw_table() should return a table with a rows matching the xname
         and nid filters.
         """
 
-        nodes = sample_nodes()
-        raw_table = sat.status.main.make_raw_table(1, False, dict(
-            ID=frozenset([('z', 0), ('aa', 0)]), NID=frozenset(['9', '42'])))
+        raw_table = sat.status.main.make_raw_table(
+            sample_nodes(),
+            1, False,
+            dict(ID=frozenset([('z', 0), ('aa', 0)]), NID=frozenset(['9', '42']))
+        )
 
         self.assertEqual(len(raw_table), 3)
 
@@ -236,7 +206,6 @@ class TestStatusBase(unittest.TestCase):
     def test_parse_sortcol_null(self):
         """parse_sortcol() should return 0 when passed an empty string
         """
-
         self.assertEqual(sat.status.main.parse_sortcol('', TEST_HDRS), 0)
 
     def test_parse_sortcol_int_ok(self):
@@ -246,7 +215,6 @@ class TestStatusBase(unittest.TestCase):
         of an integer, and that integer is within the range of 1 to the table
         width.
         """
-
         parse_sortcol = sat.status.main.parse_sortcol
         n = len(TEST_HDRS)
 
