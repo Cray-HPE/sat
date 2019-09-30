@@ -4,16 +4,44 @@ The main entry point for the hwinv subcommand.
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
 import logging
-from prettytable import PrettyTable
 import sys
 
 from sat.apiclient import APIError, HSMClient
+from sat.hwinv.system import System
 
 LOGGER = logging.getLogger(__name__)
 
 
+def set_default_args(args):
+    """Defaults args to '--list-all' and '--summarize-all' if none specified.
+
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this subcommand.
+
+    Returns:
+        None. Modifies `args` given as input.
+    """
+    # Extract all the arguments that start with the word 'list'
+    list_args = {arg: val for arg, val in vars(args).items()
+                 if arg.startswith('list')}
+    no_list_args = not any(val for val in list_args.values())
+
+    # Extract all the arguments that start with the word 'summarize'
+    summarize_args = {arg: val for arg, val in vars(args).items()
+                      if arg.startswith('summarize')}
+    no_summarize_args = not any(val for val in summarize_args.values())
+
+    # The default behavior of hwinv is to summarize and list all components
+    if no_list_args and no_summarize_args:
+        LOGGER.debug("No '--summarize' or '--list' options specified. Defaulting to "
+                     "'--summarize-all' and '--list-all'.")
+        args.list_all = True
+        args.summarize_all = True
+
+
 def do_hwinv(args):
-    """Execute the hwinv command with the given arguments.
+    """Executes the hwinv command with the given arguments.
 
     Args:
         args: The argparse.Namespace object containing the parsed arguments
@@ -23,6 +51,7 @@ def do_hwinv(args):
         None
     """
     LOGGER.debug('do_hwinv received the following args: %s', args)
+    set_default_args(args)
 
     client = HSMClient()
 
@@ -38,17 +67,6 @@ def do_hwinv(args):
         LOGGER.error('Failed to parse JSON from hardware inventory response: %s', err)
         sys.exit(1)
 
-    # TODO: Implement actual options for display.
-    # The code below is just a placeholder for the real functionality that needs
-    # to be implemented for hwinv output. It does demonstrate the ability to
-    # extract and display information from HSM's hardware inventory database.
-    nodes = [component for component in response_json if component['Type'] == 'Node']
-
-    LOGGER.warning('Parsing of hwinv options not implemented. Showing table of nodes.')
-
-    pt = PrettyTable()
-    pt.field_names = ['xname', 'serial number']
-    for node in nodes:
-        pt.add_row([node['ID'], node['PopulatedFRU']['NodeFRUInfo']['SerialNumber']])
-
-    print(pt)
+    full_system = System(response_json, args)
+    full_system.parse_all()
+    print(full_system.get_all_output())
