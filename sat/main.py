@@ -10,6 +10,7 @@ import sys
 from sat.parser import create_parent_parser
 from sat.cablecheck.main import do_cablecheck
 from sat.config import load_config
+from sat.hwinv.main import do_hwinv
 from sat.logging import bootstrap_logging, configure_logging
 from sat.showrev.main import showrev
 from sat.status.main import do_status
@@ -21,6 +22,7 @@ SUBCOMMAND_FUNCS = {
     'cablecheck': do_cablecheck,
     'showrev': showrev,
     'status':  do_status,
+    'hwinv': do_hwinv,
 }
 
 

@@ -11,6 +11,7 @@ CONSOLE_LOG_FORMAT = '%(levelname)s: %(message)s'
 FILE_LOG_FORMAT = '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
 LOGGER = logging.getLogger(__name__)
 
+
 def _add_console_handler(logger, log_level):
     """Adds a handler that prints to stderr to the given logger
 
