@@ -1,0 +1,3 @@
+# Top-level requirements for building sat rpm.
+# Copyright 2019 Cray Inc. All Rights Reserved.
+docutils
