@@ -9,6 +9,13 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
+with open(path.join(here, 'requirements.txt'), encoding='utf-8') as f:
+    install_requires = []
+    for line in f.readlines():
+        commentless_line = line.split('#', 1)[0].strip()
+        if commentless_line:
+            install_requires.append(commentless_line)
+
 setup(
     name='sat',
     version='0.3.0',
@@ -19,8 +26,8 @@ setup(
     author='Cray, Inc.',
     packages=find_packages(exclude=['tests']),
     python_requires='>=3, <4',
-    # Add top-level dependencies (e.g. requests) for this package
-    install_requires=['docker', 'requests < 3.0', 'prettytable >= 0.7.2, < 1.0'],
+    # Top-level dependencies are parsed from requirements.txt
+    install_requires=install_requires,
 
     # This makes setuptools generate our executable script automatically for us.
     entry_points={
