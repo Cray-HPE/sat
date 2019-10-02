@@ -19,7 +19,7 @@ APIHSM = 'apis/smd/hsm/v1/'
 
 
 APIKEYS = ('ID', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Role', 'NetType')
-HEADERS = ('XName', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Role', 'Net Type')
+HEADERS = ('xname', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Role', 'Net Type')
 
 
 class UsageError(Exception):
@@ -245,7 +245,7 @@ def do_status(args):
     """Displays node status.
 
     Results are sorted by the "sort_column" member of args, which defaults
-    to xname. Xnames are tokenized for the purposes of sorting, so that their
+    to xname. xnames are tokenized for the purposes of sorting, so that their
     numeric elements are sorted by their value, not lexicographically. Sort
     order is reversed if the "reverse" member of args is True.
 
