@@ -11,3 +11,10 @@ pycodestyle can be installed with 'pip3 install pycodestyle'.
 
 Rule 2:
 80 chars per line if you can keep it pretty, 120 max.
+
+Rule 3:
+Use Google-style docstrings when writing python-docstrings, except use 4
+spaces for indentation. A description for Google-style can be found at the
+link below.
+
+http://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings
