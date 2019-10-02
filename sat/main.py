@@ -7,11 +7,12 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 import logging
 import sys
 
-from sat.parser import create_parent_parser
 from sat.cablecheck.main import do_cablecheck
 from sat.config import load_config
 from sat.hwinv.main import do_hwinv
 from sat.logging import bootstrap_logging, configure_logging
+from sat.parser import create_parent_parser
+from sat.setrev.main import setrev
 from sat.showrev.main import showrev
 from sat.status.main import do_status
 
@@ -21,6 +22,7 @@ LOGGER = logging.getLogger(__name__)
 SUBCOMMAND_FUNCS = {
     'cablecheck': do_cablecheck,
     'hwinv': do_hwinv,
+    'setrev': setrev,
     'showrev': showrev,
     'status':  do_status,
 }

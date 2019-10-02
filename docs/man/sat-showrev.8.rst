@@ -49,6 +49,10 @@ These options must be specified after the command.
 **-n, --no-headings**
         If applicable, do not print table headings.
 
+**--sitefile** *file*
+        Specify custom site information file printed by --system. This file
+        must be in a yaml format.
+
 **-h, --help**
         Print the help message for 'sat showrev'.
 

@@ -15,7 +15,7 @@ def add_showrev_subparser(subparsers):
         None
     """
 
-    showrev_parser = subparsers.add_parser('showrev', help='Show Shasta revision information')
+    showrev_parser = subparsers.add_parser('showrev', help='Show Shasta revision information.')
     showrev_parser.add_argument(
         '--all',
         help='Print everything. Equivalent to specifying --system, --docker, and --packages.',
@@ -33,10 +33,14 @@ def add_showrev_subparser(subparsers):
     showrev_parser.add_argument(
         '-s',
         '--substr',
-        help='Show version information for components whose names or IDs contain the substring',
+        help='Show version information for components whose names or IDs contain the substring.',
         default='')
     showrev_parser.add_argument(
         '-n',
         '--no-headings',
         help='If applicable, do not print table headings.',
         action='store_true')
+    showrev_parser.add_argument(
+        '--sitefile',
+        help='Specify custom site information file printed by --system.',
+        default='')

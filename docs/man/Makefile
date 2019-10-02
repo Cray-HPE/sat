@@ -1,4 +1,4 @@
-all: sat.8 sat-status.8 sat-showrev.8 sat-cablecheck.8
+all: sat.8 sat-status.8 sat-showrev.8 sat-cablecheck.8 sat-setrev.8
 
 %.8: %.8.rst
 	rst2man.py $< $@
