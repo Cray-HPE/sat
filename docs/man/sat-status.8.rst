@@ -33,7 +33,7 @@ These options must be specified after the command.
         (starting at 1). The column can be abbreviated if unambiguous.
         If an ambiguous abbreviation is given, the first matching column
         will be selected.
-        Some columns may contain whitespace. If whitespace is necessary to
+        Some columns may contain whitespace. If whitespace is necessary
         to unambiguously single out such a column, the whitespace may be
         included by wrapping the column name or abbreviation in quotes.
 
@@ -41,8 +41,8 @@ These options must be specified after the command.
         Reverses the order of the nodes.
 
 **-x, --xnames**
-        Selects nodes to report from a comma-separated list of XNames, or a single
-        XName. Any case may be used, and leading zeros from the integer parts will
+        Selects nodes to report from a comma-separated list of xnames, or a single
+        xname. Any case may be used, and leading zeros from the integer parts will
         be removed before matching. May be used with **--nids**.
 
 **-n, --nids**
