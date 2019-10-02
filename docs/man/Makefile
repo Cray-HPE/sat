@@ -1,7 +1,9 @@
-all:
-	rst2man.py sat.8.rst sat.8
-	rst2man.py sat-showrev.8.rst sat-showrev.8
-	rst2man.py sat-cablecheck.8.rst sat-cablecheck.8
+all: sat.8 sat-status.8 sat-showrev.8 sat-cablecheck.8
+
+%.8: %.8.rst
+	rst2man.py $< $@
 
 clean:
 	rm -f *.8
+
+.PHONY: all clean
