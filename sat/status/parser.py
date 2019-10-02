@@ -22,3 +22,11 @@ def add_status_subparser(subparsers):
                                help='Sort by the selected column. The default is to sort by xname. '
                                     'May be specified by the (case insensitive) column, or by index '
                                     '(starting at 1). The column can be abbreviated if unambiguous.')
+    status_parser.add_argument('-x', '--xnames',
+                               help='Filter list of nodes to show only those with xnames specified '
+                                    'with this argument. A single xname may be given, or a comma-'
+                                    'separated list (no spaces) of multiple xnames.')
+    status_parser.add_argument('-n', '--nids',
+                               help='Filter list of nodes to show only those with NIDs specified '
+                                    'with this argument. A single NID may be given, or a comma-'
+                                    'separated list (no spaces) of multiple NIDs.')

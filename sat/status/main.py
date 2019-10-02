@@ -5,7 +5,7 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 """
 
 import re
-import textwrap
+import logging
 
 import requests
 from prettytable import PrettyTable
@@ -19,11 +19,14 @@ APIHSM = 'apis/smd/hsm/v1/'
 
 
 APIKEYS = ('ID', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Role', 'NetType')
-HEADERS = ('XName', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Role', 'Net Type')
+HEADERS = ('xname', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Role', 'Net Type')
 
 
 class UsageError(Exception):
     pass
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 def api_query(*args, **kwargs):
@@ -51,10 +54,10 @@ def tokenize_xname(xname):
     regardless of digit count.
 
     Args:
-        xname: the xname to tokenize
+        xname: The xname to tokenize
 
     Returns:
-        tokenized xname
+        Tokenized xname
 
         A sequence with the alternating string and integer elements of the
         provided xname. For example, "x3000c0s28b0n0" would tokenize to
@@ -68,6 +71,8 @@ def tokenize_xname(xname):
     for i, tok in enumerate(toks):
         if i % 2 == 1:
             toks[i] = int(toks[i])
+        else:
+            toks[i] = toks[i].lower()
 
     return tuple(toks)
 
@@ -86,8 +91,8 @@ def parse_sortcol(s, column_hdrs):
     If passed an empty string, use the default (0)
 
     Args:
-        s (string): the value passed on the command line
-        headers (sequence of strings): the column headers to match against
+        s (string): The value passed on the command line
+        headers (sequence of strings): The column headers to match against
 
     Returns:
         The (0-based) index of the column to sort by
@@ -116,16 +121,97 @@ def parse_sortcol(s, column_hdrs):
                      'number from 1 to {:d}.'.format(s, ', '.join(column_hdrs), len(column_hdrs)))
 
 
-def make_raw_table(sort_index, reverse):
+def parse_filters(filtersIn):
+    """Parse filter specifications.
+
+    A specification is a single term or many terms separated by commas.
+
+    No validation is done. Passing a non-integer as a NID will fail to match,
+    but no errors will occur.
+
+    Args:
+        filtersIn: A dictionary with keys matching those of the API response,
+        and values specifying the terms to match against.
+
+    Returns:
+        A corresponding dictionary with frozensets parsed from comma-separated
+        values, and xnames tokenized. All strings and string xname tokens are
+        lowercased.
+    """
+
+    filtersOut = {}
+    for k, vIn in filtersIn.items():
+        if vIn is not None:
+            # filter out spurious empties, which may occur, for instance, with 'foo,'.split(',')
+            # or even just ','.split(',')!
+            vOut = filter(None, vIn.split(','))
+            if k == 'ID':
+                vOut = frozenset([tokenize_xname(e) for e in vOut])
+            else:
+                # comparisons will be case-insensitive
+                vOut = frozenset([e.lower() for e in vOut])
+
+            if vOut:
+                filtersOut[k] = vOut
+
+    return filtersOut
+
+
+def filter_match(comp, filters):
+    """Determine whether the component passes the filters.
+
+    Components are passed if they match any filter, like an OR.
+
+    Each key in the filter dictionary is also present in the component. The
+    value of this key in the filters is a set of strings whose elements may be
+    exact case-insensitive matches of the value of the key in the component, or
+    case-insensitive abbreviations.
+
+    If there are no filters, all components pass.
+
+    Args:
+        comp (dict): Any dictionary whose keys are a superset of the keys in
+        the filters. Typically, a component as returned by the HSM API's entry
+        point /State/Components.
+
+        filters (dict): Keys are a subset of those in the component. Values are
+        sets of strings.
+
+    Returns:
+        True if the component matches, else False
+
+    Raises:
+        KeyError if a key in the filters is not present in the component
+    """
+
+    if not filters:
+        return True
+
+    for key, matchers in filters.items():
+        # the component's values need not be strings
+        match = str(comp[key]).lower()
+
+        if key == 'ID':
+            match = tokenize_xname(match)
+
+        for matcher in matchers:
+            if matcher == match[:len(matcher)]:
+                return True
+
+    return False
+
+
+def make_raw_table(sort_index, reverse, filters):
     """Obtains node status, normalizes the field order, and sorts according to
     the provided index.
 
     Args:
-        sort_index (int): a 0-based index into the rows that determines sort
-        order. If 0, interpret as an xname, and tokenize to sort integer parts
-        correctly.
-
+        sort_index (int): A 0-based index into the rows that determines sort
+            order. If 0, interpret as an xname, and tokenize to sort integer
+            parts correctly.
         reverse (bool): If true, reverse the sort order
+        filters (dict): Keys are a subset of those returned from the API call,
+            values are sequences of strings.
 
     Returns:
         A list-of-lists table of strings, each row representing the status of a
@@ -133,12 +219,19 @@ def make_raw_table(sort_index, reverse):
 
     Raises:
         Exceptions raised by requests.get()
+        KeyError (via filter_match()) if a filter key does not exist in the API results
     """
 
     rsp = api_query('State', 'Components', type='Node')
+    rsp_json = rsp.json()
 
-    comps_as_dict = rsp.json()['Components']
-    comps_as_list = [[d[field_name] for field_name in APIKEYS] for d in comps_as_dict]
+    if 'Components' not in rsp_json:
+        LOGGER.error('Invalid API response. "%s"', rsp.text)
+        raise SystemExit(1)
+
+    comps_as_dict = rsp_json['Components']
+    comps_as_list = [[d[field_name] for field_name in APIKEYS] for d in comps_as_dict
+                     if filter_match(d, filters)]
 
     if sort_index == 0:
         comps_as_list.sort(key=lambda x: tokenize_xname(x[0]), reverse=reverse)
@@ -152,7 +245,7 @@ def do_status(args):
     """Displays node status.
 
     Results are sorted by the "sort_column" member of args, which defaults
-    to xname. Xnames are tokenized for the purposes of sorting, so that their
+    to xname. xnames are tokenized for the purposes of sorting, so that their
     numeric elements are sorted by their value, not lexicographically. Sort
     order is reversed if the "reverse" member of args is True.
 
@@ -172,10 +265,11 @@ def do_status(args):
     try:
         sort_index = parse_sortcol(args.sort_column, HEADERS)
     except UsageError as e:
-        print('\n'.join(textwrap.wrap(e.args[0])))
+        LOGGER.error(e.args[0])
         raise SystemExit(1)
 
-    raw_table = make_raw_table(sort_index, args.reverse)
+    raw_table = make_raw_table(sort_index, args.reverse,
+                               parse_filters(dict(ID=args.xnames, NID=args.nids)))
 
     table_out = PrettyTable()
     table_out.field_names = HEADERS
