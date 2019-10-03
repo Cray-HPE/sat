@@ -95,7 +95,7 @@ class TestSystem(unittest.TestCase):
         """Ensures the get_zypper_versions method return 'ERROR' on bad output.
         """
         result = sat.showrev.system.get_zypper_versions(['slurm-slurmd'])
-        self.assertEqual(result['slurm-slurmd'],'ERROR')
+        self.assertEqual(result['slurm-slurmd'], 'ERROR')
 
     @mock.patch('sat.showrev.system.subprocess.check_output', zypper_good_xml)
     def test_get_zypper_versions_good_return(self):
@@ -104,7 +104,8 @@ class TestSystem(unittest.TestCase):
         result = sat.showrev.system.get_zypper_versions(['slurm-slurmd'])
         self.assertEqual(result['slurm-slurmd'], '19.05.0-6')
 
-    @mock.patch('sat.showrev.system.subprocess.check_output', side_effect=sat.showrev.system.subprocess.CalledProcessError(cmd=['echo'], returncode=104))
+    @mock.patch('sat.showrev.system.subprocess.check_output',
+                side_effect=sat.showrev.system.subprocess.CalledProcessError(cmd=['echo'], returncode=104))
     def test_get_zypper_versions_package_not_found(self, mocksubprocess):
         """The get_zypper_versions method should return None if zypper query failed.
         """
