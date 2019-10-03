@@ -23,6 +23,7 @@ fakerpms = (
     b'ccc 4.0.0\n'
 )
 
+
 class TestRpms(unittest.TestCase):
 
     @mock.patch('sat.showrev.rpm.subprocess.check_output', return_value=fakerpms)
@@ -33,7 +34,6 @@ class TestRpms(unittest.TestCase):
         comp = [x.split() for x in fakerpms.decode('utf-8').splitlines()]
         self.assertEqual(result, sorted(comp))
 
-
     @mock.patch('sat.showrev.rpm.subprocess.check_output', return_value=fakerpms)
     def test_get_rpms_substr_filter(self, _):
         """Positive test case for filtering on substring.
@@ -41,14 +41,12 @@ class TestRpms(unittest.TestCase):
         result = sat.showrev.rpm.get_rpms('aa')
         self.assertEqual(result, [['aaa', '5.0.0'], ['baa', '4.0.0']])
 
-
     @mock.patch('sat.showrev.rpm.subprocess.check_output', side_effect=CalledProcessError)
     def test_get_rpms_error(self, _):
         """get_rpms should return None if there was an error.
         """
         result = sat.showrev.rpm.get_rpms()
         self.assertEqual(result, None)
-
 
     @mock.patch('sat.showrev.rpm.subprocess.check_output', return_value=fakerpms)
     def test_get_rpms_no_match(self, _):

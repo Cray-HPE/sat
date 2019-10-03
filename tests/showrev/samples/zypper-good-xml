@@ -1,0 +1,8 @@
+<?xml version='1.0'?>
+<stream>
+<search-result version="0.0">
+<solvable-list>
+<solvable status="not-installed" name="{}" kind="package" edition="19.05.0-6" arch="x86_64" repository="Cray Module SLES"/>
+</solvable-list>
+</search-result>
+</stream>
