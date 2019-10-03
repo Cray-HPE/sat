@@ -1,7 +1,7 @@
 # Top-level requirements for sat package to function.
 # Copyright 2019 Cray Inc. All Rights Reserved.
 docker
-requests < 3.0
+inflect >= 0.2.5, < 3.0
 prettytable >= 0.7.2, < 1.0
-inflect >= 2.1.0, < 3.0
 pyyaml
+requests < 3.0
