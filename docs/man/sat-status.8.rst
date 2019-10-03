@@ -52,6 +52,12 @@ These options must be specified after the command.
 **-h, --help**
         Print a usage summary and exit.
 
+NOTES
+=====
+
+If **--xnames** and **--nids** are used in combination, any node that matches either
+set will be reported, as in a set union or logical OR operation.
+
 
 SEE ALSO
 ========
