@@ -157,6 +157,5 @@ class TestLogging(unittest.TestCase):
         self.assertEqual(handler.level, logging.WARNING)
 
 
-
 if __name__ == '__main__':
     unittest.main()

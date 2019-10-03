@@ -3,48 +3,21 @@ Entry point for the status subcommand.
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
-
-import re
 import logging
+import re
 
-import requests
 from prettytable import PrettyTable
 
-APIHOST = 'api-gw-service-nmn.local/'
-APIHSM = 'apis/smd/hsm/v1/'
-
-# for local development ssh port-forwarding can be used, i.e.
-# ssh root@spottedcow-sms1 -L *:443:api-gw-service-nmn.local:443
-# APIHOST = 'localhost/'
-
+from sat.apiclient import APIError, HSMClient
 
 APIKEYS = ('ID', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Role', 'NetType')
 HEADERS = ('xname', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Role', 'Net Type')
 
-
-class UsageError(Exception):
-    pass
-
-
 LOGGER = logging.getLogger(__name__)
 
 
-def api_query(*args, **kwargs):
-    """Call the Shasta HSM API
-
-        Args:
-            Positional arguments define the path to the API call, keyword
-            parameters are passed as the parameters to the call.
-
-        Returns:
-            A Response object
-
-        Raises:
-            Exceptions raised by requests.get()
-    """
-
-    qry = 'https://' + APIHOST + APIHSM + '/'.join(args)
-    return requests.get(qry, params=kwargs)
+class UsageError(Exception):
+    pass
 
 
 def tokenize_xname(xname):
@@ -57,11 +30,9 @@ def tokenize_xname(xname):
         xname: The xname to tokenize
 
     Returns:
-        Tokenized xname
-
-        A sequence with the alternating string and integer elements of the
-        provided xname. For example, "x3000c0s28b0n0" would tokenize to
-        ('x', 3000, 'c', 0, 's', 28, 'b', 0, 'n', 0).
+        Tokenized xname, i.e. a sequence with the alternating string and
+        integer elements of the provided xname. For example, "x3000c0s28b0n0"
+        would tokenize to ('x', 3000, 'c', 0, 's', 28, 'b', 0, 'n', 0).
     """
 
     # the last element will always be an empty string, since the input string
@@ -92,13 +63,13 @@ def parse_sortcol(s, column_hdrs):
 
     Args:
         s (string): The value passed on the command line
-        headers (sequence of strings): The column headers to match against
+        column_hdrs (sequence of strings): The column headers to match against
 
     Returns:
         The (0-based) index of the column to sort by
 
     Raises:
-        UsageError if no match found
+        UsageError: if no match found
     """
 
     if not s:
@@ -121,7 +92,7 @@ def parse_sortcol(s, column_hdrs):
                      'number from 1 to {:d}.'.format(s, ', '.join(column_hdrs), len(column_hdrs)))
 
 
-def parse_filters(filtersIn):
+def parse_filters(filters_in):
     """Parse filter specifications.
 
     A specification is a single term or many terms separated by commas.
@@ -130,8 +101,8 @@ def parse_filters(filtersIn):
     but no errors will occur.
 
     Args:
-        filtersIn: A dictionary with keys matching those of the API response,
-        and values specifying the terms to match against.
+        filters_in: A dictionary with keys matching those of the API response,
+            and values specifying the terms to match against.
 
     Returns:
         A corresponding dictionary with frozensets parsed from comma-separated
@@ -139,22 +110,22 @@ def parse_filters(filtersIn):
         lowercased.
     """
 
-    filtersOut = {}
-    for k, vIn in filtersIn.items():
-        if vIn is not None:
+    filters_out = {}
+    for k, v_in in filters_in.items():
+        if v_in is not None:
             # filter out spurious empties, which may occur, for instance, with 'foo,'.split(',')
             # or even just ','.split(',')!
-            vOut = filter(None, vIn.split(','))
+            v_out = filter(None, v_in.split(','))
             if k == 'ID':
-                vOut = frozenset([tokenize_xname(e) for e in vOut])
+                v_out = frozenset([tokenize_xname(e) for e in v_out])
             else:
                 # comparisons will be case-insensitive
-                vOut = frozenset([e.lower() for e in vOut])
+                v_out = frozenset([e.lower() for e in v_out])
 
-            if vOut:
-                filtersOut[k] = vOut
+            if v_out:
+                filters_out[k] = v_out
 
-    return filtersOut
+    return filters_out
 
 
 def filter_match(comp, filters):
@@ -171,17 +142,16 @@ def filter_match(comp, filters):
 
     Args:
         comp (dict): Any dictionary whose keys are a superset of the keys in
-        the filters. Typically, a component as returned by the HSM API's entry
-        point /State/Components.
-
+            the filters. Typically, a component as returned by the HSM API's
+            entry point /State/Components.
         filters (dict): Keys are a subset of those in the component. Values are
-        sets of strings.
+            sets of strings.
 
     Returns:
         True if the component matches, else False
 
     Raises:
-        KeyError if a key in the filters is not present in the component
+        KeyError: if a key in the filters is not present in the component
     """
 
     if not filters:
@@ -201,11 +171,13 @@ def filter_match(comp, filters):
     return False
 
 
-def make_raw_table(sort_index, reverse, filters):
+def make_raw_table(components, sort_index, reverse, filters):
     """Obtains node status, normalizes the field order, and sorts according to
     the provided index.
 
     Args:
+        components (list): A list of dictionaries representing the components
+            in the system along with information about their state.
         sort_index (int): A 0-based index into the rows that determines sort
             order. If 0, interpret as an xname, and tokenize to sort integer
             parts correctly.
@@ -218,19 +190,9 @@ def make_raw_table(sort_index, reverse, filters):
         node.
 
     Raises:
-        Exceptions raised by requests.get()
-        KeyError (via filter_match()) if a filter key does not exist in the API results
+        KeyError: (via filter_match()) if a filter key does not exist in the API results
     """
-
-    rsp = api_query('State', 'Components', type='Node')
-    rsp_json = rsp.json()
-
-    if 'Components' not in rsp_json:
-        LOGGER.error('Invalid API response. "%s"', rsp.text)
-        raise SystemExit(1)
-
-    comps_as_dict = rsp_json['Components']
-    comps_as_list = [[d[field_name] for field_name in APIKEYS] for d in comps_as_dict
+    comps_as_list = [[d[field_name] for field_name in APIKEYS] for d in components
                      if filter_match(d, filters)]
 
     if sort_index == 0:
@@ -257,8 +219,7 @@ def do_status(args):
         None
 
     Raises:
-        UsageError if an argument is invalid
-        Exceptions raised by requests.get()
+        UsageError: if an argument is invalid
     """
 
     # Aborts the program if argument is invalid
@@ -268,7 +229,26 @@ def do_status(args):
         LOGGER.error(e.args[0])
         raise SystemExit(1)
 
-    raw_table = make_raw_table(sort_index, args.reverse,
+    api_client = HSMClient()
+    try:
+        response = api_client.get('State', 'Components', params={'type': 'Node'})
+    except APIError as err:
+        LOGGER.error('Request to HSM API failed: %s', err)
+        raise SystemExit(1)
+
+    try:
+        response_json = response.json()
+    except ValueError as err:
+        LOGGER.error('Failed to parse JSON from component state response: %s', err)
+        raise SystemExit(1)
+
+    try:
+        components = response_json['Components']
+    except KeyError as err:
+        LOGGER.error("Key '%s' not present in API response JSON.", err)
+        raise SystemExit(1)
+
+    raw_table = make_raw_table(components, sort_index, args.reverse,
                                parse_filters(dict(ID=args.xnames, NID=args.nids)))
 
     table_out = PrettyTable()
