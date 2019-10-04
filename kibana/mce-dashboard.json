@@ -1,0 +1,56 @@
+[
+  {
+    "_id": "AW2YA_K60f74Ftuni9T7",
+    "_type": "dashboard",
+    "_source": {
+      "title": "sat-mce",
+      "hits": 0,
+      "description": "MCE Errors by NID",
+      "panelsJSON": "[{\"size_x\":6,\"size_y\":3,\"panelIndex\":1,\"type\":\"visualization\",\"id\":\"AW2X_83C0f74Ftuni9Bp\",\"col\":1,\"row\":1},{\"size_x\":6,\"size_y\":3,\"panelIndex\":2,\"type\":\"search\",\"id\":\"AW2XhcVP0f74Ftuni1YY\",\"col\":7,\"row\":1,\"columns\":[\"severity\",\"hostname\",\"message\"],\"sort\":[\"timereported\",\"desc\"]}]",
+      "optionsJSON": "{\"darkTheme\":false}",
+      "uiStateJSON": "{\"P-1\":{\"vis\":{\"params\":{\"sort\":{\"columnIndex\":1,\"direction\":null}}}}}",
+      "version": 1,
+      "timeRestore": false,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"filter\":[{\"query\":{\"match_all\":{}}}],\"highlightAll\":true,\"version\":true}"
+      }
+    }
+  },
+  {
+    "_id": "AW2XhcVP0f74Ftuni1YY",
+    "_type": "search",
+    "_source": {
+      "title": "sat-mce",
+      "description": "",
+      "hits": 0,
+      "columns": [
+        "severity",
+        "hostname",
+        "message"
+      ],
+      "sort": [
+        "timereported",
+        "desc"
+      ],
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"index\":\"shasta-logs*\",\"highlightAll\":true,\"version\":true,\"query\":{\"query_string\":{\"query\":\"message.keyword:/mce:.*Hardware Error.*/ AND severity.keyword:/emerg|err/\",\"analyze_wildcard\":true}},\"filter\":[]}"
+      }
+    }
+  },
+  {
+    "_id": "AW2X_83C0f74Ftuni9Bp",
+    "_type": "visualization",
+    "_source": {
+      "title": "sat-mce",
+      "visState": "{\"title\":\"sat-mce\",\"type\":\"table\",\"params\":{\"perPage\":10,\"showPartialRows\":false,\"showMeticsAtAllLevels\":false,\"sort\":{\"columnIndex\":null,\"direction\":null},\"showTotal\":false,\"totalFunc\":\"sum\",\"type\":\"table\"},\"aggs\":[{\"id\":\"1\",\"enabled\":true,\"type\":\"count\",\"schema\":\"metric\",\"params\":{\"customLabel\":\"MCEs\"}},{\"id\":\"2\",\"enabled\":true,\"type\":\"terms\",\"schema\":\"bucket\",\"params\":{\"field\":\"hostname.keyword\",\"size\":100,\"order\":\"asc\",\"orderBy\":\"_term\",\"customLabel\":\"NID\"}}],\"listeners\":{}}",
+      "uiStateJSON": "{\"vis\":{\"params\":{\"sort\":{\"columnIndex\":1,\"direction\":null}}}}",
+      "description": "",
+      "savedSearchId": "AW2XhcVP0f74Ftuni1YY",
+      "version": 1,
+      "kibanaSavedObjectMeta": {
+        "searchSourceJSON": "{\"filter\":[]}"
+      }
+    }
+  }
+]
