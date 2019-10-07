@@ -16,6 +16,8 @@ from collections import defaultdict
 
 import yaml
 
+from sat.apiclient import APIError, HSMClient
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -164,8 +166,47 @@ def get_system_type():
     return None
 
 
-def get_interconnect():
-    return None
+def get_interconnects():
+    """Get string of unique interconnect types across Shasta.
+
+    Returns:
+        A space-separated string of interconnect types.
+        None is returned if no interconnects were found.
+        'ERROR' is returned if the function encountered an error.
+    """
+
+    networks = []
+
+    client = HSMClient()
+
+    try:
+        response = client.get('State', 'Components')
+    except APIError as err:
+        LOGGER.error('Request to HSM API failed: {}.'.format(err))
+        return 'ERROR'
+
+    try:
+        components = response.json()
+    except ValueError as err:
+        LOGGER.error('Failed to parse JSON from component state response: %s', err)
+        return 'ERROR'
+
+    try:
+        for component in components['Components']:
+            if 'NetType' in component:
+                networks.append(component['NetType'])
+    except KeyError:
+        LOGGER.error('No components returned.')
+        return 'ERROR'
+
+    if not networks:
+        LOGGER.warning('No interconnects found.')
+        return None
+
+    # remove redundant network types
+    networks = sorted(set(networks))
+
+    return ' '.join(networks)
 
 
 def get_install_date():
@@ -240,7 +281,7 @@ def get_system_version(substr=''):
     funcs['CLE version'] = lambda: value_streams['CLE']
     funcs['General'] = lambda: value_streams['general']
     funcs['Install date'] = get_install_date
-    funcs['Interconnect'] = get_interconnect
+    funcs['Interconnect'] = get_interconnects
     funcs['Kernel'] = get_kernel_version
     funcs['Lustre'] = lambda: zypper_versions['cray-lustre-client']
     funcs['PBS version'] = lambda: zypper_versions['pbs-crayctldeploy']
