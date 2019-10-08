@@ -73,7 +73,8 @@ def get_site_data(sitefile):
         LOGGER.warning('Site file {} is not in yaml format. It will be erased if you continue.'.format(sitefile))
         return {}
 
-    if not data:
+    # ensure we parsed the file correctly.
+    if type(data) is not dict:
         return {}
 
     # yaml.safe_load will attempt 'helpful' conversions to different types,
@@ -130,8 +131,8 @@ def input_site_data(data):
                 data[entry.name] = thisentry
 
     # if date was not entered, then set it to today
-    if data['System install date'] == '':
-        today = str(datetime.datetime.today().strftime('%Y-%m-%d'))
+    if not data['System install date']:
+        today = datetime.datetime.today().strftime('%Y-%m-%d')
         data['System install date'] = today
 
 
