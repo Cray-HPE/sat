@@ -17,6 +17,7 @@ from collections import defaultdict
 import yaml
 
 from sat.apiclient import APIError, HSMClient
+from sat.config import get_config_value
 
 
 LOGGER = logging.getLogger(__name__)
@@ -83,6 +84,51 @@ def get_value_streams(relfile='/opt/cray/etc/release'):
         return default
 
     return reldata
+
+
+def get_site_data(sitefile):
+    """Get site-specific information from the Shasta sitefile.
+
+    Args:
+        sitefile: Specify custom sitefile to load. It must be in yaml format.
+
+    Returns:
+        A defaultdict which contains the entries within the sitefile. The
+        default value for these entries is None.
+
+        If an error occurred while reading the sitefile, then the error
+        will be logged and this dict will default its entries to 'ERROR'.
+    """
+
+    s = ''
+    data = defaultdict(lambda: None)
+    default = defaultdict(lambda: 'ERROR')
+
+    if not sitefile:
+        sitefile = get_config_value('site_info')
+
+    try:
+        with open(sitefile, 'r') as f:
+            s = f.read()
+    except FileNotFoundError:
+        LOGGER.error('Sitefile {} not found.'.format(sitefile))
+        return default
+
+    try:
+        data.update(yaml.safe_load(s))
+    except yaml.parser.ParserError:
+        LOGGER.error('Site file {} is not in yaml format.'.format(sitefile))
+        return default
+
+    # use hostname if site name isn't specified
+    if not data['System name']:
+        try:
+            data['System name'] = socket.gethostname()
+        except Exception:  # TODO: find specific exception
+            LOGGER.error('Site-file {} has no "System name", and gethostname query failed.'.format(sitefile))
+            data['System name'] = 'ERROR'
+
+    return data
 
 
 def get_zypper_versions(packages):
@@ -158,14 +204,6 @@ def get_kernel_version():
     return os.uname().release
 
 
-def get_site_name():
-    return None
-
-
-def get_system_type():
-    return None
-
-
 def get_interconnects():
     """Get string of unique interconnect types across Shasta.
 
@@ -209,14 +247,6 @@ def get_interconnects():
     return ' '.join(networks)
 
 
-def get_install_date():
-    return None
-
-
-def get_system_name():
-    return socket.gethostname()
-
-
 def get_build_version():
     return None
 
@@ -255,7 +285,7 @@ def get_sles_version():
     return 'ERROR'
 
 
-def get_system_version(substr=''):
+def get_system_version(sitefile, substr=''):
     """Collect generic information about the Shasta system.
 
     This is the function that 'decides' what components (and their versions)
@@ -275,12 +305,12 @@ def get_system_version(substr=''):
     zypper_versions = get_zypper_versions(
         ['cray-lustre-client', 'slurm-slurmd', 'pbs-crayctldeploy']
     )
+    sitedata = get_site_data(sitefile)
 
     # keep this list in ascii-value sorted order on the keys.
     funcs['Build version'] = get_build_version
     funcs['CLE version'] = lambda: value_streams['CLE']
     funcs['General'] = lambda: value_streams['general']
-    funcs['Install date'] = get_install_date
     funcs['Interconnect'] = get_interconnects
     funcs['Kernel'] = get_kernel_version
     funcs['Lustre'] = lambda: zypper_versions['cray-lustre-client']
@@ -288,12 +318,14 @@ def get_system_version(substr=''):
     funcs['PE'] = lambda: value_streams['PE']
     funcs['SLES version'] = get_sles_version
     funcs['Sat'] = lambda: value_streams['sat']
-    funcs['Site name'] = get_site_name
+    funcs['Serial number'] = lambda: sitedata['Serial number']
+    funcs['Site name'] = lambda: sitedata['Site name']
     funcs['Slingshot'] = lambda: value_streams['slingshot']
     funcs['Sma'] = lambda: value_streams['sma']
     funcs['Sms'] = lambda: value_streams['sms']
-    funcs['System name'] = get_system_name
-    funcs['System type'] = get_system_type
+    funcs['System install date'] = lambda: sitedata['System install date']
+    funcs['System name'] = lambda: sitedata['System name']
+    funcs['System type'] = lambda: sitedata['System type']
     funcs['Urika'] = lambda: value_streams['urika']
     funcs['Slurm version'] = lambda: zypper_versions['slurm-slurmd']
 

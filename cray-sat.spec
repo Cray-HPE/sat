@@ -56,10 +56,14 @@ install -m 755 -d %{buildroot}/var/log/cray
 install -m 755 -d %{buildroot}/etc
 install -m 644 etc/sat.ini %{buildroot}/etc/sat.ini
 
+# This directory is used to hold the user-created site_info.yml
+install -m 755 -d %{buildroot}/opt/cray/etc
+
 # Install ansible content for crayctldeploy subpackage
 install -m 755 -d %{buildroot}/%{ansible_framework_dir}/roles
 cp -r ansible/roles/cray_sat %{buildroot}/%{ansible_framework_dir}/roles/
 
+# Install man pages
 install -m 755 -d %{buildroot}%{satmandir}/
 cp docs/man/*.8 %{buildroot}%{satmandir}/
 
@@ -76,6 +80,7 @@ cat INSTALLED_FILES | grep __pycache__ | xargs dirname | xargs dirname | uniq >>
 
 %files -f INSTALLED_FILES
 %dir /var/log/cray
+%dir /opt/cray/etc
 %config(noreplace) /etc/sat.ini
 %{satmandir}/*.8.gz
 

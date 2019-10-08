@@ -32,7 +32,7 @@ def showrev(args):
         args.system = True
 
     if args.system:
-        sysvers = system.get_system_version(args.substr)
+        sysvers = system.get_system_version(args.sitefile, args.substr)
         if sysvers is None:
             LOGGER.error('Could not print system version information.')
             exit(1)
