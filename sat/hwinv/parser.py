@@ -60,7 +60,6 @@ def _add_summarize_option(option_group, singular_component, default_xnames):
         default=[]
     )
 
-
     option_group.add_argument(
         '--show-{}-xnames'.format(singular_component), nargs='?', const='on',
         default=default_xnames, type=on_off_str2bool,

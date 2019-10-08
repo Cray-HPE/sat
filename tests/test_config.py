@@ -58,6 +58,7 @@ class TestLoadConfig(unittest.TestCase):
         """
         self.patcher.stop()
 
+    @mock.patch('os.environ', {k:v for k,v in os.environ.items() if k != 'SAT_CONFIG_FILE'})
     def test_load_config(self):
         """Test load_config with default config path."""
         with mock.patch('sat.config.os.getenv', lambda x, y: DEFAULT_CONFIG_PATH):

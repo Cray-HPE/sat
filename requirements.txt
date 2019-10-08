@@ -6,4 +6,5 @@ inflect >= 0.2.5, < 3.0
 prettytable >= 0.7.2, < 1.0
 pyyaml
 requests < 3.0
+requests-oauthlib
 toml == 0.10.0

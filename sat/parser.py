@@ -12,6 +12,8 @@ from sat.hwinv.parser import add_hwinv_subparser
 from sat.setrev.parser import add_setrev_subparser
 from sat.showrev.parser import add_showrev_subparser
 from sat.status.parser import add_status_subparser
+from sat.auth.parser import add_auth_subparser
+
 
 def create_parent_parser():
     """Creates the top-level parser for sat and adds subparsers for the commands.
@@ -22,6 +24,14 @@ def create_parent_parser():
     """
 
     parser = ArgumentParser(description='SAT - The Shasta Admin Toolkit')
+
+    parser.add_argument(
+        '-u', '--username',
+        help='Username to use when loading or fetching authentication tokens. Overrides value set in config file.')
+
+    parser.add_argument(
+        '--token-file',
+        help='Token file to use for authentication. Overrides value derived from other settings.')
 
     parser.add_argument(
         '--logfile',
@@ -43,5 +53,6 @@ def create_parent_parser():
     add_setrev_subparser(subparsers)
     add_showrev_subparser(subparsers)
     add_status_subparser(subparsers)
+    add_auth_subparser(subparsers)
 
     return parser

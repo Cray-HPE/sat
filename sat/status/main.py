@@ -9,6 +9,7 @@ import re
 from prettytable import PrettyTable
 
 from sat.apiclient import APIError, HSMClient
+from sat.session import SATSession
 
 APIKEYS = ('ID', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Role', 'NetType')
 HEADERS = ('xname', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Role', 'Net Type')
@@ -230,7 +231,7 @@ def do_status(args):
         LOGGER.error(e.args[0])
         raise SystemExit(1)
 
-    api_client = HSMClient()
+    api_client = HSMClient(SATSession())
     try:
         response = api_client.get('State', 'Components', params={'type': 'Node'})
     except APIError as err:

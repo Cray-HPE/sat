@@ -47,4 +47,4 @@ SEE ALSO
 ========
 
 sat-cablecheck(8), sat-diag(8), sat-hwinv(8), sat-setrev(8), sat-showrev(8),
-sat-status(8)
+sat-status(8), sat-auth(8)
