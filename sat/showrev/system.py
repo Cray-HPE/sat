@@ -204,47 +204,62 @@ def get_kernel_version():
     return os.uname().release
 
 
-def get_interconnects():
-    """Get string of unique interconnect types across Shasta.
+def _get_hsm_components():
+    """Helper used by get_interconnects.
 
     Returns:
-        A space-separated string of interconnect types.
-        None is returned if no interconnects were found.
-        'ERROR' is returned if the function encountered an error.
+        The json dict from HSMClient.get().
     """
-
-    networks = []
-
     client = HSMClient()
 
     try:
         response = client.get('State', 'Components')
     except APIError as err:
         LOGGER.error('Request to HSM API failed: {}.'.format(err))
-        return 'ERROR'
+        raise
 
     try:
         components = response.json()
     except ValueError as err:
         LOGGER.error('Failed to parse JSON from component state response: %s', err)
-        return 'ERROR'
+        raise
 
     try:
-        for component in components['Components']:
-            if 'NetType' in component:
-                networks.append(component['NetType'])
+        return components['Components']
     except KeyError:
         LOGGER.error('No components returned.')
-        return 'ERROR'
+        raise
+
+
+def get_interconnects():
+    """Get string of unique interconnect types across Shasta.
+
+    Returns:
+        A space-separated string of interconnect types.
+        None is returned if no interconnects were found.
+        'ERROR' is returned if the function encountered an error
+        when gathering component information.
+    """
+
+    networks = []
+
+    try:
+        components = _get_hsm_components()
+    except (APIError, KeyError, ValueError):
+        return ['ERROR']
+
+    for component in components:
+        if 'NetType' in component:
+            networks.append(component['NetType'])
 
     if not networks:
         LOGGER.warning('No interconnects found.')
-        return None
+        return [None]
 
     # remove redundant network types
     networks = sorted(set(networks))
 
-    return ' '.join(networks)
+    return networks
 
 
 def get_build_version():
@@ -311,7 +326,7 @@ def get_system_version(sitefile, substr=''):
     funcs['Build version'] = get_build_version
     funcs['CLE version'] = lambda: value_streams['CLE']
     funcs['General'] = lambda: value_streams['general']
-    funcs['Interconnect'] = get_interconnects
+    funcs['Interconnect'] = lambda: ' '.join(get_interconnects())
     funcs['Kernel'] = get_kernel_version
     funcs['Lustre'] = lambda: zypper_versions['cray-lustre-client']
     funcs['PBS version'] = lambda: zypper_versions['pbs-crayctldeploy']

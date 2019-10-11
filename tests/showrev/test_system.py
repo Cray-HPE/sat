@@ -104,13 +104,38 @@ class TestSystem(unittest.TestCase):
         result = sat.showrev.system.get_zypper_versions(['slurm-slurmd'])
         self.assertEqual(result['slurm-slurmd'], '19.05.0-6')
 
-    @mock.patch('sat.showrev.system.subprocess.check_output',
-                side_effect=sat.showrev.system.subprocess.CalledProcessError(cmd=['echo'], returncode=104))
+    @mock.patch(
+        'sat.showrev.system.subprocess.check_output',
+        side_effect=sat.showrev.system.subprocess.CalledProcessError(
+            cmd=['echo'], returncode=104))
     def test_get_zypper_versions_package_not_found(self, mocksubprocess):
         """The get_zypper_versions method should return None if zypper query failed.
         """
         result = sat.showrev.system.get_zypper_versions(['idontexist'])
         self.assertIs(result['idontexist'], None)
+
+    @mock.patch(
+        'sat.showrev.system._get_hsm_components',
+        lambda: [
+            {'NetType': 'sling'},
+            {'NetType': 'sling'},
+            {'NetType': 'asdf'},])
+    def test_get_interconnects_unique(self):
+        """get_interconnects should parse out the unique values.
+        """
+        result = sat.showrev.system.get_interconnects()
+        expected = ['asdf', 'sling']
+        self.assertEqual(expected, result)
+
+    @mock.patch('sat.showrev.system._get_hsm_components', side_effect=sat.showrev.system.APIError)
+    def test_get_interconnects_error(self, mock_get_hsm_components):
+        """Error test case for get_interconnects.
+
+        get_interconnects should return 'ERROR' if it could not retrieve a
+        list of components from the HSM API.
+        """
+        result = sat.showrev.system.get_interconnects()
+        self.assertEqual(['ERROR'], result)
 
     @mock.patch('sat.showrev.system.open', lambda x, y: open('{}/os-release'.format(samples), y))
     def test_get_sles_version_correct_format(self):
