@@ -7,11 +7,11 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 from argparse import ArgumentParser
 
 from sat.cablecheck.parser import add_cable_check_subparser
+from sat.diag.parser import add_diag_subparser
 from sat.hwinv.parser import add_hwinv_subparser
 from sat.setrev.parser import add_setrev_subparser
 from sat.showrev.parser import add_showrev_subparser
 from sat.status.parser import add_status_subparser
-
 
 def create_parent_parser():
     """Creates the top-level parser for sat and adds subparsers for the commands.
@@ -38,6 +38,7 @@ def create_parent_parser():
 
     # Add the subparsers for the individual subcommands here
     add_cable_check_subparser(subparsers)
+    add_diag_subparser(subparsers)
     add_hwinv_subparser(subparsers)
     add_setrev_subparser(subparsers)
     add_showrev_subparser(subparsers)
