@@ -20,6 +20,7 @@ class UsageError(Exception):
     pass
 
 
+# TODO: Get rid of tokenize_xname here and instead use XName class throughout code
 def tokenize_xname(xname):
     """Tokenize the xname to facilitate sorting.
 

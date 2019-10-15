@@ -56,7 +56,7 @@ SAT_CONFIG_SPEC = {
 }
 
 
-class SATConfig(object):
+class SATConfig:
     """A class representing the configuration of the SAT program.
 
     This class is responsible for loading the configuration from a config file

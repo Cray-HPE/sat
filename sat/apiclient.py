@@ -17,7 +17,7 @@ class APIError(Exception):
     pass
 
 
-class APIGatewayClient(object):
+class APIGatewayClient:
     """A client to the API Gateway.
 
     TODO: This class should handle authentication. See SAT-126.
