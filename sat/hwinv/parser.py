@@ -48,17 +48,18 @@ def _add_summarize_option(option_group, singular_component, default_xnames):
         help='Summarize the {} in the system by values of given fields.'.format(plural_component)
     )
 
+    effect_disclaimer = ("This only has an effect if {0} are being summarized by the "
+                         "'--summarize-{0}' or '--summarize-all' options.").format(plural_component)
+
     option_group.add_argument(
         '--{}-summary-fields'.format(singular_component),
         type=lambda v: v.split(','),
-        help="Summarize the {0} by the given comma-separated list of fields. "
-             "Omit this option to summarize by all fields. This option only has an "
-             "effect if specified with the --summarize-{0} option.".format(plural_component),
+        help='Summarize the {} by the given comma-separated list of fields. '
+             'Omit this option to summarize by all fields. {}'.format(plural_component,
+                                                                      effect_disclaimer),
         default=[]
     )
 
-    effect_disclaimer = ("This only has an effect if {0} are being summarized by the "
-                         "'--summarize-{0}' or '--summarize-all' options.").format(plural_component)
 
     option_group.add_argument(
         '--show-{}-xnames'.format(singular_component), nargs='?', const='on',
@@ -134,7 +135,7 @@ def add_hwinv_subparser(subparsers):
 
     list_group = hwinv_parser.add_argument_group(
         'List Options',
-        'Options to list components in tabular format.'
+        'Options to list components of certain types.'
     )
     list_group.add_argument(
         '--list-all', action='store_true',
@@ -146,10 +147,3 @@ def add_hwinv_subparser(subparsers):
                             'router-module', 'node-enclosure', 'proc', 'mem']
     for component in list_component_names:
         _add_list_option(list_group, component)
-
-    hwinv_parser.add_argument(
-        'xname', nargs='*',
-        help='An xname wildcard, or a comma-separated list of xname wildcards, '
-             'to get hardware inventory information for. The default is to get '
-             'hardware inventory information for the entire system.'
-    )
