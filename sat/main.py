@@ -43,8 +43,8 @@ def main():
 
     bootstrap_logging()
 
-    load_config()
-    configure_logging(args)
+    load_config(args)
+    configure_logging()
 
     # Print help info if executed without a subcommand
     if args.command is None:

@@ -4,15 +4,16 @@ Copyright 2019 Cray Inc. All Rights Reserved
 """
 
 from collections import namedtuple
-from configparser import ConfigParser
 import logging
 import os
 
-DEFAULT_CONFIG_PATH = '/etc/sat.ini'
+import toml
+
+DEFAULT_CONFIG_PATH = '/etc/sat.toml'
 LOGGER = logging.getLogger(__name__)
 CONFIG = None
 
-OptionSpec = namedtuple('OptionSpec', ['type', 'default', 'validation_func'])
+OptionSpec = namedtuple('OptionSpec', ['type', 'default', 'validation_func', 'cmdline_arg'])
 
 
 class ConfigValidationError(Exception):
@@ -42,18 +43,39 @@ def validate_log_level(level):
 
 
 SAT_CONFIG_SPEC = {
-    'default': {
-        'api_gateway_host': OptionSpec(str, 'api-gw-service-nmn.local', None),
-        'log_file_name': OptionSpec(str, '/var/log/cray/sat.log', None),
-        'log_file_level': OptionSpec(str, 'INFO', validate_log_level),
-        'log_stderr_level': OptionSpec(str, 'WARNING', validate_log_level),
-        'site_info': OptionSpec(str, '/opt/cray/etc/site_info.yml', None)
+    'general': {
+        'api_gateway_host': OptionSpec(str, 'api-gw-service-nmn.local', None, None),
+        'site_info': OptionSpec(str, '/opt/cray/etc/site_info.yml', None, None)
+    },
+    'logging': {
+        'file_name': OptionSpec(str, '/var/log/cray/sat.log', None, 'logfile'),
+        'file_level': OptionSpec(str, 'INFO', validate_log_level, 'loglevel'),
+        'stderr_level': OptionSpec(str, 'WARNING', validate_log_level, 'loglevel'),
     },
     'redfish': {
-        'username': OptionSpec(str, 'user', None),
-        'password': OptionSpec(str, 'pass', None)
+        'username': OptionSpec(str, 'user', None, None),
+        'password': OptionSpec(str, 'pass', None, None)
     }
 }
+
+
+def _option_value(args, curr, spec):
+    """Determine the value of an option.
+
+    There is a hierarchy of importance when determining what the value of an
+    option should be. First, if an argument is set on the command line, that
+    value should be used. Second, if the value is set in the configuration file,
+    but not on the command line, that value should be used. Third, if the value
+    is supplied neither on the command line nor in the configuration file, then
+    the OptionSpec default value is used.
+
+    Args:
+        args: a Namespace from an ArgumentParser.
+        curr: the current value (or None if not set) of some option.
+        spec: an OptionSpec for the option.
+    """
+    return (spec.cmdline_arg is not None and getattr(args, spec.cmdline_arg, None)) \
+        or curr or spec.default
 
 
 class SATConfig:
@@ -65,23 +87,40 @@ class SATConfig:
     fields in the config.
     """
 
-    def __init__(self, config_file_path):
+    def __init__(self, config_file_path, args=None):
         """Create the SATConfig object and load values from the given file path
 
         Args:
-            config_file_path: The path to the config file in INI format.
+            config_file_path: The path to the config file in TOML format.
+            args: a Namespace object returned by an ArgumentParser, used
+                to override config values to values supplied on the command
+                line.
         """
-        self.config_parser = ConfigParser(interpolation=None)
 
-        for section, options in SAT_CONFIG_SPEC.items():
-            self.config_parser[section] = {}
-            for option_name, option_spec in options.items():
-                self.config_parser[section][option_name] = option_spec.default
+        self.sections = {}
 
-        success_files = self.config_parser.read(config_file_path)
-        if not success_files:
+        config_contents = None
+        try:
+            with open(config_file_path) as config_file:
+                config_contents = toml.load(config_file)
+        except IOError as ioerr:
+            LOGGER.error("Couldn't open config file %s; using defaults. (%s)",
+                         config_file_path, ioerr)
+
+        if config_contents and isinstance(config_contents, dict):
+            self.sections.update(config_contents)
+        else:
             LOGGER.error("Unable to read config file at '%s'. Using default "
                          "configuration values.", config_file_path)
+
+        for section, options in SAT_CONFIG_SPEC.items():
+            if section not in self.sections:
+                self.sections[section] = {option: _option_value(args, None, spec)
+                                          for option, spec in options.items()}
+            else:
+                for option, spec in options.items():
+                    self.sections[section][option] = \
+                        _option_value(args, self.sections[section].get(option), spec)
 
         self._validate_config()
 
@@ -96,7 +135,7 @@ class SATConfig:
             None
         """
         unknown_sections = []
-        for section in self.config_parser.sections():
+        for section, options in self.sections.items():
             if section not in SAT_CONFIG_SPEC:
                 LOGGER.warning("Ignoring unknown section '%s' in config file.",
                                section)
@@ -104,7 +143,7 @@ class SATConfig:
                 continue
 
             unknown_options = []
-            for option, value in self.config_parser[section].items():
+            for option, value in options.items():
                 if option not in SAT_CONFIG_SPEC[section]:
                     LOGGER.warning("Ignoring unknown option '%s' in section '%s' "
                                    "of config file.", option, section)
@@ -118,7 +157,7 @@ class SATConfig:
                     LOGGER.error("Unable to convert value (%s) of option '%s' in section '%s' of "
                                  "config file to the type '%s'. Defaulting to '%s'.",
                                  value, option, section, option_spec.type, option_spec.default)
-                    self.config_parser[section][option] = option_spec.default
+                    self.sections[section][option] = option_spec.default
                     continue
 
                 try:
@@ -128,19 +167,19 @@ class SATConfig:
                     LOGGER.error("Invalid value '%s' given for option '%s' in section '%s': %s "
                                  "Defaulting to '%s'.",
                                  converted_value, option, section, err, option_spec.default)
-                    self.config_parser[section][option] = option_spec.default
+                    self.sections[section][option] = option_spec.default
                     continue
 
                 # The value converted to the correct type and validated
-                self.config_parser[section][option] = converted_value
+                self.sections[section][option] = converted_value
 
             # Remove any unknown options in this section to prevent them from being used
             for unknown_option in unknown_options:
-                self.config_parser.remove_option(section, unknown_option)
+                del self.sections[section][unknown_option]
 
         # Remove any unknown sections to prevent them from being used
         for unknown_section in unknown_sections:
-            self.config_parser.remove_section(unknown_section)
+            del self.sections[unknown_section]
 
     def get(self, section, option):
         """Gets the value of the option in the given section.
@@ -152,10 +191,15 @@ class SATConfig:
         Returns:
             The value of the given `option` in the given `section`.
         """
-        return self.config_parser.get(section, option)
+        if section not in self.sections:
+            raise KeyError("Couldn't find section {} in config.".format(section))
+        elif option not in self.sections[section]:
+            raise KeyError("Couldn't find option {} in section {}.".format(option, section))
+        else:
+            return self.sections[section][option]
 
 
-def load_config():
+def load_config(args=None):
     """Loads configuration from a config file into CONFIG global variable.
 
     Returns:
@@ -170,21 +214,33 @@ def load_config():
     # Allow the user to specify an alternate config file in an env variable
     config_file_path = os.getenv('SAT_CONFIG_FILE', DEFAULT_CONFIG_PATH)
 
-    CONFIG = SATConfig(config_file_path)
+    CONFIG = SATConfig(config_file_path, args)
 
 
-def get_config_value(option, section='default'):
+def get_config_value(query_string):
     """Loads config (if necessary) and gets option value.
 
     This is a convenience function to quickly access config option values from
     the global CONFIG object in this module.
 
     Args:
-        option (str): The name of the option
-        section (str): The name of the section, defaults to 'default' for convenience.
+        query_string (str): A dot-delimited reference to a section and option from
+            the configuration. query_string should be in the form '<section>.<option>'.
 
     Returns:
         The requested option from the global CONFIG object.
     """
     load_config()
-    return CONFIG.get(section, option)
+
+    EXPECTED_LEVELS = 2 # TODO: Arbitrary nesting?
+    parts = query_string.split('.')
+    if len(parts) != EXPECTED_LEVELS:
+        raise ValueError("Wrong number of levels in query string passed to get_config_value(). "
+                         "(Should be {}, was {}.)".format(EXPECTED_LEVELS, len(parts)))
+    else:
+        section, option = parts
+        if not section or not option:
+            raise ValueError("Improperly formatted query string supplied to get_config_value(). "
+                             "(Got '%s'.)".format(query_string))
+        else:
+            return CONFIG.get(section, option)

@@ -63,8 +63,8 @@ class DiagStatus:
     def __init__(self, xname):
         self.xname = xname
         self.session = requests.Session()
-        self.session.auth = (get_config_value('username', section='redfish'),
-                             get_config_value('password', section='redfish'))
+        self.session.auth = (get_config_value('redfish.username'),
+                             get_config_value('redfish.password'))
 
     def _update_content(self, json_blob):
         """Updates the fields of this object.

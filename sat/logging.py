@@ -42,7 +42,7 @@ def bootstrap_logging():
     _add_console_handler(root_logger, logging.WARNING)
 
 
-def configure_logging(args):
+def configure_logging():
     """Configures logging according to the config file and command-line options
 
     This sets up two handlers, one that logs to a log file and one that logs to
@@ -68,15 +68,9 @@ def configure_logging(args):
     """
     root_logger = logging.getLogger()
 
-    log_file_name = get_config_value('log_file_name')
-    if args.logfile is not None:
-        log_file_name = args.logfile
-
-    log_file_level = get_config_value('log_file_level')
-    log_stderr_level = get_config_value('log_stderr_level')
-    if args.loglevel is not None:
-        log_file_level = args.loglevel
-        log_stderr_level = args.loglevel
+    log_file_name = get_config_value('logging.file_name')
+    log_file_level = get_config_value('logging.file_level')
+    log_stderr_level = get_config_value('logging.stderr_level')
 
     # Convert to actual logging levels
     log_file_level = getattr(logging, log_file_level.upper())

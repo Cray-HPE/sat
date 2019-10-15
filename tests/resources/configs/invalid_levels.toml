@@ -1,5 +1,5 @@
 # Example of a SAT config file with invalid log levels specified.
 # Copyright 2019 Cray Inc. All Rights Reserved
-[default]
-log_file_level = BLAH
-log_stderr_level = WHATEVA
+[logging]
+file_level = "BLAH"
+stderr_level = "WHATEVA"

@@ -1,9 +1,9 @@
 # Example of a SAT config file with extra unknown sections.
 # Copyright 2019 Cray Inc. All Rights Reserved
-[default]
+[general]
 
 [unknown]
-some_option = foo
+some_option = "foo"
 
 [another_unknown]
-some_option = bar
+some_option = "bar"

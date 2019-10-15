@@ -27,9 +27,9 @@ class TestLogging(unittest.TestCase):
         self.get_logger_patcher.start()
 
         config_values = self.config_values = {
-            'log_file_name': '/var/log/cray/sat.log',
-            'log_file_level': 'debug',
-            'log_stderr_level': 'warning'
+            'logging.file_name': '/var/log/cray/sat.log',
+            'logging.file_level': 'debug',
+            'logging.stderr_level': 'warning'
         }
         self.config_patcher = mock.patch('sat.logging.get_config_value',
                                          lambda opt: config_values[opt])
@@ -95,14 +95,11 @@ class TestLogging(unittest.TestCase):
 
     @mock.patch('logging.open', mock.MagicMock)
     @mock.patch('os.makedirs')
-    def test_configure_logging_no_args(self, mock_makedirs):
+    def test_configure_logging(self, mock_makedirs):
         """Test configure_logging function."""
-        args = mock.Mock()
-        args.logfile = None
-        args.loglevel = None
-        configure_logging(args)
+        configure_logging()
 
-        log_dir = os.path.dirname(self.config_values['log_file_name'])
+        log_dir = os.path.dirname(self.config_values['logging.file_name'])
         mock_makedirs.assert_called_once_with(log_dir, exist_ok=True)
 
         stream_handler, file_handler = self.assert_configured_handlers()
@@ -110,7 +107,7 @@ class TestLogging(unittest.TestCase):
         self.assertEqual(stream_handler.level, logging.WARNING)
 
         self.assertEqual(file_handler.level, logging.DEBUG)
-        self.assertEqual(file_handler.baseFilename, self.config_values['log_file_name'])
+        self.assertEqual(file_handler.baseFilename, self.config_values['logging.file_name'])
 
         warning_message = 'This is a warning'
         with self.assertLogs(self.logger, logging.WARNING) as cm:
@@ -123,32 +120,10 @@ class TestLogging(unittest.TestCase):
                                           warning_message),
             file_handler.format(cm.records[0]))
 
-    @mock.patch('logging.open', mock.MagicMock)
-    @mock.patch('os.makedirs')
-    def test_configure_logging_with_args(self, mock_makedirs):
-        """Test configure_logging function."""
-        args = mock.Mock()
-        args.logfile = '/my/custom/log/location'
-        args.loglevel = 'info'
-        configure_logging(args)
-
-        log_dir = os.path.dirname(args.logfile)
-        mock_makedirs.assert_called_once_with(log_dir, exist_ok=True)
-
-        stream_handler, file_handler = self.assert_configured_handlers()
-
-        self.assertEqual(stream_handler.level, logging.INFO)
-
-        self.assertEqual(file_handler.level, logging.INFO)
-        self.assertEqual(file_handler.baseFilename, args.logfile)
-
     @mock.patch('os.makedirs', side_effect=OSError)
     def test_configure_logging_directory_fail(self, _):
         """Test configure_logging with a failure to create the log directory"""
-        args = mock.Mock()
-        args.logfile = None
-        args.loglevel = None
-        configure_logging(args)
+        configure_logging()
 
         # Exactly one handler of type StreamHandler should have been added.
         self.assertEqual(len(self.logger.handlers), 1)
