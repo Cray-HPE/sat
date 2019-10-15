@@ -7,6 +7,8 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 import logging
 import sys
 
+import argcomplete
+
 from sat.cablecheck.main import do_cablecheck
 from sat.config import load_config
 from sat.diag.main import do_diag
@@ -35,10 +37,11 @@ def main():
     Returns:
         None. Calls sys.exit().
     """
-    bootstrap_logging()
-
     parser = create_parent_parser()
+    argcomplete.autocomplete(parser)
     args = parser.parse_args()
+
+    bootstrap_logging()
 
     load_config()
     configure_logging(args)
