@@ -46,7 +46,7 @@ These options must be specified after the subcommand.
 
 **-h, --help**
         Print the help message for 'sat hwinv'.
-    
+
 The remaining options are split into two categories. The "summarize" options
 describe the options that control the summarizing of components, and the "list"
 options describe the options that control the listing of components.  Multiple
@@ -153,19 +153,19 @@ These options list components of certain types in the system.
 
 **--chassis-fields** *CHASSIS_FIELDS*
         Same as **--node-fields** but for chassis.
-        
+
 **--hsn-board-fields** *HSN_BOARD_FIELDS*
         Same as **--node-fields** but for HSN boards.
-        
+
 **--compute-module-fields** *COMPUTE_MODULE_FIELDS*
         Same as **--node-fields** but for compute modules.
-        
+
 **--router-module-fields** *ROUTER_MODULE_FIELDS*
         Same as **--node-fields** but for router modules.
-        
+
 **--node-enclosure-fields** *NODE_ENCLOSURE_FIELDS*
         Same as **--node-fields** but for node enclosures.
-        
+
 **--proc-fields** *PROC_FIELDS*
         Same as **--node-fields** but for processors.
 

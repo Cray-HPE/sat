@@ -2,9 +2,9 @@
  SAT-DIAG
 ==========
 
-------------------------------------
-Run L1 Rosetta diagnostics at scale.
-------------------------------------
+-----------------------------------
+Run L1 Rosetta diagnostics at scale
+-----------------------------------
 
 :Author: Cray Inc.
 :Copyright: Copyright 2019 Cray Inc. All Rights Reserved.
@@ -21,10 +21,9 @@ DESCRIPTION
 The diag subcommand is used for running L1 diagnostics on an arbitrary
 number of Rosetta switches. This tool accepts a list of switch xnames
 from the command line, a file, and/or stdin, and will launch a given
-command on these hosts. It polls the switches at a specific interval,
-and once all nodes have finished running diagnositcs, it writes the
-output returned from all switches either to stdout or to a file
-specified by the user.
+command on these hosts. Switches are polled at a specific interval.
+A report is printed after all switches have completed their diagnostics,
+either to stdout (default) or to files, one for each switch.
 
 ARGUMENTS
 =========
@@ -35,6 +34,8 @@ ARGUMENTS
 
 OPTIONS
 =======
+
+These options must be specified after the subcommand.
 
 **-h**, **--help**
         Display a help message and exit.
@@ -47,7 +48,7 @@ OPTIONS
 **-t** *SECONDS*, **--timeout** *SECONDS*
         Specify the timeout, in seconds, after which diagnostics  that
         are still running will be cancelled. Defaults to 300 seconds
-        (5 minutes.)
+        (5 minutes).
 
 **--disruptive**
         If this flag is used, the user will not be prompted
@@ -63,9 +64,8 @@ OPTIONS
         terminal.
 
 **-x** *XNAME*, **--xname** *XNAME*
-        This flag can be used to specify a specific xname on which
-        to run tests. This flag can be used multiple times to list
-        multiple xnames.
+        This flag can be used to specify an xname on which to run tests.
+        This flag can be used multiple times to specify multiple xnames.
 
 **-f** *PATH*, **--xname-file** *PATH*
         Specify a path to a newline-delimited file containing a list

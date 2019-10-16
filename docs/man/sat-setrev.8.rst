@@ -24,10 +24,10 @@ is located at */opt/cray/etc/site_info.yml* by default.
 This information is printed out by **sat showrev** during its **--system**
 operation; specifically the following fields...
 
-    - Site name           
     - Serial number
-    - System install date
+    - Site name
     - System name
+    - System install date
     - System type
 
 This subcommand is required to be run if **sat showrev** is to display this
@@ -39,8 +39,8 @@ OPTIONS
 These options must be specified after the subcommand.
 
 **--sitefile** *file*
-        Select a custom location to write the information. the **showrev**
-        subcommand has an accompanying flag as well.
+        Select a custom location to write the information. The **showrev**
+        subcommand has a corresponding option.
 
 SEE ALSO
 ========
