@@ -18,15 +18,14 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-The showrev subcommand is for printing revision information about the Shasta
-System. This includes general version information about the sat system, as
-well as version information about installed docker images and rpm packages
-on the target node.
+The showrev subcommand prints revision information about the Shasta System.
+This includes general version information about the system, as well as
+version information about installed docker images and rpm packages.
 
 OPTIONS
 =======
 
-These options must be specified after the command.
+These options must be specified after the subcommand.
 
 **--system**
         Display general version information about the Shasta system. This is
@@ -51,7 +50,7 @@ These options must be specified after the command.
 
 **--sitefile** *file*
         Specify custom site information file printed by --system. This file
-        must be in a yaml format.
+        must be in a YAML format.
 
 **-h, --help**
         Print the help message for 'sat showrev'.

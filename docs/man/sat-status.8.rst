@@ -1,6 +1,6 @@
-===========
+============
  SAT-STATUS
-===========
+============
 
 ----------------
 Show node status
@@ -18,14 +18,14 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-The status subcommand reports the status of nodes on a Shasta system. Node
-status is displayed in tabular format, with a row for each node, and columns
+The status subcommand reports the status of nodes in the system. Node status
+is displayed in tabular format, with a row for each node, and columns
 corresponding to the identities and conditions of the nodes.
 
 OPTIONS
 =======
 
-These options must be specified after the command.
+These options must be specified after the subcommand.
 
 **-s, --sort-column**
         Sort by the selected column. The default is to sort by xname.
@@ -41,9 +41,10 @@ These options must be specified after the command.
         Reverses the order of the nodes.
 
 **-x, --xnames**
-        Selects nodes to report from a comma-separated list of xnames, or a single
-        xname. Any case may be used, and leading zeros from the integer parts will
-        be removed before matching. May be used with **--nids**.
+        Selects nodes to report from a comma-separated list of xnames, or
+        a single xname. The xname values are case insensitive, and leading
+        zeros from the integer parts will be removed before matching. May be
+        used with **--nids**.
 
 **-n, --nids**
         Selects nodes to report from a comma-separated list of NIDs, or a single
@@ -56,7 +57,7 @@ NOTES
 =====
 
 If **--xnames** and **--nids** are used in combination, any node that matches either
-set will be reported, as in a set union or logical OR operation.
+set will be reported (as in a set union or logical OR operation).
 
 
 SEE ALSO
