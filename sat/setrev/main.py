@@ -181,7 +181,7 @@ def setrev(args):
     # determine sitefile location from command line args or config file.
     sitefile = args.sitefile
     if not sitefile:
-        sitefile = get_config_value('site_info')
+        sitefile = get_config_value('general.site_info')
         if not sitefile:
             LOGGER.error('No sitefile specified on commandline or in config file.')
             sys.exit(1)

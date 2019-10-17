@@ -60,16 +60,17 @@ class TestLoadConfig(unittest.TestCase):
 
     def test_load_config(self):
         """Test load_config with default config path."""
-        load_config()
-        self.mock_sat_config_cls.assert_called_once_with(DEFAULT_CONFIG_PATH)
-        self.assertEqual(self.mock_sat_config_obj, sat.config.CONFIG)
+        with mock.patch('sat.config.os.getenv', lambda x, y: DEFAULT_CONFIG_PATH):
+            load_config()
+            self.mock_sat_config_cls.assert_called_once_with(DEFAULT_CONFIG_PATH, None)
+            self.assertEqual(self.mock_sat_config_obj, sat.config.CONFIG)
 
     def test_load_config_env_var(self):
         """Test load_config with the config file path set in an env var."""
-        config_file_path = '/my/custom/config.ini'
+        config_file_path = '/my/custom/config.toml'
         with mock.patch('os.getenv', return_value=config_file_path):
             load_config()
-        self.mock_sat_config_cls.assert_called_once_with(config_file_path)
+        self.mock_sat_config_cls.assert_called_once_with(config_file_path, None)
         self.assertEqual(self.mock_sat_config_obj, sat.config.CONFIG)
 
     @mock.patch('sat.config.CONFIG')
@@ -86,12 +87,12 @@ class TestGetConfigValue(unittest.TestCase):
     @mock.patch('sat.config.CONFIG')
     @mock.patch('sat.config.load_config')
     def test_get_config_value(self, mock_load_config, mock_config):
-        option_name = 'option'
+        option_name = 'foo.bar'
         expected_value = 'expected'
         mock_config.get.return_value = expected_value
         option_value = get_config_value(option_name)
         mock_load_config.assert_called_once_with()
-        mock_config.get.assert_called_once_with('default', option_name)
+        mock_config.get.assert_called_once_with('foo', 'bar')
         self.assertEqual(expected_value, option_value)
 
 
@@ -129,12 +130,12 @@ class TestSATConfig(unittest.TestCase):
 
     def test_valid_config(self):
         """Test creating a SATConfig from a valid config file."""
-        config = SATConfig(os.path.join(CONFIGS_DIR, 'valid.ini'))
-        self.assertEqual(config.get('default', 'log_file_name'),
+        config = SATConfig(os.path.join(CONFIGS_DIR, 'valid.toml'))
+        self.assertEqual(config.get('logging', 'file_name'),
                          '/var/log/sat.log')
-        self.assertEqual(config.get('default', 'log_file_level'),
+        self.assertEqual(config.get('logging', 'file_level'),
                          'DEBUG')
-        self.assertEqual(config.get('default', 'log_stderr_level'),
+        self.assertEqual(config.get('logging', 'stderr_level'),
                          'ERROR')
 
     def test_invalid_log_levels(self):
@@ -143,11 +144,11 @@ class TestSATConfig(unittest.TestCase):
         Currently, this is just invalid log levels.
         """
         with self.assertLogs(level='ERROR') as cm:
-            config = SATConfig(os.path.join(CONFIGS_DIR, 'invalid_levels.ini'))
+            config = SATConfig(os.path.join(CONFIGS_DIR, 'invalid_levels.toml'))
 
-        msg_template = "Invalid value '{}' given for option '{}' in section 'default'"
-        file_err_msg = msg_template.format('BLAH', 'log_file_level')
-        stderr_err_msg = msg_template.format('WHATEVA', 'log_stderr_level')
+        msg_template = "Invalid value '{}' given for option '{}' in section 'logging'"
+        file_err_msg = msg_template.format('BLAH', 'file_level')
+        stderr_err_msg = msg_template.format('WHATEVA', 'stderr_level')
 
         self.assert_in_element(file_err_msg, cm.output)
         self.assert_in_element(stderr_err_msg, cm.output)
@@ -157,7 +158,7 @@ class TestSATConfig(unittest.TestCase):
     def test_unknown_sections(self):
         """Test creating a SATConfig from a config file w/ unknown sections."""
         with self.assertLogs(level='WARNING') as cm:
-            config = SATConfig(os.path.join(CONFIGS_DIR, 'unknown_sections.ini'))
+            config = SATConfig(os.path.join(CONFIGS_DIR, 'unknown_sections.toml'))
 
         unknown_section_template = "Ignoring unknown section '{}' in config file."
 
@@ -170,9 +171,9 @@ class TestSATConfig(unittest.TestCase):
     def test_unknown_options(self):
         """Test creating a SATConfig from a config file w/ unknown options."""
         with self.assertLogs(level='WARNING') as cm:
-            config = SATConfig(os.path.join(CONFIGS_DIR, 'unknown_options.ini'))
+            config = SATConfig(os.path.join(CONFIGS_DIR, 'unknown_options.toml'))
 
-        unknown_option_template = ("Ignoring unknown option '{}' in section 'default' "
+        unknown_option_template = ("Ignoring unknown option '{}' in section 'general' "
                                    "of config file.")
 
         self.assertEqual(len(cm.output), 2)
@@ -183,12 +184,12 @@ class TestSATConfig(unittest.TestCase):
 
     def test_empty_file(self):
         """Test creating a SATConfig from an empty config file."""
-        config = SATConfig(os.path.join(CONFIGS_DIR, 'empty.ini'))
+        config = SATConfig(os.path.join(CONFIGS_DIR, 'empty.toml'))
         self.assert_defaults_set(config)
 
     def test_nonexistent_file(self):
         """Test creating a SATConfig from a non-existent file."""
-        file_name = 'does_not_exist.ini'
+        file_name = 'does_not_exist.toml'
         with self.assertLogs(level='ERROR') as cm:
             config = SATConfig(file_name)
 

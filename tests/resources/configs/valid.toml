@@ -3,7 +3,7 @@
 #
 # Note that the values are all different from the defaults, which tests that
 # the values are really being set from the config file.
-[default]
-log_file_name = /var/log/sat.log
-log_file_level = DEBUG
-log_stderr_level = ERROR
+[logging]
+file_name = "/var/log/sat.log"
+file_level = "DEBUG"
+stderr_level = "ERROR"

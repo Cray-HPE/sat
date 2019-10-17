@@ -32,7 +32,7 @@ class APIGatewayClient:
             host (str): The API gateway host.
         """
         if host is None:
-            host = get_config_value('api_gateway_host')
+            host = get_config_value('general.api_gateway_host')
 
         self.host = host
 

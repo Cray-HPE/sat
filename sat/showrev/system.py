@@ -105,7 +105,7 @@ def get_site_data(sitefile):
     default = defaultdict(lambda: 'ERROR')
 
     if not sitefile:
-        sitefile = get_config_value('site_info')
+        sitefile = get_config_value('general.site_info')
 
     try:
         with open(sitefile, 'r') as f:
