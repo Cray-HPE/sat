@@ -80,8 +80,19 @@ def _option_value(args, curr, spec):
         curr: the current value (or None if not set) of some option.
         spec: an OptionSpec for the option.
     """
-    return (spec.cmdline_arg is not None and getattr(args, spec.cmdline_arg, None)) \
-        or curr or spec.default
+
+    #return (spec.cmdline_arg is not None and getattr(args, spec.cmdline_arg, None)) \
+    #    or curr or spec.default
+
+    value = curr
+    if spec.cmdline_arg is not None:
+        value = getattr(args, spec.cmdline_arg, None)
+        if value is not None:
+            value = curr
+            if curr is None:
+                value = spec.default
+
+    return value
 
 
 class SATConfig:
