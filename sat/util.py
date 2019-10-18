@@ -7,6 +7,8 @@ from collections import OrderedDict
 from functools import partial
 import logging
 import math
+import os
+import os.path
 
 # Logic borrowed from imps to get the most efficient YAML available
 try:
@@ -221,3 +223,25 @@ SATDumper.add_representer(XName, _xname_representer)
 
 # A function to dump YAML to be used by all SAT code.
 yaml_dump = partial(dump, Dumper=SATDumper, **YAML_FORMAT_PARAMS)
+
+
+def get_resource_filename(name, section='.'):
+    """Get the pathname to a resource file.
+
+    Args:
+        name (str): The filename of the resource
+        section (str): An optional subdirectory under the resource directory
+
+    Returns:
+        Full pathname to the resource file.
+    """
+
+    resource_path = os.path.join(os.environ['HOME'], '.config', 'sat', section)
+
+    try:
+        os.makedirs(resource_path, exist_ok=True)
+    except OSError as err:
+        LOGGER.error("Unable to create resource directory '%s': %s", resource_path, err)
+        raise SystemExit(1)
+
+    return os.path.join(resource_path, name)

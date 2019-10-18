@@ -4,10 +4,10 @@ Client for querying the API gateway on a Shasta system.
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
 import logging
-
 import requests
 
 from sat.config import get_config_value
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -18,23 +18,39 @@ class APIError(Exception):
 
 
 class APIGatewayClient:
-    """A client to the API Gateway.
+    """A client to the API Gateway."""
 
-    TODO: This class should handle authentication. See SAT-126.
-    """
     # This can be set in subclasses to make a client for a specific API
     base_resource_path = ''
 
-    def __init__(self, host=None):
+    def __init__(self, session=None, host=None, cert_verify=None):
         """Initialize the APIGatewayClient.
 
         Args:
+            session: The Session instance to use when making REST calls,
+                or None to make connections without a session.
             host (str): The API gateway host.
+            cert_verify (bool): Whether to verify the gateway's certificate.
         """
-        if host is None:
-            host = get_config_value('general.api_gateway_host')
 
+        # Inherit parameters from session if not passed as arguments
+        # If there is no session, get the values from configuration
+
+        if host is None:
+            if session is None:
+                host = get_config_value('api_gateway.host')
+            else:
+                host = session.host
+
+        if cert_verify is None:
+            if session is None:
+                cert_verify = get_config_value('api_gateway.cert_verify')
+            else:
+                cert_verify = session.cert_verify
+
+        self.session = session
         self.host = host
+        self.cert_verify = cert_verify
 
     def get(self, *args, params=None):
         """Issue an HTTP GET request to resource given in `args`.
@@ -51,11 +67,17 @@ class APIGatewayClient:
             APIError: if the status code of the response is >= 400 or requests.get
                 raises a RequestException of any kind.
         """
+
         url = 'https://{}/apis/{}'.format(self.host, self.base_resource_path) + '/'.join(args)
         LOGGER.debug("Issuing GET request to URL '%s'", url)
 
+        if self.session is None:
+            requester = requests
+        else:
+            requester = self.session.session
+
         try:
-            r = requests.get(url, params=params)
+            r = requester.get(url, params=params, verify=self.cert_verify)
         except requests.exceptions.RequestException as err:
             raise APIError("GET request to URL '{}' failed: {}".format(url, err))
 

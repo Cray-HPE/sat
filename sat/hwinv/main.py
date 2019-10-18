@@ -8,6 +8,7 @@ import sys
 
 from sat.apiclient import APIError, HSMClient
 from sat.hwinv.system import System
+from sat.session import SATSession
 
 LOGGER = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ def do_hwinv(args):
     LOGGER.debug('do_hwinv received the following args: %s', args)
     set_default_args(args)
 
-    client = HSMClient()
+    client = HSMClient(SATSession())
 
     try:
         response = client.get('Inventory', 'Hardware')

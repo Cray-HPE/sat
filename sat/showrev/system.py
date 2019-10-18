@@ -18,6 +18,7 @@ import yaml
 
 from sat.apiclient import APIError, HSMClient
 from sat.config import get_config_value
+from sat.session import SATSession
 
 
 LOGGER = logging.getLogger(__name__)
@@ -210,7 +211,7 @@ def _get_hsm_components():
     Returns:
         The json dict from HSMClient.get().
     """
-    client = HSMClient()
+    client = HSMClient(SATSession())
 
     try:
         response = client.get('State', 'Components')

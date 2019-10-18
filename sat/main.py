@@ -18,6 +18,7 @@ from sat.parser import create_parent_parser
 from sat.setrev.main import setrev
 from sat.showrev.main import showrev
 from sat.status.main import do_status
+from sat.auth.main import do_login
 
 LOGGER = logging.getLogger(__name__)
 
@@ -27,7 +28,8 @@ SUBCOMMAND_FUNCS = {
     'hwinv': do_hwinv,
     'setrev': setrev,
     'showrev': showrev,
-    'status':  do_status
+    'status': do_status,
+    'auth': do_login,
 }
 
 

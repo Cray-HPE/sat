@@ -4,6 +4,7 @@ Copyright 2019 Cray Inc. All Rights Reserved
 """
 
 from collections import namedtuple
+import getpass
 import logging
 import os
 
@@ -43,8 +44,13 @@ def validate_log_level(level):
 
 
 SAT_CONFIG_SPEC = {
+    'api_gateway': {
+        'host': OptionSpec(str, 'api-gw-service-nmn.local', None, None),
+        'cert_verify': OptionSpec(bool, True, None, None),
+        'username': OptionSpec(str, getpass.getuser(), None, 'username'),
+        'token_filename': OptionSpec(str, '', None, 'token_filename'),
+    },
     'general': {
-        'api_gateway_host': OptionSpec(str, 'api-gw-service-nmn.local', None, None),
         'site_info': OptionSpec(str, '/opt/cray/etc/site_info.yml', None, None)
     },
     'logging': {
@@ -74,8 +80,14 @@ def _option_value(args, curr, spec):
         curr: the current value (or None if not set) of some option.
         spec: an OptionSpec for the option.
     """
-    return (spec.cmdline_arg is not None and getattr(args, spec.cmdline_arg, None)) \
-        or curr or spec.default
+
+    if spec.cmdline_arg:
+        # Override with command-line value if specified
+        args_value = getattr(args, spec.cmdline_arg, None)
+        if args_value is not None:
+            return args_value
+
+    return spec.default if curr is None else curr
 
 
 class SATConfig:

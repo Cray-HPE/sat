@@ -20,6 +20,7 @@ Requires: python3-inflect < 3.0
 Requires: python3-PrettyTable >= 0.7.2, python3-PrettyTable < 1.0
 Requires: python3-PyYAML
 Requires: python3-requests < 3.0
+Requires: python3-requests-oauthlib
 Requires: python3-toml >= 0.10.0, python3-toml < 1.0
 BuildRequires: python3-argcomplete
 BuildRequires: python3-docutils
