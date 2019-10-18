@@ -87,10 +87,7 @@ def _option_value(args, curr, spec):
         if args_value is not None:
             return args_value
 
-    if curr is None:
-        return spec.default
-    else:
-        return curr
+    return spec.default if curr is None else curr
 
 
 class SATConfig:
