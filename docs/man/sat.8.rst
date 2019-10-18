@@ -40,6 +40,14 @@ These global options must be specified before the command.
         the configuration file for both stderr and log file (the configuration
         options "logging.file_level" and "logging.stderr_level").
 
+**--username** *username*
+        Username to use when loading or fetching authentication
+        tokens. Overrides value set in config file.
+
+**--token-file** *token-file*
+        Token file to use for authentication. Overrides value derived from other
+        settings, or set in config file.
+
 **-h, --help**
         Print the help message for sat.
 

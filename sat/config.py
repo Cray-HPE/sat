@@ -244,7 +244,7 @@ def get_config_value(query_string):
     """
     load_config()
 
-    EXPECTED_LEVELS = 2 # TODO: Arbitrary nesting?
+    EXPECTED_LEVELS = 2  # TODO: Arbitrary nesting?
     parts = query_string.split('.')
     if len(parts) != EXPECTED_LEVELS:
         raise ValueError("Wrong number of levels in query string passed to get_config_value(). "

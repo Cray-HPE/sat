@@ -6,13 +6,13 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 
 from argparse import ArgumentParser
 
+from sat.auth.parser import add_auth_subparser
 from sat.cablecheck.parser import add_cable_check_subparser
 from sat.diag.parser import add_diag_subparser
 from sat.hwinv.parser import add_hwinv_subparser
 from sat.setrev.parser import add_setrev_subparser
 from sat.showrev.parser import add_showrev_subparser
 from sat.status.parser import add_status_subparser
-from sat.auth.parser import add_auth_subparser
 
 
 def create_parent_parser():
@@ -27,11 +27,13 @@ def create_parent_parser():
 
     parser.add_argument(
         '-u', '--username',
-        help='Username to use when loading or fetching authentication tokens. Overrides value set in config file.')
+        help='Username to use when loading or fetching authentication '
+             'tokens. Overrides value set in config file.')
 
     parser.add_argument(
         '--token-file',
-        help='Token file to use for authentication. Overrides value derived from other settings.')
+        help='Token file to use for authentication. Overrides value derived '
+             'from other settings, or set in config file.')
 
     parser.add_argument(
         '--logfile',

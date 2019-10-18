@@ -9,6 +9,7 @@ import sys
 
 import argcomplete
 
+from sat.auth.main import do_login
 from sat.cablecheck.main import do_cablecheck
 from sat.config import load_config
 from sat.diag.main import do_diag
@@ -18,18 +19,17 @@ from sat.parser import create_parent_parser
 from sat.setrev.main import setrev
 from sat.showrev.main import showrev
 from sat.status.main import do_status
-from sat.auth.main import do_login
 
 LOGGER = logging.getLogger(__name__)
 
 SUBCOMMAND_FUNCS = {
+    'auth': do_login,
     'cablecheck': do_cablecheck,
     'diag': do_diag,
     'hwinv': do_hwinv,
     'setrev': setrev,
     'showrev': showrev,
     'status': do_status,
-    'auth': do_login,
 }
 
 

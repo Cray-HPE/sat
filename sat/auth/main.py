@@ -14,12 +14,12 @@ LOGGER = logging.getLogger(__name__)
 
 
 def do_login(args):
-    """Prompts user for credentials, fetches a token, and saves it to disk.
+    """Prompts user for a password, fetches a token, and saves it to disk.
 
-    The default username is set by get_username(), which first checks the
-    command-line argument "--username", then the "username" option in the
-    configuration file, then calls getpass.getuser() to get the system
-    username of the user invoking sat.
+    The prompt indicates the username to be used in combination with the
+    password. The command-line argument "--username" is checked first, then
+    the "username" option in the configuration file, and if nothing is found,
+    getpass.getuser() is called to get the system username of the user invoking sat.
 
     The token is saved to $HOME/.config/sat/tokens/hostname.username.json,
     unless overriden by --token-file on the command line.
