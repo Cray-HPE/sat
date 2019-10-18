@@ -40,7 +40,8 @@ These global options must be specified before the command.
         the configuration file for both stderr and log file (the configuration
         options "logging.file_level" and "logging.stderr_level").
 
-**--username** *username* Username to use when loading or fetching authentication
+**--username** *username*
+        Username to use when loading or fetching authentication
         tokens. Overrides value set in config file.
 
 **--token-file** *token-file*
