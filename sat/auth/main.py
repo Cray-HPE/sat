@@ -37,7 +37,9 @@ def do_login(args):
 
     session.fetch_token(password)
     if session.token:
+        print('Succeeded!')
         session.save()
     else:
+        print('Authenication failed!')
         LOGGER.error('Authentication Failed.')
         raise SystemExit(1)
