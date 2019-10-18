@@ -333,17 +333,17 @@ def get_system_version(sitefile, substr=''):
     funcs['PBS version'] = lambda: zypper_versions['pbs-crayctldeploy']
     funcs['PE'] = lambda: value_streams['PE']
     funcs['SLES version'] = get_sles_version
-    funcs['Sat'] = lambda: value_streams['sat']
+    funcs['SAT'] = lambda: value_streams['sat']
     funcs['Serial number'] = lambda: sitedata['Serial number']
     funcs['Site name'] = lambda: sitedata['Site name']
     funcs['Slingshot'] = lambda: value_streams['slingshot']
-    funcs['Sma'] = lambda: value_streams['sma']
-    funcs['Sms'] = lambda: value_streams['sms']
+    funcs['Slurm version'] = lambda: zypper_versions['slurm-slurmd']
+    funcs['SMA'] = lambda: value_streams['sma']
+    funcs['SMS'] = lambda: value_streams['sms']
     funcs['System install date'] = lambda: sitedata['System install date']
     funcs['System name'] = lambda: sitedata['System name']
     funcs['System type'] = lambda: sitedata['System type']
     funcs['Urika'] = lambda: value_streams['urika']
-    funcs['Slurm version'] = lambda: zypper_versions['slurm-slurmd']
 
     for func in funcs:
         if substr in func:

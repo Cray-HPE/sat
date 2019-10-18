@@ -28,9 +28,9 @@ line option, **username** option from **sat** configuration, or the login accoun
 of the user running **sat**.
 
 The token obtained will be stored, by default, in **$HOME/.config/sat/tokens/**
-with filename **hostname.username**.json, where **hostname** is the hostname
+with filename *hostname.username*.json, where *hostname* is the hostname
 of the API gateway (with appropriate substitutions to suit a filename), and
-**username** is the username used when acquiring the token. This may be overriden
+*username* is the username used when acquiring the token. This may be overriden
 with the global command-line argument **--token-filename**.
 
 SEE ALSO
