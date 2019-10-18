@@ -27,11 +27,13 @@ def create_parent_parser():
 
     parser.add_argument(
         '-u', '--username',
-        help='Username to use when loading or fetching authentication tokens. Overrides value set in config file.')
+        help='Username to use when loading or fetching authentication '
+             'tokens. Overrides value set in config file.')
 
     parser.add_argument(
         '--token-file',
-        help='Token file to use for authentication. Overrides value derived from other settings.')
+        help='Token file to use for authentication. Overrides value derived '
+             'from other settings, or set in config file.')
 
     parser.add_argument(
         '--logfile',
