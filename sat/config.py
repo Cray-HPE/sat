@@ -81,18 +81,16 @@ def _option_value(args, curr, spec):
         spec: an OptionSpec for the option.
     """
 
-    #return (spec.cmdline_arg is not None and getattr(args, spec.cmdline_arg, None)) \
-    #    or curr or spec.default
+    if spec.cmdline_arg:
+        # Override with command-line value if specified
+        args_value = getattr(args, spec.cmdline_arg, None)
+        if args_value is not None:
+            return args_value
 
-    value = curr
-    if spec.cmdline_arg is not None:
-        value = getattr(args, spec.cmdline_arg, None)
-        if value is not None:
-            value = curr
-            if curr is None:
-                value = spec.default
-
-    return value
+    if curr is None:
+        return spec.default
+    else:
+        return curr
 
 
 class SATConfig:
