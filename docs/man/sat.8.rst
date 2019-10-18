@@ -46,4 +46,5 @@ These global options must be specified before the command.
 SEE ALSO
 ========
 
-sat-cablecheck(8), sat-diag(8), sat-setrev(8), sat-showrev(8), sat-status(8)
+sat-cablecheck(8), sat-diag(8), sat-hwinv(8), sat-setrev(8), sat-showrev(8),
+sat-status(8)
