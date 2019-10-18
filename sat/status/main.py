@@ -254,7 +254,10 @@ def do_status(args):
                                parse_filters(dict(ID=args.xnames, NID=args.nids)))
 
     table_out = PrettyTable()
-    table_out.field_names = HEADERS
+    if args.no_headings:
+        table_out.header = False
+    else:
+        table_out.field_names = HEADERS
 
     for row in raw_table:
         table_out.add_row(row)

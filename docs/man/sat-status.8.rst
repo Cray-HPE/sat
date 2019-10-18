@@ -50,6 +50,9 @@ These options must be specified after the subcommand.
         Selects nodes to report from a comma-separated list of NIDs, or a single
         NID. May be used with **--xnames**.
 
+**--no-headings**
+        Remove headings from the output table.
+
 **-h, --help**
         Print a usage summary and exit.
 
