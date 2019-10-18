@@ -30,3 +30,7 @@ def add_status_subparser(subparsers):
                                help='Filter list of nodes to show only those with NIDs specified '
                                     'with this argument. A single NID may be given, or a comma-'
                                     'separated list (no spaces) of multiple NIDs.')
+    status_parser.add_argument('--no-headings',
+                               help='Remove headings from output.',
+                               action='store_true',
+                               default=False)
