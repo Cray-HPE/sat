@@ -71,8 +71,6 @@ These options must be specified after the subcommand.
         Specify a path to a newline-delimited file containing a list
         of xnames on which to run diagnostics.
 
-
-
 SEE ALSO
 ========
 

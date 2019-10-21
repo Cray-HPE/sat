@@ -18,9 +18,93 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-The showrev subcommand prints revision information about the Shasta System.
+The showrev subcommand prints revision information about the EX-1 system.
 This includes general version information about the system, as well as
 version information about installed docker images and rpm packages.
+
+The default behavior of this command is to print general revision information
+about the EX-1. This is a mixture of information read from the EX-1 release
+file located at */opt/cray/etc/release*, site-specific revision information,
+and various api calls to other Cray services. The following list details the
+meaning and source of information for each field.
+
+Build version
+    Not implemented, so it always displays None.
+
+CLE version
+    Version of the Cray Linux Environment read from
+    /opt/cray/etc/release.
+
+General
+    This is the general version of the Shasta software read from
+    /opt/cray/etc/release.
+
+Interconnect
+    Unique list of interconnect names obtained from the Hardware State
+    Manager (HSM).
+
+Kernel
+    Relase version of the kernal as reported by "uname".
+
+Lustre
+    Version of Lustre available in the Zypper repository.
+
+PBS version
+    Version of PBS available in the Zypper repository.
+
+PE
+    Version of PE read from /opt/cray/etc/release.
+
+SLES version
+    Version of SLES read from /etc/os-release.
+
+SAT
+    Version of SAT read from /opt/cray/etc/release
+
+Serial number
+    Manually populated by "sat setrev" and read back from
+    /opt/cray/etc/site_info.yml.
+
+Site name
+    Manually populated by "sat setrev" and read back from
+    /opt/cray/etc/site_info.yml.
+
+Slingshot
+    Version of Slingshot read from /opt/cray/etc/release.
+
+Slurm version
+    Version of Slurm available in the Zypper repository.
+
+SMA
+    Version of SMA read from /opt/cray/etc/release.
+
+SMS
+    Version of SMS read from /opt/cray/etc/release.
+
+System install date
+    Manually populated by "sat setrev" and read back from
+    /opt/cray/etc/site_info.yml.
+
+System name
+    Manually populated by "sat setrev" and read back from
+    /opt/cray/etc/site_info.yml.
+
+System type
+    Manually populated by "sat setrev" and read back from
+    /opt/cray/etc/site_info.yml.
+
+Urika
+    Version of Urika read from /opt/cray/etc/release.
+
+The **--docker** option displays information about all installed docker
+images in a table. This table is sorted on the docker image name. This
+table has 3 columns; one for the image's name, its unique short-id, and
+its version.
+
+The **--packages** option displays information about installed RPM packages.
+This output is a 2-column table with the first column containing the
+package-name and the second containing its version. This table is sorted by
+package-name.
 
 OPTIONS
 =======

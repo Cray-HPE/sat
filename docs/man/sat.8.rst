@@ -29,7 +29,7 @@ These are referenced in the **SEE ALSO** section.
 OPTIONS
 =======
 
-These global options must be specified before the command.
+These global options must be specified before the subcommand.
 
 **--logfile** *file*
         Set the location of logs for this run. This overrides the value in
@@ -55,7 +55,7 @@ CONFIGURATION
 =============
 
 SAT can be configured by editing its configuration file. This configuration
-file is in TOML format, and is installed at /etc/sat.toml .
+file is in TOML format, and is installed at /etc/sat.toml.
 
 The configuration file is installed with commented out values. These indicate
 the internal values SAT will use if these values are not provided by the
@@ -80,12 +80,6 @@ API_GATEWAY
         this paramter must be "true" or "false". These values are
         case-sensitive.
 
-        If this behavior is desired, then the package "python3-certifi" must
-        be installed. SAT's installation archive does not DEPEND on this
-        package, so it will not be included merely by using your system's
-        package manager to install SAT. You must install "python3-certifi"
-        in some other way in order to use this feature.
-
         This parameter is set to "true" by default.
 
 **username**
@@ -98,9 +92,9 @@ API_GATEWAY
         parameter is not specified.
 
 **token_filename**
-        Store the login token between sessions with the api-gateway. The
-        default location to use is *hostname*.*username*.json where all
-        dashes and underscores in *hostname* are replaced with dots.
+        Store the login token between sessions with the api-gateway. If this
+        value isn't provided, then SAT will use the default location as
+        specified in sat-auth(8). 
 
 GENERAL
 -------
