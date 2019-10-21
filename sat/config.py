@@ -47,8 +47,8 @@ SAT_CONFIG_SPEC = {
     'api_gateway': {
         'host': OptionSpec(str, 'api-gw-service-nmn.local', None, None),
         'cert_verify': OptionSpec(bool, True, None, None),
-        'username': OptionSpec(str, getpass.getuser(), None, 'username'),
-        'token_filename': OptionSpec(str, '', None, 'token_filename'),
+        'username': OptionSpec(str, getpass.getuser, None, 'username'),
+        'token_file': OptionSpec(str, '', None, 'token_file'),
     },
     'general': {
         'site_info': OptionSpec(str, '/opt/cray/etc/site_info.yml', None, None)
@@ -75,6 +75,11 @@ def _option_value(args, curr, spec):
     is supplied neither on the command line nor in the configuration file, then
     the OptionSpec default value is used.
 
+    The default value may be a callable object. If so, then it is called with no
+    arguments, and the result is used as the default value. This allows build-
+    time introspection to set such options to empty, as the results would likely
+    be meaningless.
+
     Args:
         args: a Namespace from an ArgumentParser.
         curr: the current value (or None if not set) of some option.
@@ -87,7 +92,9 @@ def _option_value(args, curr, spec):
         if args_value is not None:
             return args_value
 
-    return spec.default if curr is None else curr
+    default = spec.default() if callable(spec.default) else spec.default
+
+    return default if curr is None else curr
 
 
 class SATConfig:

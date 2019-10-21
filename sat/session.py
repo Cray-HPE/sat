@@ -61,7 +61,7 @@ class SATSession:
         """str: Filename of authentication token
         """
 
-        token_filename = get_config_value('api_gateway.token_filename')
+        token_filename = get_config_value('api_gateway.token_file')
         if token_filename == '':
             host_as_filename = self.host.replace('-', '_').replace('.', '_')
             token_filename = get_resource_filename(
