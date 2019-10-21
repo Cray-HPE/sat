@@ -9,7 +9,7 @@ from unittest import mock
 
 import sat
 from sat.config import ConfigValidationError, DEFAULT_CONFIG_PATH, get_config_value, load_config,\
-    SATConfig, SAT_CONFIG_SPEC, validate_log_level
+    SATConfig, SAT_CONFIG_SPEC, validate_log_level, _option_value, OptionSpec
 
 CONFIGS_DIR = os.path.join(os.path.dirname(__file__), 'resources/configs')
 
@@ -19,11 +19,8 @@ class TestValidateLogLevel(unittest.TestCase):
 
     def test_validate_log_level_valid(self):
         """Test validate_log_level with valid levels"""
-        validate_log_level('debug')
-        validate_log_level('info')
-        validate_log_level('warning')
-        validate_log_level('error')
-        validate_log_level('critical')
+        for lvl in ['debug', 'info', 'warning', 'error', 'critical']:
+            validate_log_level(lvl)
 
         # Verify that case doesn't matter
         validate_log_level('dEbUg')
@@ -34,6 +31,64 @@ class TestValidateLogLevel(unittest.TestCase):
         expected_msg = "Level '{}' is not one of the valid log levels".format(invalid_level)
         with self.assertRaisesRegex(ConfigValidationError, expected_msg):
             validate_log_level(invalid_level)
+
+
+class TestOptionValue(unittest.TestCase):
+    """Test we get the right values from _option_value."""
+    def setUp(self):
+        self.default = 'some default value...'
+        self.cmdline_option = 'cmdline_option'
+        self.option_spec = OptionSpec(str, self.default, None, self.cmdline_option)
+        self.mock_args = mock.MagicMock()
+
+    def test_callable_default(self):
+        """Test the result of a callable default value is the result of the call."""
+        mock_default = mock.MagicMock(return_value='this should be default')
+        callable_option = OptionSpec(str, mock_default, None, None)
+        self.assertEqual('this should be default', _option_value(self.mock_args, None, callable_option))
+
+    def test_no_arg_no_config_file(self):
+        """Test we get default without arg or config file option."""
+        setattr(self.mock_args, self.cmdline_option, None)
+        self.assertEqual(_option_value(self.mock_args, None, self.option_spec),
+                         self.default)
+
+    def test_arg_but_no_config_file(self):
+        """Test we get command line value with no config file option."""
+        cmdline_val = 'some value from the command line...'
+        setattr(self.mock_args, self.cmdline_option, cmdline_val)
+        self.assertEqual(_option_value(self.mock_args, None, self.option_spec),
+                         cmdline_val)
+
+    def test_arg_and_config_file(self):
+        """Test we get command line value even with supplied config file option."""
+        cmdline_val = 'some value from the command line...'
+        setattr(self.mock_args, self.cmdline_option, cmdline_val)
+        self.assertEqual(_option_value(self.mock_args, 'value from the config file',
+                                       self.option_spec),
+                         cmdline_val)
+
+    def test_no_arg_but_config_file(self):
+        """Test we get config file value with no command line arg."""
+        config_val = 'value from the config file'
+        setattr(self.mock_args, self.cmdline_option, None)
+        self.assertEqual(_option_value(self.mock_args, config_val, self.option_spec),
+                         config_val)
+
+    def test_no_corresponding_arg(self):
+        """Test we get config option with no corresponding command line arg."""
+        config_val = 'value from the config file'
+        setattr(self.mock_args, self.cmdline_option, 'should have no effect')
+        different_option_spec = OptionSpec(str, self.default, None, None)
+        self.assertEqual(_option_value(self.mock_args, config_val, different_option_spec),
+                         config_val)
+
+    def test_no_corresponding_arg(self):
+        """Test we get default option with no corresponding command line arg."""
+        setattr(self.mock_args, self.cmdline_option, 'should have no effect')
+        different_option_spec = OptionSpec(str, self.default, None, None)
+        self.assertEqual(_option_value(self.mock_args, None, different_option_spec),
+                         self.default)
 
 
 class TestLoadConfig(unittest.TestCase):
