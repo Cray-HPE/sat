@@ -5,6 +5,8 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 """
 import logging
 import requests
+from urllib.parse import urlunparse
+
 
 from sat.config import get_config_value
 
@@ -68,7 +70,9 @@ class APIGatewayClient:
                 raises a RequestException of any kind.
         """
 
-        url = 'https://{}/apis/{}'.format(self.host, self.base_resource_path) + '/'.join(args)
+        url = urlunparse(('https', self.host, 'apis/{}{}'.format(
+            self.base_resource_path, '/'.join(args)), '', '', ''))
+
         LOGGER.debug("Issuing GET request to URL '%s'", url)
 
         if self.session is None:
