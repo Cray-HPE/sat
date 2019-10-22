@@ -87,11 +87,7 @@ API_GATEWAY
         does not already exist. If this parameter is not specified, then SAT
         will use the login name of the user.
 
-        The commented out value provided by the default installation of SAT's
-        configuration file has no bearing on the value SAT will use if the
-        parameter is not specified.
-
-**token_filename**
+**token_file**
         Store the login token between sessions with the api-gateway. If this
         value isn't provided, then SAT will use the default location as
         specified in sat-auth(8). 

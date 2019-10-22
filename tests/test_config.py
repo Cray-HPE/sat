@@ -127,7 +127,7 @@ class TestSATConfig(unittest.TestCase):
         for section in SAT_CONFIG_SPEC:
             for option_name, option_spec in SAT_CONFIG_SPEC[section].items():
                 self.assertEqual(config.get(section, option_name),
-                                 option_spec.default)
+                    option_spec.default() if callable(option_spec.default) else option_spec.default)
 
     def test_valid_config(self):
         """Test creating a SATConfig from a valid config file."""

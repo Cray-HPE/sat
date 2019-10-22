@@ -41,7 +41,7 @@ def extract_config_spec(path, spec_var_name):
         spec = getattr(module, spec_var_name)
         return {
             section: {
-                option: spec.default
+                option: '' if callable(spec.default) else spec.default
                 for option, spec in options.items()
             }
             for section, options in spec.items()
