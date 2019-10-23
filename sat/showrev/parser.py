@@ -18,11 +18,12 @@ def add_showrev_subparser(subparsers):
     """
 
     format_options = sat.parsergroups.create_format_options()
+    filter_options = sat.parsergroups.create_filter_options()
 
     showrev_parser = subparsers.add_parser(
         'showrev',
         help='Show Shasta revision information.',
-        parents=[format_options])
+        parents=[format_options, filter_options])
 
     showrev_parser.add_argument(
         '--all',

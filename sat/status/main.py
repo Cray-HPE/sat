@@ -173,7 +173,8 @@ def do_status(args):
         HEADERS, None,
         args.sort_by, args.reverse,
         get_config_value('format.no_headings'),
-        get_config_value('format.no_borders'))
+        get_config_value('format.no_borders'),
+        filter_strs=args.filter_strs)
 
     report.add_rows(raw_table)
 

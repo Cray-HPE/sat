@@ -8,6 +8,7 @@ import logging
 
 from prettytable import PrettyTable
 
+from sat.filtering import filter_list, ParseError
 from sat.util import yaml_dump, get_rst_header
 
 
@@ -19,7 +20,8 @@ class Report:
     """
     def __init__(self, headings, title=None,
                  sort_by=None, reverse=False,
-                 no_headings=False, no_borders=False, align='l'):
+                 no_headings=False, no_borders=False,
+                 align='l', filter_strs=None):
         """Create a new SatTable instance.
 
         Args:
@@ -33,6 +35,8 @@ class Report:
                 headings from the display.
             no_borders: If True, then omit the borders around the table's cells.
             align: Set the alignment within cells. Defaults to left-alignment.
+            filter_strs: a list of strings against which the rows in the report should
+                be filtered. The queries are combined with a boolean "and".
         """
         self.headings = headings
         self.title = title
@@ -44,6 +48,7 @@ class Report:
         self.no_headings = no_headings
         self.no_borders = no_borders
         self.align = align
+        self.filter_strs = filter_strs
 
         # find the heading to sort on
         if sort_by is not None:
@@ -146,7 +151,9 @@ class Report:
         """Return a pretty-looking string from the data.
 
         Returns:
-            The contents formatted as a tabular-string.
+            a tuple containing the contents formatted as a
+            tabular-string, and any potential error messages which
+            occured while formatting or filtering.
         """
         pt = PrettyTable()
         pt.field_names = self.headings
@@ -173,8 +180,13 @@ class Report:
         for heading in self.headings:
             pt.align[heading] = self.align
 
-        for row in self.data:
-            pt.add_row(row.values())
+        try:
+            for row in filter_list(self.data, self.filter_strs):
+                pt.add_row(row.values())
+        except (KeyError, ParseError, TypeError) as err:
+            LOGGER.warning("An error occurred while filtering; returning no output."
+                           .format(err))
+            return ''
 
         return table_str + str(pt)
 

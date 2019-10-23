@@ -18,9 +18,11 @@ def add_status_subparser(subparsers):
     """
 
     format_options = sat.parsergroups.create_format_options()
+    filter_options = sat.parsergroups.create_filter_options()
 
     status_parser = subparsers.add_parser(
-        'status', help='Report node status', parents=[format_options])
+        'status', help='Report node status',
+        parents=[format_options, filter_options])
 
     status_parser.add_argument(
         '-x', '--xnames',

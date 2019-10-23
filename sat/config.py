@@ -55,7 +55,7 @@ SAT_CONFIG_SPEC = {
         'no_borders': OptionSpec(bool, False, None, 'no_borders'),
     },
     'general': {
-        'site_info': OptionSpec(str, '/opt/cray/etc/site_info.yml', None, None)
+        'site_info': OptionSpec(str, '/opt/cray/etc/site_info.yml', None, None),
     },
     'logging': {
         'file_name': OptionSpec(str, '/var/log/cray/sat.log', None, 'logfile'),

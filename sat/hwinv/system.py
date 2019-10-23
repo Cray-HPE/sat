@@ -9,6 +9,7 @@ import logging
 import inflect
 
 from sat.config import get_config_value
+from sat.filtering import filter_list
 from sat.hwinv.constants import EMPTY_STATUS, STATUS_KEY, TYPE_KEY
 from sat.hwinv.chassis import Chassis
 from sat.hwinv.compute_module import ComputeModule
@@ -193,8 +194,8 @@ class System:
                     comp_dict.values(), fields)
             else:
                 list_key = '{}_list'.format(object_type.arg_name)
-                all_lists[list_key] = self.get_components_as_dicts(
-                    comp_dict.values(), fields)
+                all_lists[list_key] = filter_list(self.get_components_as_dicts(
+                    comp_dict.values(), fields), self.args.filter_str)
 
         return all_lists
 
@@ -251,7 +252,8 @@ class System:
             report = Report(component_list[0], component,
                             self.args.sort_by, self.args.reverse,
                             get_config_value('format.no_headings'),
-                            get_config_value('format.no_borders'))
+                            get_config_value('format.no_borders'),
+                            filter_strs=self.args.filter_strs)
             report.add_rows(component_list[1:])
 
             full_list_string += str(report.get_pretty_table()) + '\n\n'
