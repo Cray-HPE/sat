@@ -6,7 +6,8 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 
 import logging
 
-from sat import util
+from sat.config import get_config_value
+from sat.report import Report
 from sat.showrev import containers, rpm, system
 
 
@@ -24,6 +25,14 @@ def showrev(args):
         None
     """
 
+    reports = []
+
+    # report formatting
+    sort_by = args.sort_by
+    reverse = args.reverse
+    no_headings = get_config_value('format.no_headings')
+    no_borders = get_config_value('format.no_borders')
+
     if args.all:
         args.system = True
         args.docker = True
@@ -32,32 +41,45 @@ def showrev(args):
         args.system = True
 
     if args.system:
-        sysvers = system.get_system_version(args.sitefile, args.substr)
-        if sysvers is None:
+        data = system.get_system_version(args.sitefile, args.substr)
+        if data is None:
             LOGGER.error('Could not print system version information.')
             exit(1)
 
-        util.pretty_print_dict(sysvers)
+        title = 'System Revision Information'
+        headings = ['component', 'data']
+        reports.append(Report(
+            headings, title, sort_by, reverse, no_headings, no_borders))
+        reports[-1].add_rows(data)
+
     if args.docker:
-        dockers = containers.get_dockers(args.substr)
-        if dockers is None:
-            LOGGER.error('Could not retrieve list of running docker containers.')
+        data = containers.get_dockers(args.substr)
+        if data is None:
+            LOGGER.error(
+                'Could not retrieve list of installed docker containers.')
             exit(1)
 
-        headings = None
-        if not args.no_headings:
-            headings = ['name', 'short-id', 'version']
-
-        util.pretty_print_list(dockers, headings)
+        title = 'Installed Container Versions'
+        headings = ['name', 'short-id', 'versions']
+        reports.append(Report(
+            headings, title, sort_by, reverse, no_headings, no_borders))
+        reports[-1].add_rows(data)
 
     if args.packages:
-        rpms = rpm.get_rpms(args.substr)
-        if rpms is None:
+        data = rpm.get_rpms(args.substr)
+        if data is None:
             LOGGER.error('Could not retrieve list of installed rpms.')
             exit(1)
 
-        headings = None
-        if not args.no_headings:
-            headings = ['name', 'version']
+        title = 'Installed Package Versions'
+        headings = ['name', 'version']
+        reports.append(Report(
+            headings, title, sort_by, reverse, no_headings, no_borders))
+        reports[-1].add_rows(data)
 
-        util.pretty_print_list(rpms, headings)
+    if args.format == 'yaml':
+        for report in reports:
+            print(report.get_yaml())
+    else:
+        for report in reports:
+            print(report.get_pretty_table() + '\n\n')

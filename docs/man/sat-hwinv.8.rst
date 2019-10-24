@@ -25,9 +25,9 @@ and listings of all component types known by the HSM.
 In the summary output, each type of component is categorized by the values for a
 given field. In list output, information about the components of each type is
 displayed in a tabular format. Options can be used to control which types of
-components are summarized, by which attributes each component type is summarized,
-which types of components are listed, and which fields are displayed for each
-component type.  Both YAML and a human-readable, or "pretty", format are
+components are summarized, by which attributes each component type is
+summarized, which types of components are listed, and which fields are displayed
+for each component type. Both YAML and a human-readable, or "pretty", format are
 supported.
 
 The default behavior of this subcommand is to display summaries and lists of all
@@ -41,17 +41,14 @@ OPTIONS
 
 These options must be specified after the subcommand.
 
-**--format** *[pretty|yaml]*
-        Display information in the given format. Defaults to **pretty**.
-
 **-h, --help**
         Print the help message for 'sat hwinv'.
 
-The remaining options are split into two categories. The "summarize" options
-describe the options that control the summarizing of components, and the "list"
-options describe the options that control the listing of components.  Multiple
-"summarize" and "list" options can be combined to display multiple views of
-hardware inventory at once.
+The following two categories describe the "summarize" and "list" options.
+The "summarize" options describe the options that control the summarizing of
+components, and the "list" options describe the options that control the
+listing of components. Multiple "summarize" and "list" options can be combined
+to display multiple views of hardware inventory at once.
 
 SUMMARIZE OPTIONS
 -----------------
@@ -171,6 +168,8 @@ These options list components of certain types in the system.
 
 **--mem-fields** *MEM_FIELDS*
         Same as **--node-fields** but for memory modules.
+
+.. include:: _sat-format-opts.rst
 
 EXAMPLES
 ========

@@ -6,10 +6,12 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 import logging
 import re
 
-from prettytable import PrettyTable
-
 from sat.apiclient import APIError, HSMClient
+from sat.config import get_config_value
+from sat.report import Report
 from sat.session import SATSession
+from sat.xname import XName
+
 
 APIKEYS = ('ID', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Role', 'NetType')
 HEADERS = ('xname', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Role', 'Net Type')
@@ -19,79 +21,6 @@ LOGGER = logging.getLogger(__name__)
 
 class UsageError(Exception):
     pass
-
-
-# TODO: Get rid of tokenize_xname here and instead use XName class throughout code
-def tokenize_xname(xname):
-    """Tokenize the xname to facilitate sorting.
-
-    Numeric elements are converted to integers so that they compare correctly
-    regardless of digit count.
-
-    Args:
-        xname: The xname to tokenize
-
-    Returns:
-        Tokenized xname, i.e. a sequence with the alternating string and
-        integer elements of the provided xname. For example, "x3000c0s28b0n0"
-        would tokenize to ('x', 3000, 'c', 0, 's', 28, 'b', 0, 'n', 0).
-    """
-
-    # the last element will always be an empty string, since the input string
-    # ends with a match.
-    toks = re.split(r'(\d+)', xname)[:-1]
-
-    for i, tok in enumerate(toks):
-        if i % 2 == 1:
-            toks[i] = int(toks[i])
-        else:
-            toks[i] = toks[i].lower()
-
-    return tuple(toks)
-
-
-def parse_sortcol(s, column_hdrs):
-    """Parse and validate the "sort-column" argument.
-
-    If an integer, interpret it as a 1-based column index
-
-    If not, iterate over the column headers, and compare case-insensitively
-    with the leading part of the header. NOTE: if the string passed would
-    match more than one column, the first (leftmost) one is selected. If
-    a column header matches, but there are remaining characters in the
-    argument, the argument is considered invalid.
-
-    If passed an empty string, use the default (0)
-
-    Args:
-        s (string): The value passed on the command line
-        column_hdrs (sequence of strings): The column headers to match against
-
-    Returns:
-        The (0-based) index of the column to sort by
-
-    Raises:
-        UsageError: if no match found
-    """
-
-    if not s:
-        # empty string, use default
-        return 0
-    else:
-        for i, hdr in enumerate(column_hdrs):
-            if hdr.lower().startswith(s.lower()):
-                return i
-
-        try:
-            i = int(s)
-        except ValueError:
-            pass
-        else:
-            if 1 <= i <= len(column_hdrs):
-                return i-1
-
-    raise UsageError('Not a valid value "{}" for --sort-column. Valid choices are {}; and a '
-                     'number from 1 to {:d}.'.format(s, ', '.join(column_hdrs), len(column_hdrs)))
 
 
 def parse_filters(filters_in):
@@ -119,7 +48,7 @@ def parse_filters(filters_in):
             # or even just ','.split(',')!
             v_out = filter(None, v_in.split(','))
             if k == 'ID':
-                v_out = frozenset([tokenize_xname(e) for e in v_out])
+                v_out = frozenset([XName(e) for e in v_out])
             else:
                 # comparisons will be case-insensitive
                 v_out = frozenset([e.lower() for e in v_out])
@@ -161,48 +90,43 @@ def filter_match(comp, filters):
 
     for key, matchers in filters.items():
         # the component's values need not be strings
-        match = str(comp[key]).lower()
+        input_ = str(comp[key]).lower()
 
         if key == 'ID':
-            match = tokenize_xname(match)
+            input_ = XName(input_)
+            input_ = input_.tokens
 
         for matcher in matchers:
-            if matcher == match[:len(matcher)]:
-                return True
+            if key == 'ID':
+                if matcher.tokens == input_[:len(matcher.tokens)]:
+                    return True
+            else:
+                if matcher == input_[:len(matcher)]:
+                    return True
 
     return False
 
 
-def make_raw_table(components, sort_index, reverse, filters):
+def make_raw_table(components, filters):
     """Obtains node status, normalizes the field order, and sorts according to
     the provided index.
 
     Args:
         components (list): A list of dictionaries representing the components
             in the system along with information about their state.
-        sort_index (int): A 0-based index into the rows that determines sort
-            order. If 0, interpret as an xname, and tokenize to sort integer
-            parts correctly.
-        reverse (bool): If true, reverse the sort order
         filters (dict): Keys are a subset of those returned from the API call,
             values are sequences of strings.
 
     Returns:
-        A list-of-lists table of strings, each row representing the status of a
-        node.
+        A list-of-lists table of strings, each row representing
+        the status of a node.
 
     Raises:
-        KeyError: (via filter_match()) if a filter key does not exist in the API results
+        KeyError: (via filter_match()) if a filter key does not exist
+            in the API results
     """
-    comps_as_list = [[d[field_name] for field_name in APIKEYS] for d in components
-                     if filter_match(d, filters)]
-
-    if sort_index == 0:
-        comps_as_list.sort(key=lambda x: tokenize_xname(x[0]), reverse=reverse)
-    else:
-        comps_as_list.sort(key=lambda x: x[sort_index], reverse=reverse)
-
-    return comps_as_list
+    return [[d[field_name] for field_name in APIKEYS]
+            for d in components if filter_match(d, filters)]
 
 
 def do_status(args):
@@ -223,14 +147,6 @@ def do_status(args):
     Raises:
         UsageError: if an argument is invalid
     """
-
-    # Aborts the program if argument is invalid
-    try:
-        sort_index = parse_sortcol(args.sort_column, HEADERS)
-    except UsageError as e:
-        LOGGER.error(e.args[0])
-        raise SystemExit(1)
-
     api_client = HSMClient(SATSession())
     try:
         response = api_client.get('State', 'Components', params={'type': 'Node'})
@@ -250,16 +166,18 @@ def do_status(args):
         LOGGER.error("Key '%s' not present in API response JSON.", err)
         raise SystemExit(1)
 
-    raw_table = make_raw_table(components, sort_index, args.reverse,
-                               parse_filters(dict(ID=args.xnames, NID=args.nids)))
+    raw_table = make_raw_table(
+        components, parse_filters(dict(ID=args.xnames, NID=args.nids)))
 
-    table_out = PrettyTable()
-    if args.no_headings:
-        table_out.header = False
+    report = Report(
+        HEADERS, None,
+        args.sort_by, args.reverse,
+        get_config_value('format.no_headings'),
+        get_config_value('format.no_borders'))
+
+    report.add_rows(raw_table)
+
+    if args.format == 'yaml':
+        print(report.get_yaml())
     else:
-        table_out.field_names = HEADERS
-
-    for row in raw_table:
-        table_out.add_row(row)
-
-    print(table_out)
+        print(report)
