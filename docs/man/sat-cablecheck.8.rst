@@ -37,6 +37,20 @@ These options must be specified after the subcommand.
 **-h, --help**
         Print the help message for 'sat cablecheck'.
 
+EXAMPLES
+========
+
+The p2p file can be generated using the Shasta Cabling Tool (SCT), which
+requires a site configuration file as input. The site configuration file is
+created as part of the installation procedure for the system. An example
+procedure is shown below.
+
+::
+
+    python scttool session-title site_cfg.yaml
+
+    cat ./out/session-title_pt_pt.csv
+
 SEE ALSO
 ========
 

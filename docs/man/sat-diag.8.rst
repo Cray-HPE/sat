@@ -71,6 +71,21 @@ These options must be specified after the subcommand.
         Specify a path to a newline-delimited file containing a list
         of xnames on which to run diagnostics.
 
+EXAMPLES
+========
+
+The xnames can be specified by providing a path to a file formatted similar
+to the following example (ie. each xname on its own line).
+
+::
+
+    x0c0s14b0n0
+    x0c0s21b0n0
+    x0c0s24b0n0
+    x0c0s28b0n0
+    x0c0s16b0n0
+    x0c0s26b0n0
+
 SEE ALSO
 ========
 
