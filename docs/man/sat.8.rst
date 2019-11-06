@@ -63,9 +63,9 @@ configuration file and were not specified on the command line. This list
 represents the complete set of values that can be set via the configuration
 file.
 
-If one of the options in the configuration file has a parallel command-line 
-parameter, then the value specified on the command-line will override the value 
-read from the configuration file. Not every parameter in the configuration file 
+If one of the options in the configuration file has a parallel command-line
+parameter, then the value specified on the command-line will override the value
+read from the configuration file. Not every parameter in the configuration file
 can be overridden on the command-line.
 
 API_GATEWAY
@@ -90,7 +90,7 @@ API_GATEWAY
 **token_file**
         Store the login token between sessions with the api-gateway. If this
         value isn't provided, then SAT will use the default location as
-        specified in sat-auth(8). 
+        specified in sat-auth(8).
 
 GENERAL
 -------

@@ -3,7 +3,7 @@
 ============
 
 ----------------------------------------------------------
-Populate site-specific information about the Shasta system
+Populate site-specific information about the system
 ----------------------------------------------------------
 
 :Author: Cray Inc.
@@ -18,11 +18,9 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-The setrev subcommand is for populating the site-information file. This file
-is located at */opt/cray/etc/site_info.yml* by default.
-
-This information is printed out by **sat showrev** during its **--system**
-operation; specifically the following fields...
+The setrev subcommand prompts the user for input from stdin in order to populate
+the site-information file. This file is used by **sat showrev --system** to
+print the following fields:
 
     - Serial number
     - Site name
@@ -31,7 +29,7 @@ operation; specifically the following fields...
     - System type
 
 This subcommand is required to be run if **sat showrev** is to display this
-information - as this information must be manually populated on a Shasta system.
+information - as this information must be manually populated on the system.
 
 OPTIONS
 =======
@@ -41,6 +39,22 @@ These options must be specified after the subcommand.
 **--sitefile** *file*
         Select a custom location to write the information. The **showrev**
         subcommand has a corresponding option.
+
+FILES
+=====
+
+This subcommand requires extra files for its operation, and this section
+details the purpose and default location of those files.
+
+config: /etc/sat.toml
+        Global config file for SAT. setrev uses the site_info variable to
+        determine where to write its information.
+
+site_info: /opt/cray/etc/site_info.yml
+        This is the file that will contain the information set by this command.
+        This file is written in YAML format, and its location is configurable
+        from the **--sitefile** command-line parameter or through the config
+        file.
 
 SEE ALSO
 ========

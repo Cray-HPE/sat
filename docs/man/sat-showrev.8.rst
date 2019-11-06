@@ -139,6 +139,24 @@ These options must be specified after the subcommand.
 **-h, --help**
         Print the help message for 'sat showrev'.
 
+FILES
+=====
+
+This section references the extra files that this command requires for its
+operation. Their default locations are also listed.
+
+config: /etc/sat.toml
+        The location of the site_info file can be configured within this
+        file. The **--sitefile** command-line parameter may also be used.
+
+site_info: /opt/cray/etc/site_info.yml
+        Showrev uses this file to display the Serial number, Site name,
+        System install date, System name, and System type fields.
+
+release: /opt/cray/etc/release
+        Showrev parses this file to collect information for the CLE
+        version, General, PE, SLES version, SAT, and Urika fields.
+
 SEE ALSO
 ========
 
