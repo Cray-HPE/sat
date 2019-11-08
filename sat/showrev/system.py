@@ -311,12 +311,11 @@ def get_system_version(sitefile, substr=''):
         substr: Only return information about docker images whose name or id
             contains the substr.
     Returns:
-        A sorted dictionary that contains version information about the
+        A list of lists that contains version information about the
         various Shasta system components.
     """
 
     funcs = OrderedDict()
-    ret = OrderedDict()
     value_streams = get_value_streams()
     zypper_versions = get_zypper_versions(
         ['cray-lustre-client', 'slurm-slurmd', 'pbs-crayctldeploy']
@@ -324,29 +323,29 @@ def get_system_version(sitefile, substr=''):
     sitedata = get_site_data(sitefile)
 
     # keep this list in ascii-value sorted order on the keys.
-    funcs['Build version'] = get_build_version
-    funcs['CLE version'] = lambda: value_streams['CLE']
-    funcs['General'] = lambda: value_streams['general']
-    funcs['Interconnect'] = lambda: ' '.join(get_interconnects())
-    funcs['Kernel'] = get_kernel_version
-    funcs['Lustre'] = lambda: zypper_versions['cray-lustre-client']
-    funcs['PBS version'] = lambda: zypper_versions['pbs-crayctldeploy']
-    funcs['PE'] = lambda: value_streams['PE']
-    funcs['SLES version'] = get_sles_version
-    funcs['SAT'] = lambda: value_streams['sat']
-    funcs['Serial number'] = lambda: sitedata['Serial number']
-    funcs['Site name'] = lambda: sitedata['Site name']
-    funcs['Slingshot'] = lambda: value_streams['slingshot']
-    funcs['Slurm version'] = lambda: zypper_versions['slurm-slurmd']
-    funcs['SMA'] = lambda: value_streams['sma']
-    funcs['SMS'] = lambda: value_streams['sms']
-    funcs['System install date'] = lambda: sitedata['System install date']
-    funcs['System name'] = lambda: sitedata['System name']
-    funcs['System type'] = lambda: sitedata['System type']
-    funcs['Urika'] = lambda: value_streams['urika']
+    field_getters_by_name = OrderedDict([
+        ('Build version', get_build_version),
+        ('CLE version', lambda: value_streams['CLE']),
+        ('General', lambda: value_streams['general']),
+        ('Interconnect', lambda: ' '.join(get_interconnects())),
+        ('Kernel', get_kernel_version),
+        ('Lustre', lambda: zypper_versions['cray-lustre-client']),
+        ('PBS version', lambda: zypper_versions['pbs-crayctldeploy']),
+        ('PE', lambda: value_streams['PE']),
+        ('SLES version', get_sles_version),
+        ('SAT', lambda: value_streams['sat']),
+        ('Serial number', lambda: sitedata['Serial number']),
+        ('Site name', lambda: sitedata['Site name']),
+        ('Slingshot', lambda: value_streams['slingshot']),
+        ('Slurm version', lambda: zypper_versions['slurm-slurmd']),
+        ('SMA', lambda: value_streams['sma']),
+        ('SMS', lambda: value_streams['sms']),
+        ('System install date', lambda: sitedata['System install date']),
+        ('System name', lambda: sitedata['System name']),
+        ('System type', lambda: sitedata['System type']),
+        ('Urika', lambda: value_streams['urika']),
+    ])
 
-    for func in funcs:
-        if substr in func:
-            ret[func] = str(funcs[func]())
-
-    return ret
+    return [[field_name, field_getter()]
+            for field_name, field_getter in field_getters_by_name.items()
+            if substr in field_name]

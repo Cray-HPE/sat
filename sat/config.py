@@ -50,6 +50,10 @@ SAT_CONFIG_SPEC = {
         'username': OptionSpec(str, getpass.getuser, None, 'username'),
         'token_file': OptionSpec(str, '', None, 'token_file'),
     },
+    'format': {
+        'no_headings': OptionSpec(bool, False, None, 'no_headings'),
+        'no_borders': OptionSpec(bool, False, None, 'no_borders'),
+    },
     'general': {
         'site_info': OptionSpec(str, '/opt/cray/etc/site_info.yml', None, None)
     },
@@ -61,7 +65,7 @@ SAT_CONFIG_SPEC = {
     'redfish': {
         'username': OptionSpec(str, 'user', None, None),
         'password': OptionSpec(str, 'pass', None, None)
-    }
+    },
 }
 
 

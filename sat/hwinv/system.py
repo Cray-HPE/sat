@@ -8,6 +8,7 @@ import logging
 
 import inflect
 
+from sat.config import get_config_value
 from sat.hwinv.constants import EMPTY_STATUS, STATUS_KEY, TYPE_KEY
 from sat.hwinv.chassis import Chassis
 from sat.hwinv.compute_module import ComputeModule
@@ -18,7 +19,8 @@ from sat.hwinv.node_enclosure import NodeEnclosure
 from sat.hwinv.processor import Processor
 from sat.hwinv.router_module import RouterModule
 from sat.hwinv.summary import ComponentSummary
-from sat.util import get_pretty_printed_list, get_rst_header, yaml_dump
+from sat.report import Report
+from sat.util import yaml_dump
 from sat.xname import XName
 
 LOGGER = logging.getLogger(__name__)
@@ -173,7 +175,8 @@ class System:
         all_lists = OrderedDict()
 
         for object_type, comp_dict in self.components_by_type.items():
-            list_arg_name = 'list_{}'.format(inflector.plural(object_type.arg_name))
+            list_arg_name = 'list_{}'.format(
+                inflector.plural(object_type.arg_name))
             fields_arg_name = '{}_fields'.format(object_type.arg_name)
 
             if not(self.args.list_all or getattr(self.args, list_arg_name)):
@@ -186,12 +189,12 @@ class System:
                 list_key = 'Listing of all {} in the system'.format(
                     object_type.plural_pretty_name()
                 )
-                all_lists[list_key] = self.get_components_as_lists(comp_dict.values(),
-                                                                   fields)
+                all_lists[list_key] = self.get_components_as_lists(
+                    comp_dict.values(), fields)
             else:
                 list_key = '{}_list'.format(object_type.arg_name)
-                all_lists[list_key] = self.get_components_as_dicts(comp_dict.values(),
-                                                                   fields)
+                all_lists[list_key] = self.get_components_as_dicts(
+                    comp_dict.values(), fields)
 
         return all_lists
 
@@ -227,8 +230,7 @@ class System:
 
         return all_summaries
 
-    @staticmethod
-    def get_pretty_output(summaries, lists):
+    def get_pretty_output(self, summaries, lists):
         """Gets the complete output in pretty format.
 
         Args:
@@ -236,19 +238,23 @@ class System:
             lists (dict): The dict returned by the `get_all_lists` method.
 
         Returns:
-            A pretty string containing the complete output requested by the args.
+            A pretty string containing the complete output requested by
+            the args.
         """
         full_summary_string = ''
         for summary in summaries:
             full_summary_string += str(summary)
 
         full_list_string = ''
+
         for component, component_list in lists.items():
-            component_header = get_rst_header(component, 1)
-            pretty_component_table = get_pretty_printed_list(component_list[1:],
-                                                             component_list[0],
-                                                             sort_by=0)
-            full_list_string += component_header + pretty_component_table + '\n\n'
+            report = Report(component_list[0], component,
+                            self.args.sort_by, self.args.reverse,
+                            get_config_value('format.no_headings'),
+                            get_config_value('format.no_borders'))
+            report.add_rows(component_list[1:])
+
+            full_list_string += str(report.get_pretty_table()) + '\n\n'
 
         return full_summary_string + full_list_string
 

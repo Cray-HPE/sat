@@ -3,6 +3,8 @@ The parser for the showrev subcommand.
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
 
+import sat.parsergroups
+
 
 def add_showrev_subparser(subparsers):
     """Add the showrev subparser to the parent parser.
@@ -15,7 +17,13 @@ def add_showrev_subparser(subparsers):
         None
     """
 
-    showrev_parser = subparsers.add_parser('showrev', help='Show Shasta revision information.')
+    format_options = sat.parsergroups.create_format_options()
+
+    showrev_parser = subparsers.add_parser(
+        'showrev',
+        help='Show Shasta revision information.',
+        parents=[format_options])
+
     showrev_parser.add_argument(
         '--all',
         help='Print everything. Equivalent to specifying --system, --docker, and --packages.',
@@ -35,11 +43,6 @@ def add_showrev_subparser(subparsers):
         '--substr',
         help='Show version information for components whose names or IDs contain the substring.',
         default='')
-    showrev_parser.add_argument(
-        '-n',
-        '--no-headings',
-        help='If applicable, do not print table headings.',
-        action='store_true')
     showrev_parser.add_argument(
         '--sitefile',
         help='Specify custom site information file printed by --system.',

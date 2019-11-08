@@ -6,6 +6,8 @@ from argparse import ArgumentTypeError
 
 import inflect
 
+import sat.parsergroups
+
 
 def on_off_str2bool(value):
     """Converts 'on' or 'off' to a boolean.
@@ -107,14 +109,12 @@ def add_hwinv_subparser(subparsers):
     Returns:
         None
     """
-    hwinv_parser = subparsers.add_parser('hwinv', help='Show hardware inventory')
+    format_options = sat.parsergroups.create_format_options()
 
-    hwinv_parser.add_argument(
-        '--format', '-f',
-        help="Display information in the given format. Defaults to 'pretty'.",
-        choices=['pretty', 'yaml'],
-        default='pretty'
-    )
+    hwinv_parser = subparsers.add_parser(
+        'hwinv',
+        help='Show hardware inventory',
+        parents=[format_options])
 
     summarize_group = hwinv_parser.add_argument_group(
         'Summarize Options',

@@ -92,6 +92,15 @@ API_GATEWAY
         value isn't provided, then SAT will use the default location as
         specified in sat-auth(8).
 
+FORMAT
+------
+
+**no_headings**
+        If "true", then omit headings from tabular output. Defaults to "false".
+
+**no_borders**
+        If "true", then omit borders from tabular output. Defaults to "false".
+
 GENERAL
 -------
 

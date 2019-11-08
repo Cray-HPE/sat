@@ -129,15 +129,14 @@ These options must be specified after the subcommand.
         Show version information for components whose names or IDs contain
         the substring.
 
-**-n, --no-headings**
-        If applicable, do not print table headings.
-
 **--sitefile** *file*
         Specify custom site information file printed by --system. This file
         must be in a YAML format.
 
 **-h, --help**
         Print the help message for 'sat showrev'.
+
+.. include:: _sat-format-opts.rst
 
 FILES
 =====

@@ -42,7 +42,7 @@ def get_dockers(substr=''):
                 if not versions:
                     versions.append('latest')
 
-                ret.append([name, short_id] + versions)
+                ret.append([name, short_id, ', '.join(versions)])
 
     ret.sort()
     return ret
