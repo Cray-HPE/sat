@@ -8,7 +8,7 @@ import logging
 
 from prettytable import PrettyTable
 
-from sat.filtering import filter_list, ParseError
+from sat.filtering import filter_list, ParseError, _subsequence
 from sat.util import yaml_dump, get_rst_header
 
 
@@ -35,8 +35,9 @@ class Report:
                 headings from the display.
             no_borders: If True, then omit the borders around the table's cells.
             align: Set the alignment within cells. Defaults to left-alignment.
-            filter_strs: a list of strings against which the rows in the report should
-                be filtered. The queries are combined with a boolean "and".
+            filter_strs: a list of strings against which the rows in the
+                report should be filtered. The queries are combined with a
+                boolean "and".
         """
         self.headings = headings
         self.title = title
@@ -52,25 +53,25 @@ class Report:
 
         # find the heading to sort on
         if sort_by is not None:
-            warn_str = (
-                'Element %s is not in %s. '
-                'Defaulting to sorting on the first column.')
+            warn_str = ('Element %s is not in %s. Output will be unsorted.')
             try:
                 self.sort_by = int(self.sort_by)
                 self.sort_by = self.headings[self.sort_by]
             except IndexError:
                 # sort_by is out of range.
-                LOGGER.warning(warn_str, self.sort_by, self.headings)
+                LOGGER.warning(warn_str, sort_by, self.headings)
                 self.sort_by = None
             except ValueError:
                 # sort_by is not an int.
                 up = self.sort_by.upper()
-                try:
-                    idx = [h.upper() for h in headings].index(up)
-                    self.sort_by = self.headings[idx]
-                except ValueError:
-                    LOGGER.warning(warn_str, self.sort_by, self.headings)
-                    self.sort_by = None
+                self.sort_by = None
+                for h in headings:
+                    if _subsequence(up, h.upper()):
+                        self.sort_by = h
+                        break
+
+                if not self.sort_by:
+                    LOGGER.warning(warn_str, sort_by, self.headings)
 
     def __str__(self):
         """Return this report as a pretty-looking table.
@@ -78,7 +79,18 @@ class Report:
         Returns:
             This report as a pretty-looking table.
         """
-        return self.get_pretty_table()
+        heading = ''
+        if not self.no_headings and self.title:
+            heading += get_rst_header(self.title, min_len=80)
+
+        if not self.data:
+            return heading
+
+        pt = self.get_pretty_table()
+        if pt is not None:
+            return heading + str(pt)
+        else:
+            return ''
 
     def convert_row(self, row):
         """Returns a row as it should appear as an entry in the report.
@@ -148,23 +160,17 @@ class Report:
         self.data.append(new_row)
 
     def get_pretty_table(self):
-        """Return a pretty-looking string from the data.
+        """Return a PrettyTable instance created from the data and format opts.
 
         Returns:
-            The contents formatted as a tabular-string.
+            A prettytable.PrettyTable reference. Returns None if an error
+            occurred.
         """
         pt = PrettyTable()
         pt.field_names = self.headings
         pt.reversesort = self.reverse
         pt.border = not self.no_borders
         pt.header = not self.no_headings
-
-        table_str = ''
-        if not self.no_headings and self.title:
-            table_str += get_rst_header(self.title, min_len=80)
-
-        if not self.data:
-            return table_str
 
         if self.sort_by is not None:
             try:
@@ -181,16 +187,15 @@ class Report:
         try:
             rows_to_print = filter_list(self.data, self.filter_strs)
 
+            for row in rows_to_print:
+                pt.add_row([str(r) for r in row.values()])
+
         except (KeyError, ParseError, TypeError) as err:
             LOGGER.warning("An error occurred while filtering; "
                            "returning no output. (%s)", err)
-            return ''
+            return None
 
-        else:
-            for row in rows_to_print:
-                pt.add_row(row.values())
-
-        return table_str + str(pt)
+        return pt
 
     def get_yaml(self):
         """Retrieve the report's yaml representation.

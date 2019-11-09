@@ -85,4 +85,4 @@ def showrev(args):
             print(report.get_yaml())
     else:
         for report in reports:
-            print(report.get_pretty_table() + '\n\n')
+            print(str(report) + '\n\n')
