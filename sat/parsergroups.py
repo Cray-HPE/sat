@@ -40,3 +40,20 @@ def create_format_options():
               'or a 0-based index. Only applies for "pretty"'))
 
     return parser
+
+def create_filter_options():
+    """Creates a parser containing options for filtering.
+
+    Returns: an ArgumentParser object configured with options and help
+        text for filtering.
+    """
+    parser = ArgumentParser(add_help=False)
+
+    group = parser.add_argument_group(
+        'filtering options', 'Options to filter output for applicable commands.')
+
+    group.add_argument(
+        '--filter', metavar='QUERY', dest='filter_strs', action='append',
+        help='Filter the output against some constraint.')
+
+    return parser

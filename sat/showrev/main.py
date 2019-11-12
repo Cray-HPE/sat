@@ -74,7 +74,8 @@ def showrev(args):
         title = 'Installed Package Versions'
         headings = ['name', 'version']
         reports.append(Report(
-            headings, title, sort_by, reverse, no_headings, no_borders))
+            headings, title, sort_by, reverse, no_headings, no_borders,
+            filter_strs=args.filter_strs))
         reports[-1].add_rows(data)
 
     if args.format == 'yaml':

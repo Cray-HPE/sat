@@ -84,10 +84,8 @@ class XName:
         return self.tokens <= other.tokens
 
     def __eq__(self, other):
-        return self.tokens == other.tokens
-
-    def __ne__(self, other):
-        return self.tokens != other.tokens
+        return (isinstance(self, type(other)) and
+                self.tokens == other.tokens)
 
     def __gt__(self, other):
         return self.tokens > other.tokens
