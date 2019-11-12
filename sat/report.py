@@ -48,7 +48,7 @@ class Report:
         self.no_headings = no_headings
         self.no_borders = no_borders
         self.align = align
-        self.filter_strs = filter_strs
+        self.filter_strs = filter_strs or []
 
         # find the heading to sort on
         if sort_by is not None:
@@ -151,9 +151,7 @@ class Report:
         """Return a pretty-looking string from the data.
 
         Returns:
-            a tuple containing the contents formatted as a
-            tabular-string, and any potential error messages which
-            occured while formatting or filtering.
+            The contents formatted as a tabular-string.
         """
         pt = PrettyTable()
         pt.field_names = self.headings
@@ -181,12 +179,16 @@ class Report:
             pt.align[heading] = self.align
 
         try:
-            for row in filter_list(self.data, self.filter_strs):
-                pt.add_row(row.values())
+            rows_to_print = filter_list(self.data, self.filter_strs)
+
         except (KeyError, ParseError, TypeError) as err:
-            LOGGER.warning("An error occurred while filtering; returning no output."
-                           .format(err))
+            LOGGER.warning("An error occurred while filtering; "
+                           "returning no output. (%s)", err)
             return ''
+
+        else:
+            for row in rows_to_print:
+                pt.add_row(row.values())
 
         return table_str + str(pt)
 
@@ -196,4 +198,13 @@ class Report:
         Returns:
             The data of the report formatted as a string in yaml format.
         """
-        return yaml_dump(self.data)
+        try:
+            rows_to_print = filter_list(self.data, self.filter_strs)
+
+        except (KeyError, ParseError, TypeError) as err:
+            LOGGER.warning("An error occurred while filtering; "
+                           "returning no output. (%s)", err)
+            return ''
+
+        else:
+            return yaml_dump(rows_to_print)

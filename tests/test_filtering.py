@@ -176,6 +176,13 @@ class TestFilterList(unittest.TestCase):
         self.assertEqual(filtering.filter_list([], self.query_strings),
                          [])
 
+    def test_filtering_with_no_filters(self):
+        """Test filtering against an empty set of filters."""
+        items = [{'name': 'garfield'}, {'name': 'odie'},
+                 {'name': 'jon arbuckle'}]
+        self.assertEqual(filtering.filter_list(items, []),
+                         items)
+
     def test_invalid_input_list(self):
         """Test filtering a list with inconsistent headings (i.e. keys)."""
         with self.assertRaises(ValueError):

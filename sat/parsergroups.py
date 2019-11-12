@@ -53,7 +53,8 @@ def create_filter_options():
         'filtering options', 'Options to filter output for applicable commands.')
 
     group.add_argument(
-        '--filter', metavar='QUERY', dest='filter_strs', action='append',
+        '--filter', metavar='QUERY', dest='filter_strs',
+        action='append', default=[],
         help='Filter the output against some constraint.')
 
     return parser
