@@ -4,34 +4,17 @@ Entry point for the command-line interface.
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
 
+import importlib
 import logging
 import sys
 
 import argcomplete
 
-from sat.auth.main import do_login
-from sat.cablecheck.main import do_cablecheck
 from sat.config import load_config
-from sat.diag.main import do_diag
-from sat.hwinv.main import do_hwinv
 from sat.logging import bootstrap_logging, configure_logging
 from sat.parser import create_parent_parser
-from sat.setrev.main import setrev
-from sat.showrev.main import showrev
-from sat.status.main import do_status
 
 LOGGER = logging.getLogger(__name__)
-
-SUBCOMMAND_FUNCS = {
-    'auth': do_login,
-    'cablecheck': do_cablecheck,
-    'diag': do_diag,
-    'hwinv': do_hwinv,
-    'setrev': setrev,
-    'showrev': showrev,
-    'status': do_status,
-}
-
 
 def main():
     """SAT Main.
@@ -39,24 +22,49 @@ def main():
     Returns:
         None. Calls sys.exit().
     """
-    parser = create_parent_parser()
-    argcomplete.autocomplete(parser)
-    args = parser.parse_args()
+    try:
+        parser = create_parent_parser()
+        argcomplete.autocomplete(parser)
+        args = parser.parse_args()
 
-    bootstrap_logging()
+        bootstrap_logging()
 
-    load_config(args)
-    configure_logging()
+        load_config(args)
+        configure_logging()
 
-    # Print help info if executed without a subcommand
-    if args.command is None:
-        parser.print_help()
-        sys.exit(1)
+        # Print help info if executed without a subcommand
+        if args.command is None:
+            parser.print_help()
+            sys.exit(1)
 
-    # parse_args will catch any invalid values of arg.command
-    subcommand = SUBCOMMAND_FUNCS[args.command]
+        try:
+            # Dynamically importing here affords the following
+            # advantages:
+            # 1. If Ctrl-C is pressed while imports are occuring, we
+            #    can handle it gracefully.
+            # 2. We can import only the subcommand code relevant to the
+            #    desired subcommand, which gives a small performance benefit,
+            #    about a 100ms speedup for the import step.
+            subcommand_module = importlib.import_module('sat.{}.main'.format(args.command))
+            subcommand = getattr(subcommand_module, 'do_{}'.format(args.command))
+            subcommand(args)
 
-    subcommand(args)
+        except ImportError:
+            # This should only really happen if there's a programming mistake.
+            LOGGER.error("Subcommand implementation for '%s' not found. "
+                         "Is the subpackage 'sat.%s' present?",
+                         args.command, args.command)
+            sys.exit(1)
+
+        except AttributeError:
+            # Much like the above exception handler, this should only
+            # happen if there's a programming mistake.
+            LOGGER.error("Couldn't find function 'sat.%s.main.do_%s'. "
+                         "Is it named correctly?",
+                         args.command, args.command)
+            sys.exit(1)
+    except KeyboardInterrupt:
+        LOGGER.info("Received keyboard interrupt; quitting.")
 
     sys.exit(0)
 

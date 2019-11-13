@@ -168,7 +168,7 @@ def write_site_data(sitefile, data):
                 raise
 
 
-def setrev(args):
+def do_setrev(args):
     """Populate site-specific information.
 
     Args:
