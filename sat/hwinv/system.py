@@ -195,7 +195,7 @@ class System:
             else:
                 list_key = '{}_list'.format(object_type.arg_name)
                 all_lists[list_key] = filter_list(self.get_components_as_dicts(
-                    comp_dict.values(), fields), self.args.filter_str)
+                    comp_dict.values(), fields), self.args.filter_strs)
 
         return all_lists
 

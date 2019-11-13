@@ -440,6 +440,9 @@ def filter_list(dicts, query_strings):
     if not dicts:
         return []
 
+    if not query_strings:
+        return dicts
+
     # Assume the first row's headings are the "right ones."
     first, rest = dicts[0], dicts[1:]
     fkeys = first.keys()

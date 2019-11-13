@@ -49,7 +49,8 @@ def showrev(args):
         title = 'System Revision Information'
         headings = ['component', 'data']
         reports.append(Report(
-            headings, title, sort_by, reverse, no_headings, no_borders))
+            headings, title, sort_by, reverse, no_headings, no_borders,
+            filter_strs=args.filter_strs))
         reports[-1].add_rows(data)
 
     if args.docker:
@@ -62,7 +63,8 @@ def showrev(args):
         title = 'Installed Container Versions'
         headings = ['name', 'short-id', 'versions']
         reports.append(Report(
-            headings, title, sort_by, reverse, no_headings, no_borders))
+            headings, title, sort_by, reverse, no_headings, no_borders,
+            filter_strs=args.filter_strs))
         reports[-1].add_rows(data)
 
     if args.packages:
