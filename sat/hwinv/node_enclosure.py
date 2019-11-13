@@ -8,7 +8,7 @@ from sat.hwinv.constants import NODE_ENCLOSURE_TYPE
 
 
 class NodeEnclosure(BaseComponent):
-    """A node enclosure in the EX-1 system."""
+    """A node enclosure in the system."""
 
     hsm_type = NODE_ENCLOSURE_TYPE
     arg_name = 'node_enclosure'

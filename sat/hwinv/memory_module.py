@@ -11,7 +11,7 @@ from sat.hwinv.field import ComponentField
 
 
 class MemoryModule(BaseComponent):
-    """A memory module in the EX-1 system."""
+    """A memory module in the system."""
 
     hsm_type = MEMORY_TYPE
     arg_name = 'mem'

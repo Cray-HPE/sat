@@ -27,7 +27,7 @@ LOGGER = logging.getLogger(__name__)
 def get_value_streams(relfile='/opt/cray/etc/release'):
     """Returns the version information within the release file.
 
-    Shasta stores release information for various value-streams in a file
+    Release information for various value-streams is stored in a file
     located at /opt/cray/etc/release. This file is stored in YAML format,
     and this function reads the data into a dictionary where the keys are the
     names of the value-streams, and the values are the versions for each.
@@ -88,7 +88,7 @@ def get_value_streams(relfile='/opt/cray/etc/release'):
 
 
 def get_site_data(sitefile):
-    """Get site-specific information from the Shasta sitefile.
+    """Get site-specific information from the sitefile.
 
     Args:
         sitefile: Specify custom sitefile to load. It must be in yaml format.
@@ -233,7 +233,7 @@ def _get_hsm_components():
 
 
 def get_interconnects():
-    """Get string of unique interconnect types across Shasta.
+    """Get string of unique interconnect types across the system.
 
     Returns:
         A space-separated string of interconnect types.
@@ -268,7 +268,7 @@ def get_build_version():
 
 
 def get_sles_version():
-    """SLES version info is found in /etc/os-release on Shasta systems.
+    """Gets SLES version info found in /etc/os-release.
 
     Returns:
         A string containing the NAME and VERSION field as found in the file
@@ -302,17 +302,17 @@ def get_sles_version():
 
 
 def get_system_version(sitefile, substr=''):
-    """Collect generic information about the Shasta system.
+    """Collects generic information about the system.
 
     This is the function that 'decides' what components (and their versions)
-    adequately describe the 'version' of a Shasta system.
+    adequately describe the 'version' of the system.
 
     Args:
         substr: Only return information about docker images whose name or id
             contains the substr.
     Returns:
         A list of lists that contains version information about the
-        various Shasta system components.
+        various system components.
     """
 
     funcs = OrderedDict()

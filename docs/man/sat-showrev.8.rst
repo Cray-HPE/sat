@@ -2,9 +2,9 @@
  SAT-SHOWREV
 =============
 
--------------------------------------------------
-Print version information about the Shasta system
--------------------------------------------------
+------------------------------------------
+Print version information about the system
+------------------------------------------
 
 :Author: Cray Inc.
 :Copyright: Copyright 2019 Cray Inc. All Rights Reserved.
@@ -18,12 +18,12 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-The showrev subcommand prints revision information about the EX-1 system.
+The showrev subcommand prints revision information about the system.
 This includes general version information about the system, as well as
 version information about installed docker images and rpm packages.
 
 The default behavior of this command is to print general revision information
-about the EX-1. This is a mixture of information read from the EX-1 release
+about the system. This is a mixture of information read from the release
 file located at */opt/cray/etc/release*, site-specific revision information,
 and various api calls to other Cray services. The following list details the
 meaning and source of information for each field.
@@ -36,7 +36,7 @@ CLE version
     /opt/cray/etc/release.
 
 General
-    This is the general version of the Shasta software read from
+    This is the general version of the system software read from
     /opt/cray/etc/release.
 
 Interconnect
@@ -112,7 +112,7 @@ OPTIONS
 These options must be specified after the subcommand.
 
 **--system**
-        Display general version information about the Shasta system. This is
+        Display general version information about the system. This is
         the default behavior.
 
 **--docker**

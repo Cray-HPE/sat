@@ -169,7 +169,7 @@ def write_site_data(sitefile, data):
 
 
 def setrev(args):
-    """Populate Shasta's site-specific information.
+    """Populate site-specific information.
 
     Args:
         args: The argparse.Namespace object containing the parsed arguments

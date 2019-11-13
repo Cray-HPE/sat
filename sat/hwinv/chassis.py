@@ -9,7 +9,7 @@ from sat.hwinv.node import Node
 
 
 class Chassis(BaseComponent):
-    """A chassis in the EX-1 system."""
+    """A chassis in the system."""
 
     hsm_type = CHASSIS_TYPE
     arg_name = 'chassis'

@@ -11,7 +11,7 @@ from sat.hwinv.field import ComponentField
 
 
 class Processor(BaseComponent):
-    """A processor in the EX-1 system."""
+    """Represents a processor in the system."""
 
     hsm_type = PROCESSOR_TYPE
     arg_name = 'proc'

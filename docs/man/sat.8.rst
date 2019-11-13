@@ -20,7 +20,7 @@ DESCRIPTION
 
 The System Admin Toolkit (SAT) is a command line utility meant to be run from
 the Bastion Inception Sentinel (BIS) server. Its purpose is to assist admins
-with troubleshooting and querying information about the Shasta system and its
+with troubleshooting and querying information about the system and its
 components at large.
 
 This utility operates via "subcommands", and each has its own manual page.
@@ -107,7 +107,7 @@ API_GATEWAY
 -----------
 
 **host**
-        Points to the Cray EX-1 API gateway.
+        Points to the API gateway.
 
 **cert_verify**
         If "true", then SAT will validate the authenticity of the api-gateway
@@ -140,7 +140,7 @@ GENERAL
 -------
 
 **site_info**
-        Some installation information about the EX-1 is site-specific, and
+        Some installation information about the system is site-specific, and
         needs to be manually entered. This file is where that information is
         stored. SAT expects this file to be in YAML format.
 

@@ -23,7 +23,7 @@ def create_parent_parser():
         added to it.
     """
 
-    parser = ArgumentParser(description='SAT - The Shasta Admin Toolkit')
+    parser = ArgumentParser(description='SAT - The System Admin Toolkit')
 
     parser.add_argument(
         '-u', '--username',

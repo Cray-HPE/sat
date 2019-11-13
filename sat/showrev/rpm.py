@@ -1,6 +1,6 @@
 """
 sat showrev uses the functions in this module to display information about
-rpms that are available to Shasta.
+rpms that are available.
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
