@@ -6,16 +6,15 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 
 from collections import defaultdict
 from datetime import date
-import getpass
 import logging
-import re
 import sys
 import time
 
 import inflect
 
-from sat.cli.diag import redfish
-from sat.config import get_config_value
+from sat import redfish as sat_redfish
+from sat.cli.diag import redfish as diag_redfish
+from sat.util import pester
 
 
 inf = inflect.engine()
@@ -47,61 +46,6 @@ def xnames_from_file(fstream):
     """
     return [xname.strip() for xname in fstream.readlines() if xname.strip()] \
         if not fstream.isatty() else []
-
-
-def pester(message, valid_answer=r"^(yes|no)?$", human_readable_valid="yes/[no]",
-           parse_answer=lambda answer: answer.lower() == "yes"):
-    """Queries user on stdin for some value until the user
-    provides an input that matches `valid_answer`.
-
-    By default, this asks for a yes or no answer.
-
-    Args:
-        message: a string with a prompt to be printed before asking
-            the user.
-        valid_answer: a regex string for which if message matches,
-            return some value based on the input.
-        human_readable_valid: a human-readable version of valid_answer.
-            This is displayed at the prompt. If it is falsy (e.g., None or empty
-            string), then the regex is displayed instead.
-        parse_answer: a function taking one string argument which returns a
-            value which is to be used in some higher-level conditional.
-
-    Returns:
-        For some first valid user input `answer`, return parse_answer(answer). If
-        an input error occurs, return None.
-    """
-    try:
-        while True:
-            answer = input("{} ({}) ".format(message, human_readable_valid or valid_answer))
-            if re.match(valid_answer, answer):
-                return parse_answer(answer)
-            else:
-                print("Input must match '{}'. ".format(valid_answer), end="")
-    except (KeyboardInterrupt, EOFError):
-        print("\n", end="")
-        return
-
-
-def get_username_and_pass():
-    """Gets the username and password for a user.
-
-    This will lookup the username and password from the config
-    file. If either is not supplied, then the user will be queried
-    interactively for both.
-
-    Returns: a pair (2-tuple) containing the username and password
-        for use with the Redfish API.
-    """
-    username, password = (get_config_value('redfish.username'),
-                          get_config_value('redfish.password'))
-    if not (username and password):
-        username = pester("Username: ", "^.*$",
-                          human_readable_valid="Redfish",
-                          parse_answer=(lambda x: x))
-        password = getpass.getpass()
-
-    return username, password
 
 
 def report(finished_diags, timestamp, split):
@@ -170,9 +114,10 @@ def run_diag_set(xnames, diag_command, diag_args,
     running_diags = None
     try:
         # Initialize all diags
-        running_diags = redfish.RunningDiagPool(xnames, diag_command, diag_args,
-                                                cli_args.interval, cli_args.timeout,
-                                                username, password)
+        running_diags = diag_redfish.RunningDiagPool(
+            xnames, diag_command, diag_args,
+            cli_args.interval, cli_args.timeout,
+            username, password)
 
         # Continually poll until all diags are complete.
         while not running_diags.complete:
@@ -269,7 +214,7 @@ def do_diag(args):
     if not really_run:
         sys.exit(0)
 
-    username, password = get_username_and_pass()
+    username, password = sat_redfish.get_username_and_pass()
     if args.interactive:
         run_diags_from_prompt(xnames, args, username, password)
     else:

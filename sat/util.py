@@ -9,6 +9,7 @@ import logging
 import math
 import os
 import os.path
+import re
 
 # Logic borrowed from imps to get the most efficient YAML available
 try:
@@ -22,6 +23,43 @@ from prettytable import PrettyTable
 from sat.xname import XName
 
 LOGGER = logging.getLogger(__name__)
+
+
+def pester(message,
+           valid_answer=r"^(yes|no)?$",
+           human_readable_valid="yes/[no]",
+           parse_answer=lambda answer: answer.lower() == "yes"):
+    """Pester until given a valid input over stdin.
+
+    Queries user on stdin for some value until the user provides an input
+    that matches `valid_answer`.
+
+    By default, this asks for a yes or no answer.
+
+    Args:
+        message: a string with a prompt to be printed before asking the user.
+        valid_answer: a regex string for which if message matches,
+            return some value based on the input.
+        human_readable_valid: a human-readable version of valid_answer.
+            This is displayed at the prompt. If it is falsy
+            (e.g., None or empty string), then the regex is displayed instead.
+        parse_answer: a function taking one string argument which returns a
+            value which is to be used in some higher-level conditional.
+
+    Returns:
+        For some first valid user input `answer`, return
+        parse_answer(answer). If an input error occurs, return None.
+    """
+    try:
+        while True:
+            answer = input("{} ({}) ".format(message, human_readable_valid or valid_answer))
+            if re.match(valid_answer, answer):
+                return parse_answer(answer)
+            else:
+                print("Input must match '{}'. ".format(valid_answer), end="")
+    except (KeyboardInterrupt, EOFError):
+        print("\n", end="")
+        return
 
 
 def get_pretty_printed_dict(d, min_len=0):

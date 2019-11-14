@@ -265,7 +265,7 @@ def parse_query_string(query_string):
     tok_and = lexeme(parsec.string('and'))
     tok_or = lexeme(parsec.string('or'))
     tok_cmpr = lexeme(parsec.regex(COMPARATOR_RE))
-    tok_lhs = lexeme(parsec.regex(r'[a-zA-Z_]+'))
+    tok_lhs = lexeme(parsec.regex(r'[a-zA-Z_\-0-9]+'))
 
     @lexeme
     @parsec.generate

@@ -5,6 +5,7 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 """
 
 import logging
+from collections import OrderedDict
 
 from prettytable import PrettyTable
 
@@ -122,10 +123,10 @@ class Report:
                 LOGGER.error(msg)
                 raise ValueError(msg)
 
-            return dict(zip(self.headings, row))
+            return OrderedDict(zip(self.headings, row))
         elif isinstance(row, dict):
             try:
-                return dict(zip(self.headings, [row[x] for x in self.headings]))
+                return OrderedDict(zip(self.headings, [row[x] for x in self.headings]))
             except KeyError:
                 raise ValueError(
                     'The headings {} need to be present.'.format(self.headings))
