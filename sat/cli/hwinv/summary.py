@@ -112,7 +112,7 @@ class FieldSummary:
         Args:
             comp_type: The type of component being summarized, subclass of
                 BaseComponent.
-            field (sat.hwinv.field.ComponentField): The field to summarize the
+            field (sat.cli.hwinv.field.ComponentField): The field to summarize the
                 components by.
             components (Iterable): An Iterable of BaseComponent objects to
                 summarize.

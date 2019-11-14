@@ -1,5 +1,5 @@
 """
-Unit tests for the sat.sat.setrev.main functions.
+Unit tests for the sat.sat.cli.setrev.main functions.
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
@@ -10,7 +10,7 @@ import os
 import unittest
 from unittest import mock
 
-import sat.setrev.main
+import sat.cli.setrev.main
 
 
 samples = os.path.join(os.path.dirname(__file__), 'samples')
@@ -64,24 +64,24 @@ class TestSetrev(unittest.TestCase):
     def test_is_valid_date_empty_string(self):
         """is_valid_date should return True on empty string.
         """
-        self.assertTrue(sat.setrev.main.is_valid_date(''))
+        self.assertTrue(sat.cli.setrev.main.is_valid_date(''))
 
     def test_is_valid_date_good_format(self):
         """is_valid_date should return True if format matches YYYY-mm-dd.
         """
-        self.assertTrue(sat.setrev.main.is_valid_date('2019-08-10'))
+        self.assertTrue(sat.cli.setrev.main.is_valid_date('2019-08-10'))
 
     def test_is_valid_date_bad_dates(self):
         """is_valid_date should not accept invalid dates.
         """
-        self.assertFalse(sat.setrev.main.is_valid_date('2019-13-10'))
-        self.assertFalse(sat.setrev.main.is_valid_date('2019-08-32'))
+        self.assertFalse(sat.cli.setrev.main.is_valid_date('2019-13-10'))
+        self.assertFalse(sat.cli.setrev.main.is_valid_date('2019-08-32'))
 
     def test_get_site_data_good_file(self):
         """get_site_data should return a dict after reading valid yaml.
         """
         path = '{}/good.yml'.format(samples)
-        d = sat.setrev.main.get_site_data(path)
+        d = sat.cli.setrev.main.get_site_data(path)
 
         self.assertEqual(d['Serial number'], '12345shasdf')
         self.assertEqual(d['Site name'], 'site-name-with-spaces')
@@ -93,7 +93,7 @@ class TestSetrev(unittest.TestCase):
         """The dict returned by get_site_data should only contain str types.
         """
         path = '{}/good.yml'.format(samples)
-        d = sat.setrev.main.get_site_data(path)
+        d = sat.cli.setrev.main.get_site_data(path)
 
         for key, value in d.items():
             self.assertEqual(type(value), str)
@@ -102,47 +102,47 @@ class TestSetrev(unittest.TestCase):
         """get_site_data should return empty dict if file doesn't exist.
         """
         path = 'idontexist.yml'
-        d = sat.setrev.main.get_site_data(path)
+        d = sat.cli.setrev.main.get_site_data(path)
         self.assertEqual(d, {})
 
     def test_get_site_data_file_not_found(self):
         """get_site_data should return empty dict if file doesn't exist.
         """
         path = 'idontexist.yml'
-        d = sat.setrev.main.get_site_data(path)
+        d = sat.cli.setrev.main.get_site_data(path)
         self.assertEqual(d, {})
 
-    @mock.patch('sat.setrev.main.open', side_effect=PermissionError)
+    @mock.patch('sat.cli.setrev.main.open', side_effect=PermissionError)
     def test_get_site_data_permission_error(self, mockopen):
         """get_site_data should throw permission error if file had bad perms.
         """
         path = '{}/good.yml'.format(samples)
         with self.assertRaises(PermissionError):
-            d = sat.setrev.main.get_site_data(path)
+            d = sat.cli.setrev.main.get_site_data(path)
 
     def test_get_site_data_empty_file(self):
         """get_site_data should return empty dict if file was empty
         """
         path = '{}/empty'.format(samples)
-        d = sat.setrev.main.get_site_data(path)
+        d = sat.cli.setrev.main.get_site_data(path)
         self.assertEqual(d, {})
 
     def test_get_site_data_non_yaml(self):
         """get_site_data should return empty dict if the file was non-yaml.
         """
         path = '{}/non-yaml.yml'.format(samples)
-        d = sat.setrev.main.get_site_data(path)
+        d = sat.cli.setrev.main.get_site_data(path)
         self.assertEqual(d, {})
 
-    @mock.patch('sat.setrev.main.input', lambda x: full[x])
+    @mock.patch('sat.cli.setrev.main.input', lambda x: full[x])
     def test_input_site_data_fresh(self):
         """input_site_data should insert vals to an empty dict.
         """
         d1 = {}
-        sat.setrev.main.input_site_data(d1)
+        sat.cli.setrev.main.input_site_data(d1)
         self.assertEqual(d1, full)
 
-    @mock.patch('sat.setrev.main.input', lambda x: empty_date[x])
+    @mock.patch('sat.cli.setrev.main.input', lambda x: empty_date[x])
     def test_input_site_data_empty_date(self):
         """input_site_data should default to today for 'System install date'.
         """
@@ -150,10 +150,10 @@ class TestSetrev(unittest.TestCase):
         d2 = {}
         d2.update(empty_date)
         d2['System install date'] = datetime.today().strftime('%Y-%m-%d')
-        sat.setrev.main.input_site_data(d1)
+        sat.cli.setrev.main.input_site_data(d1)
         self.assertEqual(d1, d2)
 
-    @mock.patch('sat.setrev.main.input', lambda x: empty_input[x])
+    @mock.patch('sat.cli.setrev.main.input', lambda x: empty_input[x])
     def test_input_site_data_preservation(self):
         """input_site_data should preserve non-empty entries of existing data.
         """
@@ -161,11 +161,11 @@ class TestSetrev(unittest.TestCase):
         d2 = {}
         d1.update(full)
         d2.update(d1)
-        sat.setrev.main.input_site_data(d1)
+        sat.cli.setrev.main.input_site_data(d1)
 
         self.assertEqual(d1, d2)
 
-    @mock.patch('sat.setrev.main.input', lambda x: full[x])
+    @mock.patch('sat.cli.setrev.main.input', lambda x: full[x])
     def test_input_site_data_overwrite(self):
         """input_site_data should overwrite existing entries.
         """
@@ -173,10 +173,10 @@ class TestSetrev(unittest.TestCase):
         d1.update(full)
         d1['Serial number'] = 'new-serial-number'
 
-        sat.setrev.main.input_site_data(d1)
+        sat.cli.setrev.main.input_site_data(d1)
         self.assertEqual(d1, full)
 
-    @mock.patch('sat.setrev.main.input', lambda x: empty_input[x])
+    @mock.patch('sat.cli.setrev.main.input', lambda x: empty_input[x])
     def test_input_site_data_empty_input(self):
         """input_site_data should allow completely empty input.
         """
@@ -189,7 +189,7 @@ class TestSetrev(unittest.TestCase):
             'System type': '',
         }
 
-        sat.setrev.main.input_site_data(d1)
+        sat.cli.setrev.main.input_site_data(d1)
         self.assertEqual(d1, expected)
 
     def test_write_site_data_newfile(self):
@@ -199,8 +199,8 @@ class TestSetrev(unittest.TestCase):
         d1 = {}
 
         m = mock.mock_open()
-        with mock.patch('sat.setrev.main.open', m):
-            sat.setrev.main.write_site_data(sitefile, d1)
+        with mock.patch('sat.cli.setrev.main.open', m):
+            sat.cli.setrev.main.write_site_data(sitefile, d1)
 
         m.assert_called_once_with(sitefile, 'w')
 
@@ -216,8 +216,8 @@ class TestSetrev(unittest.TestCase):
                 os.remove(sitefile)
 
             # test that data is read the same as it is written
-            sat.setrev.main.write_site_data(sitefile, d1)
-            d2 = sat.setrev.main.get_site_data(sitefile)
+            sat.cli.setrev.main.write_site_data(sitefile, d1)
+            d2 = sat.cli.setrev.main.get_site_data(sitefile)
 
             self.assertEqual(d1, d2)
         finally:
@@ -231,11 +231,11 @@ class TestSetrev(unittest.TestCase):
         try:
             sitefile = '{}/sitefile1.yml'.format(samples)
             d1 = full
-            sat.setrev.main.write_site_data(sitefile, d1)
-            sat.setrev.main.write_site_data(sitefile, {})
+            sat.cli.setrev.main.write_site_data(sitefile, d1)
+            sat.cli.setrev.main.write_site_data(sitefile, {})
 
             empty = {}
-            result = sat.setrev.main.get_site_data(sitefile)
+            result = sat.cli.setrev.main.get_site_data(sitefile)
 
             self.assertEqual(empty, empty)
         finally:

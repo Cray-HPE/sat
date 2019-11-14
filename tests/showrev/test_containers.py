@@ -1,5 +1,5 @@
 """
-Unit tests for the sat.showrev.containers .
+Unit tests for the sat.cli.showrev.containers .
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
@@ -8,7 +8,7 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 import unittest
 from unittest import mock
 
-import sat.showrev
+import sat.cli.showrev
 
 
 class FakeDockerImage:
@@ -78,33 +78,33 @@ class FakeDockerEnv:
 
 class TestContainers(unittest.TestCase):
 
-    @mock.patch('sat.showrev.containers.docker.from_env', FakeDockerEnv)
+    @mock.patch('sat.cli.showrev.containers.docker.from_env', FakeDockerEnv)
     def test_get_dockers(self):
         """Positive test case for get_dockers. Verifies a sorted list of returns.
         """
-        result = sat.showrev.containers.get_dockers()
+        result = sat.cli.showrev.containers.get_dockers()
         self.assertEqual(result, sorted(result))
         self.assertGreater(len(result), 0)
 
-    @mock.patch('sat.showrev.containers.docker.from_env', FakeDockerEnv)
+    @mock.patch('sat.cli.showrev.containers.docker.from_env', FakeDockerEnv)
     def test_get_dockers_no_match(self):
         """get_dockers should return empty list if there was no match.
         """
-        result = sat.showrev.containers.get_dockers('idontexist')
+        result = sat.cli.showrev.containers.get_dockers('idontexist')
         self.assertEqual(result, [])
 
-    @mock.patch('sat.showrev.containers.docker.from_env', FakeDockerEnv)
+    @mock.patch('sat.cli.showrev.containers.docker.from_env', FakeDockerEnv)
     def test_get_docker_id_substring(self):
         """get_dockers should return images whose full id contains the substr.
         """
-        result = sat.showrev.containers.get_dockers('304735eab4e4df55b236f')
+        result = sat.cli.showrev.containers.get_dockers('304735eab4e4df55b236f')
         self.assertEqual(result[0], ['statsd-exporter', '304735eab4', 'v0.6.0'])
 
-    @mock.patch('sat.showrev.containers.docker.from_env', FakeDockerEnv)
+    @mock.patch('sat.cli.showrev.containers.docker.from_env', FakeDockerEnv)
     def test_get_docker_name_substring(self):
         """get_dockers should return images whose name contains the substr.
         """
-        result = sat.showrev.containers.get_dockers('statsd-export')
+        result = sat.cli.showrev.containers.get_dockers('statsd-export')
         self.assertEqual(result[0], ['statsd-exporter', '304735eab4', 'v0.6.0'])
 
 

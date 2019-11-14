@@ -4,7 +4,7 @@ from unittest import mock
 
 import requests
 
-from sat import diag
+from sat.cli import diag
 
 # These sample Redfish API responses are taken from
 # https://connect.us.cray.com/confluence/display/ASICD/Shasta+Controller+Diagnostics+Usage
@@ -53,16 +53,16 @@ class DiagStatusTestCase(unittest.TestCase):
     def setUp(self):
         self.rq_post_mock = mock.MagicMock()
         self.rq_post_mock.return_value.text = MOCK_POST_RESPONSE
-        mock.patch('sat.diag.requests.Session.post', self.rq_post_mock).start()
+        mock.patch('sat.cli.diag.redfish.requests.Session.post', self.rq_post_mock).start()
 
         self.rq_get_mock = mock.MagicMock()
         self.rq_get_mock.return_value.text = MOCK_GET_RESPONSE
-        mock.patch('sat.diag.requests.Session.get', self.rq_get_mock).start()
+        mock.patch('sat.cli.diag.redfish.requests.Session.get', self.rq_get_mock).start()
 
         self.rq_del_mock = mock.MagicMock()
-        mock.patch('sat.diag.requests.Session.delete', self.rq_del_mock).start()
+        mock.patch('sat.cli.diag.redfish.requests.Session.delete', self.rq_del_mock).start()
 
-        self.initial_status = diag.DiagStatus.initiate_diag(MOCK_XNAME, MOCK_DIAG_COMMAND, MOCK_DIAG_ARGS)
+        self.initial_status = diag.redfish.DiagStatus.initiate_diag(MOCK_XNAME, MOCK_DIAG_COMMAND, MOCK_DIAG_ARGS)
 
     def tearDown(self):
         mock.patch.stopall()
@@ -79,7 +79,7 @@ class TestDiagStatusClass(DiagStatusTestCase):
     def test_diag_status_malformed_json(self):
         """Test that malformed JSON will return status None."""
         self.rq_post_mock.return_value.text = '{"No closing quote or brace'
-        self.assertEqual(diag.DiagStatus.initiate_diag(MOCK_XNAME, MOCK_DIAG_COMMAND, MOCK_DIAG_ARGS), None)
+        self.assertEqual(diag.redfish.DiagStatus.initiate_diag(MOCK_XNAME, MOCK_DIAG_COMMAND, MOCK_DIAG_ARGS), None)
 
     def test_diag_status_update_content(self):
         """Test if status of the diagnostic can be updated."""
@@ -99,7 +99,7 @@ class TestRedfishQueries(DiagStatusTestCase):
 
     def test_request_payload(self):
         """Test if diag scheduling payloads are created correctly."""
-        payload = diag._request_payload('foo', ['bar', '--baz'])
+        payload = diag.redfish._request_payload('foo', ['bar', '--baz'])
         self.assertEqual(payload.get('Name'), 'foo')
         self.assertEqual(payload.get('Options'), 'bar --baz')
 
@@ -117,7 +117,7 @@ class TestRedfishQueries(DiagStatusTestCase):
         self.rq_post_mock.return_value = None
         self.rq_post_mock.side_effect = requests.exceptions.RequestException()
 
-        self.assertEqual(diag.DiagStatus.initiate_diag(MOCK_XNAME, 'foo', ['bar', '--baz']), None)
+        self.assertEqual(diag.redfish.DiagStatus.initiate_diag(MOCK_XNAME, 'foo', ['bar', '--baz']), None)
 
     def test_update_diag_status(self):
         """Test if updating the diag status works properly."""
