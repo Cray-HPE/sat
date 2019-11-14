@@ -1,5 +1,5 @@
 """
-OAuth2 Shasta API authentication support.
+OAuth2 authentication support.
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
@@ -22,7 +22,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 class SATSession:
-    """Manage Shasta API sessions, authentication, and token storage/retrieval."""
+    """Manage API sessions, authentication, and token storage/retrieval."""
 
     TOKEN_URI = '/keycloak/realms/{}/protocol/openid-connect/token'
     tenant = 'shasta'

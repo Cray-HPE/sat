@@ -8,7 +8,7 @@ from sat.hwinv.constants import HSN_BOARD_TYPE
 
 
 class HSNBoard(BaseComponent):
-    """A High-speed Network (HSN) Board in the EX-1 system."""
+    """A High-speed Network (HSN) Board in a system."""
 
     hsm_type = HSN_BOARD_TYPE
     arg_name = 'hsn_board'

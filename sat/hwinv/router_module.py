@@ -8,7 +8,7 @@ from sat.hwinv.constants import ROUTER_MODULE_TYPE
 
 
 class RouterModule(BaseComponent):
-    """A router module in the EX-1 system."""
+    """Represents a router module in the system."""
 
     hsm_type = ROUTER_MODULE_TYPE
     arg_name = 'router_module'

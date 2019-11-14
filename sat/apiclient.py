@@ -1,5 +1,5 @@
 """
-Client for querying the API gateway on a Shasta system.
+Client for querying the API gateway.
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """

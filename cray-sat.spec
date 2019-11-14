@@ -1,4 +1,4 @@
-# Spec file for Shasta Admin Toolkit (SAT)
+# Spec file for System Admin Toolkit (SAT)
 # Copyright 2019, Cray Inc. All Rights Reserved
 %define ansible_framework_dir /opt/cray/crayctl/ansible_framework
 %define satmandir %{_mandir}/man8
@@ -9,7 +9,7 @@ Release: %(echo ${BUILD_METADATA})
 # TODO: Determine the correct license to use for SAT
 License: Cray Proprietary
 Source: %{name}-%{version}.tar.gz
-Summary: Shasta Admin Toolkit (SAT)
+Summary: System Admin Toolkit (SAT)
 Group: System/Management
 BuildRoot: %{_topdir}
 Vendor: Cray Inc.
@@ -27,21 +27,21 @@ BuildRequires: python3-argcomplete
 BuildRequires: python3-docutils
 
 %description
-The Shasta Admin Toolkit (SAT) is a command-line utility to perform various
-diagnostic activities on a Shasta system, including reporting on hardware
+The System Admin Toolkit (SAT) is a command-line utility to perform various
+diagnostic activities on a system including reporting on hardware
 inventory, displaying the installed and running versions of software, and
 displaying the status of the nodes in the system, among other things.
 
 SAT was created to provide functionality similar to what was provided by the
-xt-prefixed commands in the Cray XC platform, such as xthwinv, xtshowrev,
+xt-prefixed commands in the XC platform, such as xthwinv, xtshowrev,
 xtcli, and others.
 
 %package crayctldeploy
-Summary: Shasta Admin Toolkit (SAT) Deployment Ansible role
+Summary: System Admin Toolkit (SAT) Deployment Ansible role
 Requires: cray-crayctl
 
 %description crayctldeploy
-The Ansible role within the crayctl Ansible Framework that installs the Shasta
+The Ansible role within the crayctl Ansible Framework that installs the System
 Admin Toolkit (SAT).
 
 %prep

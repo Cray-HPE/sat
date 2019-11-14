@@ -19,7 +19,7 @@ with open(path.join(here, 'requirements.txt'), encoding='utf-8') as f:
 setup(
     name='sat',
     version='0.3.0',
-    description="Shasta Admin Toolkit",
+    description="System Admin Toolkit",
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://stash.us.cray.com/projects/SAT/repos/sat',

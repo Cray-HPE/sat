@@ -1,5 +1,5 @@
 ---
-# Main task file for cray_sat role to install the Shasta Admin Toolkit (SAT)
+# Main task file for cray_sat role to install the System Admin Toolkit (SAT)
 # Copyright 2019 Cray Inc. All Rights Reserved.
 - name: Install the cray-sat package
   zypper:

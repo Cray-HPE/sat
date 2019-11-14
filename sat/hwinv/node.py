@@ -16,7 +16,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 class Node(BaseComponent):
-    """A node in the EX-1 system."""
+    """A node in the system."""
 
     hsm_type = NODE_TYPE
     arg_name = 'node'
@@ -59,7 +59,7 @@ class Node(BaseComponent):
     @cached_property
     def cabinet_type(self):
         """str: The cabinet type this node is in."""
-        # We currently identify whether a node is in an EX-1 C cabinet (Mountain)
+        # We currently identify whether a node is in a liquid-cooled cabinet (Mountain)
         # based on whether there is a corresponding chassis in the inventory.
         if self.chassis:
             return EX_1_C

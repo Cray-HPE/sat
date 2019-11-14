@@ -122,15 +122,15 @@ These options list components of certain types in the system.
 
 **--list-compute-modules**
         List all the compute modules in the system. These are the compute blade
-        slots in the EX-1 C cabinets.
+        slots in liquid-cooled cabinets.
 
 **--list-router-modules**
         List all the router modules in the system. These are the HSN switch
-        slots in the EX-1 C cabinets.
+        slots in liquid-cooled cabinets.
 
 **--list-node-enclosures**
         List all the node enclosures in the system. These are the enclosures for
-        nodes in EX-1 S cabinets. For nodes in EX-1 C cabinets, these represent
+        nodes in air-cooled cabinets. For nodes in liquid-cooled cabinets, these represent
         the node card associated with two of the nodes in a slot.
 
 **--list-procs**

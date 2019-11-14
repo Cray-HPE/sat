@@ -22,7 +22,7 @@ def add_showrev_subparser(subparsers):
 
     showrev_parser = subparsers.add_parser(
         'showrev',
-        help='Show Shasta revision information.',
+        help='Show system revision information.',
         parents=[format_options, filter_options])
 
     showrev_parser.add_argument(
@@ -31,7 +31,7 @@ def add_showrev_subparser(subparsers):
         action='store_true')
     showrev_parser.add_argument(
         '--system',
-        help='Print general Shasta version information. This is the default.',
+        help='Print general system version information. This is the default.',
         action='store_true')
     showrev_parser.add_argument(
         '--docker',

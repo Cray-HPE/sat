@@ -19,13 +19,13 @@ DESCRIPTION
 ===========
 
 The auth subcommand performs tasks that involve authentication and authorization
-of **sat** with respect to access to the Shasta API.
+of **sat** with respect to access to the API.
 
 This entails the acquisition of authentication tokens for a given username.
 The username will have a default value that is taken from (in order, if
 defined): **--username** global command-line option, **username** option
 from **sat** configuration, or the login account of the user running **sat**.
-The password must be provided by the user when prompted. 
+The password must be provided by the user when prompted.
 
 FILES
 =====

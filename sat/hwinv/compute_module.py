@@ -2,8 +2,8 @@
 Class to represent a ComputeModule object obtained from Hardware State Manager (HSM).
 
 ComputeModules will have xnames of the form 'xXcCsS'. They represent compute
-blades in a Mountain (EX-1 C) cabinet. They do not exist for nodes in a River
-cabinet.
+blades in a liquid-cooled cabinet. They do not exist for nodes in air-cooled
+cabinets.
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
@@ -12,7 +12,7 @@ from sat.hwinv.constants import COMPUTE_MODULE_TYPE
 
 
 class ComputeModule(BaseComponent):
-    """A compute module in the EX-1 system."""
+    """Represents a compute module in a liquid-cooled system."""
 
     hsm_type = COMPUTE_MODULE_TYPE
     arg_name = 'compute_module'

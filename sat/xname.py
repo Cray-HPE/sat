@@ -1,5 +1,5 @@
 """
-Class for representing an xname in an EX-1 system.
+Class for representing an xname.
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
@@ -9,7 +9,7 @@ from sat.cached_property import cached_property
 
 
 class XName:
-    """An xname representing a component in an EX-1 system."""
+    """An xname representing a component in the system."""
 
     def __init__(self, xname_str):
         """Creates a new xname object from the given xname string.
