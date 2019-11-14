@@ -81,8 +81,11 @@ components in each category is shown depends on the value of the relevant
         **--summarize-all** options.
 
         Fields are not case-sensitive, and spaces in the field name can be
-        replaced with underscores. In addition, if the prefix of a field name is
-        specified, all fields with that prefix will match.
+        replaced with underscores. In addition, a subsequence can be specified,
+        and all fields that contain that subsequence will be used. A subsequence
+        of a field name is a value that can be obtained by deleting characters
+        from the field name while maintaining order. It is more permissive than
+        a substring.
 
 **--proc-summary-fields** *PROC_SUMMARY_FIELDS*
         Same as **--node-summary-fields** but for processors.
@@ -145,8 +148,11 @@ These options list components of certain types in the system.
         nodes are being listed by the **--list-all** or **--list-nodes** option.
 
         Fields are not case-sensitive, and spaces in the field name can be
-        replaced with underscores. In addition, if the prefix of a field name is
-        specified, all fields with that prefix will match.
+        replaced with underscores. In addition, a subsequence can be specified,
+        and all fields that contain that subsequence will be displayed. A
+        subsequence of a field name is a value that can be obtained by deleting
+        characters from the field name while maintaining order. It is more
+        permissive than a substring.
 
 **--chassis-fields** *CHASSIS_FIELDS*
         Same as **--node-fields** but for chassis.

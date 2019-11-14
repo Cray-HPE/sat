@@ -5,6 +5,8 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 """
 import re
 
+from sat.filtering import is_subsequence
+
 
 class ComponentField:
     """A field of a component."""
@@ -32,10 +34,11 @@ class ComponentField:
     def matches(self, filter_str):
         """Returns whether this field matches the given filter string.
 
-        For now, this just canonicalizes the given filter string and checks
-        whether the given it's a substring of this field's canonical name.
+        This canonicalizes the given filter string and then checks whether it's
+        a subsequence of this field's canonical name.
         """
-        return self.canonicalize(filter_str) in self.canonical_name
+        return is_subsequence(self.canonicalize(filter_str),
+                              self.canonical_name)
 
     @staticmethod
     def canonicalize(name):
