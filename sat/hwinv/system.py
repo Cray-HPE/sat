@@ -256,7 +256,7 @@ class System:
                             filter_strs=self.args.filter_strs)
             report.add_rows(component_list[1:])
 
-            full_list_string += str(report.get_pretty_table()) + '\n\n'
+            full_list_string += str(report) + '\n\n'
 
         return full_summary_string + full_list_string
 
