@@ -25,7 +25,8 @@ class MemoryModule(BaseComponent):
         ComponentField('Part Number'),
         ComponentField('SKU'),
         ComponentField('Serial Number'),
-        ComponentField('DDR Type', summarizable=True),
+        ComponentField('Memory Type', summarizable=True),
+        ComponentField('Device Type', summarizable=True),
         ComponentField('Capacity (MiB)', summarizable=True),
         ComponentField('Operating Speed (MHz)', summarizable=True)
     ]
@@ -43,8 +44,13 @@ class MemoryModule(BaseComponent):
         self.node = None
 
     @cached_property
-    def ddr_type(self):
-        """str: The DDR type of the memory module."""
+    def memory_type(self):
+        """str: The memory type of the memory module."""
+        return self.fru_info['MemoryType']
+
+    @cached_property
+    def device_type(self):
+        """str: The device type of the memory module."""
         return self.fru_info['MemoryDeviceType']
 
     @cached_property

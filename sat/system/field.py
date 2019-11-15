@@ -10,7 +10,7 @@ class ComponentField:
     """A field of a component."""
 
     def __init__(self, pretty_name, listable=True, summarizable=False, property_name=None):
-        """Creates a  new component field.
+        """Creates a new component field.
 
         Args:
             pretty_name (str): The human-readable name of the field.

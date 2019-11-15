@@ -1,5 +1,5 @@
 """
-Constant values to be used in hwinv.
+Constant values for system representation
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
@@ -24,10 +24,10 @@ HSN_BOARD_TYPE = 'HSNBoard'
 ROUTER_MODULE_TYPE = 'RouterModule'
 
 # The types of cabinets
-EX_1_C = "EX-1 C"
-EX_1_S = "EX-1 S"
+EX_1_C = 'EX-1 C'
+EX_1_S = 'EX-1 S'
 
 # The value to use when a requested key is missing
-MISSING_VALUE = "MISSING"
+MISSING_VALUE = 'MISSING'
 # The value to use in place of the empty string.
-EMPTY_VALUE = "EMPTY"
+EMPTY_VALUE = 'EMPTY'

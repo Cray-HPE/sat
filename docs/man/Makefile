@@ -1,5 +1,5 @@
 all: sat.8 sat-status.8 sat-showrev.8 sat-cablecheck.8 sat-setrev.8 sat-diag.8 \
-	sat-hwinv.8 sat-auth.8
+	sat-hwinv.8 sat-auth.8 sat-hwmatch.8
 
 %.8: %.8.rst
 	rst2man.py $< $@

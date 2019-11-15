@@ -10,6 +10,7 @@ from sat.auth.parser import add_auth_subparser
 from sat.cablecheck.parser import add_cable_check_subparser
 from sat.diag.parser import add_diag_subparser
 from sat.hwinv.parser import add_hwinv_subparser
+from sat.hwmatch.parser import add_hwmatch_subparser
 from sat.setrev.parser import add_setrev_subparser
 from sat.showrev.parser import add_showrev_subparser
 from sat.status.parser import add_status_subparser
@@ -52,6 +53,7 @@ def create_parent_parser():
     add_cable_check_subparser(subparsers)
     add_diag_subparser(subparsers)
     add_hwinv_subparser(subparsers)
+    add_hwmatch_subparser(subparsers)
     add_setrev_subparser(subparsers)
     add_showrev_subparser(subparsers)
     add_status_subparser(subparsers)

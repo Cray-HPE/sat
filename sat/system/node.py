@@ -25,9 +25,11 @@ class Node(BaseComponent):
     fields = BaseComponent.fields + [
         ComponentField('Cabinet Type', summarizable=True),
         ComponentField('Memory Type', summarizable=True),
+        ComponentField('Memory Device Type', summarizable=True),
         ComponentField('Memory Manufacturer', summarizable=True),
         ComponentField('Memory Model', summarizable=True),
         ComponentField('Memory Size (GiB)', summarizable=True),
+        ComponentField('Memory Module Count)', summarizable=True),
         ComponentField('Processor Count'),
         ComponentField('Processor Manufacturer', summarizable=True),
         ComponentField('Processor Model', summarizable=True),
@@ -66,53 +68,41 @@ class Node(BaseComponent):
         else:
             return EX_1_S
 
-    @staticmethod
-    def get_unique_child_vals(children, field_name):
-        """Gets the unique values of the given `field_name` from the children.
-
-        Args:
-            children (dict): A dictionary of children to get values from
-            field_name (str): The name of the field to get from children.
-
-        Returns:
-            A comma-separated list of unique values for the given field_name.
-        """
-        if not children:
-            return MISSING_VALUE
-        else:
-            return ','.join(set(getattr(child, field_name)
-                                for child in children.values()))
-
     @cached_property
     def processor_manufacturer(self):
         """str: The manufacturer(s) of this node's processors as a comma-separated list."""
-        return self.get_unique_child_vals(self.processors, 'manufacturer')
+        return self.get_unique_child_vals_str(Processor, 'manufacturer')
 
     @cached_property
     def processor_model(self):
         """str: The model(s) of this node's processors as a comma-separated list."""
-        return self.get_unique_child_vals(self.processors, 'model')
+        return self.get_unique_child_vals_str(Processor, 'model')
 
     @cached_property
     def processor_count(self):
         """int: The number of CPUs on this node."""
         # Use information from location info for now until Mountain processors show up in HSM
-        return self.location_info.get("ProcessorSummary", {}).get("Count", 0)
+        return self.location_info.get('ProcessorSummary', {}).get('Count', 0)
 
     @cached_property
     def memory_type(self):
-        """str: The type(s) of this node's memory as a comma-separated list."""
-        return self.get_unique_child_vals(self.memory_modules, 'ddr_type')
+        """str: The memory type(s) of this node's memory as a comma-separated list."""
+        return self.get_unique_child_vals_str(MemoryModule, 'memory_type')
+
+    @cached_property
+    def memory_device_type(self):
+        """str: The device type(s) of this node's memory as a comma-separated list."""
+        return self.get_unique_child_vals_str(MemoryModule, 'device_type')
 
     @cached_property
     def memory_manufacturer(self):
         """str: The manufacturer(s) of this node's memory as a comma-separated list."""
-        return self.get_unique_child_vals(self.memory_modules, 'manufacturer')
+        return self.get_unique_child_vals_str(MemoryModule, 'manufacturer')
 
     @cached_property
     def memory_model(self):
         """str: The model(s) of this node's memory as a comma-separated list."""
-        return self.get_unique_child_vals(self.memory_modules, 'model')
+        return self.get_unique_child_vals_str(MemoryModule, 'model')
 
     @cached_property
     def memory_size_gib(self):
@@ -120,6 +110,21 @@ class Node(BaseComponent):
         return sum([mm.capacity_mib for mm in self.memory_modules.values()]) / 1024
 
     @cached_property
+    def memory_module_count(self):
+        """int: The number of memory modules this node has."""
+        return len(self.memory_modules)
+
+    @cached_property
     def bios_version(self):
         """str: The BIOS version for this node."""
         return self.fru_info['BiosVersion']
+
+    @cached_property
+    def card_xname(self):
+        """sat.xname.XName: The xname of this node's node card"""
+        return self.xname.get_direct_parent()
+
+    @cached_property
+    def slot_xname(self):
+        """sat.xname.XName: The xname of this node's slot"""
+        return self.xname.get_ancestor(2)
