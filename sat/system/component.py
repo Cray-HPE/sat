@@ -8,8 +8,8 @@ import logging
 from inflect import engine
 
 from sat.cached_property import cached_property
-from sat.hwinv.constants import MISSING_VALUE, EMPTY_VALUE
-from sat.hwinv.field import ComponentField
+from sat.system.constants import MISSING_VALUE, EMPTY_VALUE
+from sat.system.field import ComponentField
 from sat.xname import XName
 
 LOGGER = logging.getLogger(__name__)

@@ -7,8 +7,8 @@ import logging
 import sys
 
 from sat.apiclient import APIError, HSMClient
-from sat.hwinv.system import System
 from sat.session import SATSession
+from sat.system.system import System
 
 LOGGER = logging.getLogger(__name__)
 

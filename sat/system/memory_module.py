@@ -5,9 +5,9 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 """
 
 from sat.cached_property import cached_property
-from sat.hwinv.component import BaseComponent
-from sat.hwinv.constants import MEMORY_TYPE
-from sat.hwinv.field import ComponentField
+from sat.system.component import BaseComponent
+from sat.system.constants import MEMORY_TYPE
+from sat.system.field import ComponentField
 
 
 class MemoryModule(BaseComponent):

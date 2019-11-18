@@ -7,8 +7,8 @@ cabinets.
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
-from sat.hwinv.component import BaseComponent
-from sat.hwinv.constants import COMPUTE_MODULE_TYPE
+from sat.system.component import BaseComponent
+from sat.system.constants import COMPUTE_MODULE_TYPE
 
 
 class ComputeModule(BaseComponent):

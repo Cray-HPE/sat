@@ -3,24 +3,25 @@ Class to define the entire system hardware inventory.
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
-from collections import defaultdict, OrderedDict
 import logging
+from collections import defaultdict, OrderedDict
 
 import inflect
 
 from sat.config import get_config_value
 from sat.filtering import filter_list
-from sat.hwinv.constants import EMPTY_STATUS, STATUS_KEY, TYPE_KEY
-from sat.hwinv.chassis import Chassis
-from sat.hwinv.compute_module import ComputeModule
-from sat.hwinv.hsn_board import HSNBoard
-from sat.hwinv.memory_module import MemoryModule
-from sat.hwinv.node import Node
-from sat.hwinv.node_enclosure import NodeEnclosure
-from sat.hwinv.processor import Processor
-from sat.hwinv.router_module import RouterModule
+# TODO: Probably shouldn't import stuff from hwinv package here
 from sat.hwinv.summary import ComponentSummary
 from sat.report import Report
+from sat.system.chassis import Chassis
+from sat.system.compute_module import ComputeModule
+from sat.system.constants import EMPTY_STATUS, STATUS_KEY, TYPE_KEY
+from sat.system.hsn_board import HSNBoard
+from sat.system.memory_module import MemoryModule
+from sat.system.node import Node
+from sat.system.node_enclosure import NodeEnclosure
+from sat.system.processor import Processor
+from sat.system.router_module import RouterModule
 from sat.util import yaml_dump
 from sat.xname import XName
 

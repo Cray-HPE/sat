@@ -3,9 +3,9 @@ Class to represent a Chassis object obtained from Hardware State Manager (HSM).
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
-from sat.hwinv.component import BaseComponent
-from sat.hwinv.constants import CHASSIS_TYPE
-from sat.hwinv.node import Node
+from sat.system.component import BaseComponent
+from sat.system.constants import CHASSIS_TYPE
+from sat.system.node import Node
 
 
 class Chassis(BaseComponent):

@@ -3,8 +3,8 @@ Class to represent a NodeEnclosure object obtained from Hardware State Manager (
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
-from sat.hwinv.component import BaseComponent
-from sat.hwinv.constants import NODE_ENCLOSURE_TYPE
+from sat.system.component import BaseComponent
+from sat.system.constants import NODE_ENCLOSURE_TYPE
 
 
 class NodeEnclosure(BaseComponent):
