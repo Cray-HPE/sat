@@ -14,7 +14,7 @@ from sat.showrev import containers, rpm, system
 LOGGER = logging.getLogger(__name__)
 
 
-def showrev(args):
+def do_showrev(args):
     """Run the showrev comand with the given arguments.
 
     Args:

@@ -13,7 +13,7 @@ from sat.session import SATSession
 LOGGER = logging.getLogger(__name__)
 
 
-def do_login(args):
+def do_auth(args):
     """Prompts user for a password, fetches a token, and saves it to disk.
 
     The prompt indicates the username to be used in combination with the
