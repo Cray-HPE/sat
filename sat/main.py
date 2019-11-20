@@ -45,7 +45,7 @@ def main():
             # 2. We can import only the subcommand code relevant to the
             #    desired subcommand, which gives a small performance benefit,
             #    about a 100ms speedup for the import step.
-            subcommand_module = importlib.import_module('sat.{}.main'.format(args.command))
+            subcommand_module = importlib.import_module('sat.cli.{}.main'.format(args.command))
             subcommand = getattr(subcommand_module, 'do_{}'.format(args.command))
             subcommand(args)
 

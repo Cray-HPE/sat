@@ -14,7 +14,7 @@ import time
 
 import inflect
 
-from sat import diag as sat_diag
+from sat.cli.diag import redfish
 
 
 inf = inflect.engine()
@@ -145,7 +145,7 @@ def do_diag(args):
 
     try:
         # Initialize all diags
-        running_diags = sat_diag.RunningDiagPool(xnames, args.diag_command, args.diag_args,
+        running_diags = redfish.RunningDiagPool(xnames, args.diag_command, args.diag_args,
                                                  args.interval, args.timeout)
 
         # Continually poll until all diags are complete.

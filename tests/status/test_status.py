@@ -1,5 +1,5 @@
 """
-Unit tests for sat.status
+Unit tests for sat.cli.status
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
@@ -7,7 +7,7 @@ from copy import deepcopy
 
 import unittest
 
-import sat.status.main
+import sat.cli.status.main
 from sat.xname import XName
 
 
@@ -34,7 +34,7 @@ class TestStatusBase(unittest.TestCase):
         make_raw_table() should return an empty table when the list of nodes
         is empty
         """
-        raw_table = sat.status.main.make_raw_table([], {})
+        raw_table = sat.cli.status.main.make_raw_table([], {})
         self.assertEqual(raw_table, [])
 
     def test_one(self):
@@ -43,9 +43,9 @@ class TestStatusBase(unittest.TestCase):
         make_raw_table() should return a table with a single row and the same
         number of columns as there are column headers
         """
-        raw_table = sat.status.main.make_raw_table([row()], {})
+        raw_table = sat.cli.status.main.make_raw_table([row()], {})
         self.assertEqual(len(raw_table), 1)
-        self.assertEqual(len(raw_table[0]), len(sat.status.main.HEADERS))
+        self.assertEqual(len(raw_table[0]), len(sat.cli.status.main.HEADERS))
 
     def test_many_default(self):
         """make_raw_table() with many nodes, default sorting
@@ -55,18 +55,18 @@ class TestStatusBase(unittest.TestCase):
         column headers.
         """
         nodes = sample_nodes()
-        raw_table = sat.status.main.make_raw_table(deepcopy(nodes), {})
+        raw_table = sat.cli.status.main.make_raw_table(deepcopy(nodes), {})
         self.assertEqual(len(raw_table), len(nodes))
 
         self.assertTrue(
-            all(len(row) == len(sat.status.main.HEADERS) for row in raw_table))
+            all(len(row) == len(sat.cli.status.main.HEADERS) for row in raw_table))
 
     def test_filter_no_match(self):
         """make_raw_table() filtered with no matches
 
         make_raw_table() should return an empty table.
         """
-        raw_table = sat.status.main.make_raw_table(
+        raw_table = sat.cli.status.main.make_raw_table(
             sample_nodes(), dict(ID=frozenset([XName('q99')])))
 
         self.assertEqual(len(raw_table), 0)
@@ -77,7 +77,7 @@ class TestStatusBase(unittest.TestCase):
         make_raw_table() should return a table with a single row matching
         the xname filter.
         """
-        raw_table = sat.status.main.make_raw_table(
+        raw_table = sat.cli.status.main.make_raw_table(
             sample_nodes(), dict(ID=frozenset([XName('q0')])))
 
         self.assertEqual(len(raw_table), 1)
@@ -89,7 +89,7 @@ class TestStatusBase(unittest.TestCase):
         make_raw_table() should return a table with rows matching the xname
         filter.
         """
-        raw_table = sat.status.main.make_raw_table(
+        raw_table = sat.cli.status.main.make_raw_table(
             sample_nodes(),
             dict(ID=frozenset([XName('q0'), XName('aa0')])))
 
@@ -104,7 +104,7 @@ class TestStatusBase(unittest.TestCase):
         make_raw_table() should return a table with a single row matching
         the nid filter.
         """
-        raw_table = sat.status.main.make_raw_table(
+        raw_table = sat.cli.status.main.make_raw_table(
             sample_nodes(), dict(NID=frozenset(['42'])))
 
         self.assertEqual(len(raw_table), 1)
@@ -117,7 +117,7 @@ class TestStatusBase(unittest.TestCase):
         filter.
         """
 
-        raw_table = sat.status.main.make_raw_table(
+        raw_table = sat.cli.status.main.make_raw_table(
             sample_nodes(), dict(NID=frozenset(['42', '1'])))
 
         self.assertEqual(len(raw_table), 2)
@@ -132,7 +132,7 @@ class TestStatusBase(unittest.TestCase):
         and nid filters.
         """
 
-        raw_table = sat.status.main.make_raw_table(
+        raw_table = sat.cli.status.main.make_raw_table(
             sample_nodes(),
             dict(ID=frozenset([XName('z0'), XName('aa0')]), NID=frozenset(['9', '42'])))
 

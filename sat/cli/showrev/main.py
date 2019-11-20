@@ -8,7 +8,7 @@ import logging
 
 from sat.config import get_config_value
 from sat.report import Report
-from sat.showrev import containers, rpm, system
+from sat.cli.showrev import containers, rpm, system
 
 
 LOGGER = logging.getLogger(__name__)

@@ -10,18 +10,17 @@ import inflect
 
 from sat.config import get_config_value
 from sat.filtering import filter_list
-# TODO: Probably shouldn't import stuff from hwinv package here
+from sat.cli.hwinv.constants import EMPTY_STATUS, STATUS_KEY, TYPE_KEY
+from sat.cli.hwinv.chassis import Chassis
+from sat.cli.hwinv.compute_module import ComputeModule
+from sat.cli.hwinv.hsn_board import HSNBoard
+from sat.cli.hwinv.memory_module import MemoryModule
+from sat.cli.hwinv.node import Node
+from sat.cli.hwinv.node_enclosure import NodeEnclosure
+from sat.cli.hwinv.processor import Processor
+from sat.cli.hwinv.router_module import RouterModule
 from sat.cli.hwinv.summary import ComponentSummary
 from sat.report import Report
-from sat.system.constants import EMPTY_STATUS, STATUS_KEY, TYPE_KEY
-from sat.system.chassis import Chassis
-from sat.system.compute_module import ComputeModule
-from sat.system.hsn_board import HSNBoard
-from sat.system.memory_module import MemoryModule
-from sat.system.node import Node
-from sat.system.node_enclosure import NodeEnclosure
-from sat.system.processor import Processor
-from sat.system.router_module import RouterModule
 from sat.util import yaml_dump
 from sat.xname import XName
 
@@ -59,9 +58,9 @@ class System:
             try:
                 comp_type = component[TYPE_KEY]
                 comp_status = component[STATUS_KEY]
-            except KeyError as err:
+            except KeyError:
                 LOGGER.warning("Missing '%s' key in hardware inventory component. "
-                               "The following keys are present: %s", err,
+                               "The following keys are present: {}", TYPE_KEY,
                                ', '.join(component.keys()))
                 continue
 
@@ -130,10 +129,6 @@ class System:
             node_object.chassis = chassis_object
             chassis_object.add_child_object(node_object)
 
-    # TODO: Refactor these methods out of the `System` class because they
-    # specific to hwinv and its command-line arguments.
-    # Jira SAT-210 opened for this.
-    # ===================== Begin methods to refactor ========================
     @staticmethod
     def get_components_as_dicts(components, fields):
         """Gets the given components as a list of dicts with keys given by fields.
@@ -300,6 +295,3 @@ class System:
             return self.get_yaml_output(summaries, lists)
         elif self.args.format == 'pretty':
             return self.get_pretty_output(summaries, lists)
-
-    # TODO: Refactor methods above to corresponding comment.
-    # ===================== End of methods to refactor ========================
