@@ -1,13 +1,16 @@
+Coding standard
+===============
+
 Rule 0:
 Keep the standard short.
 
 Rule 1:
 Use pycodestyle to catch styling errors with python code, and use the
-pycodestyle.conf file at the root of this repository.
+pycodestyle.conf file at the root of this repository. e.g.::
 
-    eg. pycodestyle --config=./pycodestyle.conf myfile.py
+    pycodestyle --config=./pycodestyle.conf myfile.py
 
-pycodestyle can be installed with 'pip3 install pycodestyle'.
+pycodestyle can be installed with ``pip3 install pycodestyle``.
 
 Rule 2:
 80 chars per line if you can keep it pretty, 120 max.
