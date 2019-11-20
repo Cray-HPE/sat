@@ -62,9 +62,12 @@ def _add_summarize_option(option_group, singular_component, default_xnames):
         default=[]
     )
 
+    # Note that defaults are actually specified in BaseComponent subclasses, so
+    # we can see whether this option was actually specified by the user. It will
+    # be None if not specified.
     option_group.add_argument(
-        '--show-{}-xnames'.format(singular_component), nargs='?', const='on',
-        default=default_xnames, type=on_off_str2bool,
+        '--show-{}-xnames'.format(singular_component), nargs='?',
+        const='on', type=on_off_str2bool,
         help="Specify 'on' or 'off' to show or hide all {0} xnames in {0} summaries. {1} "
              "Defaults to '{2}'.".format(singular_component, effect_disclaimer, default_xnames)
     )
@@ -126,6 +129,11 @@ def add_hwinv_subparser(subparsers):
         help='Summarize all the components in the system. This is equivalent to specifying all '
              'the other --summarize-<component> options at once.'
     )
+
+    # Note that summary_components and list_component_names are redundant with
+    # info in the classes, but we don't import them here to reduce the time
+    # required to create the parser to increase responsiveness of autocomplete
+    # and reduce startup time when running a subcommand other than `hwinv`.
 
     # A list of tuples of the form (component_name, default_xname) where default_xname
     # is 'on' if xnames should be listed by default and 'off' if they should be suppressed.
