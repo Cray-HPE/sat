@@ -3,13 +3,14 @@ Class to define a generic component obtained from Hardware State Manager (HSM).
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
+from collections import defaultdict
 import logging
 
 from inflect import engine
 
 from sat.cached_property import cached_property
-from sat.hwinv.constants import MISSING_VALUE, EMPTY_VALUE
-from sat.hwinv.field import ComponentField
+from sat.system.constants import MISSING_VALUE, EMPTY_VALUE
+from sat.system.field import ComponentField
 from sat.xname import XName
 
 LOGGER = logging.getLogger(__name__)
@@ -50,10 +51,10 @@ class BaseComponent:
     # component of this type.
     hsm_type = ''
 
-    # The name of the component as specified in 'sat hwinv' options
+    # The name of the component for reference in command options
     arg_name = ''
 
-    # The pretty name of the component
+    # The pretty name of the component for output
     pretty_name = ''
 
     # The list of fields supported by the component. Subclasses can override or add.
@@ -77,6 +78,9 @@ class BaseComponent:
         # child object type to an instance variable of type dict to hold the
         # child objects if they support children of certain types.
         self.children_by_type = {}
+        # A cache to store values from children objects so that we don't need
+        # to iterate over them multiple times.
+        self._child_vals_cache = defaultdict(dict)
 
     @classmethod
     def plural_pretty_name(cls):
@@ -91,7 +95,7 @@ class BaseComponent:
         """Add the given child object to this object's appropriate children dict.
 
         Args:
-            child_object (sat.hwinv.component.BaseComponent): The child object
+            child_object (sat.system.component.BaseComponent): The child object
 
         Returns:
             None
@@ -104,6 +108,51 @@ class BaseComponent:
             LOGGER.warning("Received unknown object '%s' "
                            "to add as child of object '%s'.",
                            child_object, self)
+
+    def get_child_vals(self, child_type, field_name):
+        """Gets the values of the given `field_name` from the children.
+
+        Args:
+            child_type (type): The type of the children from which to get values
+            field_name (str): The name of the field to get from children.
+
+        Returns:
+            A list of the values for the given field_name from all children.
+        """
+        if not self.children_by_type.get(child_type):
+            return []
+
+        if not self._child_vals_cache[child_type].get(field_name):
+            child_vals = [getattr(child, field_name)
+                          for child in self.children_by_type[child_type].values()]
+            self._child_vals_cache[child_type][field_name] = child_vals
+        return self._child_vals_cache[child_type][field_name]
+
+    def get_unique_child_vals(self, child_type, field_name):
+        """Gets the unique values of the given `field_name` from the children.
+
+        Args:
+            child_type (type): The type of the children from which to get values
+            field_name (str): The name of the field to get from children.
+
+        Returns:
+            A set of unique values for the given field_name.
+        """
+        return set(self.get_child_vals(child_type, field_name))
+
+    def get_unique_child_vals_str(self, child_type, field_name):
+        """Gets the unique values of the given `field_name` from the children.
+
+        Args:
+            child_type (type): The type of the children from which to get values
+            field_name (str): The name of the field to get from children.
+
+        Returns:
+            A comma-separate string of unique values for the given field_name
+            or the EMPTY_VALUE string if there are no children of this type.
+        """
+        unique_child_vals = self.get_unique_child_vals(child_type, field_name)
+        return EMPTY_VALUE if not unique_child_vals else ', '.join(unique_child_vals)
 
     @cached_property
     def type(self):

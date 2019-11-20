@@ -3,8 +3,8 @@ Class to represent a RouterModule object obtained from Hardware State Manager (H
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
-from sat.hwinv.component import BaseComponent
-from sat.hwinv.constants import ROUTER_MODULE_TYPE
+from sat.system.component import BaseComponent
+from sat.system.constants import ROUTER_MODULE_TYPE
 
 
 class RouterModule(BaseComponent):

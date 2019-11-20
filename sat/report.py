@@ -212,4 +212,7 @@ class Report:
             return ''
 
         else:
-            return yaml_dump(rows_to_print)
+            if not self.no_headings and self.title:
+                return yaml_dump({self.title: rows_to_print})
+            else:
+                return yaml_dump(rows_to_print)

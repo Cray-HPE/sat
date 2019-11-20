@@ -3,8 +3,8 @@ Class to represent an HSNBoard object obtained from Hardware State Manager (HSM)
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
-from sat.hwinv.component import BaseComponent
-from sat.hwinv.constants import HSN_BOARD_TYPE
+from sat.system.component import BaseComponent
+from sat.system.constants import HSN_BOARD_TYPE
 
 
 class HSNBoard(BaseComponent):

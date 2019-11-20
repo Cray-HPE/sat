@@ -66,6 +66,24 @@ class XName:
         xname_str = ''.join(str(t) for t in tokens)
         return cls(xname_str)
 
+    def get_ancestor(self, levels):
+        """Get the ancestor of this xname by stripping off levels.
+
+        Args:
+            levels (int): the number of levels to strip off this xname to get
+                the ancestor. Specifying 1 is equivalent to get_direct_parent.
+
+        Returns:
+            An XName object that is the ancestor the given number of levels up
+            the hierarchy.
+        """
+        reverse_index = 2 * levels
+        if reverse_index >= len(self.tokens):
+            raise ValueError('No ancestor exists {} levels '
+                             'up from {}'.format(levels, self))
+
+        return XName.get_xname_from_tokens(self.tokens[:-reverse_index])
+
     def get_direct_parent(self):
         """Get the direct parent of this xname.
 
@@ -75,7 +93,7 @@ class XName:
         Returns:
             An XName object that is the parent of this object.
         """
-        return XName.get_xname_from_tokens(self.tokens[:-2])
+        return self.get_ancestor(1)
 
     def __lt__(self, other):
         return self.tokens < other.tokens
