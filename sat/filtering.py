@@ -67,6 +67,10 @@ class FilterFunction:
 
         Returns:
             True if row matches the filter, False otherwise.
+
+        Raises:
+            TypeError: if the value for the query key in the row can't be
+                compared to the given value with the given comparison.
         """
         if not hasattr(self, '_computed_query_key'):
             self._computed_query_key = \
@@ -434,8 +438,9 @@ def filter_list(dicts, query_strings):
     Raises:
         ValueError: if keys in dicts are inconsistent.
         ParseError: if any of query_strings is invalid.
-        KeyError: if attempting to filter against an invalid
-            key.
+        KeyError: if attempting to filter against an invalid key.
+        TypeError: if a value for the query key can't be compared to the given
+            comparison value.
     """
     if not dicts:
         return []
