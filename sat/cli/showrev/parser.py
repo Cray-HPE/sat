@@ -21,8 +21,8 @@ def add_showrev_subparser(subparsers):
     filter_options = sat.parsergroups.create_filter_options()
 
     showrev_parser = subparsers.add_parser(
-        'showrev',
-        help='Show system revision information.',
+        'showrev', help='Show system revision information.',
+        description='Show system revision information.',
         parents=[format_options, filter_options])
 
     showrev_parser.add_argument(

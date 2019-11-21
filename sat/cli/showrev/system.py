@@ -112,7 +112,8 @@ def get_site_data(sitefile):
         with open(sitefile, 'r') as f:
             s = f.read()
     except FileNotFoundError:
-        LOGGER.error('Sitefile {} not found.'.format(sitefile))
+        LOGGER.error('Sitefile {} not found. '
+                     'Run "sat setrev" to generate this file.'.format(sitefile))
         return default
 
     try:

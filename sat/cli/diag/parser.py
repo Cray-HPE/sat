@@ -8,7 +8,9 @@ from argparse import REMAINDER
 
 
 def add_diag_subparser(subparsers):
-    diag_parser = subparsers.add_parser('diag', help='Launch diagnostics for Rosetta switches.')
+    diag_parser = subparsers.add_parser(
+        'diag', help='Launch diagnostics for Rosetta switches.',
+        description='Launch diagnostics for Rosetta switches.')
 
     xnames_group = diag_parser.add_argument_group('xnames', 'methods of specifying target xnames')
     xnames_group.add_argument('-f', '--xname-file', metavar='PATH',

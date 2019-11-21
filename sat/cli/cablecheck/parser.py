@@ -14,6 +14,8 @@ def add_cable_check_subparser(subparsers):
     Returns:
         None
     """
-    cable_check_parser = subparsers.add_parser('cablecheck', help='Check cabling.')
+    cable_check_parser = subparsers.add_parser(
+        'cablecheck', help='Check cabling.',
+        description='Check that cabling is correct and output any problems found.')
     cable_check_parser.add_argument('p2p_file',
                                     help='Path of point-to-point data file (CSV format).')

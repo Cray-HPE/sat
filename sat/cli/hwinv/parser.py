@@ -113,8 +113,8 @@ def add_hwinv_subparser(subparsers):
     filter_options = sat.parsergroups.create_filter_options()
 
     hwinv_parser = subparsers.add_parser(
-        'hwinv',
-        help='Show hardware inventory',
+        'hwinv', help='Show hardware inventory.',
+        description='Show hardware inventory as lists and/or summaries.',
         parents=[format_options, filter_options])
 
     summarize_group = hwinv_parser.add_argument_group(
