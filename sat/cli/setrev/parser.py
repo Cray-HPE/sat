@@ -17,8 +17,9 @@ def add_setrev_subparser(subparsers):
     """
 
     setrev_parser = subparsers.add_parser(
-        'setrev',
-        help='Set site-specific information.')
+        'setrev', help='Set site-specific information.',
+        description='Set site-specific information for serial number, site name, '
+                    'system name, system install date, and system type.')
 
     setrev_parser.add_argument(
         '--sitefile',

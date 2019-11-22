@@ -20,7 +20,8 @@ def add_hwmatch_subparser(subparsers):
     filter_options = sat.parsergroups.create_filter_options()
 
     hwmatch_parser = subparsers.add_parser(
-        'hwmatch', help='Report hardware match issues',
+        'hwmatch', help='Report hardware match issues.',
+        description='Report hardware match issues for processors and memory.',
         parents=[format_options, filter_options])
 
     hwmatch_parser.add_argument(

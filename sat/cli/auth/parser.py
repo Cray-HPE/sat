@@ -15,4 +15,7 @@ def add_auth_subparser(subparsers):
         None
     """
 
-    auth_parser = subparsers.add_parser('auth', help='Acquire authentication tokens and save for reuse')
+    auth_parser = subparsers.add_parser(
+        'auth', help='Acquire authentication tokens and save for reuse.',
+        description='Acquire authentication tokens and save for reuse. '
+                    'See "sat --help" and "man sat-auth" for additional information.')
