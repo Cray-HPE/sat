@@ -30,7 +30,7 @@ class Node(BaseComponent):
         ComponentField('Memory Manufacturer', summarizable=True),
         ComponentField('Memory Model', summarizable=True),
         ComponentField('Memory Size (GiB)', summarizable=True),
-        ComponentField('Memory Module Count)', summarizable=True),
+        ComponentField('Memory Module Count', summarizable=True),
         ComponentField('Processor Count'),
         ComponentField('Processor Manufacturer', summarizable=True),
         ComponentField('Processor Model', summarizable=True),

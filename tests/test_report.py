@@ -182,9 +182,9 @@ class TestReport(unittest.TestCase):
 
         yaml_s = report.get_yaml()
 
-        data = yaml.load(yaml_s)
+        data = yaml.safe_load(yaml_s)
         for expected, actual in zip(self.entries, data):
-            # yaml.load sorts keys
+            # yaml.safe_load sorts keys
             self.assertEqual(sorted(expected), sorted(actual.values()))
 
 
@@ -204,6 +204,8 @@ class TestReportFormatting(unittest.TestCase):
         e3 = ['charlie', 'earth', 'purple']
 
         self.entries = [e1, e2, e3]
+        self.entries_as_dict = [dict(zip(self.headings, e))
+                                for e in self.entries]
         self.reverse_entries = [e3, e2, e1]
         self.out_of_order = [e1, e3, e2]
         self.sorted_1 = [e3, e1, e2]
@@ -236,6 +238,16 @@ class TestReportFormatting(unittest.TestCase):
 
         for expected, actual in zip(self.entries, pt_s):
             self.assertEqual(expected, actual)
+
+    def test_sorted_yaml(self):
+        """The YAML output list should be sorted as well.
+        """
+        report = Report(self.headings, sort_by=0)
+
+        report.add_rows(self.out_of_order)
+
+        loaded_yaml = yaml.safe_load(report.get_yaml())
+        self.assertEqual(self.entries_as_dict, loaded_yaml)
 
     def test_reverse_sorting(self):
         """The internal PT should reverse its order if report.reverse.

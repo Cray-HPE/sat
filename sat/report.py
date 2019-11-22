@@ -159,6 +159,21 @@ class Report:
         new_row = self.convert_row(row)
         self.data.append(new_row)
 
+    def sort_data(self):
+        """Sorts the data contained in the report.
+
+        This sorts `self.data` in place using the field specified in
+        `self.sort_by` as the key and reversing if specified by `self.reverse`.
+        If `self.sort_by` is None, no sorting is done.
+        """
+        if self.sort_by is not None:
+            try:
+                self.data.sort(key=lambda d: d[self.sort_by], reverse=self.reverse)
+            except TypeError:
+                LOGGER.info("Converting all values of '%s' field to str "
+                            "to allow sorting.", self.sort_by)
+                self.data.sort(key=lambda d: str(d[self.sort_by]), reverse=self.reverse)
+
     def get_pretty_table(self):
         """Return a PrettyTable instance created from the data and format opts.
 
@@ -168,18 +183,10 @@ class Report:
         """
         pt = PrettyTable()
         pt.field_names = self.headings
-        pt.reversesort = self.reverse
         pt.border = not self.no_borders
         pt.header = not self.no_headings
 
-        if self.sort_by is not None:
-            try:
-                pt.sortby = self.sort_by
-            except Exception:
-                # The checks in __init__ should prevent this, but just in case.
-                LOGGER.warning(
-                    'Element %s is not in %s. '
-                    'Defaulting to no sorting.', self.sort_by, self.headings)
+        self.sort_data()
 
         for heading in self.headings:
             pt.align[heading] = self.align
@@ -190,7 +197,7 @@ class Report:
             for row in rows_to_print:
                 pt.add_row([str(r) for r in row.values()])
 
-        except (KeyError, ParseError, TypeError) as err:
+        except (KeyError, ParseError, TypeError, ValueError) as err:
             LOGGER.warning("An error occurred while filtering; "
                            "returning no output. (%s)", err)
             return None
@@ -203,10 +210,12 @@ class Report:
         Returns:
             The data of the report formatted as a string in yaml format.
         """
+        self.sort_data()
+
         try:
             rows_to_print = filter_list(self.data, self.filter_strs)
 
-        except (KeyError, ParseError, TypeError) as err:
+        except (KeyError, ParseError, TypeError, ValueError) as err:
             LOGGER.warning("An error occurred while filtering; "
                            "returning no output. (%s)", err)
             return ''
