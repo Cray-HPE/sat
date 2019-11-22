@@ -21,6 +21,7 @@ class Node(BaseComponent):
     hsm_type = NODE_TYPE
     arg_name = 'node'
     pretty_name = 'node'
+    default_show_xnames = True
 
     fields = BaseComponent.fields + [
         ComponentField('Cabinet Type', summarizable=True),

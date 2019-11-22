@@ -22,13 +22,15 @@ class ComponentSummary:
                 use to summarize the components.
             components (Iterable): An Iterable of BaseComponent objects to
                 summarize.
-            include_xnames (bool): Whether to include xnames in summaries or
-                just counts.
+            include_xnames (bool or NoneType): Whether to include xnames in
+                summaries or just counts.
         """
         self.comp_type = comp_type
         self.fields = fields
         self.components = components
-        self.include_xnames = include_xnames
+        self.include_xnames = (include_xnames if include_xnames is not None
+                               else comp_type.default_show_xnames)
+
         self.field_summaries = []
         self.summary_dict = {}
 

@@ -57,6 +57,9 @@ class BaseComponent:
     # The pretty name of the component for output
     pretty_name = ''
 
+    # Whether xnames should be included by default when summarizing this type
+    default_show_xnames = False
+
     # The list of fields supported by the component. Subclasses can override or add.
     fields = [
         ComponentField('xname'),
