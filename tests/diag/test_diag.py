@@ -62,7 +62,8 @@ class DiagStatusTestCase(unittest.TestCase):
         self.rq_del_mock = mock.MagicMock()
         mock.patch('sat.cli.diag.redfish.requests.Session.delete', self.rq_del_mock).start()
 
-        self.initial_status = diag.redfish.DiagStatus.initiate_diag(MOCK_XNAME, MOCK_DIAG_COMMAND, MOCK_DIAG_ARGS)
+        self.initial_status = diag.redfish.DiagStatus.initiate_diag(MOCK_XNAME, 'user', 'pass',
+                                                                    MOCK_DIAG_COMMAND, MOCK_DIAG_ARGS)
 
     def tearDown(self):
         mock.patch.stopall()
@@ -79,7 +80,8 @@ class TestDiagStatusClass(DiagStatusTestCase):
     def test_diag_status_malformed_json(self):
         """Test that malformed JSON will return status None."""
         self.rq_post_mock.return_value.text = '{"No closing quote or brace'
-        self.assertEqual(diag.redfish.DiagStatus.initiate_diag(MOCK_XNAME, MOCK_DIAG_COMMAND, MOCK_DIAG_ARGS), None)
+        self.assertEqual(diag.redfish.DiagStatus.initiate_diag(MOCK_XNAME, 'user', 'pass',
+                                                               MOCK_DIAG_COMMAND, MOCK_DIAG_ARGS), None)
 
     def test_diag_status_update_content(self):
         """Test if status of the diagnostic can be updated."""
@@ -117,7 +119,8 @@ class TestRedfishQueries(DiagStatusTestCase):
         self.rq_post_mock.return_value = None
         self.rq_post_mock.side_effect = requests.exceptions.RequestException()
 
-        self.assertEqual(diag.redfish.DiagStatus.initiate_diag(MOCK_XNAME, 'foo', ['bar', '--baz']), None)
+        self.assertEqual(diag.redfish.DiagStatus.initiate_diag(MOCK_XNAME, 'user', 'pass',
+                                                               'foo', ['bar', '--baz']), None)
 
     def test_update_diag_status(self):
         """Test if updating the diag status works properly."""

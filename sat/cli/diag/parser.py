@@ -29,6 +29,9 @@ def add_diag_subparser(subparsers):
     diag_parser.add_argument('--split', action='store_true',
                              help='Write a split report, writing output from each switch '
                              'to its own file rather than stdout.')
+    diag_parser.add_argument('--interactive', action='store_true',
+                             help='launch an interactive shell for running diagnostics.')
+
 
     diag_parser.add_argument('diag_command', metavar='command',
                              help='diagnostic command to run on the switch')

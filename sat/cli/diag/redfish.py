@@ -60,11 +60,10 @@ class DiagStatus:
         session: the HTTP session used to connect to the host.
 
     """
-    def __init__(self, xname):
+    def __init__(self, xname, username, password):
         self.xname = xname
         self.session = requests.Session()
-        self.session.auth = (get_config_value('redfish.username'),
-                             get_config_value('redfish.password'))
+        self.session.auth = (username, password)
 
     def _update_content(self, json_blob):
         """Updates the fields of this object.
@@ -95,8 +94,8 @@ class DiagStatus:
             else:
                 setattr(self, key.lower(), val)
 
-    @classmethod
-    def initiate_diag(cls, xname, diag_command, diag_args):
+    @staticmethod
+    def initiate_diag(xname, username, password, diag_command, diag_args):
         """Runs a diagnostic command on a physical product.
 
         Args:
@@ -119,7 +118,7 @@ class DiagStatus:
         try:
             LOGGER.info("Starting diagnostic %s on %s.", diag_command, xname)
 
-            status = DiagStatus(xname)
+            status = DiagStatus(xname, username, password)
             # TODO: Fix SSL.
             resp = status.session.post(sched_url, json=payload, verify=False)
 
@@ -224,7 +223,8 @@ class DiagStatus:
 class RunningDiagPool:
     """A bundle of running diagnostics that are to be tracked."""
 
-    def __init__(self, xnames, diag_command, diag_args, poll_interval, timeout):
+    def __init__(self, xnames, diag_command, diag_args, poll_interval, timeout,
+                 username, password):
         """Constructor for a RunningDiagPool.
 
         Args:
@@ -242,7 +242,8 @@ class RunningDiagPool:
         self._last_poll = self.starttime
 
         for xname in xnames:
-            new_diag = DiagStatus.initiate_diag(xname, diag_command, diag_args)
+            new_diag = DiagStatus.initiate_diag(xname, username, password,
+                                                diag_command, diag_args)
             if new_diag is not None:
                 self._diags.append(new_diag)
 
