@@ -6,7 +6,6 @@
 Name: cray-sat
 Version: 0.3.0
 Release: %(echo ${BUILD_METADATA})
-# TODO: Determine the correct license to use for SAT
 License: Cray Proprietary
 Source: %{name}-%{version}.tar.gz
 Summary: System Admin Toolkit (SAT)
