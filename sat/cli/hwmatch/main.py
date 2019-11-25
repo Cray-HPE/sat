@@ -90,7 +90,7 @@ def do_hwmatch(args):
     except ValueError as err:
         LOGGER.error('Failed to parse JSON from hardware inventory response: %s', err)
         sys.exit(1)
-    full_system = System(response_json, args)
+    full_system = System(response_json)
     full_system.parse_all()
 
     records_by_level = {}

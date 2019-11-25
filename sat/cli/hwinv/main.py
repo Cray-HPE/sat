@@ -3,6 +3,7 @@ The main entry point for the hwinv subcommand.
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
+from collections import OrderedDict
 import logging
 import re
 import sys
@@ -10,8 +11,12 @@ import sys
 import inflect
 
 from sat.apiclient import APIError, HSMClient
+from sat.cli.hwinv.summary import ComponentSummary
+from sat.config import get_config_value
+from sat.report import Report
 from sat.session import SATSession
 from sat.system.system import System
+from sat.util import yaml_dump
 
 LOGGER = logging.getLogger(__name__)
 
@@ -125,6 +130,157 @@ def report_unused_options(args):
     return messages
 
 
+def get_all_lists(system, args):
+    """Gets a list containing Reports listing each type of component.
+
+    Args:
+        system (sat.system.system.System): The representation of the full
+            system according to HSM.
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this subcommand.
+
+    Returns:
+        A list of Reports of all components of each type.
+    """
+    inflector = inflect.engine()
+    all_lists = []
+
+    for object_type, comp_dict in system.components_by_type.items():
+        list_arg_name = 'list_{}'.format(inflector.plural(object_type.arg_name))
+        fields_arg_name = '{}_fields'.format(object_type.arg_name)
+
+        # Continue if list of this component type was not requested
+        if not (args.list_all or getattr(args, list_arg_name)):
+            continue
+
+        field_filters = getattr(args, fields_arg_name)
+        fields = object_type.get_listable_fields(field_filters)
+        field_key_attr = 'pretty_name' if args.format == 'pretty' else 'canonical_name'
+        headings = [getattr(field, field_key_attr) for field in fields]
+        list_title = object_type.get_list_title(args.format)
+
+        component_dicts = [component.get_dict(fields, field_key_attr)
+                           for component in comp_dict.values()]
+
+        component_report = Report(
+            headings=headings, title=list_title,
+            sort_by=args.sort_by, reverse=args.reverse,
+            no_headings=get_config_value('format.no_headings'),
+            no_borders=get_config_value('format.no_borders'),
+            filter_strs=args.filter_strs
+        )
+        component_report.add_rows(component_dicts)
+
+        all_lists.append(component_report)
+
+    return all_lists
+
+
+def get_all_summaries(system, args):
+    """Gets a list of all the summaries of components.
+
+    Args:
+        system (sat.system.system.System): The representation of the full
+            system according to HSM.
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this subcommand.
+
+    Returns:
+        A list of ComponentSummary objects that provide a summary of each
+        type of component by the given fields as requested by `self.args`.
+    """
+    inflector = inflect.engine()
+    all_summaries = []
+
+    for object_type, comp_dict in system.components_by_type.items():
+        summarize_arg_name = 'summarize_{}'.format(inflector.plural(object_type.arg_name))
+        fields_arg_name = '{}_summary_fields'.format(object_type.arg_name)
+        xnames_arg_name = 'show_{}_xnames'.format(object_type.arg_name)
+
+        if not hasattr(args, summarize_arg_name):
+            # Not a type of object that can be summarized
+            continue
+
+        if args.summarize_all or getattr(args, summarize_arg_name):
+            field_filters = getattr(args, fields_arg_name)
+            fields = object_type.get_summary_fields(field_filters)
+
+            include_xnames = getattr(args, xnames_arg_name)
+
+            components = comp_dict.values()
+            all_summaries.append(ComponentSummary(object_type, fields,
+                                                  components, include_xnames))
+
+    return all_summaries
+
+
+def get_pretty_output(summaries, lists):
+    """Gets the complete output in pretty format.
+
+    Args:
+        summaries (Iterable): The `ComponentSummary` objects returned by
+            `get_all_summaries`.
+        lists (Iterable): The `Report` objects returned by `get_all_lists`.
+
+    Returns:
+        A pretty string containing the complete output requested by
+        the args.
+    """
+    full_summary_string = ''
+    for summary in summaries:
+        full_summary_string += str(summary)
+
+    full_list_string = ''
+    for component_list in lists:
+        full_list_string += str(component_list) + '\n\n'
+
+    return full_summary_string + full_list_string
+
+
+def get_yaml_output(summaries, lists):
+    """Gets the complete output formatted as YAML.
+
+    Args:
+        summaries (Iterable): The `ComponentSummary` objects returned by
+            `get_all_summaries`.
+        lists (Iterable): The `Report` objects returned by `get_all_lists`.
+
+    Returns:
+        A string containing the complete output requested by the args in
+        YAML format.
+    """
+    # The way we are constructing a top-level dictionary by joining together
+    # YAML representations of dictionaries is not optimal, but it works for now.
+    summary_str = ''
+    summary_dicts = OrderedDict()
+
+    for summary in summaries:
+        summary_dict = summary.as_dict()
+        # There should only be one key here, but iterate for flexibility
+        for key, val in summary_dict.items():
+            summary_dicts[key] = val
+
+    if summary_dicts:
+        summary_str += yaml_dump(summary_dicts)
+
+    return summary_str + ''.join(report.get_yaml() for report in lists)
+
+
+def get_all_output(system, args):
+    """Get the complete system inventory output according to `self.args`.
+
+    Returns:
+        A string of the full system inventory output.
+    """
+    summaries = get_all_summaries(system, args)
+    lists = get_all_lists(system, args)
+
+    if args.format == 'yaml':
+        return get_yaml_output(summaries, lists)
+    elif args.format == 'pretty':
+        return get_pretty_output(summaries, lists)
+
+
 def do_hwinv(args):
     """Executes the hwinv command with the given arguments.
 
@@ -153,9 +309,9 @@ def do_hwinv(args):
         LOGGER.error('Failed to parse JSON from hardware inventory response: %s', err)
         sys.exit(1)
 
-    full_system = System(response_json, args)
+    full_system = System(response_json)
     full_system.parse_all()
-    print(full_system.get_all_output())
+    print(get_all_output(full_system, args))
 
     for message in warning_messages:
         LOGGER.warning(message)

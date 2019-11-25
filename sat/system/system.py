@@ -3,16 +3,9 @@ Class to define the entire system hardware inventory.
 
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 import logging
 
-import inflect
-
-from sat.config import get_config_value
-from sat.filtering import filter_list
-# TODO: Probably shouldn't import stuff from hwinv package here
-from sat.cli.hwinv.summary import ComponentSummary
-from sat.report import Report
 from sat.system.constants import EMPTY_STATUS, STATUS_KEY, TYPE_KEY
 from sat.system.chassis import Chassis
 from sat.system.compute_module import ComputeModule
@@ -22,7 +15,6 @@ from sat.system.node import Node
 from sat.system.node_enclosure import NodeEnclosure
 from sat.system.processor import Processor
 from sat.system.router_module import RouterModule
-from sat.util import yaml_dump
 from sat.xname import XName
 
 LOGGER = logging.getLogger(__name__)
@@ -31,17 +23,14 @@ LOGGER = logging.getLogger(__name__)
 class System:
     """The full hardware inventory as returned by the HSM API."""
 
-    def __init__(self, complete_raw_data, args):
+    def __init__(self, complete_raw_data):
         """Creates a new object representing the full system's hardware inventory.
 
         Args:
             complete_raw_data (list): The list of dictionaries returned as JSON
                 by the HSM API.
-            args: The argparse.Namespace object containing the parsed arguments
-                passed to the hwinv subcommand.
         """
         self.complete_raw_data = complete_raw_data
-        self.args = args
         self.raw_data_by_type = defaultdict(list)
 
         self.components_by_type = {
@@ -129,177 +118,3 @@ class System:
             LOGGER.debug("Found chassis object '%s' for node '%s'", chassis_object, node_object)
             node_object.chassis = chassis_object
             chassis_object.add_child_object(node_object)
-
-    # TODO: Refactor these methods out of the `System` class because they
-    # specific to hwinv and its command-line arguments.
-    # Jira SAT-210 opened for this.
-    # ===================== Begin methods to refactor ========================
-    @staticmethod
-    def get_components_as_dicts(components, fields):
-        """Gets the given components as a list of dicts with keys given by fields.
-
-        Args:
-            components (Iterable): An iterable of objects of type BaseComponent
-                to get as lists for printing in a table format.
-            fields (Iterable): An iterable of ComponentField objects to get from
-                each component.
-
-        Returns:
-            A list of dicts, each representing one of the components and each
-            with the canonical names of the fields as keys.
-        """
-        return [component.get_dict(fields) for component in components]
-
-    @staticmethod
-    def get_components_as_lists(components, fields):
-        """Get the given attribute as a list of value lists.
-
-        Args:
-            components (Iterable): An iterable of objects of type BaseComponent
-                to get as lists for printing in a table format.
-            fields (Iterable): An iterable of fields to get from each component.
-
-        Returns:
-            A list of lists, each representing one of the components and each
-            with the values of the fields in the same order as `fields`.
-            The first row of the list is the list of field_names.
-        """
-        return [[field.pretty_name for field in fields]] + [component.get_table_row(fields)
-                                                            for component in components]
-
-    def get_all_lists(self):
-        """Gets a dict containing all the lists of components as values.
-
-        Returns:
-            A dictionary mapping from the list name to the list of components
-            of that type. Each list of components will either be a list of
-            dictionaries (if format is 'yaml'), or a list of lists (if format
-            is 'pretty'). For 'pretty' format, each list of lists will contain
-            the headers as the first element.
-        """
-        inflector = inflect.engine()
-        all_lists = OrderedDict()
-
-        for object_type, comp_dict in self.components_by_type.items():
-            list_arg_name = 'list_{}'.format(
-                inflector.plural(object_type.arg_name))
-            fields_arg_name = '{}_fields'.format(object_type.arg_name)
-
-            if not(self.args.list_all or getattr(self.args, list_arg_name)):
-                continue
-
-            filters = getattr(self.args, fields_arg_name)
-            fields = object_type.get_listable_fields(filters)
-
-            if self.args.format == 'pretty':
-                list_key = 'Listing of all {} in the system'.format(
-                    object_type.plural_pretty_name()
-                )
-                all_lists[list_key] = self.get_components_as_lists(
-                    comp_dict.values(), fields)
-            else:
-                list_key = '{}_list'.format(object_type.arg_name)
-                all_lists[list_key] = filter_list(self.get_components_as_dicts(
-                    comp_dict.values(), fields), self.args.filter_strs)
-
-        return all_lists
-
-    def get_all_summaries(self):
-        """Gets a dict containing all the summaries of components as values.
-
-        Returns:
-            A list of ComponentSummary objects that provide a summary of each
-            type of component by the given fields as requested by `self.args`.
-        """
-        inflector = inflect.engine()
-        all_summaries = []
-
-        for object_type, comp_dict in self.components_by_type.items():
-            summarize_arg_name = 'summarize_{}'.format(inflector.plural(object_type.arg_name))
-            fields_arg_name = '{}_summary_fields'.format(object_type.arg_name)
-            xnames_arg_name = 'show_{}_xnames'.format(object_type.arg_name)
-
-            if not hasattr(self.args, summarize_arg_name):
-                # Not a type of object that can be summarized
-                continue
-
-            if self.args.summarize_all or getattr(self.args, summarize_arg_name):
-
-                filters = getattr(self.args, fields_arg_name)
-                fields = object_type.get_summary_fields(filters)
-
-                include_xnames = getattr(self.args, xnames_arg_name)
-
-                components = comp_dict.values()
-                all_summaries.append(ComponentSummary(object_type, fields,
-                                                      components, include_xnames))
-
-        return all_summaries
-
-    def get_pretty_output(self, summaries, lists):
-        """Gets the complete output in pretty format.
-
-        Args:
-            summaries (Iterable): The list of ComponentSummary objects.
-            lists (dict): The dict returned by the `get_all_lists` method.
-
-        Returns:
-            A pretty string containing the complete output requested by
-            the args.
-        """
-        full_summary_string = ''
-        for summary in summaries:
-            full_summary_string += str(summary)
-
-        full_list_string = ''
-
-        for component, component_list in lists.items():
-            report = Report(component_list[0], component,
-                            self.args.sort_by, self.args.reverse,
-                            get_config_value('format.no_headings'),
-                            get_config_value('format.no_borders'),
-                            filter_strs=self.args.filter_strs)
-            report.add_rows(component_list[1:])
-
-            full_list_string += str(report) + '\n\n'
-
-        return full_summary_string + full_list_string
-
-    @staticmethod
-    def get_yaml_output(summaries, lists):
-        """Gets the complete output formatted as YAML.
-
-        Args:
-            summaries (Iterable): The list of ComponentSummary objects.
-            lists (dict): The dict returned by the `get_all_lists` method.
-
-        Returns:
-            A string containing the complete output requested by the args in
-            YAML format.
-        """
-        summary_dicts = OrderedDict()
-
-        for summary in summaries:
-            summary_dict = summary.as_dict()
-            # There should only be one key here, but iterate for flexibility
-            for key, val in summary_dict.items():
-                summary_dicts[key] = val
-
-        return ''.join(yaml_dump(obj) for obj in [summary_dicts, lists] if obj)
-
-    def get_all_output(self):
-        """Get the complete system inventory output according to `self.args`.
-
-        Returns:
-            A string of the full system inventory output.
-        """
-        summaries = self.get_all_summaries()
-        lists = self.get_all_lists()
-
-        if self.args.format == 'yaml':
-            return self.get_yaml_output(summaries, lists)
-        elif self.args.format == 'pretty':
-            return self.get_pretty_output(summaries, lists)
-
-    # TODO: Refactor methods above to corresponding comment.
-    # ===================== End of methods to refactor ========================
