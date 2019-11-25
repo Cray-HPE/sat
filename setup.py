@@ -24,6 +24,7 @@ setup(
     long_description_content_type='text/markdown',
     url='https://stash.us.cray.com/projects/SAT/repos/sat',
     author='Cray, Inc.',
+    license='Cray Proprietary',
     packages=find_packages(exclude=['tests']),
     python_requires='>=3, <4',
     # Top-level dependencies are parsed from requirements.txt
