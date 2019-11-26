@@ -74,7 +74,7 @@ install -m 755 -d %{buildroot}/opt/cray/etc
 # Install files for import into Kibana:
 install -m 755 -d %{buildroot}/opt/cray/sat
 install -m 755 -d %{buildroot}/opt/cray/sat/kibana
-install -m 644 kibana/mce-dashboard.json %{buildroot}/opt/cray/sat/kibana/mce-dashboard.json
+install -m 644 kibana/mce-dashboard.ndjson %{buildroot}/opt/cray/sat/kibana/mce-dashboard.ndjson
 
 # Install ansible content for crayctldeploy subpackage
 install -m 755 -d %{buildroot}/%{ansible_framework_dir}/roles
@@ -104,7 +104,7 @@ cat INSTALLED_FILES | grep __pycache__ | xargs dirname | xargs dirname | uniq >>
 %dir /opt/cray/etc
 %dir /opt/cray/sat
 %dir /opt/cray/sat/kibana
-/opt/cray/sat/kibana/mce-dashboard.json
+/opt/cray/sat/kibana/mce-dashboard.ndjson
 %config(noreplace) /etc/sat.toml
 %{satmandir}/*.8.gz
 /etc/bash_completion.d/sat-completion.bash
