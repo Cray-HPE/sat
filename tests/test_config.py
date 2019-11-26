@@ -10,6 +10,7 @@ from unittest import mock
 import sat
 from sat.config import ConfigValidationError, DEFAULT_CONFIG_PATH, get_config_value, load_config,\
     SATConfig, SAT_CONFIG_SPEC, validate_log_level, _option_value, OptionSpec
+from tests.common import ExtendedTestCase
 
 CONFIGS_DIR = os.path.join(os.path.dirname(__file__), 'resources/configs')
 
@@ -152,23 +153,8 @@ class TestGetConfigValue(unittest.TestCase):
         self.assertEqual(expected_value, option_value)
 
 
-class TestSATConfig(unittest.TestCase):
+class TestSATConfig(ExtendedTestCase):
     """Tests for the SATConfig class"""
-
-    def assert_in_element(self, element, container):
-        """Assert the given element is in one of the elements in container.
-
-        Returns:
-            None.
-
-        Raises:
-            AssertionError: if the assertion fails.
-        """
-        for item in container:
-            if element in item:
-                return
-        self.fail("Element '{}' is not in any of the elements in "
-                  "the given container.".format(element))
 
     def assert_defaults_set(self, config):
         """Assert that all options in config are set to defaults.
