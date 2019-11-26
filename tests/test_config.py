@@ -76,7 +76,7 @@ class TestOptionValue(unittest.TestCase):
         self.assertEqual(_option_value(self.mock_args, config_val, self.option_spec),
                          config_val)
 
-    def test_no_corresponding_arg(self):
+    def test_no_corresponding_arg_config_file(self):
         """Test we get config option with no corresponding command line arg."""
         config_val = 'value from the config file'
         setattr(self.mock_args, self.cmdline_option, 'should have no effect')
@@ -84,7 +84,7 @@ class TestOptionValue(unittest.TestCase):
         self.assertEqual(_option_value(self.mock_args, config_val, different_option_spec),
                          config_val)
 
-    def test_no_corresponding_arg(self):
+    def test_no_corresponding_arg_default(self):
         """Test we get default option with no corresponding command line arg."""
         setattr(self.mock_args, self.cmdline_option, 'should have no effect')
         different_option_spec = OptionSpec(str, self.default, None, None)
