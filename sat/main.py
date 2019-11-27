@@ -16,6 +16,7 @@ from sat.parser import create_parent_parser
 
 LOGGER = logging.getLogger(__name__)
 
+
 def main():
     """SAT Main.
 
@@ -31,11 +32,6 @@ def main():
 
         load_config(args)
         configure_logging()
-
-        # Print help info if executed without a subcommand
-        if args.command is None:
-            parser.print_help()
-            sys.exit(1)
 
         try:
             # Dynamically importing here affords the following
