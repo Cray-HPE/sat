@@ -107,7 +107,7 @@ def combine_filter_fns(fns, combine_fn=all):
     return inner
 
 
-def _subsequence(needle, haystack):
+def is_subsequence(needle, haystack):
     """Checks if needle is a subsequence of haystack.
 
     Informally, needle is a subsequence of haystack if needle can be
@@ -131,7 +131,7 @@ def _subsequence(needle, haystack):
         try:
             first, rest = needle[0], needle[1:]
             hpos = haystack.index(first)
-            return _subsequence(rest, haystack[(hpos + 1):])
+            return is_subsequence(rest, haystack[(hpos + 1):])
 
         except ValueError:
             # Letter from needle not found in haystack, so there's no
@@ -164,7 +164,7 @@ def _match_query_key(query_key, headings):
     # info (e.g. units etc.) that we don't want the user to worry
     # about.
     matching_keys = [key for key in headings
-                     if _subsequence(query_key.lower(), key.lower())]
+                     if is_subsequence(query_key.lower(), key.lower())]
     if len(matching_keys) != 1:
         raise KeyError("Query key '{}' is invalid because it {}"
                        .format(query_key,

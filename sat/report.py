@@ -8,7 +8,7 @@ import logging
 
 from prettytable import PrettyTable
 
-from sat.filtering import filter_list, ParseError, _subsequence
+from sat.filtering import filter_list, ParseError, is_subsequence
 from sat.util import yaml_dump, get_rst_header
 
 
@@ -66,7 +66,7 @@ class Report:
                 up = self.sort_by.upper()
                 self.sort_by = None
                 for h in headings:
-                    if _subsequence(up, h.upper()):
+                    if is_subsequence(up, h.upper()):
                         self.sort_by = h
                         break
 

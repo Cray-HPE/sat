@@ -38,23 +38,23 @@ class TestSubsequenceMatching(unittest.TestCase):
         test_str = 'spamneggs'
         for l in range(len(test_str) + 1):
             for subseq in itertools.combinations(test_str, l):
-                self.assertTrue(filtering._subsequence(''.join(subseq), test_str))
+                self.assertTrue(filtering.is_subsequence(''.join(subseq), test_str))
 
     def test_trivial_subsequence(self):
         """Test empty string is a subsequence."""
-        self.assertTrue(filtering._subsequence('', 'foo'))
+        self.assertTrue(filtering.is_subsequence('', 'foo'))
 
     def test_subseq_of_empty(self):
         """Test subsequences of the empty string."""
-        self.assertFalse(filtering._subsequence('foo', ''))
-        self.assertTrue(filtering._subsequence('', ''))
+        self.assertFalse(filtering.is_subsequence('foo', ''))
+        self.assertTrue(filtering.is_subsequence('', ''))
 
     def test_is_not_subsequence(self):
         """Test subsequence misses."""
         haystack = 'foobarbaz'
         for needle in ['zabraboof', 'nothing', 'ofoarbazb',
                        'foobarbax', 'bff', 'egads']:
-            self.assertFalse(filtering._subsequence(needle, haystack))
+            self.assertFalse(filtering.is_subsequence(needle, haystack))
 
     def test_combine_filter_fns(self):
         """Test composing filtering functions with boolean combinators."""
