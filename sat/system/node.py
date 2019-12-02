@@ -7,7 +7,7 @@ import logging
 
 from sat.cached_property import cached_property
 from sat.system.component import BaseComponent
-from sat.system.constants import EX_1_C, EX_1_S, NODE_TYPE, MISSING_VALUE
+from sat.system.constants import EX_1_C, EX_1_S, NODE_TYPE
 from sat.system.field import ComponentField
 from sat.system.memory_module import MemoryModule
 from sat.system.processor import Processor

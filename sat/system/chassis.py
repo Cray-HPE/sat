@@ -28,8 +28,6 @@ class Chassis(BaseComponent):
         super().__init__(raw_data)
 
         # Links to objects that are children of this component in the hierarchy
-        self.compute_modules = {}
-        self.node_enclosures = {}
         self.nodes = {}
 
         self.children_by_type = {

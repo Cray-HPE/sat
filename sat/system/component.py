@@ -155,7 +155,8 @@ class BaseComponent:
             or the EMPTY_VALUE string if there are no children of this type.
         """
         unique_child_vals = self.get_unique_child_vals(child_type, field_name)
-        return EMPTY_VALUE if not unique_child_vals else ', '.join(unique_child_vals)
+        return (EMPTY_VALUE if not unique_child_vals
+                else ', '.join(str(val) for val in unique_child_vals))
 
     @cached_property
     def type(self):
