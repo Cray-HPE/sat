@@ -220,6 +220,21 @@ class BaseComponent:
         return cls.filter_fields('summarizable', filters)
 
     @classmethod
+    def get_list_title(cls, fmt):
+        """Gets the title for the listing of this component.
+
+        Args:
+            fmt (str): The format the title will be printed in.
+
+        Returns:
+            str: The title to use for the given format as a string.
+        """
+        if fmt == 'pretty':
+            return 'Listing of all {}'.format(cls.plural_pretty_name())
+        else:
+            return '{}_list'.format(cls.arg_name)
+
+    @classmethod
     def get_listable_fields(cls, filters=None):
         """Gets a filtered list of fields to use in a listing of the component.
 
@@ -275,31 +290,21 @@ class BaseComponent:
 
         return filtered_fields
 
-    def get_dict(self, fields):
+    def get_dict(self, fields, field_key_attr):
         """Gets a dict representation of this component with the given fields.
 
         Args:
             fields (Iterable): An Iterable of ComponentField objects to get the
                 values of from this component.
+            field_key_attr (str): The attribute to use to get the key from the
+                field.
 
         Returns:
             A dict mapping from the given field to the values of those fields
             for this component.
         """
-        return {field.canonical_name: getattr(self, field.property_name)
+        return {getattr(field, field_key_attr): getattr(self, field.property_name)
                 for field in fields}
-
-    def get_table_row(self, fields):
-        """Gets a table row for this component.
-
-        Args:
-            fields (Iterable): An Iterable of ComponentField objects to get the
-                values of from this component.
-
-        Returns:
-            A list of the requested fields from this object.
-        """
-        return [getattr(self, field.property_name) for field in fields]
 
     def __str__(self):
         """Just use the xname as the string representation of a component."""
