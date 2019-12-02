@@ -63,8 +63,8 @@ SAT_CONFIG_SPEC = {
         'stderr_level': OptionSpec(str, 'WARNING', validate_log_level, 'loglevel'),
     },
     'redfish': {
-        'username': OptionSpec(str, 'user', None, None),
-        'password': OptionSpec(str, 'pass', None, None)
+        'username': OptionSpec(str, '', None, None),
+        'password': OptionSpec(str, '', None, None)
     },
 }
 

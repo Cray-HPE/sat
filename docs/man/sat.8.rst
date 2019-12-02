@@ -162,13 +162,16 @@ REDFISH
 -------
 
 **username**
-        Default username to use when querying Cray services that are dependent
-        on Redfish.
+        (optional) Default username to use when querying Cray services that are
+        dependent on Redfish. If not supplied, the user will be queried on the
+        command line to give a username when running diagnostics.
 
 **password**
-        Default password to use when querying Cray services that are dependent
-        on Redfish. Use caution, as the password is stored as plaintext within
-        the SAT configuration file.
+        (optional) Default password to use when querying Cray services that are
+        dependent on Redfish. Use caution, as the password is stored as
+        plaintext within the SAT configuration file. If not supplied, the user
+        will be queried for a password on the command line when running
+        diagnostics.
 
 SEE ALSO
 ========

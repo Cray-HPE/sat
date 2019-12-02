@@ -63,6 +63,13 @@ These options must be specified after the subcommand.
         output or for reducing the amount of output printed to the
         terminal.
 
+**--interactive**
+        If this flag is supplied, the user will be given an interactive shell
+        from which multiple diagnostic commands can be launched sequentially.
+        Note that this option may only be supplied if **command** is not
+        given. At least one of **command** or **--interactive** must be supplied
+        on the command line.
+
 **-x** *XNAME*, **--xname** *XNAME*
         This flag can be used to specify an xname on which to run tests.
         This flag can be used multiple times to specify multiple xnames.
