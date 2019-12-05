@@ -101,6 +101,7 @@ class TestLoadConfig(unittest.TestCase):
         Patches SATConfig constructor.
         """
         # Ensure that CONFIG is None to start with a clean slate
+        self.backup_config = sat.config.CONFIG
         sat.config.CONFIG = None
         self.mock_sat_config_obj = mock.Mock()
         self.patcher = mock.patch('sat.config.SATConfig',
@@ -113,6 +114,7 @@ class TestLoadConfig(unittest.TestCase):
         Stops patcher for the SATConfig constructor.
         """
         self.patcher.stop()
+        sat.config.CONFIG = self.backup_config
 
     @mock.patch('os.environ', {k:v for k,v in os.environ.items() if k != 'SAT_CONFIG_FILE'})
     def test_load_config(self):
