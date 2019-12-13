@@ -35,6 +35,11 @@ def add_linkhealth_subparser(subparsers):
         help='Show all links determined to be "configured".')
 
     linkhealth_parser.add_argument(
+        '--unhealthy', action='store_true',
+        help='Show all unhealthy links - even ones which happen '
+             'to be "unconfigured".')
+
+    linkhealth_parser.add_argument(
         '-x', '--xname', dest='xnames', metavar='XNAME',
         action='append', default=[],
         help='Target only the desired xnames. '

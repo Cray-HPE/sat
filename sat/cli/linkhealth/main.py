@@ -307,6 +307,7 @@ def get_report(xname_port_map, username, password, args):
 
             if (args.all
                     or (args.configured and entry['physical_port'] in configured_ports[xname])
+                    or (args.unhealthy and entry['health'] != 'OK')
                     or (entry['physical_port'] in configured_ports[xname] and entry['health'] != 'OK')):
                 report.add_row(entry)
 

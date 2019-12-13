@@ -38,6 +38,10 @@ These options must be specified after the subcommand.
 **--configured**
         Report on all configured links - even those that are healthy.
 
+**--unhealthy**
+        Report on all links whose status is not "OK" - even those
+        that are not "configured".
+
 **-x, --xname**
         List the xnames which should be queried. These will match against
         Redfish endpoints that are of type "RouterBMC" as reported by the
