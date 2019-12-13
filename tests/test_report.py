@@ -4,6 +4,7 @@ Unit tests for sat/util.py .
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
 import unittest
+from collections import defaultdict
 
 import yaml
 
@@ -66,7 +67,17 @@ class TestReport(unittest.TestCase):
         entry = dict(zip(self.headings, self.e1))
         report.add_row(entry)
 
-        self.assertEqual(self.headings, report.headings)
+        self.assertEqual(1, len(report.data))
+        self.assertEqual(entry, report.data[0])
+
+    def test_adding_default_dict(self):
+        """Verify that a default dict can be added to a Report.
+        """
+        report = Report(self.headings)
+
+        entry = defaultdict(lambda: 'hello')
+        report.add_row(entry)
+
         self.assertEqual(1, len(report.data))
         self.assertEqual(entry, report.data[0])
 
