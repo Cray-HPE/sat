@@ -81,17 +81,24 @@ These options must be specified after the subcommand.
 EXAMPLES
 ========
 
-The xnames can be specified by providing a path to a file formatted similar
-to the following example (ie. each xname on its own line).
+Run a diagnostic named **runMemTester** with an option to just print its usage
+information on two xnames at once::
 
-::
+        sat diag --xname x1000c0r0b0 --xname x1000c0r1b0 runMemTester -h
 
-    x0c0s14b0n0
-    x0c0s21b0n0
-    x0c0s24b0n0
-    x0c0s28b0n0
-    x0c0s16b0n0
-    x0c0s26b0n0
+The xnames can also be specified by providing a path to a file that contains one
+xname per line. E.g.::
+
+        sat diag --xname-file my-xnames.txt runMemTester -h
+
+In the example above, the file **my-xnames.txt** contains the following lines::
+
+        x0c0s14b0n0
+        x0c0s21b0n0
+        x0c0s24b0n0
+        x0c0s28b0n0
+        x0c0s16b0n0
+        x0c0s26b0n0
 
 SEE ALSO
 ========

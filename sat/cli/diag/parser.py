@@ -18,7 +18,7 @@ def add_diag_subparser(subparsers):
                               'xnames of all switches to be tested')
     xnames_group.add_argument('-x', '--xname', action='append', dest='xnames', metavar='XNAME',
                               default=[], help='An xname on which the diagnostic should be run. '
-                              'Multiple xnames may be specified with this option')
+                              'This flag can be used multiple times to specify multiple xnames.')
 
     diag_parser.add_argument('-t', '--timeout', default=300, metavar='SECONDS',
                              help='Timeout for a diagnostic run on a switch')
