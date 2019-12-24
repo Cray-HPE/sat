@@ -51,7 +51,7 @@ def get_router_xnames():
     try:
         endpoints = response.json()
         endpoints = endpoints['RedfishEndpoints']
-    except ValueError:
+    except ValueError as err:
         raise ValueError('Failed to parse JSON from hardware inventory response: {}'.format(err))
     except KeyError:
         raise KeyError('The response from the HSM has no entry for "RedfishEndpoints"')
