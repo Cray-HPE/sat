@@ -51,12 +51,12 @@ def create_filter_options():
     parser = ArgumentParser(add_help=False)
 
     group = parser.add_argument_group(
-        'filtering options', 'Options to filter output for applicable commands.')
+        'filtering options', 'Options to filter output.')
 
     group.add_argument(
         '--filter', metavar='QUERY', dest='filter_strs',
         action='append', default=[],
-        help='Filter the output against some constraint.')
+        help='Filter rows of the output.')
 
     return parser
 

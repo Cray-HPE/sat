@@ -33,13 +33,6 @@ These options must be specified after the subcommand.
         zeros from the integer parts will be removed before matching. May be
         used with **--nids**.
 
-**-n, --nids**
-        Selects nodes to report from a comma-separated list of NIDs, or a single
-        NID. May be used with **--xnames**.
-
-**-h, --help**
-        Print a usage summary and exit.
-
 .. include:: _sat-format-opts.rst
 
 EXAMPLES
@@ -50,16 +43,45 @@ Sample Output
 
 ::
 
-  +-------------+-----+---------+-------+---------+------+-------------+----------+
-  |    xname    | NID |  State  |  Flag | Enabled | Arch |     Role    | Net Type |
-  +-------------+-----+---------+-------+---------+------+-------------+----------+
-  | x0c0s11b0n0 | 999 |  Ready  |   OK  |   True  | X86  | Application |  Sling   |
-  | x0c0s13b0n0 | 998 | Standby | Alert |   True  | X86  | Application |  Sling   |
-  | x0c0s21b0n0 |  4  |  Ready  |   OK  |   True  | X86  |   Compute   |  Sling   |
-  | x0c0s24b0n0 |  3  |  Ready  |   OK  |   True  | X86  |   Compute   |  Sling   |
-  | x0c0s26b0n0 |  2  |    On   |   OK  |   True  | X86  |   Compute   |  Sling   |
-  | x0c0s28b0n0 |  1  |  Ready  |   OK  |   True  | X86  |   Compute   |  Sling   |
-  +-------------+-----+---------+-------+---------+------+-------------+----------+
+  # no filter
+  $ sat status
+  +----------------+------+-------+------+---------+------+---------+----------+
+  | xname          | NID  | State | Flag | Enabled | Arch | Role    | Net Type |
+  +----------------+------+-------+------+---------+------+---------+----------+
+  | x3000c0s19b1n0 | 1    | Ready | OK   | True    | X86  | Compute | Sling    |
+  | x3000c0s19b2n0 | 2    | Ready | OK   | True    | X86  | Compute | Sling    |
+  | x3000c0s19b3n0 | 3    | Ready | OK   | True    | X86  | Compute | Sling    |
+  | x3000c0s19b4n0 | 4    | Ready | OK   | True    | X86  | Compute | Sling    |
+  | x5000c1s0b0n0  | 1000 | Ready | OK   | True    | X86  | Compute | Sling    |
+  | x5000c1s0b0n1  | 1001 | Ready | OK   | True    | X86  | Compute | Sling    |
+  +----------------+------+-------+------+---------+------+---------+----------+
+
+  $ sat status --filter nid=1
+  +----------------+------+-------+------+---------+------+---------+----------+
+  | xname          | NID  | State | Flag | Enabled | Arch | Role    | Net Type |
+  +----------------+------+-------+------+---------+------+---------+----------+
+  | x3000c0s19b1n0 | 1    | Ready | OK   | True    | X86  | Compute | Sling    |
+  +----------------+------+-------+------+---------+------+---------+----------+
+
+  $ sat status --filter xname=x3000c0s19b4n0
+  +----------------+------+-------+------+---------+------+---------+----------+
+  | xname          | NID  | State | Flag | Enabled | Arch | Role    | Net Type |
+  +----------------+------+-------+------+---------+------+---------+----------+
+  | x3000c0s19b4n0 | 4    | Ready | OK   | True    | X86  | Compute | Sling    |
+  +----------------+------+-------+------+---------+------+---------+----------+
+
+  # filters are case-insensitive as well
+  $ sat status --filter role=compute
+  +----------------+------+-------+------+---------+------+---------+----------+
+  | xname          | NID  | State | Flag | Enabled | Arch | Role    | Net Type |
+  +----------------+------+-------+------+---------+------+---------+----------+
+  | x3000c0s19b1n0 | 1    | Ready | OK   | True    | X86  | Compute | Sling    |
+  | x3000c0s19b2n0 | 2    | Ready | OK   | True    | X86  | Compute | Sling    |
+  | x3000c0s19b3n0 | 3    | Ready | OK   | True    | X86  | Compute | Sling    |
+  | x3000c0s19b4n0 | 4    | Ready | OK   | True    | X86  | Compute | Sling    |
+  | x5000c1s0b0n0  | 1000 | Ready | OK   | True    | X86  | Compute | Sling    |
+  | x5000c1s0b0n1  | 1001 | Ready | OK   | True    | X86  | Compute | Sling    |
+  +----------------+------+-------+------+---------+------+---------+----------+
 
 Possible Values
 ---------------
@@ -93,12 +115,6 @@ Possible Values
 |
 |   Ready
 |    - Both On and Ready to provide its expected services, i.e. jobs.
-
-NOTES
-=====
-
-If **--xnames** and **--nids** are used in combination, any node that matches
-either set will be reported (as in a set union or logical OR operation).
 
 SEE ALSO
 ========

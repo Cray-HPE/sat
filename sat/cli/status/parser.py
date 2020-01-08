@@ -24,15 +24,3 @@ def add_status_subparser(subparsers):
         'status', help='Report node status.',
         description='Report node status.',
         parents=[format_options, filter_options])
-
-    status_parser.add_argument(
-        '-x', '--xnames',
-        help='Filter list of nodes to show only those with xnames specified '
-             'with this argument. A single xname may be given, or a '
-             'comma-separated list (no spaces) of multiple xnames.')
-
-    status_parser.add_argument(
-        '-n', '--nids',
-        help='Filter list of nodes to show only those with NIDs specified '
-             'with this argument. A single NID may be given, or a '
-             'comma-separated list (no spaces) of multiple NIDs.')
