@@ -99,8 +99,14 @@ def get_matches(filters, elems):
     return used, unused, matches, no_matches
 
 
-def get_endpoint_ids(xnames, username, password):
-    """Retrieve all endpoint ids for the xnames.
+def get_jack_port_ids(xnames, username, password):
+    """Retrieve all jack-port IDs for the xnames.
+
+    A jack ID represents a physical slot in the Rosetta swtitch, and each
+    has 2 logical ports.
+
+        eg. A jack ID might take the form of j0 or bp0, and the whole port
+            address would be j0p0 and j0p1.
 
     Args:
         xnames: List of xnames to query.
@@ -138,62 +144,77 @@ def get_endpoint_ids(xnames, username, password):
 
     return port_mapping
 
+def get_cable_presence(xnames, username, password):
+    """Determine the presence of cables as reported by Redfish.
 
-def get_configured_ports():
-    """Return a mapping from xnames to physical ports that are configured.
+    The {xname}/Chassis/Enclosure/NetworkAdapters/Rosetta/Oem/NetworkCables
+    endpoint is queried, and reports the jack IDs along with whether or
+    not a cable is present in the jack.
 
-    Kubernetes is used to query these ports. These are the ports that appear
-    in the 'fabricPorts' and 'edgePorts' fields in the output from the
-    following command.
+        'j' ports can report 'Present' or 'Not Present'
+        'bp' ports can report 'No Device'.
 
-        'kubectl -n services get configmaps bringup-info -o json'
+    Args:
+        xnames: List of xnames to ask.
+        username: Redfish username.
+        password: Redfish password.
 
     Returns:
-        A dict where the keys are the xnames and the values are lists
-        of physical ports that are configured for that endpoint.
-
-        If there was an error gathering this information, then any queries about
-        ports within this dictionary shall return True.
+        A dict where the keys are the xnames and the values are dicts
+        of jack IDs mapped to string values indicating their presence.
     """
-    default = defaultdict(lambda: range(0, 1000000))
-    cmd = 'kubectl -n services get configmaps bringup-info -o json'
+    presence_mapping = dict()
 
-    try:
-        data = subprocess.check_output(cmd.split())
-    except Exception as e:
-        LOGGER.warning(
-            'An exception happened while attempting to execute "{}". '
-            'The report will not trim unconfigured ports.'.format(cmd))
-        LOGGER.warning(e)
-        return default
+    endpoint_addr = [
+        'Chassis',
+        'Enclosure',
+        'NetworkAdapters',
+        'Rosetta',
+        'Oem',
+        'NetworkCables',
+    ]
 
-    try:
-        # json.loads may have a bug where this entry is saved as a string.
-        # This code corrects for that.
-        data = json.loads(data)
-        data = json.loads(data['data']['topology'])
-    except (json.decoder.JSONDecodeError, KeyError):
-        LOGGER.warning(
-            'Cannot determine which ports are unconfigured. The '
-            'JSON payload did not contain the expected mapping of '
-            '"data.topology.switches.[IP,fabricPorts,edgePorts]"')
-        return default
+    for xname in xnames:
+        try:
+            url, response = redfish.query(
+                xname, endpoint_addr, username, password)
+        except requests.exceptions.ConnectionError as ce:
+            LOGGER.warning(
+                'While determining which ports are present: No endpoint '
+                'at {}.'.format(ce))
+            continue
 
-    port_map = defaultdict(lambda: set())
-    try:
-        for switch in data['switches']:
-            xname = XName(switch['IP'])
-            fabric_ports = switch['fabricPorts']
-            edge_ports = switch['edgePorts']
-            port_map[xname] = set(fabric_ports + edge_ports)
-    except KeyError:
-        LOGGER.warning(
-            'Cannot determine which ports are unconfigured. The '
-            'JSON payload did not contain the expected mapping of '
-            '"data.topology.switches.[IP,fabricPorts,edgePorts]"')
-        return default
+        if 'error' in response:
+            code = response['error']['code']
+            msg = response['error']['message']
+            LOGGER.warning(
+                'While determining present ports; Redfish URL {} returned an error with the '
+                'following code and message.'.format(url))
+            LOGGER.warning('Code: {}'.format(code))
+            LOGGER.warning('Message: {}'.format(msg))
+            continue
 
-    return port_map
+        presence_mapping[xname] = dict()
+        for member in response['Members']:
+            id = os.path.basename(member['@odata.id'])
+            cable_addr = endpoint_addr + [id]
+
+            try:
+                url, response = redfish.query(
+                    xname, cable_addr, username, password)
+            except requests.exceptions.ConnectionError as ce:
+                LOGGER.warning(
+                    'No endpoint at {} despite it being listed as a port in '
+                    '{}.'.format(ce, '/'.join([xname] + endpoint_addr)))
+                continue
+
+            try:
+                presence_mapping[xname][id] = response['CableStatus']
+            except KeyError:
+                LOGGER.error('No "CableStatus" found for {}{}.'.format(xname, id))
+                presence_mapping[xname][id] = 'MISSING'
+
+    return presence_mapping
 
 
 def get_report(xname_port_map, username, password, args):
@@ -211,6 +232,7 @@ def get_report(xname_port_map, username, password, args):
     """
     headings = [
         'xname',
+        'cable_present',
         'physical_port',
         'link_status',
         'health',
@@ -227,19 +249,19 @@ def get_report(xname_port_map, username, password, args):
         no_borders=get_config_value('format.no_borders'),
         filter_strs=args.filter_strs)
 
-    # first determine which ports are configured. It's not a super big deal
-    # if this fails - it's just a hint to help trim the report.
-    configured_ports = get_configured_ports()
+    # determine which cables are present
+    presence_mapping = get_cable_presence(xname_port_map.keys(), username, password)
 
-    for xname, endpoints in xname_port_map.items():
-        for endpoint in endpoints:
+    for xname, jackports in xname_port_map.items():
+
+        for jackport in jackports:
             addr = [
                 'Chassis',
                 'Enclosure',
                 'NetworkAdapters',
                 'Rosetta',
                 'NetworkPorts',
-                endpoint,
+                jackport,
             ]
             try:
                 url, response = redfish.query(xname, addr, username, password)
@@ -247,18 +269,24 @@ def get_report(xname_port_map, username, password, args):
                 LOGGER.warning('Query failed. Skipping. {}'.format(err))
                 continue
 
-            entry = defaultdict(lambda: 'Not found')
-            entry['xname'] = XName('{}{}'.format(xname, endpoint))
+            entry = defaultdict(lambda: 'MISSING')
+            entry['xname'] = XName('{}{}'.format(xname, jackport))
 
             try:
                 entry['physical_port'] = int(response['PhysicalPortNumber'])
             except KeyError:
                 pass
             except ValueError:
-                LOGGER.warning('PhysicalPortNumber field for endpoint {} was not '
-                               'an integer.'.format(entry['xname']))
-                LOGGER.warning('This link might not appear in the report.')
-                pass
+                LOGGER.warning(
+                    'PhysicalPortNumber field for jackport {} was not an '
+                    'integer. Value was {}.'.format(
+                        entry['xname'], response['PhysicalPortNumber']))
+                entry['physical_port'] = response['PhysicalPortNumber']
+
+            # Raw jack ID - Use to print physical presence of cable.
+            jack = jackport[:-2] 
+            if jack in presence_mapping[xname]:
+                entry['cable_present'] = presence_mapping[xname][jack]
 
             try:
                 entry['link_status'] = response['LinkStatus']
@@ -278,18 +306,14 @@ def get_report(xname_port_map, username, password, args):
             try:
                 entry['flow_control_configuration'] = response['FlowControlConfiguration']
             except KeyError:
-                entry['flow_control_configuration'] = None
+                pass
 
             try:
                 entry['link_speed_mbps'] = response['CurrentLinkSpeedMbps']
             except KeyError:
                 pass
 
-            if (args.all
-                    or (args.configured and entry['physical_port'] in configured_ports[xname])
-                    or (args.unhealthy and entry['health'] != 'OK')
-                    or (entry['physical_port'] in configured_ports[xname] and entry['health'] != 'OK')):
-                report.add_row(entry)
+            report.add_row(entry)
 
     return report
 
@@ -337,7 +361,7 @@ def do_linkhealth(args):
         sys.exit(1)
 
     # get all ports for all xnames
-    xname_port_map = get_endpoint_ids(xnames, username, password)
+    xname_port_map = get_jack_port_ids(xnames, username, password)
     if not xname_port_map:
         LOGGER.error('No physical ports discovered')
         sys.exit(1)
@@ -346,10 +370,6 @@ def do_linkhealth(args):
     report = get_report(xname_port_map, username, password, args)
 
     if args.format == 'pretty':
-        if not report.data:
-            print('All links for Redfish endpoints {} are healthy '
-                  '(or unconfigured).'.format(xnames))
-        else:
-            print(report)
+        print(report)
     elif args.format == 'yaml':
         print(report.get_yaml())
