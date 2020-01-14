@@ -8,7 +8,6 @@ from copy import deepcopy
 import unittest
 
 import sat.cli.status.main
-from sat.xname import XName
 
 
 # a fake table row, representing a fake node
@@ -34,7 +33,7 @@ class TestStatusBase(unittest.TestCase):
         make_raw_table() should return an empty table when the list of nodes
         is empty
         """
-        raw_table = sat.cli.status.main.make_raw_table([], {})
+        raw_table = sat.cli.status.main.make_raw_table([])
         self.assertEqual(raw_table, [])
 
     def test_one(self):
@@ -43,7 +42,7 @@ class TestStatusBase(unittest.TestCase):
         make_raw_table() should return a table with a single row and the same
         number of columns as there are column headers
         """
-        raw_table = sat.cli.status.main.make_raw_table([row()], {})
+        raw_table = sat.cli.status.main.make_raw_table([row()])
         self.assertEqual(len(raw_table), 1)
         self.assertEqual(len(raw_table[0]), len(sat.cli.status.main.HEADERS))
 
@@ -55,91 +54,11 @@ class TestStatusBase(unittest.TestCase):
         column headers.
         """
         nodes = sample_nodes()
-        raw_table = sat.cli.status.main.make_raw_table(deepcopy(nodes), {})
+        raw_table = sat.cli.status.main.make_raw_table(deepcopy(nodes))
         self.assertEqual(len(raw_table), len(nodes))
 
         self.assertTrue(
             all(len(row) == len(sat.cli.status.main.HEADERS) for row in raw_table))
-
-    def test_filter_no_match(self):
-        """make_raw_table() filtered with no matches
-
-        make_raw_table() should return an empty table.
-        """
-        raw_table = sat.cli.status.main.make_raw_table(
-            sample_nodes(), dict(ID=frozenset([XName('q99')])))
-
-        self.assertEqual(len(raw_table), 0)
-
-    def test_filter_xname(self):
-        """make_raw_table() filtered by a single xname
-
-        make_raw_table() should return a table with a single row matching
-        the xname filter.
-        """
-        raw_table = sat.cli.status.main.make_raw_table(
-            sample_nodes(), dict(ID=frozenset([XName('q0')])))
-
-        self.assertEqual(len(raw_table), 1)
-        self.assertEqual(raw_table[0][0], 'q0')
-
-    def test_filter_xnames(self):
-        """make_raw_table() filtered by multiple xnames
-
-        make_raw_table() should return a table with rows matching the xname
-        filter.
-        """
-        raw_table = sat.cli.status.main.make_raw_table(
-            sample_nodes(),
-            dict(ID=frozenset([XName('q0'), XName('aa0')])))
-
-        self.assertEqual(len(raw_table), 2)
-
-        self.assertEqual(
-            frozenset(tuple(zip(*raw_table))[0]), frozenset(['aa0', 'q0']))
-
-    def test_filter_nid(self):
-        """make_raw_table() filtered by a single nid
-
-        make_raw_table() should return a table with a single row matching
-        the nid filter.
-        """
-        raw_table = sat.cli.status.main.make_raw_table(
-            sample_nodes(), dict(NID=frozenset(['42'])))
-
-        self.assertEqual(len(raw_table), 1)
-        self.assertEqual(raw_table[0][1], 42)
-
-    def test_filter_nids(self):
-        """make_raw_table() filtered by multiple nids
-
-        make_raw_table() should return a table with rows matching the nid
-        filter.
-        """
-
-        raw_table = sat.cli.status.main.make_raw_table(
-            sample_nodes(), dict(NID=frozenset(['42', '1'])))
-
-        self.assertEqual(len(raw_table), 2)
-
-        self.assertEqual(
-            frozenset(tuple(zip(*raw_table))[1]), frozenset([1, 42]))
-
-    def test_filter_both(self):
-        """make_raw_table() filtered by xname and nid
-
-        make_raw_table() should return a table with a rows matching the xname
-        and nid filters.
-        """
-
-        raw_table = sat.cli.status.main.make_raw_table(
-            sample_nodes(),
-            dict(ID=frozenset([XName('z0'), XName('aa0')]), NID=frozenset(['9', '42'])))
-
-        self.assertEqual(len(raw_table), 3)
-
-        self.assertEqual(
-            frozenset(tuple(zip(*raw_table))[1]), frozenset([9, 42, 1]))
 
 
 if __name__ == '__main__':
