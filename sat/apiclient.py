@@ -1,7 +1,7 @@
 """
 Client for querying the API gateway.
 
-Copyright 2019 Cray Inc. All Rights Reserved.
+Copyright 2019-2020 Cray Inc. All Rights Reserved.
 """
 import logging
 import requests
@@ -97,3 +97,7 @@ class APIGatewayClient:
 
 class HSMClient(APIGatewayClient):
     base_resource_path = 'smd/hsm/v1/'
+
+
+class FirmwareClient(APIGatewayClient):
+    base_resource_path = 'fw-update/v1/'
