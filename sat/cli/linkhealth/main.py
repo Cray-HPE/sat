@@ -46,7 +46,7 @@ def get_router_xnames():
         response = client.get(
             'Inventory', 'RedfishEndpoints', params={'type': 'RouterBMC'})
     except APIError as err:
-        raise APIError('Failed to get xnames from HSM: %s', err)
+        raise APIError('Failed to get xnames from HSM: {}'.format(err))
 
     try:
         endpoints = response.json()
@@ -124,18 +124,8 @@ def get_endpoint_ids(xnames, username, password):
 
         try:
             url, response = redfish.query(xname, addr, username, password)
-        except requests.exceptions.ConnectionError as ce:
-            LOGGER.error('No endpoint at {}.'.format(ce))
-            sys.exit(1)
-
-        if 'error' in response:
-            code = response['error']['code']
-            msg = response['error']['message']
-            LOGGER.error(
-                'Querying Redfish URL {} returned an error with the '
-                'following code and message.'.format(url))
-            LOGGER.error('Code: {}'.format(code))
-            LOGGER.error('Message: {}'.format(msg))
+        except requests.exceptions.RequestException as err:
+            LOGGER.error('Query failed. {}'.format(err))
             sys.exit(1)
 
         try:
@@ -253,19 +243,9 @@ def get_report(xname_port_map, username, password, args):
             ]
             try:
                 url, response = redfish.query(xname, addr, username, password)
-            except requests.exceptions.ConnectionError as ce:
-                LOGGER.warning('No endpoint at {}. Skipping.'.format(ce))
+            except requests.exceptions.RequestException as err:
+                LOGGER.warning('Query failed. Skipping. {}'.format(err))
                 continue
-
-            if 'error' in response:
-                code = response['error']['code']
-                msg = response['error']['message']
-                LOGGER.error(
-                    'Querying Redfish URL {} returned an error with the '
-                    'following code and message.'.format(url))
-                LOGGER.error('Code: {}'.format(code))
-                LOGGER.error('Message: {}'.format(msg))
-                sys.exit(1)
 
             entry = defaultdict(lambda: 'Not found')
             entry['xname'] = XName('{}{}'.format(xname, endpoint))

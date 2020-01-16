@@ -86,11 +86,11 @@ class APIGatewayClient:
             raise APIError("GET request to URL '{}' failed: {}".format(url, err))
 
         if not r:
-            raise APIError("GET request to URL '{}' failed "
-                           "with status code {}".format(url, r.status_code))
+            raise APIError("GET request to URL '{}' failed with status "
+                           "code {}: {}".format(url, r.status_code, r.reason))
 
-        LOGGER.debug("Received response to GET request to URL '%s' with status code: '%s'",
-                     url, r.status_code)
+        LOGGER.debug("Received response to GET request to URL '%s'"
+                     "with status code: '%s': %s", url, r.status_code, r.reason)
 
         return r
 

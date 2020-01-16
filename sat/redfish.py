@@ -12,6 +12,19 @@ from sat.config import get_config_value
 from sat.util import pester
 
 
+class RedfishQueryError(requests.exceptions.RequestException):
+    """Subclasses requests.exceptions.RequesException
+    
+    Meant for delivering status codes and an english reason for why a call
+    to query delivered a payload indicating an error from the server.
+    """
+    def __init__(self, summary, code, reason):
+        self.summary = summary
+        self.code = code
+        self.reason = reason
+        super().__init__(summary)
+
+
 def get_username_and_pass(suggestion=''):
     """Gets the username and password for a user.
 
@@ -42,6 +55,9 @@ def get_username_and_pass(suggestion=''):
 def query(xname, addr, username, password):
     """Make a query using the redfish username and password to the URL.
 
+    Either of the exceptions raised by this function can be caught by handling
+    requests.exceptions.RequestException.
+
     Args:
         xname: Xname of Redfish node.
         addr: List whose members represent the entries in the Redfish path
@@ -51,16 +67,30 @@ def query(xname, addr, username, password):
 
     Returns:
         url: The formatted url which was used by to make the query
-        data: Dictionary created from the JSON in the response.
+        response: Dictionary created from the JSON in the response. If the
+            response failed, then the response is plainly returned.
 
     Raises:
         requests.exceptions.ConnectionError: requests.get can raise this if
             there was no endpoint present.
+
+        RedfishQueryError: Any other error happened after the presence of the
+            endpoint was established. Includes 'code' and 'reason' fields to
+            indicate the http error code and reason for the failure.
     """
     url = 'https://{}/redfish/v1/{}'.format(xname, '/'.join(addr))
     try:
-        data = requests.get(url, auth=(username, password), verify=False)
-    except requests.exceptions.ConnectionError as ce:
-        raise requests.exceptions.ConnectionError(url)
+        response = requests.get(url, auth=(username, password), verify=False)
+    except requests.exceptions.ConnectionError:
+        msg = 'No Redfish resource at url {}'.format(url)
+        raise requests.exceptions.ConnectionError(msg)
 
-    return url, data.json()
+    # response isn't None, the class just evals to False if an error occurred.
+    if not response:
+        code = response.status_code
+        reason = response.reason
+        msg = ('GET request to Redfish URL {} returned an error with the '
+               'following code and message: {}: {}'.format(url, code, reason))
+        raise RedfishQueryError(msg, code, reason)
+
+    return url, response.json()
