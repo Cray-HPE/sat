@@ -1,13 +1,13 @@
 """
 Class to represent a node object obtained from Hardware State Manager (HSM).
 
-Copyright 2019 Cray Inc. All Rights Reserved.
+Copyright 2019-2020 Cray Inc. All Rights Reserved.
 """
 import logging
 
 from sat.cached_property import cached_property
 from sat.system.component import BaseComponent
-from sat.system.constants import EX_1_C, EX_1_S, NODE_TYPE
+from sat.system.constants import CAB_TYPE_C, CAB_TYPE_S, NODE_TYPE
 from sat.system.field import ComponentField
 from sat.system.memory_module import MemoryModule
 from sat.system.processor import Processor
@@ -65,9 +65,9 @@ class Node(BaseComponent):
         # We currently identify whether a node is in a liquid-cooled cabinet (Mountain)
         # based on whether there is a corresponding chassis in the inventory.
         if self.chassis:
-            return EX_1_C
+            return CAB_TYPE_C
         else:
-            return EX_1_S
+            return CAB_TYPE_S
 
     @cached_property
     def processor_manufacturer(self):
