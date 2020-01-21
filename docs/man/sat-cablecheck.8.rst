@@ -27,7 +27,11 @@ ARGUMENTS
 
 *p2p-file*
         Point-to-point file. This file should contain the expected
-        configuration of links between ports.
+        configuration of links between ports. The file can be found
+        in the directory "/opt/cray/etc/sct/", with a name that likely
+        starts with "Shasta", includes the system name, and ends with
+        "_pt_pt.csv". The xnames in the file must have a normal format
+        without "." separating any component levels.
 
 OPTIONS
 =======
@@ -36,20 +40,6 @@ These options must be specified after the subcommand.
 
 **-h, --help**
         Print the help message for 'sat cablecheck'.
-
-EXAMPLES
-========
-
-The p2p file can be generated using the Shasta Cabling Tool (SCT), which
-requires a site configuration file as input. The site configuration file is
-created as part of the installation procedure for the system. An example
-procedure is shown below.
-
-::
-
-    python scttool session-title site_cfg.yaml
-
-    cat ./out/session-title_pt_pt.csv
 
 SEE ALSO
 ========
