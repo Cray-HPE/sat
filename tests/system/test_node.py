@@ -1,13 +1,13 @@
 """
 Unit tests for sat.system.node.
 
-Copyright 2019 Cray Inc. All Rights Reserved.
+Copyright 2019-2020 Cray Inc. All Rights Reserved.
 """
 import unittest
 from unittest import mock
 
 from sat.system.chassis import Chassis
-from sat.system.constants import EX_1_C, EX_1_S
+from sat.system.constants import CAB_TYPE_C, CAB_TYPE_S
 from sat.system.memory_module import MemoryModule
 from sat.system.node import Node
 from sat.system.processor import Processor
@@ -72,11 +72,11 @@ class TestNode(unittest.TestCase):
         """Test the cabinet_type property with a chassis."""
         self.node.chassis = Chassis(get_component_raw_data(hsm_type='Chassis',
                                                            xname=CHASSIS_XNAME))
-        self.assertEqual(self.node.cabinet_type, EX_1_C)
+        self.assertEqual(self.node.cabinet_type, CAB_TYPE_C)
 
     def test_cabinet_type_without_chassis(self):
         """Test the cabinet_type property without a chassis."""
-        self.assertEqual(self.node.cabinet_type, EX_1_S)
+        self.assertEqual(self.node.cabinet_type, CAB_TYPE_S)
 
     def test_processor_manufacturer(self):
         """Test the processor_manufacturer property."""

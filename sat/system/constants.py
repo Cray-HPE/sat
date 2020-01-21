@@ -1,7 +1,7 @@
 """
 Constant values for system representation
 
-Copyright 2019 Cray Inc. All Rights Reserved.
+Copyright 2019-2020 Cray Inc. All Rights Reserved.
 """
 
 # The key that stores the object type in HSM output
@@ -23,9 +23,10 @@ PROCESSOR_TYPE = 'Processor'
 HSN_BOARD_TYPE = 'HSNBoard'
 ROUTER_MODULE_TYPE = 'RouterModule'
 
-# The types of cabinets
-EX_1_C = 'EX-1 C'
-EX_1_S = 'EX-1 S'
+# The types of cabinets are C-Series and S-Series.
+# C-Series is densely liquid cooled.
+CAB_TYPE_C = 'C-Series'
+CAB_TYPE_S = 'S-Series'
 
 # The value to use when a requested key is missing
 MISSING_VALUE = 'MISSING'
