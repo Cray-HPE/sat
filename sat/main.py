@@ -56,7 +56,7 @@ def main():
         subcommand(args)
 
     except KeyboardInterrupt:
-        LOGGER.info("Received keyboard interrupt; quitting.")
+        LOGGER.info("Received keyboard interrupt; quitting.", exc_info=True)
 
     sys.exit(0)
 
