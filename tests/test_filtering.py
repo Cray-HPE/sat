@@ -188,3 +188,18 @@ class TestFilterList(unittest.TestCase):
         with self.assertRaises(ValueError):
             filtering.filter_list([{'foo': 'bar'}, {'baz': 'quux'}],
                                   self.query_strings)
+
+    def test_mixed_values(self):
+        """Nonsensical comparisons should be omitted."""
+        items = [
+            {'speed': 'Not found'},
+            {'speed': None},
+            {'speed': 10},
+            {'speed': 11},
+            {'speed': 12},
+        ]
+
+        filtered = filtering.filter_list(items, ['speed<12'])
+        self.assertEqual(2, len(filtered))
+        self.assertEqual({'speed': 10}, filtered[0])
+        self.assertEqual({'speed': 11}, filtered[1])
