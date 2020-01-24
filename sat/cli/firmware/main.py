@@ -40,10 +40,11 @@ def make_fw_table(fw_devs):
                 if 'error' in target:
                     LOGGER.error('Error getting firmware for %s ID %s: %s', xname,
                                  target.get('id', 'MISSING'), target['error'])
-                    # Fall through to show version if ID and version values exist.
+                    # Fall through to show version only if ID and version values exist.
                     if 'id' not in target or 'version' not in target:
                         continue
-                fw_table.append([xname, target['id'], target['version']]),
+                fw_table.append([xname, target.get('id', 'MISSING'),
+                                 target.get('version', 'MISSING')])
         elif 'error' in fw_dev:
             LOGGER.error('Error getting firmware for %s: %s', xname, fw_dev['error'])
         else:
