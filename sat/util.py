@@ -57,7 +57,7 @@ def pester(message,
                 return parse_answer(answer)
             else:
                 print("Input must match '{}'. ".format(valid_answer), end="")
-    except (KeyboardInterrupt, EOFError):
+    except EOFError:
         print("\n", end="")
         return
 

@@ -131,6 +131,8 @@ def run_diag_set(xnames, diag_command, diag_args,
             for diag in running_diags:
                 diag.cancel()
 
+        raise
+
     finally:
         if print_report and running_diags is not None:
             running_diags.cleanup()
