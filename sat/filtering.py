@@ -357,7 +357,6 @@ def parse_query_string(query_string):
 
         return FilterFunction(query_key, comparator, cmpr_val)
 
-
     @parsec.generate
     def bool_or_expr():
         """Parses an 'or' expression. (e.g. 'foo = bar or baz > 10')
@@ -373,8 +372,7 @@ def parse_query_string(query_string):
         lhs = yield or_expr
         yield tok_or
         rhs = yield and_expr
-        return combine_filter_fns([comparison, and_expr],
-                                   combine_fn=any)
+        return combine_filter_fns([comparison, and_expr], combine_fn=any)
 
     @parsec.generate
     def bool_and_expr():
@@ -419,6 +417,29 @@ def parse_query_string(query_string):
     return expr.parse_strict(query_string)
 
 
+def _dont_care_call(excepts, fn, *args):
+    """Use to wrap exception handling around a function.
+
+    This is useful when you need to add exception handling to a function
+    before passing that function around.
+
+        eg. newfun = lambda x, y: _dont_care_call((TypeError), fun, x, y)
+
+    Args:
+        excepts: Exception or tuple of exceptions which should be caught.
+        fn: A function that accepts args.
+        args: Args to fn.
+
+    Returns:
+        The return value of fn(x). None will be returned if one of the
+        exceptions in excepts was caught.
+    """
+    try:
+        return fn(*args)
+    except excepts:
+        return None
+
+
 def filter_list(dicts, query_strings):
     """Filters a list of dicts according to some query strings.
 
@@ -433,7 +454,7 @@ def filter_list(dicts, query_strings):
             which to filter the input list.
 
     Returns:
-        a list dicts filtered according to query_string.
+        A list of dicts filtered according to query_string.
 
     Raises:
         ValueError: if keys in dicts are inconsistent.
@@ -456,5 +477,8 @@ def filter_list(dicts, query_strings):
 
     all_filter_fns = [parse_query_string(query_string)
                       for query_string in query_strings]
-    filter_fn = combine_filter_fns(all_filter_fns)
+    combined_filters = combine_filter_fns(all_filter_fns)
+
+    filter_fn = lambda x: _dont_care_call(TypeError, combined_filters, x)
+
     return list(filter(filter_fn, dicts))
