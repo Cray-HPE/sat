@@ -20,7 +20,8 @@ DESCRIPTION
 
 The firmware subcommand reports firmware versions. Tabular output includes
 the xname, the ID for the firmware element, and the firmware version. There
-can be multiple IDs per xname.
+can be multiple IDs per xname. The firmware versions for all system components
+are reported by default. Alternatively, a set of xnames can be specified.
 
 OPTIONS
 =======
