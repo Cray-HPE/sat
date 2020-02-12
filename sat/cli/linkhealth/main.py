@@ -144,6 +144,7 @@ def get_jack_port_ids(xnames, username, password):
 
     return port_mapping
 
+
 def get_cable_presence(xnames, username, password):
     """Determine the presence of cables as reported by Redfish.
 
@@ -284,7 +285,7 @@ def get_report(xname_port_map, username, password, args):
                 entry['physical_port'] = response['PhysicalPortNumber']
 
             # Raw jack ID - Use to print physical presence of cable.
-            jack = jackport[:-2] 
+            jack = jackport[:-2]
             if jack in presence_mapping[xname]:
                 entry['cable_present'] = presence_mapping[xname][jack]
 

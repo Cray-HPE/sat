@@ -65,14 +65,9 @@ def do_firmware(args):
     """
 
     api_client = FirmwareClient(SATSession())
-    if args.xname:
+    if args.xnames:
         fw_table = []
-        xnames = []
-        for xname_csv in args.xname:
-            for xname in xname_csv.split(','):
-                xnames.append(xname)
-        xnames = set(xnames)
-        for xname in xnames:
+        for xname in args.xnames:
             try:
                 response = api_client.get('version', xname)
             except APIError as err:

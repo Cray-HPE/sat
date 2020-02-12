@@ -6,19 +6,17 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 
 from argparse import REMAINDER
 
+import sat.parsergroups
+
 
 def add_diag_subparser(subparsers):
+
+    xname_opts = sat.parsergroups.create_xname_options()
+
     diag_parser = subparsers.add_parser(
         'diag', help='Launch diagnostics for Rosetta switches.',
-        description='Launch diagnostics for Rosetta switches.')
-
-    xnames_group = diag_parser.add_argument_group('xnames', 'methods of specifying target xnames')
-    xnames_group.add_argument('-f', '--xname-file', metavar='PATH',
-                              help='Path to a newline-delimited file containing '
-                              'xnames of all switches to be tested')
-    xnames_group.add_argument('-x', '--xname', action='append', dest='xnames', metavar='XNAME',
-                              default=[], help='An xname on which the diagnostic should be run. '
-                              'This flag can be used multiple times to specify multiple xnames.')
+        description='Launch diagnostics for Rosetta switches.',
+        parents=[xname_opts])
 
     diag_parser.add_argument('-t', '--timeout', default=300, metavar='SECONDS',
                              help='Timeout for a diagnostic run on a switch')

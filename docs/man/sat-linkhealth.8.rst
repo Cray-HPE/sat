@@ -22,22 +22,21 @@ The linkhealth subcommand reports on the health of links for available xnames.
 This information is obtained via Redfish queries, so a valid redfish username
 and password for the target hosts is required.
 
+This subcommand allows use of the "--xname" options. The provided xnames
+will match against Redfish endpoints that are of type "RouterBMC" as
+reported by the Hardware State Manager. The match is considered valid
+if the specified xname is a subsequence of the reported ID. If the HSM
+is down, then the verbatim xnames are targeted instead.
+
 OPTIONS
 =======
 
 These options must be specified after the subcommand.
 
-**-x** *XNAME*, **--xname** *XNAME*
-        This option can be used to list the specific xname to query. These
-        will match against Redfish endpoints that are of type "RouterBMC" as
-        reported by the Hardware State Manager. The match is considered valid
-        if the specified xname is a subsequence of the reported ID. If the HSM
-        is down, then the verbatim xnames are targeted instead. This option can
-        be used multiple times to specify multiple xnames.
-
 **-h, --help**
         Print a usage summary and exit.
 
+.. include:: _sat-xname-opts.rst
 .. include:: _sat-format-opts.rst
 .. include:: _sat-redfish-opts.rst
 

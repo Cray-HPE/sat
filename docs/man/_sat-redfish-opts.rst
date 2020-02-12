@@ -1,5 +1,5 @@
-FORMAT OPTIONS
---------------
+REDFISH OPTIONS
+---------------
 Options related to redfish queries.
 
 **--redfish-username**

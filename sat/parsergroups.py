@@ -4,7 +4,12 @@ Functions to create argument groups which are used by multiple subcommands.
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
 
+import argparse
+import logging
 from argparse import ArgumentParser
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 def create_format_options():
@@ -75,5 +80,85 @@ def create_redfish_options():
     group.add_argument(
         '--redfish-username', default=None,
         help='Override the Redfish username in sat.toml.')
+
+    return parser
+
+
+def create_xname_options():
+    """Generate arg options for xname options.
+
+    Returns: an ArgumentParser object configured with options and help
+        text for xname options.
+    """
+
+    class XnameCsvParser(argparse.Action):
+        def __init__(self, option_strings, dest, nargs=None, const=None,
+                     default=None, type=None, choices=None, required=False,
+                     help=None, metavar=None):
+            if nargs is not None:
+                raise ValueError('XnameCsvParser action does not support '
+                                 'nargs set to a non-default value.')
+            super().__init__(
+                option_strings=option_strings, dest=dest, nargs=nargs,
+                const=const, default=default, type=type, choices=choices,
+                required=required, help=help, metavar=metavar)
+
+        def __call__(self, parser, namespace, values, option_string=None):
+            xnames = []
+            if getattr(namespace, self.dest):
+                xnames.extend(getattr(namespace, self.dest))
+
+            xnames.extend([x.strip() for x in values.split(',') if x.strip()])
+            setattr(namespace, self.dest, xnames)
+
+    class XnameFileReader(argparse.Action):
+
+        def __init__(self, option_strings, dest, nargs=None, const=None,
+                     default=None, type=None, choices=None, required=False,
+                     help=None, metavar=None):
+            if nargs is not None:
+                raise ValueError('XnameFileReader action does not support '
+                                 'nargs set to a non-default value.')
+            super().__init__(
+                option_strings=option_strings, dest=dest, nargs=nargs,
+                const=const, default=default, type=type, choices=choices,
+                required=required, help=help, metavar=metavar)
+
+        def __call__(self, parser, namespace, values, option_string=None):
+            xnames = []
+            if getattr(namespace, self.dest):
+                xnames.extend(getattr(namespace, self.dest))
+
+            try:
+                with open(values) as f:
+                    xnames.extend([x.strip() for x in f.readlines() if x.strip()])
+            except FileNotFoundError:
+                raise argparse.ArgumentError(
+                    self, 'Xname file {} does not exist.'.format(values))
+
+            except PermissionError:
+                raise argparse.ArgumentError(
+                    self,
+                    'You do not have permission to access {}.'.format(values))
+
+            setattr(namespace, self.dest, xnames)
+
+    parser = ArgumentParser(add_help=False)
+
+    group = parser.add_argument_group(
+        'xnames', 'Options for specifying target xnames.')
+
+    # Both of these are accessed via args.xnames.
+    group.add_argument(
+        '-f', '--xname-file', metavar='PATH',
+        dest='xnames', action=XnameFileReader,
+        help='Path to a newline-delimited file of xnames.')
+
+    group.add_argument(
+        '-x', '--xname', '--xnames', metavar='XNAME',
+        dest='xnames', action=XnameCsvParser,
+        help='Specify an xname on which to operate. Multiple xnames may be '
+             'specified via comma-separated entries or by providing this '
+             'option multiple times.')
 
     return parser

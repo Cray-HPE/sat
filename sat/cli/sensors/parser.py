@@ -20,20 +20,16 @@ def add_sensors_subparser(subparsers):
         None
     """
 
+    xname_options = sat.parsergroups.create_xname_options()
     format_options = sat.parsergroups.create_format_options()
     filter_options = sat.parsergroups.create_filter_options()
     redfish_options = sat.parsergroups.create_redfish_options()
 
     sensors_parser = subparsers.add_parser(
         'sensors', help='Obtain sensor readings.',
-        description='Obtain sensor readings.',
-        parents=[format_options, filter_options, redfish_options]
+        description='Obtain sensor readings. IP addresses can be provided for the --xname options.',
+        parents=[xname_options, format_options, filter_options, redfish_options]
     )
-
-    sensors_parser.add_argument(
-        '-x', '--xnames', '--xname',
-        help='Xname/hostname or IP address of BMC/controller to query, or a '
-             'comma-separated list of names and/or addresses.', required=True)
 
     if CAPTURE_NAME is not None:
         capture_group = sensors_parser.add_argument_group('capture')

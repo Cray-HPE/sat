@@ -13,7 +13,7 @@ import sat.cli.firmware.main
 
 def set_options(namespace):
     """Set default options for Namespace."""
-    namespace.xname = []
+    namespace.xnames = []
     namespace.no_borders = True
     namespace.no_headings = False
     namespace.format = 'pretty'
@@ -131,7 +131,7 @@ class TestDoFirmware(unittest.TestCase):
                 {'xname': 'x3000c0s1b2', 'targets': [{'id': 'BMC', 'version': '1.0'}]}]}
         ]
         self.mock_fw_response.json.side_effect = mock_json
-        self.parsed.xname = ['x3000c0s1b0, x3000c0s1b1', 'x3000c0s1b2']
+        self.parsed.xnames = ['x3000c0s1b0', 'x3000c0s1b1', 'x3000c0s1b2']
         sat.cli.firmware.main.do_firmware(self.parsed)
         make_fw_table_args = [data['devices'] for data in mock_json]
         # Allow any order because mock inserts calls involving call().__radd__([]).
@@ -163,7 +163,7 @@ class TestDoFirmware(unittest.TestCase):
                 {'xname': 'x3000c0s1b2', 'targets': [{'id': 'BMC', 'version': '1.0'}]}]}
         ]
         self.mock_fw_response.json.side_effect = mock_json
-        self.parsed.xname = ['x3000c0s1b0, x3000c0s1b1', 'x3000c0s1b2']
+        self.parsed.xnames = ['x3000c0s1b0', 'x3000c0s1b1', 'x3000c0s1b2']
         sat.cli.firmware.main.do_firmware(self.parsed)
         make_fw_table_args = [data['devices'] for data in mock_json]
         # Allow any order because mock inserts calls involving call().__radd__([]).
@@ -192,7 +192,7 @@ class TestDoFirmware(unittest.TestCase):
                 {'xname': 'x3000c0s1b2', 'targets': [{'id': 'BMC', 'version': '1.0'}]}]}
         ]
         self.mock_fw_response.json.side_effect = mock_json
-        self.parsed.xname = ['x3000c0s1b0, x3000c0s1b1', 'x3000c0s1b2']
+        self.parsed.xnames = ['x3000c0s1b0', 'x3000c0s1b1', 'x3000c0s1b2']
         sat.cli.firmware.main.do_firmware(self.parsed)
         make_fw_table_args = [data['devices'] for data in mock_json if isinstance(data, dict)]
         # Allow any order because mock inserts calls involving call().__radd__([]).
@@ -221,7 +221,7 @@ class TestDoFirmware(unittest.TestCase):
                 {'xname': 'x3000c0s1b2', 'targets': [{'id': 'BMC', 'version': '1.0'}]}]}
         ]
         self.mock_fw_response.json.side_effect = mock_json
-        self.parsed.xname = ['x3000c0s1b0, x3000c0s1b1', 'x3000c0s1b2']
+        self.parsed.xnames = ['x3000c0s1b0', 'x3000c0s1b1', 'x3000c0s1b2']
         sat.cli.firmware.main.do_firmware(self.parsed)
         make_fw_table_args = [data['devices'] for data in mock_json if data]
         # Allow any order because mock inserts calls involving call().__radd__([]).
