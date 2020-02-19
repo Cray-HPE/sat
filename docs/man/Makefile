@@ -6,6 +6,7 @@ all: \
 	sat-hwinv.8 \
 	sat-hwmatch.8 \
 	sat-linkhealth.8 \
+	sat-sensors.8 \
 	sat-setrev.8 \
 	sat-showrev.8 \
 	sat-status.8 \
