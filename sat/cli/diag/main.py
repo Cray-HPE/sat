@@ -30,24 +30,6 @@ Usage:
 """
 
 
-def xnames_from_file(fstream):
-    """Gets a list of xnames from a file-like object.
-
-    If fstream can be read from, (i.e. non-iteractive) then generate a
-    list of strings from that file, one xname per line. If fstream is
-    interactive, e.g. stdin is a tty, then return an empty list.
-
-    Args:
-        fstream: a file object (e.g. a text file or stdin)
-            which contains a list of xnames.
-
-    Returns:
-        a list of xnames from the file.
-    """
-    return [xname.strip() for xname in fstream.readlines() if xname.strip()] \
-        if not fstream.isatty() else []
-
-
 def report(finished_diags, timestamp, split):
     """Composes a report of the results of completed diagnostics.
 
@@ -186,23 +168,8 @@ def do_diag(args):
     Returns:
         None.
     """
-
-    try:
-        file_xnames = []
-        if args.xname_file is not None:
-            with open(args.xname_file) as xname_file:
-                file_xnames = xnames_from_file(xname_file)
-
-        stdin_xnames = xnames_from_file(sys.stdin)
-        xnames = file_xnames + stdin_xnames + args.xnames
-
-    except IOError as ioerr:
-        LOGGER.error("Could not open xnames file '%s'; %s.", args.xname_file, ioerr.strerror)
-        sys.exit(1)
-
-    if not xnames:
-        LOGGER.error("No xnames were supplied. Use --xname-file/-f and/or "
-                     "--xname/-x to specify xnames.")
+    if not args.xnames:
+        LOGGER.error("No xnames were supplied.")
         sys.exit(1)
 
     if bool(args.interactive) == bool(args.diag_command):
@@ -218,7 +185,7 @@ def do_diag(args):
 
     username, password = sat_redfish.get_username_and_pass()
     if args.interactive:
-        run_diags_from_prompt(xnames, args, username, password)
+        run_diags_from_prompt(args.xnames, args, username, password)
     else:
-        run_diag_set(xnames, args.diag_command, args.diag_args,
+        run_diag_set(args.xnames, args.diag_command, args.diag_args,
                      args, username, password)

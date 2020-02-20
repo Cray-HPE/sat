@@ -28,12 +28,10 @@ OPTIONS
 
 These options must be specified after the subcommand.
 
-**-x, --xnames**
-        Get firmware for xname or comma separated list of xnames.
-
 **-h, --help**
         Print a usage summary and exit.
 
+.. include:: _sat-xname-opts.rst
 .. include:: _sat-format-opts.rst
 
 EXAMPLES

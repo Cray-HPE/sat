@@ -25,14 +25,12 @@ OPTIONS
 =======
 
 These options must be specified after the subcommand.
-
-**-x, --xname, --xnames**
-        XName/hostname or IP address of BMC/controller to query, or a
-        comma-separated list of names and/or addresses.
+The xnames may also be IP addresses.
 
 **-h, --help**
         Print a usage summary and exit.
 
+.. include:: _sat-xname-opts.rst
 .. include:: _sat-format-opts.rst
 .. include:: _sat-redfish-opts.rst
 

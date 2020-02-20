@@ -70,13 +70,7 @@ These options must be specified after the subcommand.
         given. At least one of **command** or **--interactive** must be supplied
         on the command line.
 
-**-x** *XNAME*, **--xname** *XNAME*
-        This flag can be used to specify an xname on which to run tests.
-        This flag can be used multiple times to specify multiple xnames.
-
-**-f** *PATH*, **--xname-file** *PATH*
-        Specify a path to a newline-delimited file containing a list
-        of xnames on which to run diagnostics.
+.. include:: _sat-xname-opts.rst
 
 EXAMPLES
 ========
