@@ -7,7 +7,9 @@ from copy import deepcopy
 
 import unittest
 
-import sat.cli.status.main
+from sat.cli.status.main import API_KEYS, HEADERS, make_raw_table
+from sat.system.constants import MISSING_VALUE
+from sat.xname import XName
 
 
 # a fake table row, representing a fake node
@@ -33,7 +35,7 @@ class TestStatusBase(unittest.TestCase):
         make_raw_table() should return an empty table when the list of nodes
         is empty
         """
-        raw_table = sat.cli.status.main.make_raw_table([])
+        raw_table = make_raw_table([])
         self.assertEqual(raw_table, [])
 
     def test_one(self):
@@ -42,9 +44,9 @@ class TestStatusBase(unittest.TestCase):
         make_raw_table() should return a table with a single row and the same
         number of columns as there are column headers
         """
-        raw_table = sat.cli.status.main.make_raw_table([row()])
+        raw_table = make_raw_table([row()])
         self.assertEqual(len(raw_table), 1)
-        self.assertEqual(len(raw_table[0]), len(sat.cli.status.main.HEADERS))
+        self.assertEqual(len(raw_table[0]), len(HEADERS))
 
     def test_many_default(self):
         """make_raw_table() with many nodes, default sorting
@@ -54,11 +56,45 @@ class TestStatusBase(unittest.TestCase):
         column headers.
         """
         nodes = sample_nodes()
-        raw_table = sat.cli.status.main.make_raw_table(deepcopy(nodes))
+        raw_table = make_raw_table(deepcopy(nodes))
         self.assertEqual(len(raw_table), len(nodes))
 
-        self.assertTrue(
-            all(len(row) == len(sat.cli.status.main.HEADERS) for row in raw_table))
+        self.assertTrue(all(len(row) == len(HEADERS) for row in raw_table))
+
+    def test_missing_xname(self):
+        """Test that make_raw_table handles missing 'ID' key."""
+        nodes = sample_nodes()
+        key_to_delete = 'ID'
+        deleted_index = API_KEYS.index(key_to_delete)
+        for node in nodes:
+            del node[key_to_delete]
+
+        raw_table = make_raw_table(deepcopy(nodes))
+        self.assertTrue(all(row[deleted_index] == MISSING_VALUE
+                            for row in raw_table))
+        self.assertTrue(all(len(row) == len(HEADERS) for row in raw_table))
+
+    def test_missing_key(self):
+        """Test that make_raw_table handles other missing key."""
+        nodes = sample_nodes()
+        key_to_delete = 'Flag'
+        deleted_index = API_KEYS.index(key_to_delete)
+        for node in nodes:
+            del node[key_to_delete]
+
+        raw_table = make_raw_table(deepcopy(nodes))
+        self.assertTrue(all(row[deleted_index] == MISSING_VALUE
+                            for row in raw_table))
+        self.assertTrue(all(len(row) == len(HEADERS) for row in raw_table))
+
+    def test_xname_conversion(self):
+        """Test that make_raw_table converts the xname."""
+        single_node = row()
+        nodes = [single_node]
+        raw_table = make_raw_table(deepcopy(nodes))
+        self.assertIsInstance(raw_table[0][0], XName)
+        self.assertEqual(raw_table[0][0], XName(single_node['ID']))
+        self.assertTrue(all(len(row) == len(HEADERS) for row in raw_table))
 
 
 if __name__ == '__main__':

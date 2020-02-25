@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed sorting by xname in output of ``sat status``.
+- Made ``sat status`` more robust when keys are missing from data returned by
+  HSM API.
+
 ## [1.0.0] - 2020-02-27
 
 This is the version at which we started properly maintaining our version
