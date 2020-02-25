@@ -143,5 +143,6 @@ class TestRedfishQueries(DiagStatusTestCase):
         self.initial_status.delete()
         self.rq_del_mock.assert_called_once_with('https://x0c0r0b0/redfish/v1/TaskService/Tasks/1', verify=False)
 
+
 if __name__ == '__main__':
     unittest.main()

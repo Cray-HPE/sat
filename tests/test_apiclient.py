@@ -15,6 +15,7 @@ def get_http_url_prefix(hostname):
     """Construct http URL prefix to help with assertions on requests.get calls."""
     return 'https://{}/apis/'.format(hostname)
 
+
 class TestAPIGatewayClient(unittest.TestCase):
     """Tests for the APIGatewayClient class."""
 

@@ -58,11 +58,9 @@ class SATArgParser(ArgumentParser):
         else:
             return parsed
 
-
     def parse_known_args(self, args=None, namespace=None):
         self.exit_on_error = False
         return super().parse_known_args(args=args, namespace=namespace)
-
 
     def error(self, message):
         """Prints errors based on invalid arguments.

@@ -479,6 +479,6 @@ def filter_list(dicts, query_strings):
                       for query_string in query_strings]
     combined_filters = combine_filter_fns(all_filter_fns)
 
-    filter_fn = lambda x: _dont_care_call(TypeError, combined_filters, x)
+    def filter_fn(x): return _dont_care_call(TypeError, combined_filters, x)
 
     return list(filter(filter_fn, dicts))

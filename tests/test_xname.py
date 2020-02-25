@@ -8,6 +8,7 @@ import unittest
 
 from sat.xname import XName
 
+
 class TestXName(unittest.TestCase):
     """Tests for the XName class"""
 

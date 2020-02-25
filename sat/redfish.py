@@ -14,7 +14,7 @@ from sat.util import pester
 
 class RedfishQueryError(requests.exceptions.RequestException):
     """Subclasses requests.exceptions.RequesException
-    
+
     Meant for delivering status codes and an english reason for why a call
     to query delivered a payload indicating an error from the server.
     """

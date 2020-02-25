@@ -43,6 +43,7 @@ class InputDict(dict):
 
         return ''
 
+
 full = InputDict({
     'Serial number': '1234',
     'Site name': 'site name',
@@ -58,6 +59,7 @@ empty_date = InputDict({
     'System type': 'fire type'})
 
 empty_input = InputDict({})
+
 
 class TestSetrev(unittest.TestCase):
 
