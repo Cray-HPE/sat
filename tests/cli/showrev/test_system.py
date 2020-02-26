@@ -119,7 +119,7 @@ class TestSystem(unittest.TestCase):
         lambda: [
             {'NetType': 'sling'},
             {'NetType': 'sling'},
-            {'NetType': 'asdf'},])
+            {'NetType': 'asdf'}])
     def test_get_interconnects_unique(self):
         """get_interconnects should parse out the unique values.
         """

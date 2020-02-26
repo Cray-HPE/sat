@@ -3,7 +3,9 @@ import importlib
 import inspect
 import os
 
+
 _pkg_root = os.path.dirname(os.path.abspath(__file__))
+
 
 def get_avail_subcommands(pkg_root):
     """List all available subcommands.
@@ -21,6 +23,7 @@ def get_avail_subcommands(pkg_root):
     return [dname for dname in os.listdir(pkg_root) if
             os.path.isdir(os.path.join(pkg_root, dname))
             and '__pycache__' not in dname]
+
 
 def build_out_subparsers(subparser_hook):
     """Adds subcommand subparsers to a parent parser.

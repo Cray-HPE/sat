@@ -16,6 +16,7 @@ PT_ALIGN = 'l'
 PT_L_PAD_WIDTH = 0
 SORT_BY = 1
 
+
 class TestPrettyPrinters(unittest.TestCase):
     """Tests for functions that do pretty printing."""
 
@@ -33,6 +34,7 @@ class TestPrettyPrinters(unittest.TestCase):
                          dog:       lazy
                          action:    jump
                          fox_speed: 100"""))
+
 
 class TestPrettyTables(unittest.TestCase):
     def setUp(self):
@@ -111,6 +113,7 @@ class TestPrettyTables(unittest.TestCase):
             self.assertEqual(util.get_pretty_printed_list(*args),
                              str(mock_get_pretty_table.return_value))
 
+
 class TestMiscFormatters(unittest.TestCase):
     def test_get_rst_header(self):
         """Test the header string for the given header level is correct."""
@@ -128,7 +131,7 @@ class TestMiscFormatters(unittest.TestCase):
         """Test the formatting of format_as_dense_list."""
 
         triples = [
-            ( # plain old printing. sanity check
+            (  # plain old printing. sanity check
                 'the quick brown fox jumped over a lazy dog',
                 {'max_width': 40},
                 dedent("""\
@@ -136,12 +139,12 @@ class TestMiscFormatters(unittest.TestCase):
                 jumped    over      a         lazy
                 dog"""),
             ),
-            ( # defaults with short input
+            (  # defaults with short input
                 'foo bar baz',
                 {},
                 'foo    bar    baz'
             ),
-            ( # max_width < width of each string
+            (  # max_width < width of each string
                 'foo bar baz',
                 {'max_width': 2},
                 dedent("""\
@@ -149,7 +152,7 @@ class TestMiscFormatters(unittest.TestCase):
                 bar
                 baz""")
             ),
-            ( # passed strange value to margin_width
+            (  # passed strange value to margin_width
                 'foo bar baz',
                 {'margin_width': -1},
                 'foo    bar    baz'
@@ -161,6 +164,7 @@ class TestMiscFormatters(unittest.TestCase):
                 string.split(), **kwargs)
             self.assertEqual('\n'.join(line.strip() for line in dense_list.split('\n')).strip(),
                              result)
+
 
 class TestMiscUtils(unittest.TestCase):
     """Test miscellaneous utility functions"""

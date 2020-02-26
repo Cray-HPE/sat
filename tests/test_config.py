@@ -116,7 +116,7 @@ class TestLoadConfig(unittest.TestCase):
         self.patcher.stop()
         sat.config.CONFIG = self.backup_config
 
-    @mock.patch('os.environ', {k:v for k,v in os.environ.items() if k != 'SAT_CONFIG_FILE'})
+    @mock.patch('os.environ', {k: v for k, v in os.environ.items() if k != 'SAT_CONFIG_FILE'})
     def test_load_config(self):
         """Test load_config with default config path."""
         with mock.patch('sat.config.os.getenv', lambda x, y: DEFAULT_CONFIG_PATH):
@@ -169,7 +169,8 @@ class TestSATConfig(ExtendedTestCase):
         """
         for section in SAT_CONFIG_SPEC:
             for option_name, option_spec in SAT_CONFIG_SPEC[section].items():
-                self.assertEqual(config.get(section, option_name),
+                self.assertEqual(
+                    config.get(section, option_name),
                     option_spec.default() if callable(option_spec.default) else option_spec.default)
 
     def test_valid_config(self):
