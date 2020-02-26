@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Kibana dashboards for kernel-related error messages.
+
 ### Fixed
 
 - Fixed sorting by xname in output of ``sat status``.
