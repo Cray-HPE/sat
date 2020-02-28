@@ -1,7 +1,7 @@
 """
 Tests for output filtering mechanisms.
 
-Copyright 2019, Cray Inc. All Rights Reserved.
+Copyright 2019-2020 Cray Inc. All Rights Reserved.
 """
 
 from functools import wraps
@@ -156,6 +156,15 @@ class TestFilterQueryStrings(unittest.TestCase):
     def test_numerical_string_equality(self, filter_fn):
         self.assertTrue(filter_fn({'name': 'prince rogers', 'serial_number': '1999'}))
         self.assertFalse(filter_fn({'name': 'rush', 'serial_number': '2112'}))
+
+    @with_filter('fruit = "apple" and baskets = "2" or flower = "rose" and vases = "3"')
+    def test_boolean_precedence(self, filter_fn):
+        self.assertTrue(filter_fn({'fruit': 'apple', 'baskets': '2',
+                                   'flower': 'petunia', 'vases': '1'}))
+        self.assertTrue(filter_fn({'fruit': 'orange', 'baskets': '1',
+                                   'flower': 'rose', 'vases': '3'}))
+        self.assertFalse(filter_fn({'fruit': 'apple', 'baskets': '1',
+                                    'flower': 'rose', 'vases': '2'}))
 
 
 class TestFilterList(unittest.TestCase):

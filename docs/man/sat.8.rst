@@ -51,41 +51,6 @@ These global options must be specified before the subcommand.
 **-h, --help**
         Print the help message for sat.
 
-FILTERING
-=========
-
-For subcommands which support filtering, the option **--filter** should be used.
-
-By default, the **--filter** option accepts a simple query language which can be
-used to filter data from any command which returns tabular-formatted
-information. In the query language, rows can be filtered by column using
-comparisons with the operators =, !=, >, <, >=, and <=. Comparisons using the =
-operator can utilize Unix-style wildcards (e.g., '*' or '?').  Furthermore,
-multiple comparisons can be combined with the boolean operators 'and' and/or
-'or'. A few examples of filter queries:
-
-- 'manfctr = Cray* and capacity >= 192' selects all components manufactured by
-    Cray which have at least 192 GiB of memory.
-
-- 'xname = x3000c0s21 and state = ready' selects all nodes which are ready and
-    ok on the blade in slot 21 of chassis 0 in cabinet 3000.
-
-A column may be specified by some subsequence of its name, meaning that zero or
-more characters may be deleted. For example, a column named 'memory_capacity'
-could be specified by filtering against 'mem_cap', 'mem_capacity', or
-'mem'. Note, however, that a subsequence must be unique; for example, if some
-output has columns 'mem_capacity' and 'mem_frequency', a query against 'mem'
-would be ambiguous. Either 'mem_cap' or 'mem_freq' could be used.
-
-Column headers and row contents are not case sensitive during filtering. For
-example, to filter against a column 'State', the names 'state', 'State', or even
-'StAtE' could be used.
-
-Boolean combinations, typical precedence rules apply; that is, 'and'
-combinations have higher precedence than 'or' combinations. For example, for a
-hypothetical table with columns foo, bar, and baz, the query 'foo = 1 and bar =
-2 or baz = 3' can be visualized as '(foo = 1 and bar = 2) or (baz = 3)'.
-
 CONFIGURATION
 =============
 

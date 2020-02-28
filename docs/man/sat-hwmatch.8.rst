@@ -45,6 +45,7 @@ These options must be specified after the subcommand.
         Show matches in additon to mismatches (voluminous output).
 
 .. include:: _sat-format-opts.rst
+.. include:: _sat-filter-opts.rst
 
 EXAMPLES
 ========

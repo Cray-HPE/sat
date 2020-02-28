@@ -176,6 +176,7 @@ These options list components of certain types in the system.
         Same as **--node-fields** but for memory modules.
 
 .. include:: _sat-format-opts.rst
+.. include:: _sat-filter-opts.rst
 
 EXAMPLES
 ========
