@@ -38,3 +38,6 @@ our version number.
 - An Ansible role that installs sat within the crayctl ansible framework.
 - A kibana dasbhoard for viewing MCE log messages in the system monitoring
   framework.
+- A kibana dasbhoard for viewing nodes set admindown and Application Task
+  Orchestration and Management (ATOM) test failure log messages in the system
+  monitoring framework.
