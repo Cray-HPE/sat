@@ -10,10 +10,11 @@ from sat.apiclient import APIError, HSMClient
 from sat.config import get_config_value
 from sat.report import Report
 from sat.session import SATSession
+from sat.system.constants import MISSING_VALUE
 from sat.xname import XName
 
 
-APIKEYS = ('ID', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Role', 'NetType')
+API_KEYS = ('ID', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Role', 'NetType')
 HEADERS = ('xname', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Role', 'Net Type')
 
 LOGGER = logging.getLogger(__name__)
@@ -34,7 +35,14 @@ def make_raw_table(components):
         A list-of-lists table of strings, each row representing
         the status of a node.
     """
-    return [[d[field_name] for field_name in APIKEYS] for d in components]
+    def get_component_value(component, api_key):
+        value = component.get(api_key, MISSING_VALUE)
+        if api_key == 'ID' and value != MISSING_VALUE:
+            value = XName(value)
+        return value
+
+    return [[get_component_value(component, api_key) for api_key in API_KEYS]
+            for component in components]
 
 
 def do_status(args):
