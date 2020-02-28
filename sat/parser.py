@@ -4,7 +4,8 @@ Functions to create the top-level ArgumentParser for the program.
 Copyright 2019 Cray Inc. All Rights Reserved.
 """
 
-from argparse import ArgumentError, ArgumentParser, _SubParsersAction
+from argparse import ArgumentParser, _SubParsersAction
+import pkg_resources
 import sys
 
 import inflect
@@ -102,6 +103,11 @@ def create_parent_parser():
     """
 
     parser = SATArgParser(description='SAT - The System Admin Toolkit')
+
+    # This gets the version from the installed package.
+    version = pkg_resources.require('sat')[0].version
+    parser.add_argument('--version', action='version',
+                        version='%(prog)s {}'.format(version))
 
     parser.add_argument(
         '-u', '--username',
