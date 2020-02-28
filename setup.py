@@ -1,8 +1,10 @@
 # setuptools-based installation module for sat
 # Copyright 2019 Cray Inc. All Rights Reserved
 
-from setuptools import setup, find_packages
 from os import path
+from setuptools import setup, find_packages
+
+from tools.changelog import get_latest_version_from_file
 
 here = path.abspath(path.dirname(__file__))
 
@@ -16,9 +18,13 @@ with open(path.join(here, 'requirements.txt'), encoding='utf-8') as f:
         if commentless_line:
             install_requires.append(commentless_line)
 
+version = get_latest_version_from_file('CHANGELOG.md')
+if version is None:
+    version = 'VERSION_MISSING'
+
 setup(
     name='sat',
-    version='0.3.0',
+    version=version,
     description="System Admin Toolkit",
     long_description=long_description,
     long_description_content_type='text/markdown',

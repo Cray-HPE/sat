@@ -4,7 +4,7 @@
 %define satmandir %{_mandir}/man8
 
 Name: cray-sat
-Version: 0.3.0
+Version: %(./tools/changelog.py ./CHANGELOG.md)
 Release: %(echo ${BUILD_METADATA})
 License: Cray Proprietary
 Source: %{name}-%{version}.tar.gz
