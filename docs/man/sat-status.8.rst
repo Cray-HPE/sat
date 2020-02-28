@@ -34,6 +34,7 @@ These options must be specified after the subcommand.
         used with **--nids**.
 
 .. include:: _sat-format-opts.rst
+.. include:: _sat-filter-opts.rst
 
 EXAMPLES
 ========

@@ -1,7 +1,7 @@
 """
 Generic output filtering utilities for SAT.
 
-Copyright 2019 Cray Inc. All rights reserved.
+Copyright 2019-2020 Cray Inc. All rights reserved.
 """
 
 import fnmatch
@@ -266,6 +266,7 @@ def parse_query_string(query_string):
     tok_or = lexeme(parsec.string('or'))
     tok_cmpr = lexeme(parsec.regex(COMPARATOR_RE))
     tok_lhs = lexeme(parsec.regex(r'[a-zA-Z_\-0-9]+'))
+    tok_end = lexeme(parsec.regex(r'$'))
 
     @lexeme
     @parsec.generate
@@ -358,55 +359,29 @@ def parse_query_string(query_string):
         return FilterFunction(query_key, comparator, cmpr_val)
 
     @parsec.generate
-    def bool_or_expr():
-        """Parses an 'or' expression. (e.g. 'foo = bar or baz > 10')
-
-        'or' expressions have the following grammar:
-            or_expr   ::= and_expr | <or_expr> "or" <and_expr>
-
-        Returns:
-            a function which can filter input rows by whether
-            they match the boolean expression according to its
-            constituent parts and operator.
-        """
-        lhs = yield or_expr
-        yield tok_or
-        rhs = yield and_expr
-        return combine_filter_fns([comparison, and_expr], combine_fn=any)
-
-    @parsec.generate
     def bool_and_expr():
         """Parses an 'and' expression. (e.g. 'foo = bar and baz > 10')
 
-        'and' expressions have the following grammar:
-            and_expr   ::= comparison | <and_expr> "and" <comparison>
-
         Returns:
-            a function which can filter input rows by whether
-            they match the boolean expression according to its
-            constituent parts and operator.
+            Result of boolean and-operation.
         """
-        lhs = yield and_expr
+        lhs = yield comparison
         yield tok_and
-        rhs = yield comparison
-        return combine_filter_fns([comparison, and_expr])
-
-    # This should enforce operator precedence at the grammar level.
-    and_expr = comparison ^ bool_and_expr
-    or_expr = and_expr ^ bool_or_expr
+        rhs = yield (bool_and_expr ^ comparison)
+        return combine_filter_fns([lhs, rhs], combine_fn=all)
 
     @parsec.generate
     def bool_expr():
-        # Left hand side is always a comparison. (i.e. boolean
-        # operators are always right-associative.)
-        lhs = yield comparison
-        oper = yield (tok_and | tok_or)
+        """Parses a boolean expression with operators: and, or.
 
-        # Right hand side can be another boolean expression; if it
-        # isn't, fall back and check if it's just a single comparison
-        # (i.e., the base case)
+        Returns:
+            Result of boolean operation.
+        """
+        lhs = yield (bool_and_expr ^ comparison)
+        oper = yield (tok_or | tok_and | tok_end)
+        if oper not in ['and', 'or']:
+            return combine_filter_fns([lhs], combine_fn=all)
         rhs = yield (bool_expr ^ comparison)
-
         return combine_filter_fns([lhs, rhs],
                                   combine_fn=all if oper == 'and' else any)
 

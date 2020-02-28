@@ -137,6 +137,7 @@ These options must be specified after the subcommand.
         Print the help message for 'sat showrev'.
 
 .. include:: _sat-format-opts.rst
+.. include:: _sat-filter-opts.rst
 
 FILES
 =====
