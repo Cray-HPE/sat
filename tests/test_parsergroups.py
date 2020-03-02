@@ -105,6 +105,16 @@ class TestCreateXnameOptions(unittest.TestCase):
         with self.assertRaises(SystemExit):
             args = parser.parse_args(l_)
 
+    def test_deduplicated(self):
+        """ Duplicated xnames should be removed.
+        """
+        l_ = ['-x', 'x1, x2', '--xnames', 'x1', '--xname-file', xnames_file]
+        expected = ['x1', 'x2', 'x3']
+        parser = create_xname_options()
+        args = parser.parse_args(l_)
+
+        self.assertEqual(expected, args.xnames)
+
 
 if __name__ == '__main__':
     unittest.main()

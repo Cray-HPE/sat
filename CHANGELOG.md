@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Orchestration and Management (ATOM) test failure log messages in the system
   monitoring framework.
 
+### Changed
+- The xnames specified with the ``--xnames`` or ``--xname-file`` options are
+  now made unique while preserving order.
+
 ### Fixed
 
 - Fixed sorting by xname in output of ``sat status``.
