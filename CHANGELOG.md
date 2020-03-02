@@ -9,12 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Kibana dashboards for kernel-related error messages.
+- A kibana dasbhoard for viewing nodes set admindown and Application Task
+  Orchestration and Management (ATOM) test failure log messages in the system
+  monitoring framework.
 
 ### Fixed
 
 - Fixed sorting by xname in output of ``sat status``.
 - Made ``sat status`` more robust when keys are missing from data returned by
   HSM API.
+- Fixed boolean operator precedence in filtering queries.
 
 ## [1.0.0] - 2020-02-27
 
@@ -38,6 +42,3 @@ our version number.
 - An Ansible role that installs sat within the crayctl ansible framework.
 - A kibana dasbhoard for viewing MCE log messages in the system monitoring
   framework.
-- A kibana dasbhoard for viewing nodes set admindown and Application Task
-  Orchestration and Management (ATOM) test failure log messages in the system
-  monitoring framework.
