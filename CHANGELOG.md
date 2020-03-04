@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Made ``sat status`` more robust when keys are missing from data returned by
   HSM API.
 - Fixed boolean operator precedence in filtering queries.
+- Fixed exception that occurred in ``sat sensors`` when trying to split a list
+  of xnames on commas or to iterate over None.
 
 ## [1.0.0] - 2020-02-27
 
