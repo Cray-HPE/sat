@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2020-03-20
+
+### Changed
+- Changed ``sat linkhealth`` to target switches contained by specifed xnames,
+  for example xname component x1000c1 contains xname component x1000c1s2b0, as
+  does x1000c1s2b0 (an xname component contains itself).
+
 ## [1.1.0] - 2020-03-18
 
 ### Added
