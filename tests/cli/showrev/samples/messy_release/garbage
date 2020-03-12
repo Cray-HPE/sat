@@ -1,0 +1,8 @@
+This file contains a bunch of garbage and does not even appear to contain any
+key-value pairs. This should hopefully not happen in the real world, as the
+intent is for all the files in this directory to contain release information in
+a common INI-style format.
+
+However, we still want to test that the 'sat showrev' will handle it gracefully
+when there is a file present that does not really conform to the expected
+format, even when there are stray = characters in the file like this one.

@@ -27,18 +27,25 @@ def add_showrev_subparser(subparsers):
 
     showrev_parser.add_argument(
         '--all',
-        help='Print everything. Equivalent to specifying --system, --docker, and --packages.',
+        help='Display everything. Equivalent to specifying --system, --products, '
+             '--docker, and --packages.',
         action='store_true')
     showrev_parser.add_argument(
         '--system',
-        help='Print general system version information. This is the default.',
+        help='Display general system version information. This is enabled when '
+             'no other options are specified.',
+        action='store_true')
+    showrev_parser.add_argument(
+        '--products',
+        help='Display version information about the installed products. '
+             'This is enabled when no other options are specified.',
         action='store_true')
     showrev_parser.add_argument(
         '--docker',
-        help='Print running docker image versions.',
+        help='Display running docker image versions.',
         action='store_true')
     showrev_parser.add_argument(
-        '--packages', help='Print installed rpm versions.', action='store_true')
+        '--packages', help='Display installed rpm versions.', action='store_true')
     showrev_parser.add_argument(
         '-s',
         '--substr',

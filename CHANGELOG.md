@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   monitoring framework.
 - ``contains_component`` method added to ``XName`` class to test whether a
   component represented by an xname contains another.
+- New ``--products`` option for ``sat showrev`` that shows information about
+  installed product versions from ``/opt/cray/etc/release`` directory.
 
 ### Changed
 - The xnames specified with the ``--xnames`` or ``--xname-file`` options are
@@ -27,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed boolean operator precedence in filtering queries.
 - Fixed exception that occurred in ``sat sensors`` when trying to split a list
   of xnames on commas or to iterate over None.
+- Fixed ``sat showrev`` traceback that resulted from ``/opt/cray/etc/release``
+  being changed from a file to a directory.
 
 ## [1.0.0] - 2020-02-27
 

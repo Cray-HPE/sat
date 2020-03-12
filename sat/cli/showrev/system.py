@@ -24,69 +24,6 @@ from sat.session import SATSession
 LOGGER = logging.getLogger(__name__)
 
 
-def get_value_streams(relfile='/opt/cray/etc/release'):
-    """Returns the version information within the release file.
-
-    Release information for various value-streams is stored in a file
-    located at /opt/cray/etc/release. This file is stored in YAML format,
-    and this function reads the data into a dictionary where the keys are the
-    names of the value-streams, and the values are the versions for each.
-
-    Args:
-        relfile (str): Path to release file that contains information. This
-            file should be in yaml format.
-
-    Returns:
-        A dictionary containing the name of the value-stream and its
-        associated version(s). If the appropriate key for version does not
-        exist, then the dictionary will hold a value of None for that value-
-        stream.
-
-        If the file could not be read, or the file was in a non-yaml format,
-        then this function will return a defaultdict which will supply the
-        value 'ERROR' for any entries.
-    """
-
-    reldata = defaultdict(lambda: 'ERROR')
-    default = defaultdict(lambda: 'ERROR')
-    relstring = ''
-
-    try:
-        with open(relfile, 'r') as f:
-            relstring = f.read()
-    except FileNotFoundError:
-        LOGGER.warning('No release file at {} .'.format(relfile))
-        return default
-    except PermissionError:
-        LOGGER.error('Unable to read {} due to permission issue.'.format(relfile))
-        return default
-
-    # return {} if file doesn't match yaml format
-    try:
-        data = yaml.safe_load(relstring)
-    except yaml.parser.ParserError:
-        LOGGER.error('The release file, {}, has non-yaml format.'.format(relfile))
-        return default
-
-    # Return empty-dict if file is empty.
-    if data is None:
-        LOGGER.error('The release file {} is empty.'.format(relfile))
-        return {}
-
-    try:
-        for entry in data['products']:
-            try:
-                reldata[entry] = data['products'][entry]['version']
-            except KeyError:
-                LOGGER.warning('The product entry {} in {} has no "version" field.'.format(entry, relfile))
-                reldata[entry] = None
-    except KeyError:
-        LOGGER.error('There is no "products" section within {} .'.format(relfile))
-        return default
-
-    return reldata
-
-
 def get_site_data(sitefile):
     """Get site-specific information from the sitefile.
 
@@ -316,8 +253,6 @@ def get_system_version(sitefile, substr=''):
         various system components.
     """
 
-    funcs = OrderedDict()
-    value_streams = get_value_streams()
     zypper_versions = get_zypper_versions(
         ['cray-lustre-client', 'slurm-slurmd', 'pbs-crayctldeploy']
     )
@@ -326,25 +261,17 @@ def get_system_version(sitefile, substr=''):
     # keep this list in ascii-value sorted order on the keys.
     field_getters_by_name = OrderedDict([
         ('Build version', get_build_version),
-        ('CLE version', lambda: value_streams['CLE']),
-        ('General', lambda: value_streams['general']),
         ('Interconnect', lambda: ' '.join(get_interconnects())),
         ('Kernel', get_kernel_version),
         ('Lustre', lambda: zypper_versions['cray-lustre-client']),
         ('PBS version', lambda: zypper_versions['pbs-crayctldeploy']),
-        ('PE', lambda: value_streams['PE']),
         ('SLES version', get_sles_version),
-        ('SAT', lambda: value_streams['sat']),
         ('Serial number', lambda: sitedata['Serial number']),
         ('Site name', lambda: sitedata['Site name']),
-        ('Slingshot', lambda: value_streams['slingshot']),
         ('Slurm version', lambda: zypper_versions['slurm-slurmd']),
-        ('SMA', lambda: value_streams['sma']),
-        ('SMS', lambda: value_streams['sms']),
         ('System install date', lambda: sitedata['System install date']),
         ('System name', lambda: sitedata['System name']),
         ('System type', lambda: sitedata['System type']),
-        ('Urika', lambda: value_streams['urika']),
     ])
 
     return [[field_name, field_getter()]
