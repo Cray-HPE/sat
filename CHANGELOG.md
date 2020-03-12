@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A kibana dasbhoard for viewing nodes set admindown and Application Task
   Orchestration and Management (ATOM) test failure log messages in the system
   monitoring framework.
+- ``contains_component`` method added to ``XName`` class to test whether a
+  component represented by an xname contains another.
 
 ### Changed
 - The xnames specified with the ``--xnames`` or ``--xname-file`` options are
