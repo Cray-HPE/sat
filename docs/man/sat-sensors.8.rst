@@ -24,8 +24,8 @@ one or more BMCs.
 OPTIONS
 =======
 
-These options must be specified after the subcommand.
-The xnames may also be IP addresses.
+These options must be specified after the subcommand. The xnames may also be IP
+addresses or aliases. At least one xname must be provided.
 
 **-h, --help**
         Print a usage summary and exit.
