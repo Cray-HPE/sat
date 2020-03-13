@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Kibana dashboard for AER messages.
 - Kibana dashboard for rasdaemon messages.
 
+### Changed
+- Kibana kernel dashboards to use DSL from KQL.
+
+### Fixed
+- Kibana LBUG search query.
+
 ## [1.1.0] - 2020-03-18
 
 ### Added
