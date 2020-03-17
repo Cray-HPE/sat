@@ -119,3 +119,29 @@ class XName:
 
     def __repr__(self):
         return self.xname_str
+
+    def contains_component(self, other):
+        """Returns whether this component contains another.
+
+        Tests whether the component represented by this xname contains the
+        component represented by the `other` xname. Also returns true when
+        this xname is the same as the other.
+
+        E.g., the xname 'x1000c0' represents chassis 0 in cabinet 1000, and
+        the xname 'x1000c0s5b0n0' represents a node in that chassis, so
+        XName('x1000c0').contains_component(XName('x1000c0s5b0n0')) would be
+        true.
+
+        Returns:
+            True if this xname contains the other or is the same as the other.
+        """
+        if not isinstance(self, type(other)):
+            return False
+
+        if len(self.tokens) > len(other.tokens):
+            return False
+
+        for idx, token in enumerate(self.tokens):
+            if other.tokens[idx] != token:
+                return False
+        return True

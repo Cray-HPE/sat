@@ -6,8 +6,6 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 
 import codecs
 import os
-import subprocess
-import sys
 import unittest
 from unittest import mock
 
@@ -50,45 +48,6 @@ def zypper_good_xml(packages):
 
 
 class TestSystem(unittest.TestCase):
-
-    @mock.patch('sat.cli.showrev.system.open', lambda x, y: open('{}/relfile-good'.format(samples), y))
-    def test_get_value_streams_good_format(self):
-        """Positive test case for reading from the shasta release file.
-        """
-        result = sat.cli.showrev.system.get_value_streams()
-        self.assertEqual(result['SAT'], '1.0.0')
-        self.assertEqual(result['SAT2'], '3.0.0')
-
-    @mock.patch('sat.cli.showrev.system.open', lambda x, y: open('idontexist', y))
-    def test_get_value_streams_file_not_found(self):
-        """get_value_streams should return empty dict if file-not-found.
-        """
-        result = sat.cli.showrev.system.get_value_streams()
-        self.assertEqual(result, {})
-
-    @mock.patch('sat.cli.showrev.system.open', lambda x, y: open('{}/relfile-nonyaml'.format(samples), y))
-    def test_get_value_streams_file_nonyaml(self):
-        """The get_value_streams is only expected to handle yaml files.
-        """
-        result = sat.cli.showrev.system.get_value_streams()
-        self.assertTrue(os.path.exists('{}/relfile-nonyaml'.format(samples)))
-        self.assertEqual(result, {})
-
-    @mock.patch('sat.cli.showrev.system.open', lambda x, y: open('{}/relfile-bad-sections'.format(samples), y))
-    def test_get_value_streams_file_bad_sections(self):
-        """get_value_streams expects the first header to be 'products'.
-        """
-        result = sat.cli.showrev.system.get_value_streams()
-        self.assertTrue(os.path.exists('{}/relfile-bad-sections'.format(samples)))
-        self.assertEqual(result, {})
-
-    @mock.patch('sat.cli.showrev.system.open', lambda x, y: open('{}/empty'.format(samples), y))
-    def test_get_value_streams_file_empty(self):
-        """get_value_streams should return empty dict if file was empty.
-        """
-        result = sat.cli.showrev.system.get_value_streams()
-        self.assertTrue(os.path.exists('{}/empty'.format(samples)))
-        self.assertEqual(result, {})
 
     @mock.patch('sat.cli.showrev.system.subprocess.check_output', bad_zypper_return)
     def test_get_zypper_versions_bad_return(self):

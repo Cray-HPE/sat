@@ -5,6 +5,7 @@ Copyright 2020 Cray Inc. All Rights Reserved.
 """
 
 import logging
+import sys
 
 from sat.config import get_config_value
 import sat.redfish
@@ -41,6 +42,9 @@ def do_sensors(args):
     Returns:
         None
     """
+    if not args.xnames:
+        LOGGER.error("No xnames were supplied.")
+        sys.exit(1)
 
     username, password = sat.redfish.get_username_and_pass(args.redfish_username)
 
@@ -64,7 +68,7 @@ def do_sensors(args):
 
     n = 0
 
-    for xname in args.xnames.split(','):
+    for xname in args.xnames:
         bmc = capture_mgr.bmc_factory(xname, username, password)
         bmc.detect_type()
 

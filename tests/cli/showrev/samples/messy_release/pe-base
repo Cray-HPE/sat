@@ -1,0 +1,5 @@
+PRODUCT="Cray's Programming Environment BASE Packages"
+OS=SLES15SP1
+ARCH=x86_64
+VERSION=master
+DATE=20200309154143

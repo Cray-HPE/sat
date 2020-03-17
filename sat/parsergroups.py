@@ -91,6 +91,16 @@ def create_xname_options():
         text for xname options.
     """
 
+    def deduplicate(l_):
+        seen = set()
+        deduplicated = []
+        for item in l_:
+            if item not in seen:
+                deduplicated.append(item)
+                seen.add(item)
+
+        return deduplicated
+
     class XnameCsvParser(argparse.Action):
         def __init__(self, option_strings, dest, nargs=None, const=None,
                      default=None, type=None, choices=None, required=False,
@@ -109,7 +119,7 @@ def create_xname_options():
                 xnames.extend(getattr(namespace, self.dest))
 
             xnames.extend([x.strip() for x in values.split(',') if x.strip()])
-            setattr(namespace, self.dest, xnames)
+            setattr(namespace, self.dest, deduplicate(xnames))
 
     class XnameFileReader(argparse.Action):
 
@@ -141,7 +151,7 @@ def create_xname_options():
                     self,
                     'You do not have permission to access {}.'.format(values))
 
-            setattr(namespace, self.dest, xnames)
+            setattr(namespace, self.dest, deduplicate(xnames))
 
     parser = ArgumentParser(add_help=False)
 

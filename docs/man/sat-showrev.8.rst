@@ -23,78 +23,53 @@ This includes general version information about the system, as well as
 version information about installed docker images and rpm packages.
 
 The default behavior of this command is to print general revision information
-about the system. This is a mixture of information read from the release
-file located at */opt/cray/etc/release*, site-specific revision information,
-and various api calls to other Cray services. The following list details the
-meaning and source of information for each field.
+about the system and the installed products. This is a mixture of information
+read from individual product release files in ``/opt/cray/etc/release``,
+site-specific information read from ``/opt/cray/etc/site_info.yml``, and various
+api calls to other Cray services. The following list details the meaning and
+source of information for each field.
 
 Build version
     Not implemented, so it always displays None.
-
-CLE version
-    Version of the Cray Linux Environment read from
-    /opt/cray/etc/release.
-
-General
-    This is the general version of the system software read from
-    /opt/cray/etc/release.
 
 Interconnect
     Unique list of interconnect names obtained from the Hardware State
     Manager (HSM).
 
 Kernel
-    Relase version of the kernal as reported by "uname".
+    Release version of the kernel on the local host as reported by ``uname``.
 
 Lustre
-    Version of Lustre available in the Zypper repository.
+    Version of Lustre available in the Zypper repositories.
 
 PBS version
-    Version of PBS available in the Zypper repository.
-
-PE
-    Version of PE read from /opt/cray/etc/release.
+    Version of PBS available in the Zypper repositories.
 
 SLES version
-    Version of SLES read from /etc/os-release.
-
-SAT
-    Version of SAT read from /opt/cray/etc/release
+    Version of SLES read from ``/etc/os-release`` on the local host.
 
 Serial number
-    Manually populated by "sat setrev" and read back from
-    /opt/cray/etc/site_info.yml.
+    Manually populated by ``sat setrev`` and read back from
+    ``/opt/cray/etc/site_info.yml``.
 
 Site name
-    Manually populated by "sat setrev" and read back from
-    /opt/cray/etc/site_info.yml.
-
-Slingshot
-    Version of Slingshot read from /opt/cray/etc/release.
+    Manually populated by ``sat setrev`` and read back from
+    ``/opt/cray/etc/site_info.yml``.
 
 Slurm version
-    Version of Slurm available in the Zypper repository.
-
-SMA
-    Version of SMA read from /opt/cray/etc/release.
-
-SMS
-    Version of SMS read from /opt/cray/etc/release.
+    Version of Slurm available in the Zypper repositories.
 
 System install date
-    Manually populated by "sat setrev" and read back from
-    /opt/cray/etc/site_info.yml.
+    Manually populated by ``sat setrev`` and read back from
+    ``/opt/cray/etc/site_info.yml``.
 
 System name
-    Manually populated by "sat setrev" and read back from
-    /opt/cray/etc/site_info.yml.
+    Manually populated by ``sat setrev`` and read back from
+    ``/opt/cray/etc/site_info.yml``.
 
 System type
-    Manually populated by "sat setrev" and read back from
-    /opt/cray/etc/site_info.yml.
-
-Urika
-    Version of Urika read from /opt/cray/etc/release.
+    Manually populated by ``sat setrev`` and read back from
+    ``/opt/cray/etc/site_info.yml``.
 
 The **--docker** option displays information about all installed docker
 images in a table. This table is sorted on the docker image name. This
@@ -112,8 +87,12 @@ OPTIONS
 These options must be specified after the subcommand.
 
 **--system**
-        Display general version information about the system. This is
-        the default behavior.
+        Display general version information about the system. When none of the
+        other options are specified, this option is enabled by default.
+
+**--products**
+        Display version information about the installed products. When none of
+        the other options are specified, this option is enabled by default.
 
 **--docker**
         Display information about the containers installed on this node.
@@ -122,8 +101,8 @@ These options must be specified after the subcommand.
         Display information about the installed packages on this node.
 
 **--all**
-        Print everything. Equivalent to specifying **--system**,
-        **--docker**, and **--packages**.
+        Display everything. Equivalent to specifying **--system**,
+        **--products**, **--docker**, and **--packages**.
 
 **-s** *SUBSTR*, **--substr** *SUBSTR*
         Show version information for components whose names or IDs contain
@@ -134,7 +113,7 @@ These options must be specified after the subcommand.
         must be in a YAML format.
 
 **-h, --help**
-        Print the help message for 'sat showrev'.
+        Print the help message for ``sat showrev``.
 
 .. include:: _sat-format-opts.rst
 .. include:: _sat-filter-opts.rst

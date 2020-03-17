@@ -5,10 +5,11 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 """
 
 import logging
+import sys
 
 from sat.config import get_config_value
 from sat.report import Report
-from sat.cli.showrev import containers, rpm, system
+from sat.cli.showrev import containers, products, rpm, system
 
 
 LOGGER = logging.getLogger(__name__)
@@ -24,7 +25,6 @@ def do_showrev(args):
     Returns:
         None
     """
-
     reports = []
 
     # report formatting
@@ -35,19 +35,35 @@ def do_showrev(args):
 
     if args.all:
         args.system = True
+        args.products = True
         args.docker = True
         args.packages = True
-    elif not args.system and not args.docker and not args.packages:
+    elif not any((args.system, args.products, args.docker, args.packages)):
         args.system = True
+        args.products = True
 
     if args.system:
         data = system.get_system_version(args.sitefile, args.substr)
         if data is None:
             LOGGER.error('Could not print system version information.')
-            exit(1)
+            # TODO: Replace immediate exit. See SAT-346
+            sys.exit(1)
 
         title = 'System Revision Information'
         headings = ['component', 'data']
+        reports.append(Report(
+            headings, title, sort_by, reverse, no_headings, no_borders,
+            filter_strs=args.filter_strs))
+        reports[-1].add_rows(data)
+
+    if args.products:
+        headings, data = products.get_product_versions()
+        if not data:
+            LOGGER.error('Could not retrieve product versions.')
+            # TODO: Replace immediate exit. See SAT-346
+            sys.exit(1)
+
+        title = 'Product Revision Information'
         reports.append(Report(
             headings, title, sort_by, reverse, no_headings, no_borders,
             filter_strs=args.filter_strs))
@@ -58,7 +74,8 @@ def do_showrev(args):
         if data is None:
             LOGGER.error(
                 'Could not retrieve list of installed docker containers.')
-            exit(1)
+            # TODO: Replace immediate exit. See SAT-346
+            sys.exit(1)
 
         title = 'Installed Container Versions'
         headings = ['name', 'short-id', 'versions']
@@ -71,7 +88,8 @@ def do_showrev(args):
         data = rpm.get_rpms(args.substr)
         if data is None:
             LOGGER.error('Could not retrieve list of installed rpms.')
-            exit(1)
+            # TODO: Replace immediate exit. See SAT-346
+            sys.exit(1)
 
         title = 'Installed Package Versions'
         headings = ['name', 'version']
