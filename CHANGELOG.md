@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Kibana kernel dashboards to use DSL from KQL.
+- Put list of subcommands in usage help in alphabetical order.
 
 ### Fixed
 - Kibana LBUG search query.
