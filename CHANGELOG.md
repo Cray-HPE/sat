@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Kibana dashboards for AER messages.
+- Kibana dashboard for AER messages.
+- Kibana dashboard for rasdaemon messages.
 
 ## [1.1.0] - 2020-03-18
 
