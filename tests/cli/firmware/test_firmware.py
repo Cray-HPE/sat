@@ -15,6 +15,7 @@ import sat.cli.firmware.main
 def set_options(namespace):
     """Set default options for Namespace."""
     namespace.xnames = []
+    namespace.snapshots = None
     namespace.no_borders = True
     namespace.no_headings = False
     namespace.format = 'pretty'
