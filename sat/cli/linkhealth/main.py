@@ -1,13 +1,11 @@
 """
 The main entry point for the linkhealth subcommand.
 
-Copyright 2019 Cray Inc. All Rights Reserved.
+Copyright 2019-2020 Cray Inc. All Rights Reserved.
 """
 
-import json
 import logging
 import os
-import subprocess
 import sys
 import urllib3
 from collections import defaultdict
@@ -17,7 +15,6 @@ import requests
 from sat import redfish
 from sat.apiclient import APIError, HSMClient
 from sat.config import get_config_value
-from sat.filtering import is_subsequence
 from sat.report import Report
 from sat.session import SATSession
 from sat.xname import XName
@@ -72,16 +69,17 @@ def get_matches(filters, elems):
     """Separate a list into matching and unmatched members.
 
     Args:
-        filters: List of strings which represent subsequences. If an elem in
-            elems contains any subsequence in this list, then it will be
-            considered a match.
-        elems: List of elems to filter.
+        filters: List of xnames having the type XName. If an elem in
+            elems is contained by an xname in this list, meaning it is
+            above the element xname in the hierarchy of xname components,
+            then it will be considered a match.
+        elems: List of xnames to filter.
 
     Returns:
-        used: Filters that generated a match.
-        unused: Filters that did not generate a match.
-        matches: Elements that matched one or more filters.
-        no_matches: Elements that did not match anything.
+        used: Set of filters that generated a match.
+        unused: Set of filters that did not generate a match.
+        matches: Set of elements that matched one or more filters.
+        no_matches: Set of elements that did not match anything.
     """
     used = set()
     unused = set(filters)
@@ -90,7 +88,7 @@ def get_matches(filters, elems):
 
     for elem in elems:
         for filter_ in filters:
-            if is_subsequence(filter_, str(elem)):
+            if filter_.contains_component(elem):
                 used.add(filter_)
                 unused.discard(filter_)
                 matches.add(elem)
@@ -132,7 +130,7 @@ def get_jack_port_ids(xnames, username, password):
             url, response = redfish.query(xname, addr, username, password)
         except requests.exceptions.RequestException as err:
             LOGGER.error('Query failed. {}'.format(err))
-            sys.exit(1)
+            continue
 
         try:
             port_mapping[xname] = [os.path.basename(x['@odata.id']) for x in response['Members']]
@@ -140,7 +138,7 @@ def get_jack_port_ids(xnames, username, password):
             LOGGER.error(
                 'The JSON payload for Redfish URL {} did not contain the '
                 'expected fields "Members.@odata.id"'.format(url))
-            sys.exit(1)
+            continue
 
     return port_mapping
 
@@ -334,31 +332,34 @@ def do_linkhealth(args):
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     try:
-        xnames = get_router_xnames()
+        hsm_xnames = get_router_xnames()
     except (APIError, KeyError, ValueError) as err:
         if args.xnames:
             LOGGER.warning(err)
-            LOGGER.warning(
-                'Will proceed using the literal values in --xnames.')
-            xnames = args.xnames
+            hsm_xnames = []
         else:
             LOGGER.error(err)
             sys.exit(1)
 
-    # filter for matches
     if args.xnames:
-        used, unused, xnames, _ = get_matches(args.xnames, xnames)
-
-        if unused:
-            LOGGER.warning('The following xname filters generated no '
-                           'matches {}'.format(unused))
+        xnames = [XName(xname) for xname in args.xnames]
+        # Filter for matches if xnames obtained from HSM.
+        if hsm_xnames:
+            used, unused, xnames, _ = get_matches(xnames, hsm_xnames)
+            if unused:
+                LOGGER.warning('The following xname filters generated no '
+                               'matches {}'.format(unused))
+        else:
+            LOGGER.warning('Could not obtain xnames from HSM, '
+                           'will proceed using the literal values in --xnames.')
+    else:
+        xnames = hsm_xnames
 
     if not xnames:
         if args.xnames:
             LOGGER.error('No BMC routers discovered with matching IDs.')
         else:
             LOGGER.error('No BMC routers discovered.')
-
         sys.exit(1)
 
     # get all ports for all xnames
