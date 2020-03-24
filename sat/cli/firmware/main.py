@@ -9,6 +9,7 @@ from sat.apiclient import APIError, FirmwareClient
 from sat.config import get_config_value
 from sat.report import Report
 from sat.session import SATSession
+from sat.xname import XName
 
 
 HEADERS = ('xname', 'ID', 'version')
@@ -43,7 +44,8 @@ def make_fw_table(fw_devs):
                     # Fall through to show version only if ID and version values exist.
                     if 'id' not in target or 'version' not in target:
                         continue
-                fw_table.append([xname, target.get('id', 'MISSING'),
+                # Use XName class so xnames sort properly.
+                fw_table.append([XName(xname), target.get('id', 'MISSING'),
                                  target.get('version', 'MISSING')])
         elif 'error' in fw_dev:
             LOGGER.error('Error getting firmware for %s: %s', xname, fw_dev['error'])
