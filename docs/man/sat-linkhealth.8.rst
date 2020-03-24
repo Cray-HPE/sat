@@ -18,15 +18,17 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-The linkhealth subcommand reports on the health of links for available xnames.
-This information is obtained via Redfish queries, so a valid redfish username
+The linkhealth subcommand reports on the health of links for available routers.
+This information is obtained via Redfish queries, so a valid Redfish username
 and password for the target hosts is required.
 
-This subcommand allows use of the "--xname" options. The provided xnames
-will match against Redfish endpoints that are of type "RouterBMC" as
-reported by the Hardware State Manager. The match is considered valid
-if the specified xname is a subsequence of the reported ID. If the HSM
-is down, then the verbatim xnames are targeted instead.
+This subcommand allows use of the "--xname" options. The provided xnames must
+be Router BMCs or components that contain Router BMCs. The xname of a Router BMC
+has the form x#c#r#b# (cabinet #, chassis # router #, BMC #). If a cabinet is
+specified, then all router BMCs in that cabinet are targeted. If a chassis is
+specified, then all router BMCs in that chassis are targeted. If a router is
+specified, then all BMSs for the router are targeted. If no xname is specified,
+all router BMCs are targeted.
 
 OPTIONS
 =======
