@@ -236,7 +236,7 @@ def get_report(xname_port_map, username, password, args):
         'link_status',
         'health',
         'state',
-        'flow_control_configuration',
+        'flow_control_config',
         'link_speed_mbps'
     ]
 
@@ -303,7 +303,7 @@ def get_report(xname_port_map, username, password, args):
                 pass
 
             try:
-                entry['flow_control_configuration'] = response['FlowControlConfiguration']
+                entry['flow_control_config'] = response['FlowControlConfiguration']
             except KeyError:
                 pass
 
