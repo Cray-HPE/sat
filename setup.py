@@ -31,7 +31,7 @@ setup(
     url='https://stash.us.cray.com/projects/SAT/repos/sat',
     author='Cray, Inc.',
     license='Cray Proprietary',
-    packages=find_packages(exclude=['tests']),
+    packages=find_packages(exclude=['tests', 'tests.*', 'tools', 'tools.*']),
     python_requires='>=3, <4',
     # Top-level dependencies are parsed from requirements.txt
     install_requires=install_requires,
