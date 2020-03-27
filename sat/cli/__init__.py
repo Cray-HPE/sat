@@ -1,3 +1,9 @@
+"""
+The main entry point for the command line interface.
+
+Copyright 2020 Cray Inc. All Rights Reserved.
+"""
+
 import glob
 import importlib
 import inspect
@@ -20,7 +26,7 @@ def get_avail_subcommands(pkg_root):
         a list of strings representing the names of all subpackages
         present in the given directory.
     """
-    return [dname for dname in os.listdir(pkg_root) if
+    return [dname for dname in sorted(os.listdir(pkg_root)) if
             os.path.isdir(os.path.join(pkg_root, dname))
             and '__pycache__' not in dname]
 
