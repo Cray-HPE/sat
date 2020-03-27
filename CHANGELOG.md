@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.2.0] - 2020-03-27
 
 ### Added
 - Kibana dashboard for AER messages.
@@ -14,9 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Kibana kernel dashboards to use DSL from KQL.
 - Put list of subcommands in usage help in alphabetical order.
+- All Kibana dashboards include time, hostname, message, and severity columns in
+  the search output.
 
 ### Fixed
-- Kibana LBUG search query.
+- The regular expression for the Kibana LBUG search query has been corrected.
+- The output of firmware subcommand now properly sorts xnames by their numerical
+  components.
 
 ## [1.1.0] - 2020-03-18
 
