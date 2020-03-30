@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Changed ``sat linkhealth`` to display "flow_control_config" rather than
+  "flow_control_configuration" as a column heading.
+
 ## [1.2.0] - 2020-03-27
 
 ### Added
@@ -27,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Updated ``setup.py`` to not include our ``tools`` python package and
   subpackages of our ``tests`` package.
+
+### Changed
+- Changed ``sat linkhealth`` to display "flow control config" rather than
+  "flow_control_configuration" as a column heading.
 
 ## [1.1.1] - 2020-03-20
 
