@@ -38,7 +38,9 @@ These options must be specified after the subcommand.
 EXAMPLES
 ========
 
-Get a report of all the firmware versions on the system::
+Get a report of all the firmware versions on the system:
+
+::
 
   # sat firmware
   +--------------+-------+-------------------------------------------+

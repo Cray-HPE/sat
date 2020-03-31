@@ -76,16 +76,22 @@ EXAMPLES
 ========
 
 Run a diagnostic named **runMemTester** with an option to just print its usage
-information on two xnames at once::
+information on two xnames at once:
 
-        sat diag --xname x1000c0r0b0 --xname x1000c0r1b0 runMemTester -h
+::
+
+        # sat diag --xname x1000c0r0b0 --xname x1000c0r1b0 runMemTester -h
 
 The xnames can also be specified by providing a path to a file that contains one
-xname per line. E.g.::
+xname per line. E.g.:
 
-        sat diag --xname-file my-xnames.txt runMemTester -h
+::
 
-In the example above, the file **my-xnames.txt** contains the following lines::
+        # sat diag --xname-file my-xnames.txt runMemTester -h
+
+In the example above, the file **my-xnames.txt** contains the following lines:
+
+::
 
         x0c0s14b0n0
         x0c0s21b0n0

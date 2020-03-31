@@ -32,7 +32,9 @@ supported.
 
 The default behavior of this subcommand is to display summaries and lists of all
 component types in the system in pretty format. That is, the default behavior is
-equivalent to the following invocation::
+equivalent to the following invocation:
+
+::
 
         sat hwinv --summarize-all --list-all
 
@@ -182,52 +184,68 @@ EXAMPLES
 ========
 
 List all the nodes in the system and include only the xname, processor
-manufacturer, and memory size fields::
+manufacturer, and memory size fields:
 
-        sat hwinv --list-nodes --node-fields xname,processor_manufacturer,memory_size
+::
+
+        # sat hwinv --list-nodes --node-fields xname,processor_manufacturer,memory_size
 
 List all processors and memory modules in the system and show only xname and
-serial number for each::
+serial number for each:
 
-        sat hwinv --list-procs --proc-fields xname,serial_number \
-                  --list-mems --mem-fields xname,serial_number
+::
+
+        # sat hwinv --list-procs --proc-fields xname,serial_number \
+                    --list-mems --mem-fields xname,serial_number
 
 Summarize nodes but only by the value of the cabinet type field, and show only
-counts of the nodes in each category, not a full listing of xnames::
+counts of the nodes in each category, not a full listing of xnames:
 
-        sat hwinv --summarize-nodes --node-summary-fields cabinet_type \
-                  --show-node-xnames off
+::
+
+        # sat hwinv --summarize-nodes --node-summary-fields cabinet_type \
+                    --show-node-xnames off
 
 Summarize all components and include xnames for the memory modules and
-processors::
+processors:
 
-        sat hwinv --summarize-all --show-mem-xnames --show-proc-xnames
+::
 
-Summarize all nodes by all possible fields and get output in YAML format::
+        # sat hwinv --summarize-all --show-mem-xnames --show-proc-xnames
 
-        sat hwinv --summarize-nodes --format yaml
+Summarize all nodes by all possible fields and get output in YAML format:
+
+::
+
+        # sat hwinv --summarize-nodes --format yaml
 
 Get a listing of all nodes, processors, and memory modules in the system,
 displaying only their xnames and serial numbers, and providing output in YAML
-format::
+format:
 
-        sat hwinv --list-nodes --node-fields xname,serial \
-                  --list-mems --mem-fields xname,serial \
-                  --list-procs --proc-fields xname,serial \
-                  --format yaml
+::
+
+        # sat hwinv --list-nodes --node-fields xname,serial \
+                    --list-mems --mem-fields xname,serial \
+                    --list-procs --proc-fields xname,serial \
+                    --format yaml
 
 Note that in the above example we are specifying the "Serial Number" field using
 a prefix of that field name.
 
 Summarize the nodes by information related to their processors, i.e. the
-processor manufacturer and processor model::
+processor manufacturer and processor model:
 
-        sat hwinv --summarize-nodes --node-summary-fields proc
+::
+
+        # sat hwinv --summarize-nodes --node-summary-fields proc
 
 List nodes and display only the node xnames and fields that start with mem and
-proc, i.e. fields related to memory and processor information::
+proc, i.e. fields related to memory and processor information:
 
-        sat hwinv --list-nodes --node-fields xname,proc,mem
+::
+
+        # sat hwinv --list-nodes --node-fields xname,proc,mem
 
 SEE ALSO
 ========

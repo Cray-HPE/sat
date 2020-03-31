@@ -50,17 +50,11 @@ These options must be specified after the subcommand.
 EXAMPLES
 ========
 
-Command
--------
-
-sat hwmatch --level slot --level node
-
-
-Sample Output
--------------
+Match at the slot and node level:
 
 ::
 
+    # sat hwmatch --level slot --level node
     +-----------+-------+----------+---------------------+---------------+
     | xname     | Level | Category | Field               | Values        |
     +-----------+-------+----------+---------------------+---------------+

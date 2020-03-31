@@ -39,13 +39,11 @@ These options must be specified after the subcommand.
 EXAMPLES
 ========
 
-Sample Output
--------------
+Show status of all nodes in the system:
 
 ::
 
-  # no filter
-  $ sat status
+  # sat status
   +----------------+------+-------+------+---------+------+---------+----------+
   | xname          | NID  | State | Flag | Enabled | Arch | Role    | Net Type |
   +----------------+------+-------+------+---------+------+---------+----------+
@@ -57,22 +55,34 @@ Sample Output
   | x5000c1s0b0n1  | 1001 | Ready | OK   | True    | X86  | Compute | Sling    |
   +----------------+------+-------+------+---------+------+---------+----------+
 
-  $ sat status --filter nid=1
+
+Show status of nid 1:
+
+::
+
+  # sat status --filter nid=1
   +----------------+------+-------+------+---------+------+---------+----------+
   | xname          | NID  | State | Flag | Enabled | Arch | Role    | Net Type |
   +----------------+------+-------+------+---------+------+---------+----------+
   | x3000c0s19b1n0 | 1    | Ready | OK   | True    | X86  | Compute | Sling    |
   +----------------+------+-------+------+---------+------+---------+----------+
 
-  $ sat status --filter xname=x3000c0s19b4n0
+Show status of the node with xname x3000c0s19b4n0:
+
+::
+
+  # sat status --filter xname=x3000c0s19b4n0
   +----------------+------+-------+------+---------+------+---------+----------+
   | xname          | NID  | State | Flag | Enabled | Arch | Role    | Net Type |
   +----------------+------+-------+------+---------+------+---------+----------+
   | x3000c0s19b4n0 | 4    | Ready | OK   | True    | X86  | Compute | Sling    |
   +----------------+------+-------+------+---------+------+---------+----------+
 
-  # filters are case-insensitive as well
-  $ sat status --filter role=compute
+Filters are case-insensitive as well:
+
+::
+
+  # sat status --filter role=compute
   +----------------+------+-------+------+---------+------+---------+----------+
   | xname          | NID  | State | Flag | Enabled | Arch | Role    | Net Type |
   +----------------+------+-------+------+---------+------+---------+----------+

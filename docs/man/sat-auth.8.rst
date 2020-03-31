@@ -55,7 +55,7 @@ The following command creates a new token for a user named "uastest".
 
 ::
 
-    sat --username uastest auth
+    # sat --username uastest auth
 
 And the token file will be created at
 ~/.config/sat/tokens/api_gw_service_nmn_local.uastest.json
@@ -65,7 +65,7 @@ token to the screen.
 
 ::
 
-    jq '.access_token' ~/.config/sat/tokens/api_gw_service_nmn_local.uastest.json
+    # jq '.access_token' ~/.config/sat/tokens/api_gw_service_nmn_local.uastest.json
 
 SEE ALSO
 ========
