@@ -4,8 +4,10 @@ Entry point for the firmware subcommand.
 Copyright 2020 Cray Inc. All Rights Reserved.
 """
 import logging
+import sys
 
 from sat.apiclient import APIError, FirmwareClient
+from sat.cli.firmware.snapshots import describe_snapshots, get_all_snapshot_names
 from sat.config import get_config_value
 from sat.report import Report
 from sat.session import SATSession
@@ -23,6 +25,14 @@ def make_fw_table(fw_devs):
     Args:
         fw_devs (list): A list of dictionaries with xnames and their
             firmware elements and versions.
+
+            fw_devs = [
+                {
+                    xname: xname,
+                    'targets': [{'version': vers, 'id': id}, ...]
+                },
+                ...
+            ]
 
     Returns:
         A list-of-lists table of strings, each row representing
@@ -61,14 +71,42 @@ def do_firmware(args):
     Args:
         args: The argparse.Namespace object containing the parsed arguments
             passed to this subcommand.
-
-    Returns:
-        None
     """
 
     api_client = FirmwareClient(SATSession())
-    if args.xnames:
-        fw_table = []
+
+    # title is key to tables.
+    fw_tables = {}
+
+    if args.snapshots is not None:
+
+        try:
+            known_snaps = get_all_snapshot_names()
+        except APIError as err:
+            LOGGER.error('Getting available snapshot names: {}'.format(err))
+            sys.exit(1)
+        if not args.snapshots:
+            for name in known_snaps:
+                print(name)
+            return
+        else:
+            if not known_snaps:
+                LOGGER.error('No existing snapshots.')
+                sys.exit(1)
+
+            try:
+                descriptions = describe_snapshots(args.snapshots)
+            except APIError as err:
+                LOGGER.error('Getting snapshot descriptions: {}'.format(err))
+                sys.exit(1)
+
+            for name, snapshot in descriptions.items():
+                fw_tables[name] = make_fw_table(snapshot)
+
+    elif args.xnames:
+
+        # This report won't have a title.
+        fw_tables[None] = []
         for xname in args.xnames:
             try:
                 response = api_client.get('version', xname)
@@ -85,7 +123,7 @@ def do_firmware(args):
             except KeyError as err:
                 LOGGER.error("Failed to obtain firmware devices for %s: %s", xname, err)
                 continue
-            fw_table = fw_table + make_fw_table(fw_devs)
+            fw_tables[None] += make_fw_table(fw_devs)
     else:
         try:
             response = api_client.get('version', 'all')
@@ -102,18 +140,21 @@ def do_firmware(args):
         except KeyError as err:
             LOGGER.error("Failed to obtain firmware devices: %s", err)
             raise SystemExit(1)
-        fw_table = make_fw_table(fw_devs)
 
-    report = Report(
-        HEADERS, None,
-        args.sort_by, args.reverse,
-        get_config_value('format.no_headings'),
-        get_config_value('format.no_borders'),
-        filter_strs=args.filter_strs)
+        # This report won't have a title.
+        fw_tables[None] = make_fw_table(fw_devs)
 
-    report.add_rows(fw_table)
+    for title, table in sorted(fw_tables.items()):
+        report = Report(
+            HEADERS, title,
+            args.sort_by, args.reverse,
+            get_config_value('format.no_headings'),
+            get_config_value('format.no_borders'),
+            filter_strs=args.filter_strs)
 
-    if args.format == 'yaml':
-        print(report.get_yaml())
-    else:
-        print(report)
+        report.add_rows(table)
+
+        if args.format == 'yaml':
+            print(report.get_yaml())
+        else:
+            print(report)

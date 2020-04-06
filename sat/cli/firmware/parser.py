@@ -27,3 +27,8 @@ def add_firmware_subparser(subparsers):
         description='Report firmware version of xname IDs. If no xnames '
                     'are specified, then all xnames will be targeted.',
         parents=[xname_options, format_options, filter_options])
+
+    firmware_parser.add_argument(
+        '--snapshots', dest='snapshots', metavar='SNAPSHOT', nargs='*',
+        help='Describe firmware snapshots. Provide no arguments to this '
+             'option to list available snapshots.')

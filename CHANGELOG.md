@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added ``Class`` to the fields reported by ``sat status``.
+- "--snapshots" option for sat firmware.
 
 ### Changed
 - Changed ``sat linkhealth`` to display "flow_control_config" rather than
