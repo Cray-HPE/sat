@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added ``Class`` to the fields reported by ``sat status``.
+
 ### Changed
 - Changed ``sat linkhealth`` to display "flow_control_config" rather than
   "flow_control_configuration" as a column heading.
