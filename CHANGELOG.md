@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Revised man pages for improved style and consistency.
 - Changed ``sat linkhealth`` to display "flow_control_config" rather than
   "flow_control_configuration" as a column heading.
 
@@ -41,8 +42,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.1] - 2020-03-20
 
 ### Changed
-- Revised man man pages for improved style and consistency.
-
 - Changed ``sat linkhealth`` to target switches contained by specifed xnames,
   for example xname component x1000c1 contains xname component x1000c1s2b0, as
   does x1000c1s2b0 (an xname component contains itself).
