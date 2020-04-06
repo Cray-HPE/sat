@@ -27,12 +27,6 @@ OPTIONS
 
 These options must be specified after the subcommand.
 
-**-x, --xnames**
-        Selects nodes to report from a comma-separated list of xnames, or
-        a single xname. The xname values are case insensitive, and leading
-        zeros from the integer parts will be removed before matching. May be
-        used with **--nids**.
-
 .. include:: _sat-format-opts.rst
 .. include:: _sat-filter-opts.rst
 
