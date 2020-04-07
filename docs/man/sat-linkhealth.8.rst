@@ -71,7 +71,7 @@ Get the health of all links in the system (note that this may not scale well to 
 The **-x** option has more uses than simple output filtering because it cuts
 down the number of queries made.
 
-Get the health of all links in the system (note that this may not scale well to a large system):
+Get the health of all links in a particular router:
 
 ::
 
