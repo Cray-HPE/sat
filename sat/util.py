@@ -283,3 +283,16 @@ def get_resource_filename(name, section='.'):
         raise SystemExit(1)
 
     return os.path.join(resource_path, name)
+
+
+def bytes_to_gib(bytes_val, ndigits=2):
+    """Convert the given bytes value to GiB.
+
+    Args:
+        bytes_val (int or float): The bytes value to convert.
+        ndigits (int): The number of digits to round to.
+
+    Returns:
+        The rounded GiB value.
+    """
+    return round(bytes_val / 2**30, ndigits)

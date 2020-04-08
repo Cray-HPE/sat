@@ -50,7 +50,7 @@ class TestNode(unittest.TestCase):
         self.fake_mem_modules = []
         # Give each fake memory module 32 GiB capacity
         self.mem_module_capacity_gib = 32
-        for i in range(4):
+        for _ in range(4):
             fake_mem = mock.Mock()
             fake_mem.capacity_mib = self.mem_module_capacity_gib * 1024
             self.fake_mem_modules.append(fake_mem)
@@ -58,6 +58,20 @@ class TestNode(unittest.TestCase):
         # that it should matter.
         self.node.memory_modules = {'{}d{}'.format(NODE_XNAME, index): mm
                                     for index, mm in enumerate(self.fake_mem_modules)}
+
+    def add_fake_drives(self):
+        """Add some fake drives to `self.node`."""
+        self.fake_drives = []
+        # Give each fake drive a 500 GiB capacity
+        self.drive_capacity_gib = 500
+        for _ in range(4):
+            fake_drive = mock.Mock()
+            fake_drive.capacity_bytes = 500 * 2**30
+            self.fake_drives.append(fake_drive)
+        # Set the drives in the node with some xnames beneath the node, not
+        # that it should matter.
+        self.node.drives = {'{}g1k{}'.format(NODE_XNAME, index): drive
+                            for index, drive in enumerate(self.fake_drives)}
 
     def test_init(self):
         """Test initialization of a Node object."""
@@ -128,6 +142,17 @@ class TestNode(unittest.TestCase):
         """Test the memory_module_count property."""
         self.add_fake_mem_modules()
         self.assertEqual(self.node.memory_module_count, len(self.fake_mem_modules))
+
+    def test_total_drive_capacity_gib(self):
+        """Test the total_drive_capacity_gib property."""
+        self.add_fake_drives()
+        self.assertEqual(self.node.total_drive_capacity_gib,
+                         len(self.fake_drives) * self.drive_capacity_gib)
+
+    def test_drive_count(self):
+        """Test the drive_count property."""
+        self.add_fake_drives()
+        self.assertEqual(self.node.drive_count, len(self.fake_drives))
 
     def test_bios_version(self):
         """Test the bios_version property."""

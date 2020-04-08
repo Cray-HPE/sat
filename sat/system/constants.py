@@ -16,11 +16,12 @@ EMPTY_STATUS = 'Empty'
 # The various known values for TYPE_KEY in HSM output
 CHASSIS_TYPE = 'Chassis'
 COMPUTE_MODULE_TYPE = 'ComputeModule'
+DRIVE_TYPE = 'Drive'
+HSN_BOARD_TYPE = 'HSNBoard'
+MEMORY_TYPE = 'Memory'
 NODE_ENCLOSURE_TYPE = 'NodeEnclosure'
 NODE_TYPE = 'Node'
-MEMORY_TYPE = 'Memory'
 PROCESSOR_TYPE = 'Processor'
-HSN_BOARD_TYPE = 'HSNBoard'
 ROUTER_MODULE_TYPE = 'RouterModule'
 
 # The types of cabinets are C-Series and S-Series.

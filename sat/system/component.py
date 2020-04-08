@@ -310,3 +310,19 @@ class BaseComponent:
     def __str__(self):
         """Just use the xname as the string representation of a component."""
         return str(self.xname)
+
+
+class NodeComponent(BaseComponent):
+    """A component that logically resides within a node."""
+
+    def __init__(self, raw_data):
+        """Creates a NodeComponent with the raw JSON returned by the HSM API.
+
+        Args:
+            raw_data (dict): The dictionary returned as JSON by the HSM API
+                that contains the raw data for the component.
+        """
+        super().__init__(raw_data)
+
+        # Link to parent Node object to be filled in later
+        self.node = None

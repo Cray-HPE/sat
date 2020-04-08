@@ -189,3 +189,40 @@ class TestMiscUtils(unittest.TestCase):
         self.mkdir_mock.side_effect = FileNotFoundError('Couldn\'t open it...')
         with self.assertRaises(SystemExit):
             util.get_resource_filename(self.resource)
+
+
+class TestBytesToGibibytes(unittest.TestCase):
+    """Test conversion of bytes to gibibytes"""
+    def test_power_of_2(self):
+        """Test conversion with powers of 2"""
+        exponents = [28, 30, 32, 34, 40]
+        for exponent in exponents:
+            expected_gib = 2 ** (exponent - 30)
+            self.assertEqual(util.bytes_to_gib(2 ** exponent), expected_gib)
+
+    def test_fractional_power_of_2(self):
+        """Test that rounding works with a fractional GiB value"""
+        # 2^27 bytes should be 1/8 of a byte, which converts to 0.125
+        bytes_val = 2 ** 27
+        # Note that the underlying round function uses bankers' rounding where
+        # numbers equidistant to two ints are rounded to the nearest even int
+        self.assertEqual(util.bytes_to_gib(bytes_val), 0.12)
+        self.assertEqual(util.bytes_to_gib(bytes_val, 3), 0.125)
+        self.assertEqual(util.bytes_to_gib(bytes_val, 4), 0.125)
+
+    def test_non_power_of_2(self):
+        """Test a number that is not an even power of 2."""
+        bytes_val = 2**35 + 2**27
+        self.assertEqual(util.bytes_to_gib(bytes_val), 32.12)
+        self.assertEqual(util.bytes_to_gib(bytes_val, 3), 32.125)
+
+    def test_real_value(self):
+        """Test a real value seen on a system."""
+        bytes_val = 503424483328
+        self.assertEqual(util.bytes_to_gib(bytes_val), 468.85)
+        self.assertEqual(util.bytes_to_gib(bytes_val, 3), 468.851)
+        self.assertEqual(util.bytes_to_gib(bytes_val, 4), 468.8506)
+
+
+if __name__ == '__main__':
+    unittest.main()

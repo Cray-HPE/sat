@@ -152,6 +152,7 @@ def add_hwinv_subparser(subparsers):
     )
 
     list_component_names = ['node', 'chassis', 'hsn-board', 'compute-module',
-                            'router-module', 'node-enclosure', 'proc', 'mem']
+                            'router-module', 'node-enclosure', 'proc', 'mem',
+                            'drive']
     for component in list_component_names:
         _add_list_option(list_group, component)

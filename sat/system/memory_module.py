@@ -5,12 +5,12 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 """
 
 from sat.cached_property import cached_property
-from sat.system.component import BaseComponent
+from sat.system.component import NodeComponent
 from sat.system.constants import MEMORY_TYPE
 from sat.system.field import ComponentField
 
 
-class MemoryModule(BaseComponent):
+class MemoryModule(NodeComponent):
     """A memory module in the system."""
 
     hsm_type = MEMORY_TYPE
@@ -19,7 +19,7 @@ class MemoryModule(BaseComponent):
 
     fields = [
         ComponentField('xname'),
-        # Allow summarization by manufacturer and model unlike in BaseComponent
+        # Allow summary by manufacturer and model unlike in BaseComponent
         ComponentField('Manufacturer', summarizable=True),
         ComponentField('Model', summarizable=True),
         ComponentField('Part Number'),
