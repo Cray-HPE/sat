@@ -14,8 +14,8 @@ from sat.system.constants import MISSING_VALUE
 from sat.xname import XName
 
 
-API_KEYS = ('ID', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Class', 'Role', 'NetType')
-HEADERS = ('xname', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Class', 'Role', 'Net Type')
+API_KEYS = ('ID', 'Type', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Class', 'Role', 'NetType')
+HEADERS = ('xname', 'Type', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Class', 'Role', 'Net Type')
 
 LOGGER = logging.getLogger(__name__)
 
@@ -65,7 +65,8 @@ def do_status(args):
     """
     api_client = HSMClient(SATSession())
     try:
-        response = api_client.get('State', 'Components', params={'type': 'Node'})
+        types = ['ChassisBMC', 'Node', 'NodeBMC', 'RouterBMC']
+        response = api_client.get('State', 'Components', params={'type': types})
     except APIError as err:
         LOGGER.error('Request to HSM API failed: %s', err)
         raise SystemExit(1)
