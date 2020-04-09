@@ -50,10 +50,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated ``setup.py`` to not include our ``tools`` python package and
   subpackages of our ``tests`` package.
 
-### Changed
-- Changed ``sat linkhealth`` to display "flow control config" rather than
-  "flow_control_configuration" as a column heading.
-
 ## [1.1.1] - 2020-03-20
 
 ### Changed
