@@ -5,17 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.0] - 2020-04-09
 
 ### Added
 - Added ``Class`` to the fields reported by ``sat status``.
-- "--snapshots" option for sat firmware.
+- ``--snapshots`` option for sat firmware.
 
 ### Changed
 - Revised man pages for improved style and consistency.
-- Changed ``sat linkhealth`` to display "flow_control_config" rather than
-  "flow_control_configuration" as a column heading.
+- Changed ``sat linkhealth`` to display ``flow_control_config`` rather than
+  ``flow_control_configuration`` as a column heading.
 - Changed dependency from slingshot-cable-validation to slingshot-tools.
+
+### Removed
+- Removed unsupported ``--xname`` option from ``sat status`` man page.
 
 ## [1.2.0] - 2020-03-27
 
