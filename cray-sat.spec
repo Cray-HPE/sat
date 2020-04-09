@@ -1,5 +1,5 @@
 # Spec file for System Admin Toolkit (SAT)
-# Copyright 2019, Cray Inc. All Rights Reserved
+# Copyright 2019-2020, Cray Inc. All Rights Reserved
 %define ansible_framework_dir /opt/cray/crayctl/ansible_framework
 %define satmandir %{_mandir}/man8
 
@@ -12,7 +12,7 @@ Summary: System Admin Toolkit (SAT)
 Group: System/Management
 BuildRoot: %{_topdir}
 Vendor: Cray Inc.
-Requires: slingshot-cable-validation
+Requires: slingshot-tools
 Requires: python3-argcomplete
 Requires: python3-docker
 Requires: python3-inflect < 3.0
