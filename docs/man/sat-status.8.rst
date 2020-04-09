@@ -27,62 +27,70 @@ OPTIONS
 
 These options must be specified after the subcommand.
 
-**-x, --xnames**
-        Selects nodes to report from a comma-separated list of xnames, or
-        a single xname. The xname values are case insensitive, and leading
-        zeros from the integer parts will be removed before matching. May be
-        used with **--nids**.
-
 .. include:: _sat-format-opts.rst
 .. include:: _sat-filter-opts.rst
 
 EXAMPLES
 ========
 
-Sample Output
--------------
+Show status of all nodes in the system:
 
 ::
 
-  # no filter
-  $ sat status
-  +----------------+------+-------+------+---------+------+---------+----------+
-  | xname          | NID  | State | Flag | Enabled | Arch | Role    | Net Type |
-  +----------------+------+-------+------+---------+------+---------+----------+
-  | x3000c0s19b1n0 | 1    | Ready | OK   | True    | X86  | Compute | Sling    |
-  | x3000c0s19b2n0 | 2    | Ready | OK   | True    | X86  | Compute | Sling    |
-  | x3000c0s19b3n0 | 3    | Ready | OK   | True    | X86  | Compute | Sling    |
-  | x3000c0s19b4n0 | 4    | Ready | OK   | True    | X86  | Compute | Sling    |
-  | x5000c1s0b0n0  | 1000 | Ready | OK   | True    | X86  | Compute | Sling    |
-  | x5000c1s0b0n1  | 1001 | Ready | OK   | True    | X86  | Compute | Sling    |
-  +----------------+------+-------+------+---------+------+---------+----------+
+  # sat status
+  +----------------+-----+-------+------+---------+------+-------+------------+----------+
+  | xname          | NID | State | Flag | Enabled | Arch | Class | Role       | Net Type |
+  +----------------+-----+-------+------+---------+------+-------+------------+----------+
+  | x3000c0s1b0n0  | 100 | On    | OK   | True    | X86  | River | Management | Sling    |
+  | x3000c0s3b0n0  | 101 | On    | OK   | True    | X86  | River | Management | Sling    |
+  | x3000c0s5b0n0  | 102 | On    | OK   | True    | X86  | River | Management | Sling    |
+  | x3000c0s9b0n0  | 104 | Ready | OK   | True    | X86  | River | Management | Sling    |
+  | x3000c0s11b0n0 | 105 | Ready | OK   | True    | X86  | River | Management | Sling    |
+  | x3000c0s13b0n0 | 106 | On    | OK   | True    | X86  | River | Management | Sling    |
+  | x3000c0s15b0n0 | 107 | On    | OK   | True    | X86  | River | Management | Sling    |
+  | x3000c0s17b0n0 | 108 | On    | OK   | True    | X86  | River | Management | Sling    |
+  | x3000c0s19b1n0 | 1   | Ready | OK   | True    | X86  | River | Compute    | Sling    |
+  | x3000c0s19b2n0 | 2   | Ready | OK   | True    | X86  | River | Compute    | Sling    |
+  | x3000c0s19b3n0 | 3   | Ready | OK   | True    | X86  | River | Compute    | Sling    |
+  | x3000c0s19b4n0 | 4   | Ready | OK   | True    | X86  | River | Compute    | Sling    |
+  +----------------+-----+-------+------+---------+------+-------+------------+----------+
 
-  $ sat status --filter nid=1
-  +----------------+------+-------+------+---------+------+---------+----------+
-  | xname          | NID  | State | Flag | Enabled | Arch | Role    | Net Type |
-  +----------------+------+-------+------+---------+------+---------+----------+
-  | x3000c0s19b1n0 | 1    | Ready | OK   | True    | X86  | Compute | Sling    |
-  +----------------+------+-------+------+---------+------+---------+----------+
 
-  $ sat status --filter xname=x3000c0s19b4n0
-  +----------------+------+-------+------+---------+------+---------+----------+
-  | xname          | NID  | State | Flag | Enabled | Arch | Role    | Net Type |
-  +----------------+------+-------+------+---------+------+---------+----------+
-  | x3000c0s19b4n0 | 4    | Ready | OK   | True    | X86  | Compute | Sling    |
-  +----------------+------+-------+------+---------+------+---------+----------+
+Show status of nid 1:
 
-  # filters are case-insensitive as well
-  $ sat status --filter role=compute
-  +----------------+------+-------+------+---------+------+---------+----------+
-  | xname          | NID  | State | Flag | Enabled | Arch | Role    | Net Type |
-  +----------------+------+-------+------+---------+------+---------+----------+
-  | x3000c0s19b1n0 | 1    | Ready | OK   | True    | X86  | Compute | Sling    |
-  | x3000c0s19b2n0 | 2    | Ready | OK   | True    | X86  | Compute | Sling    |
-  | x3000c0s19b3n0 | 3    | Ready | OK   | True    | X86  | Compute | Sling    |
-  | x3000c0s19b4n0 | 4    | Ready | OK   | True    | X86  | Compute | Sling    |
-  | x5000c1s0b0n0  | 1000 | Ready | OK   | True    | X86  | Compute | Sling    |
-  | x5000c1s0b0n1  | 1001 | Ready | OK   | True    | X86  | Compute | Sling    |
-  +----------------+------+-------+------+---------+------+---------+----------+
+::
+
+  # sat status --filter nid=1
+  +----------------+-----+-------+------+---------+------+-------+---------+----------+
+  | xname          | NID | State | Flag | Enabled | Arch | Class | Role    | Net Type |
+  +----------------+-----+-------+------+---------+------+-------+---------+----------+
+  | x3000c0s19b1n0 | 1   | Ready | OK   | True    | X86  | River | Compute | Sling    |
+  +----------------+-----+-------+------+---------+------+-------+---------+----------+
+
+Show status of the node with xname x3000c0s1b0n0:
+
+::
+
+  # sat status --filter xname=x3000c0s1b0n0
+  +---------------+-----+-------+------+---------+------+-------+------------+----------+
+  | xname         | NID | State | Flag | Enabled | Arch | Class | Role       | Net Type |
+  +---------------+-----+-------+------+---------+------+-------+------------+----------+
+  | x3000c0s1b0n0 | 100 | On    | OK   | True    | X86  | River | Management | Sling    |
+  +---------------+-----+-------+------+---------+------+-------+------------+----------+
+
+Filters are case-insensitive as well:
+
+::
+
+  # sat status --filter role=compute
+  +----------------+-----+-------+------+---------+------+-------+---------+----------+
+  | xname          | NID | State | Flag | Enabled | Arch | Class | Role    | Net Type |
+  +----------------+-----+-------+------+---------+------+-------+---------+----------+
+  | x3000c0s19b1n0 | 1   | Ready | OK   | True    | X86  | River | Compute | Sling    |
+  | x3000c0s19b2n0 | 2   | Ready | OK   | True    | X86  | River | Compute | Sling    |
+  | x3000c0s19b3n0 | 3   | Ready | OK   | True    | X86  | River | Compute | Sling    |
+  | x3000c0s19b4n0 | 4   | Ready | OK   | True    | X86  | River | Compute | Sling    |
+  +----------------+-----+-------+------+---------+------+-------+---------+----------+
 
 Possible Values
 ---------------

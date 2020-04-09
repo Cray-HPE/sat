@@ -8,12 +8,14 @@ import unittest
 from unittest import mock
 from argparse import Namespace
 from sat.apiclient import APIError
+from sat.xname import XName
 import sat.cli.firmware.main
 
 
 def set_options(namespace):
     """Set default options for Namespace."""
     namespace.xnames = []
+    namespace.snapshots = None
     namespace.no_borders = True
     namespace.no_headings = False
     namespace.format = 'pretty'
@@ -253,15 +255,15 @@ class TestMakeFwTable(unittest.TestCase):
         """Test Firmware: make_fw_table() with one device/xname"""
         fw_table = sat.cli.firmware.main.make_fw_table([
             {'xname': 'x3000c0s1b0', 'targets': [{'id': 'BMC', 'version': '1.0'}]}])
-        self.assertEqual(fw_table, [['x3000c0s1b0', 'BMC', '1.0']])
+        self.assertEqual(fw_table, [[XName('x3000c0s1b0'), 'BMC', '1.0']])
 
     def test_two_devices(self):
         """Test Firmware: make_fw_table() with two devices/xnames"""
         fw_table = sat.cli.firmware.main.make_fw_table([
             {'xname': 'x3000c0s1b0', 'targets': [{'id': 'BMC', 'version': '0.0'}]},
             {'xname': 'x3000c0s1b1', 'targets': [{'id': 'BMC', 'version': '1.0'}]}])
-        self.assertEqual(fw_table, [['x3000c0s1b0', 'BMC', '0.0'],
-                                    ['x3000c0s1b1', 'BMC', '1.0']])
+        self.assertEqual(fw_table, [[XName('x3000c0s1b0'), 'BMC', '0.0'],
+                                    [XName('x3000c0s1b1'), 'BMC', '1.0']])
 
     def test_multiple_targets(self):
         """Test Firmware: make_fw_table() with two devices/xnames and two targets"""
@@ -270,10 +272,10 @@ class TestMakeFwTable(unittest.TestCase):
                                                  {'id': 'SDR', 'version': '0.0.0'}]},
             {'xname': 'x3000c0s1b1', 'targets': [{'id': 'BMC', 'version': '1.0'},
                                                  {'id': 'SDR', 'version': '1.0.0'}]}])
-        self.assertEqual(fw_table, [['x3000c0s1b0', 'BMC', '0.0'],
-                                    ['x3000c0s1b0', 'SDR', '0.0.0'],
-                                    ['x3000c0s1b1', 'BMC', '1.0'],
-                                    ['x3000c0s1b1', 'SDR', '1.0.0']])
+        self.assertEqual(fw_table, [[XName('x3000c0s1b0'), 'BMC', '0.0'],
+                                    [XName('x3000c0s1b0'), 'SDR', '0.0.0'],
+                                    [XName('x3000c0s1b1'), 'BMC', '1.0'],
+                                    [XName('x3000c0s1b1'), 'SDR', '1.0.0']])
 
     def test_missing_xname(self):
         """Test Firmware: make_fw_table() with xname missing"""
@@ -291,20 +293,20 @@ class TestMakeFwTable(unittest.TestCase):
         """Test Firmware: make_fw_table() with id missing"""
         fw_table = sat.cli.firmware.main.make_fw_table([
             {'xname': 'x3000c0s1b0', 'targets': [{'version': '1.0'}]}])
-        self.assertEqual(fw_table, [['x3000c0s1b0', 'MISSING', '1.0']])
+        self.assertEqual(fw_table, [[XName('x3000c0s1b0'), 'MISSING', '1.0']])
 
     def test_missing_version(self):
         """Test Firmware: make_fw_table() with version missing"""
         fw_table = sat.cli.firmware.main.make_fw_table([
             {'xname': 'x3000c0s1b0', 'targets': [{'id': 'BMC'}]}])
-        self.assertEqual(fw_table, [['x3000c0s1b0', 'BMC', 'MISSING']])
+        self.assertEqual(fw_table, [[XName('x3000c0s1b0'), 'BMC', 'MISSING']])
 
     def test_error_with_fw_data(self):
         """Test Firmware: make_fw_table() with error"""
         fw_table = sat.cli.firmware.main.make_fw_table([
             {'xname': 'x3000c0s1b0', 'error': 'Danger Will Robinson',
              'targets': [{'id': 'BMC', 'version': '1.0'}]}])
-        self.assertEqual(fw_table, [['x3000c0s1b0', 'BMC', '1.0']])
+        self.assertEqual(fw_table, [[XName('x3000c0s1b0'), 'BMC', '1.0']])
 
     def test_error_without_xname(self):
         """Test Firmware: make_fw_table() with error and no xname"""
@@ -319,7 +321,7 @@ class TestMakeFwTable(unittest.TestCase):
             {'xname': 'x3000c0s1b0',
              'targets': [{'error': 'Danger Will Robinson',
                           'id': 'BMC', 'version': '1.0'}]}])
-        self.assertEqual(fw_table, [['x3000c0s1b0', 'BMC', '1.0']])
+        self.assertEqual(fw_table, [[XName('x3000c0s1b0'), 'BMC', '1.0']])
 
     def test_error_in_target_without_id(self):
         """Test Firmware: make_fw_table() with error in target and no id"""
@@ -340,14 +342,14 @@ class TestMakeFwTable(unittest.TestCase):
         fw_table = sat.cli.firmware.main.make_fw_table([
             {'xname': 'x3000c0s1b0', 'error': 'Danger Will Robinson',
              'targets': [{'version': '1.0'}]}])
-        self.assertEqual(fw_table, [['x3000c0s1b0', 'MISSING', '1.0']])
+        self.assertEqual(fw_table, [[XName('x3000c0s1b0'), 'MISSING', '1.0']])
 
     def test_error_without_version(self):
         """Test Firmware: make_fw_table() with error and no version"""
         fw_table = sat.cli.firmware.main.make_fw_table([
             {'xname': 'x3000c0s1b0', 'error': 'Danger Will Robinson',
              'targets': [{'id': 'BMC'}]}])
-        self.assertEqual(fw_table, [['x3000c0s1b0', 'BMC', 'MISSING']])
+        self.assertEqual(fw_table, [[XName('x3000c0s1b0'), 'BMC', 'MISSING']])
 
 
 if __name__ == '__main__':

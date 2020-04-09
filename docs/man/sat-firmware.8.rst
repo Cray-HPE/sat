@@ -31,6 +31,11 @@ These options must be specified after the subcommand.
 **-h, --help**
         Print a usage summary and exit.
 
+**--snapshots**
+        Print versions of devices associated with the provided snapshot
+        names. Provide this option with no arguments to print a list
+        of available snapshots.
+
 .. include:: _sat-xname-opts.rst
 .. include:: _sat-format-opts.rst
 .. include:: _sat-filter-opts.rst
@@ -38,7 +43,9 @@ These options must be specified after the subcommand.
 EXAMPLES
 ========
 
-Get a report of all the firmware versions on the system::
+Get a report of all the firmware versions on the system:
+
+::
 
   # sat firmware
   +--------------+-------+-------------------------------------------+

@@ -14,8 +14,8 @@ from sat.system.constants import MISSING_VALUE
 from sat.xname import XName
 
 
-API_KEYS = ('ID', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Role', 'NetType')
-HEADERS = ('xname', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Role', 'Net Type')
+API_KEYS = ('ID', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Class', 'Role', 'NetType')
+HEADERS = ('xname', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Class', 'Role', 'Net Type')
 
 LOGGER = logging.getLogger(__name__)
 

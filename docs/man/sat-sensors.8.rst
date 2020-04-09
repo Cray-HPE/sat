@@ -38,10 +38,9 @@ addresses or aliases. At least one xname must be provided.
 EXAMPLES
 ========
 
-Sample Output
--------------
+Query all sensors of the node x0c0s11b0 (truncated to ten rows):
 
-A River node, truncated to ten rows::
+::
 
   # sat sensors -x x0c0s11b0
   +-----------+---------------+--------------------+------------------+------------------+---------------------+-------+-------------+---------+-------+
@@ -59,7 +58,9 @@ A River node, truncated to ten rows::
   | x0c0s11b0 | 35            | None               | BB P2 VR Temp    | None             | None                | None  | Temperature | 31      | Cel   |
   +-----------+---------------+--------------------+------------------+------------------+---------------------+-------+-------------+---------+-------+
 
-Specific sensors, from a selection of nodes::
+Query specific sensors, from a selection of nodes:
+
+::
 
   # sat sensors -x x3000c0s19b1,x3000c0s19b2,x3000c0s19b3,x3000c0s19b4 --filter "number=208 or number=222"
   +--------------+---------------+--------------------+----------------+------------------+---------------------+-------+-------------+---------+-------+
