@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Revised man pages for improved style and consistency.
 - Changed ``sat linkhealth`` to display "flow_control_config" rather than
   "flow_control_configuration" as a column heading.
+- Changed dependency from slingshot-cable-validation to slingshot-tools.
 
 ## [1.2.0] - 2020-03-27
 
