@@ -1,6 +1,4 @@
-"""
-The parser for the auth subcommand.
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -14,26 +12,8 @@ in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
 THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
 OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
-"""
-
-
-def add_auth_subparser(subparsers):
-    """Add the auth subparser to the parent parser.
-
-    Args:
-        subparsers: The argparse.ArgumentParser object returned by the
-            add_subparsers method.
-
-    Returns:
-        None
-    """
-
-    auth_parser = subparsers.add_parser(
-        'auth', help='Acquire authentication tokens and save for reuse.',
-        description='Acquire authentication tokens and save for reuse. '
-                    'See "sat --help" and "man sat-auth" for additional information.')
