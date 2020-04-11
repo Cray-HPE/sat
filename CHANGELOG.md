@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New fields for drive counts and total drive capacity when listing and
   summarizing nodes in ``sat hwinv``.
 
+### Changed
+
+- Showrev will no longer exit at the first failure to retrieve a set
+  of information.
+  E.g., a failure to retrieve package version info will not impact showrev's
+  ability to display system revision information.
+
 ## [1.3.0] - 2020-04-09
 
 ### Added

@@ -44,59 +44,59 @@ def do_showrev(args):
 
     if args.system:
         data = system.get_system_version(args.sitefile, args.substr)
-        if data is None:
-            LOGGER.error('Could not print system version information.')
-            # TODO: Replace immediate exit. See SAT-346
-            sys.exit(1)
+        if not data:
+            LOGGER.warning('Could not retrieve system version information.')
 
-        title = 'System Revision Information'
-        headings = ['component', 'data']
-        reports.append(Report(
-            headings, title, sort_by, reverse, no_headings, no_borders,
-            filter_strs=args.filter_strs))
-        reports[-1].add_rows(data)
+        else:
+            title = 'System Revision Information'
+            headings = ['component', 'data']
+            reports.append(Report(
+                headings, title, sort_by, reverse, no_headings, no_borders,
+                filter_strs=args.filter_strs))
+            reports[-1].add_rows(data)
 
     if args.products:
         headings, data = products.get_product_versions()
         if not data:
-            LOGGER.error('Could not retrieve product versions.')
-            # TODO: Replace immediate exit. See SAT-346
-            sys.exit(1)
+            LOGGER.warning('Could not retrieve product versions.')
 
-        title = 'Product Revision Information'
-        reports.append(Report(
-            headings, title, sort_by, reverse, no_headings, no_borders,
-            filter_strs=args.filter_strs))
-        reports[-1].add_rows(data)
+        else:
+            title = 'Product Revision Information'
+            reports.append(Report(
+                headings, title, sort_by, reverse, no_headings, no_borders,
+                filter_strs=args.filter_strs))
+            reports[-1].add_rows(data)
 
     if args.docker:
         data = containers.get_dockers(args.substr)
-        if data is None:
-            LOGGER.error(
+        if not data:
+            LOGGER.warning(
                 'Could not retrieve list of installed docker containers.')
-            # TODO: Replace immediate exit. See SAT-346
-            sys.exit(1)
 
-        title = 'Installed Container Versions'
-        headings = ['name', 'short-id', 'versions']
-        reports.append(Report(
-            headings, title, sort_by, reverse, no_headings, no_borders,
-            filter_strs=args.filter_strs))
-        reports[-1].add_rows(data)
+        else:
+            title = 'Installed Container Versions'
+            headings = ['name', 'short-id', 'versions']
+            reports.append(Report(
+                headings, title, sort_by, reverse, no_headings, no_borders,
+                filter_strs=args.filter_strs))
+            reports[-1].add_rows(data)
 
     if args.packages:
         data = rpm.get_rpms(args.substr)
-        if data is None:
-            LOGGER.error('Could not retrieve list of installed rpms.')
-            # TODO: Replace immediate exit. See SAT-346
-            sys.exit(1)
+        if not data:
+            LOGGER.warning('Could not retrieve list of installed rpms.')
 
-        title = 'Installed Package Versions'
-        headings = ['name', 'version']
-        reports.append(Report(
-            headings, title, sort_by, reverse, no_headings, no_borders,
-            filter_strs=args.filter_strs))
-        reports[-1].add_rows(data)
+        else:
+            title = 'Installed Package Versions'
+            headings = ['name', 'version']
+            reports.append(Report(
+                headings, title, sort_by, reverse, no_headings, no_borders,
+                filter_strs=args.filter_strs))
+            reports[-1].add_rows(data)
+
+    if not reports:
+        LOGGER.error('No data collected')
+        sys.exit(1)
 
     if args.format == 'yaml':
         for report in reports:
