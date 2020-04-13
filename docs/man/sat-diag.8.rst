@@ -23,7 +23,8 @@ number of Rosetta switches. This tool accepts a list of switch xnames
 from the command line, a file, and/or stdin, and will launch a given
 command on these hosts. Switches are polled at a specific interval.
 A report is printed after all switches have completed their diagnostics,
-either to stdout (default) or to files, one for each switch.
+either to stdout (default) or to files, one for each switch. A Redfish
+username and password is required.
 
 ARGUMENTS
 =========

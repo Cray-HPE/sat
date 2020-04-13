@@ -1,7 +1,7 @@
 """
 Contains structures and code that is generally useful across all of SAT.
 
-Copyright 2019 Cray Inc. All Rights Reserved.
+Copyright 2019-2020 Cray Inc. All Rights Reserved.
 """
 from collections import OrderedDict
 from functools import partial
@@ -43,6 +43,7 @@ def pester(message,
         human_readable_valid: a human-readable version of valid_answer.
             This is displayed at the prompt. If it is falsy
             (e.g., None or empty string), then the regex is displayed instead.
+            If it is "N/A" then only the message part of the prompt is displayed.
         parse_answer: a function taking one string argument which returns a
             value which is to be used in some higher-level conditional.
 
@@ -52,7 +53,10 @@ def pester(message,
     """
     try:
         while True:
-            answer = input("{} ({}) ".format(message, human_readable_valid or valid_answer))
+            valid = ""
+            if human_readable_valid != "N/A":
+                valid = "({}) ".format(human_readable_valid or valid_answer)
+            answer = input("{} {}".format(message, valid))
             if re.match(valid_answer, answer):
                 return parse_answer(answer)
             else:

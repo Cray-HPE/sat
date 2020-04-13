@@ -19,8 +19,7 @@ DESCRIPTION
 ===========
 
 The linkhealth subcommand reports on the health of links for available routers.
-This information is obtained via Redfish queries, so a valid Redfish username
-and password for the target hosts is required.
+A Redfish username and password is required.
 
 This subcommand allows use of the "--xname" options. The provided xnames must
 be Router BMCs or components that contain Router BMCs. The xname of a Router BMC

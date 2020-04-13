@@ -1,7 +1,7 @@
 """
 Functions to assist with querying a Redfish endpoint.
 
-Copyright 2019 Cray Inc. All Rights Reserved.
+Copyright 2019-2020 Cray Inc. All Rights Reserved.
 """
 
 import getpass
@@ -42,8 +42,8 @@ def get_username_and_pass(suggestion=''):
     username = suggestion or get_config_value('redfish.username')
     password = '' if suggestion else get_config_value('redfish.password')
     if not username:
-        username = pester("Username: ", "^.*$",
-                          human_readable_valid="Redfish",
+        username = pester("Username (Redfish):", "^.*$",
+                          human_readable_valid="N/A",
                           parse_answer=(lambda x: x))
         password = ''
     if not password:

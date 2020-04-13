@@ -19,7 +19,7 @@ DESCRIPTION
 ===========
 
 The sensors subcommand obtains current sensor readings from
-one or more BMCs.
+one or more BMCs. A Redfish username and password is required.
 
 OPTIONS
 =======
