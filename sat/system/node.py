@@ -8,9 +8,11 @@ import logging
 from sat.cached_property import cached_property
 from sat.system.component import BaseComponent
 from sat.system.constants import CAB_TYPE_C, CAB_TYPE_S, NODE_TYPE
+from sat.system.drive import Drive
 from sat.system.field import ComponentField
 from sat.system.memory_module import MemoryModule
 from sat.system.processor import Processor
+from sat.util import bytes_to_gib
 
 LOGGER = logging.getLogger(__name__)
 
@@ -34,6 +36,8 @@ class Node(BaseComponent):
         ComponentField('Processor Count'),
         ComponentField('Processor Manufacturer', summarizable=True),
         ComponentField('Processor Model', summarizable=True),
+        ComponentField('Drive Count', summarizable=True),
+        ComponentField('Total Drive Capacity (GiB)', summarizable=True),
         ComponentField('BIOS Version'),
     ]
 
@@ -53,10 +57,12 @@ class Node(BaseComponent):
         # are children of this node.
         self.memory_modules = {}
         self.processors = {}
+        self.drives = {}
 
         self.children_by_type = {
             MemoryModule: self.memory_modules,
-            Processor: self.processors
+            Processor: self.processors,
+            Drive: self.drives
         }
 
     @cached_property
@@ -114,6 +120,23 @@ class Node(BaseComponent):
     def memory_module_count(self):
         """int: The number of memory modules this node has."""
         return len(self.memory_modules)
+
+    @cached_property
+    def drive_count(self):
+        """int: The number of drives this node has."""
+        return len(self.drives)
+
+    @cached_property
+    def total_drive_capacity_gib(self):
+        """float: The total capacity in GiB of all drives in this node"""
+        try:
+            return bytes_to_gib(sum([drive.capacity_bytes
+                                     for drive in self.drives.values()]))
+        except TypeError as err:
+            LOGGER.warning("Unable to compute total drive capacity for node "
+                           "'%s' due to non-numeric drive capacity values: %s",
+                           self, err)
+            return 0
 
     @cached_property
     def bios_version(self):

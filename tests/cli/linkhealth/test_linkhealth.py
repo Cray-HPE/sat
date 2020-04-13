@@ -215,8 +215,9 @@ class TestDoLinkhealth(unittest.TestCase):
         sat.cli.linkhealth.main.do_linkhealth(self.parsed)
         self.mock_get_router_xnames.assert_called_once()
         # List returned by get_router_xnames becomes argument:
-        self.mock_get_jack_port_ids.assert_called_once_with(self.mock_bmc_xnames,
-            'ginger', 'Spice32')
+        self.mock_get_jack_port_ids.assert_called_once_with(
+            self.mock_bmc_xnames, 'ginger', 'Spice32'
+        )
         self.mock_get_report.assert_called_once()
         self.mock_print.assert_called_once()
 

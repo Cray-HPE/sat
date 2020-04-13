@@ -13,6 +13,7 @@ NODE_ENCLOSURE_XNAME = 'x1000c0s0e0'
 NODE_XNAME = 'x1000c0s0b0n0'
 PROCESSOR_XNAME = 'x1000c0s0b0n0p0'
 MEMORY_MODULE_XNAME = 'x1000c0s0b0n0d0'
+DRIVE_XNAME = 'x1000c0s0b0n0g1k1'
 
 # Default values for component raw data.
 DEFAULT_HSM_TYPE = 'Sample'

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Ability to list drives in ``sat hwinv`` with ``--list-drives``.
+- New fields for drive counts and total drive capacity when listing and
+  summarizing nodes in ``sat hwinv``.
+
 ## [1.3.0] - 2020-04-09
 
 ### Added
@@ -42,10 +49,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Updated ``setup.py`` to not include our ``tools`` python package and
   subpackages of our ``tests`` package.
-
-### Changed
-- Changed ``sat linkhealth`` to display "flow control config" rather than
-  "flow_control_configuration" as a column heading.
 
 ## [1.1.1] - 2020-03-20
 

@@ -11,6 +11,8 @@ from sat.cached_property import cached_property
 class XName:
     """An xname representing a component in the system."""
 
+    NODE_XNAME_REGEX = re.compile(r'x\d+c\d+s\d+b\d+n\d+')
+
     def __init__(self, xname_str):
         """Creates a new xname object from the given xname string.
 
@@ -94,6 +96,19 @@ class XName:
             An XName object that is the parent of this object.
         """
         return self.get_ancestor(1)
+
+    def get_parent_node(self):
+        """Get the xname of the parent node of this xname, if possible.
+
+        Returns:
+            The parent node XName of this XName, or None if this XName is not
+            the child of a node XName.
+        """
+        match = self.NODE_XNAME_REGEX.match(str(self))
+        if match:
+            return XName(match.group(0))
+        else:
+            return None
 
     def __lt__(self, other):
         return self.tokens < other.tokens

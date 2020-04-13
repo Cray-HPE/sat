@@ -46,6 +46,33 @@ class TestXName(unittest.TestCase):
             self.assertEqual(XName(given_xname).get_direct_parent(),
                              XName(parent))
 
+    def test_drive_get_node_parent(self):
+        """Test getting the parent node xname of a drive xname."""
+        drive_xname_str = 'x1000c3s5b0n1g1k1'
+        node_xname_str = drive_xname_str[:-4]
+        self.assertEqual(XName(node_xname_str),
+                         XName(drive_xname_str).get_parent_node())
+
+    def test_processor_get_node_parent(self):
+        """Test getting the parent node xname of a processor xname."""
+        proc_xname_str = 'x1000c3s5b0n1p1'
+        node_xname_str = proc_xname_str[:-2]
+        self.assertEqual(XName(node_xname_str),
+                         XName(proc_xname_str).get_parent_node())
+
+    def test_node_get_node_parent(self):
+        """Test getting the parent node xname of a node xname."""
+        node_xname_str = 'x1000c3s5b0n1'
+        # The parent node of a node should just be itself
+        self.assertEqual(XName(node_xname_str),
+                         XName(node_xname_str).get_parent_node())
+
+    def test_chassis_get_node_parent(self):
+        """Test getting the parent node xname of a drive xname."""
+        chassis_xname_str = 'x1000c3'
+        # A chassis should not find a parent node
+        self.assertEqual(None, XName(chassis_xname_str).get_parent_node())
+
 
 class TestXNameContainsComponent(unittest.TestCase):
     """Tests for whether xname for a component contains another."""

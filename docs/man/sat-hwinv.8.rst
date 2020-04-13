@@ -144,6 +144,9 @@ These options list components of certain types in the system.
 **--list-mems**
         List all the memory modules in the system.
 
+**--list-drives**
+        List all the drives in the system.
+
 **--node-fields** *NODE_FIELDS*
         Display the given comma-separated list of fields for each node. Omit
         this option to display all fields. This option only has an effect if
@@ -177,11 +180,17 @@ These options list components of certain types in the system.
 **--mem-fields** *MEM_FIELDS*
         Same as **--node-fields** but for memory modules.
 
+**--drive-fields** *DRIVE_FIELDS*
+        Same as **--node-fields** but for drives.
+
 .. include:: _sat-format-opts.rst
 .. include:: _sat-filter-opts.rst
 
 EXAMPLES
 ========
+
+The following examples show only the command and omit the output for the sake of
+brevity. You may run and modify the examples to view the output on your system.
 
 List all the nodes in the system and include only the xname, processor
 manufacturer, and memory size fields:
@@ -246,6 +255,13 @@ proc, i.e. fields related to memory and processor information:
 ::
 
         # sat hwinv --list-nodes --node-fields xname,proc,mem
+
+List specific fields for the drives attached to a particular node using a filter
+with a wildcard:
+
+::
+
+        # sat hwinv --list-drives --filter 'xname=x3000c0s9b0n0*' --drive-fields xname,model,capacity
 
 SEE ALSO
 ========

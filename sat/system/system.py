@@ -6,9 +6,11 @@ Copyright 2019 Cray Inc. All Rights Reserved.
 from collections import defaultdict
 import logging
 
+from sat.system.component import NodeComponent
 from sat.system.constants import EMPTY_STATUS, STATUS_KEY, TYPE_KEY
 from sat.system.chassis import Chassis
 from sat.system.compute_module import ComputeModule
+from sat.system.drive import Drive
 from sat.system.hsn_board import HSNBoard
 from sat.system.memory_module import MemoryModule
 from sat.system.node import Node
@@ -34,13 +36,14 @@ class System:
         self.raw_data_by_type = defaultdict(list)
 
         self.components_by_type = {
-            Node: {},
-            Processor: {},
-            MemoryModule: {},
             Chassis: {},
             ComputeModule: {},
-            NodeEnclosure: {},
+            Drive: {},
             HSNBoard: {},
+            MemoryModule: {},
+            Node: {},
+            NodeEnclosure: {},
+            Processor: {},
             RouterModule: {}
         }
 
@@ -86,14 +89,18 @@ class System:
     def relate_node_children(self):
         """Creates links between nodes and their processors and memory modules."""
         node_children_dicts = [
-            self.components_by_type[MemoryModule],
-            self.components_by_type[Processor]
+            comp_dict for comp_type, comp_dict in self.components_by_type.items()
+            if issubclass(comp_type, NodeComponent)
         ]
         nodes = self.components_by_type[Node]
 
         for children_by_xname in node_children_dicts:
             for child_xname, child_object in children_by_xname.items():
-                node_xname = child_xname.get_direct_parent()
+                node_xname = child_xname.get_parent_node()
+                if node_xname is None:
+                    LOGGER.warning("Unable to determine parent node xname of "
+                                   "child xname '%s'.", child_xname)
+                    continue
                 try:
                     node_object = nodes[node_xname]
                 except KeyError:
