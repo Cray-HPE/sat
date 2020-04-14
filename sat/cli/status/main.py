@@ -64,9 +64,11 @@ def do_status(args):
         UsageError: if an argument is invalid
     """
     api_client = HSMClient(SATSession())
+    if 'all' in args.types:
+        args.types = []
+
     try:
-        types = ['ChassisBMC', 'Node', 'NodeBMC', 'RouterBMC']
-        response = api_client.get('State', 'Components', params={'type': types})
+        response = api_client.get('State', 'Components', params={'type': args.types})
     except APIError as err:
         LOGGER.error('Request to HSM API failed: %s', err)
         raise SystemExit(1)
