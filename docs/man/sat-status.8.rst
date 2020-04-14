@@ -27,6 +27,15 @@ OPTIONS
 
 These options must be specified after the subcommand.
 
+**--types** *type [type]...*
+        Specify the a list of types to query. The default is for 'Node' only. 
+        The types that may be specified are...
+
+            all, Chassis, ChassisBMC, ComputeModule, HSNBoard, Node, NodeBMC,
+            NodeEnclosure, RouterBMC, RouterModule
+
+        If "all" is specified, then all types will be queried.
+
 .. include:: _sat-format-opts.rst
 .. include:: _sat-filter-opts.rst
 
@@ -61,11 +70,11 @@ Show status of nid 1:
 ::
 
   # sat status --filter nid=1
-  +----------------+------+-------+-----+------+---------+------+-------+------------+----------+
-  | xname          | Type | NID | State | Flag | Enabled | Arch | Class | Role       | Net Type |
-  +----------------+------+-------+-----+------+---------+------+-------+------------+----------+
-  | x3000c0s19b1n0 | Node | 1   | Ready | OK   | True    | X86  | River | Compute    | Sling    |
-  +----------------+------+-------+-----+------+---------+------+-------+------------+----------+
+  +----------------+------+-----+-------+------+---------+------+-------+---------+----------+
+  | xname          | Type | NID | State | Flag | Enabled | Arch | Class | Role    | Net Type |
+  +----------------+------+-----+-------+------+---------+------+-------+---------+----------+
+  | x3000c0s19b1n0 | Node | 1   | Ready | OK   | True    | X86  | River | Compute | Sling    |
+  +----------------+------+-----+-------+------+---------+------+-------+---------+----------+
 
 Show status of the node with xname x3000c0s1b0n0:
 
@@ -92,9 +101,32 @@ Filters are case-insensitive as well:
   | x3000c0s19b4n0 | Node | 4   | Ready | OK   | True    | X86  | River | Compute    | Sling    |
   +----------------+------+-------+-----+------+---------+------+-------+------------+----------+
 
+Query all types of components:
+
+::
+
+  # sat status --types all
+  +----------------+---------------+---------+-----------+---------+---------+------+----------+-------------+----------+
+  | xname          | Type          | NID     | State     | Flag    | Enabled | Arch | Class    | Role        | Net Type |
+  +----------------+---------------+---------+-----------+---------+---------+------+----------+-------------+----------+
+  | x3000c0r24b0   | RouterBMC     | MISSING | Ready     | Warning | True    | X86  | River    | MISSING     | Sling    |
+  | x3000c0r24e0   | HSNBoard      | MISSING | On        | OK      | True    | X86  | River    | MISSING     | Sling    |
+  | x3000c0s1b0    | NodeBMC       | MISSING | Ready     | OK      | True    | X86  | River    | MISSING     | Sling    |
+  | x3000c0s19e1   | NodeEnclosure | MISSING | On        | OK      | True    | X86  | River    | MISSING     | Sling    |
+  | x3000c0s26b0n0 | Node          | 5000    | Ready     | OK      | True    | X86  | River    | Application | Sling    |
+  | x5000c1        | Chassis       | MISSING | On        | Warning | True    | X86  | Mountain | MISSING     | Sling    |
+  | x5000c1b0      | ChassisBMC    | MISSING | Ready     | Warning | True    | X86  | Mountain | MISSING     | Sling    |
+  | x5000c1r5      | RouterModule  | MISSING | On        | OK      | True    | X86  | Mountain | MISSING     | Sling    |
+  | x5000c1s0      | ComputeModule | MISSING | On        | OK      | True    | X86  | Mountain | MISSING     | Sling    |
+  +----------------+---------------+---------+-----------+---------+---------+------+----------+-------------+----------+
+
 Possible Values
 ---------------
 
+| *Type*
+|
+|   Chassis, ChassisBMC, ComputeModule, HSNBoard, Node, NodeBMC, NodeEnclosure, RouterBMC, RouterModule
+| 
 | *Flag*
 |
 |   OK, Warning, Alert
