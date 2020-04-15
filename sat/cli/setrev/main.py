@@ -1,7 +1,7 @@
 """
 The main entry point for the setrev subcommand.
 
-Copyright 2019 Cray Inc. All Rights Reserved.
+Copyright 2019-2020 Cray Inc. All Rights Reserved.
 """
 
 import datetime
@@ -70,7 +70,8 @@ def get_site_data(sitefile):
     try:
         data = yaml.safe_load(s)
     except yaml.parser.ParserError:
-        LOGGER.warning('Site file {} is not in yaml format. It will be erased if you continue.'.format(sitefile))
+        LOGGER.warning('Site file {} is not in yaml format. ' +
+                       'It will be erased if you continue.'.format(sitefile))
         return {}
 
     # ensure we parsed the file correctly.
@@ -104,7 +105,8 @@ def input_site_data(data):
         Entry(name='Serial number', help='', validate=lambda x: True),
         Entry(name='Site name', help='', validate=lambda x: True),
         Entry(name='System name', help='', validate=lambda x: True),
-        Entry(name='System install date', help='(YYYY-mm-dd, empty for today)', validate=is_valid_date),
+        Entry(name='System install date', help='(YYYY-mm-dd, empty for today)',
+              validate=is_valid_date),
         Entry(name='System type', help='', validate=lambda x: True),
     ]
 
@@ -188,20 +190,17 @@ def do_setrev(args):
 
     # ensure our ability to create the file
     dir = os.path.dirname(sitefile)
-    if not os.path.exists(dir):
-        LOGGER.error('Directory {} does not exist.'.format(dir))
-        sys.exit(1)
+    if dir and not os.path.exists(dir):
+        LOGGER.info('Creating directory(s) on sitefile path: {}.'.format(dir))
+        os.makedirs(dir)
 
     data = get_site_data(sitefile)
 
     # check to see if we can open the file for writing.
     try:
-        stream = open(sitefile, 'a')
+        stream = open(sitefile, 'w')
     except PermissionError:
         LOGGER.error('Cannot open {} for writing.'.format(sitefile))
-        sys.exit(1)
-    except FileNotFoundError:
-        LOGGER.error('Cannot create {}.'.format(sitefile))
         sys.exit(1)
 
     # when we reopen the file, we want to overwrite it.

@@ -1,14 +1,16 @@
 """
 Unit tests for the sat.sat.cli.setrev.main functions.
 
-Copyright 2019 Cray Inc. All Rights Reserved.
+Copyright 2019-2020 Cray Inc. All Rights Reserved.
 """
 
 
 from datetime import datetime
 import os
+import os.path
 import unittest
 from unittest import mock
+from argparse import Namespace
 
 import sat.cli.setrev.main
 
@@ -243,6 +245,136 @@ class TestSetrev(unittest.TestCase):
         finally:
             if os.path.exists(sitefile):
                 os.remove(sitefile)
+
+
+def set_options(namespace):
+    """Set default options for Namespace."""
+    namespace.sitefile = '/sol/saturn/tethys_info.yml'
+    namespace.no_borders = True
+    namespace.no_headings = False
+    namespace.format = 'pretty'
+    namespace.reverse = object()
+    namespace.sort_by = object()
+    namespace.filter_strs = object()
+
+
+class FakeStream:
+    """Used for mocking the return from open."""
+    def close(self):
+        pass
+
+
+class TestDoSetrev(unittest.TestCase):
+    """Unit test for Setrev do_setrev()."""
+
+    def setUp(self):
+        """Mock functions called by do_setrev."""
+
+        # Mock get_site_data to return site data. If a test wishes to
+        # change the mock_site_data, the test should do something like:
+        #     self.mock_site_data.return_value = {...}
+
+        # The data returned by get_site_data:
+        self.mock_site_data = {
+            'Serial number': '2-4-8-16-32-64',
+            'Site name': 'Saturn',
+            'System name': 'Tethys',
+            'System install': '',
+            'System install date': datetime.today().strftime('%Y-%m-%d'),
+            'System type': 'moon'
+        }
+        self.mock_get_site_data = mock.patch('sat.cli.setrev.main.get_site_data',
+                                             return_value=self.mock_site_data,
+                                             autospec=True).start()
+
+        self.mock_input_site_data = mock.patch('sat.cli.setrev.main.input_site_data',
+                                               autospec=True).start()
+        self.mock_write_site_data = mock.patch('sat.cli.setrev.main.write_site_data',
+                                               autospec=True).start()
+
+        self.mock_get_config_value = mock.patch('sat.cli.setrev.main.get_config_value',
+                                                return_value='/opt/cray/etc/site_info.yml',
+                                                autospec=True).start()
+
+        self.mock_os_path_dirname = mock.Mock()
+        self.mock_os_path_dirname = mock.patch('os.path.dirname',
+                                               return_value='/sol/saturn').start()
+        self.mock_os_path_exists = mock.Mock()
+        self.mock_os_path_exists = mock.patch('os.path.exists',
+                                              return_value=False).start()
+        self.mock_os_makedirs = mock.Mock()
+        self.mock_os_makedirs = mock.patch('os.makedirs').start()
+
+        self.mock_open = mock.patch('builtins.open', return_value=FakeStream(),
+                                    autospec=True).start()
+
+        self.parsed = Namespace()
+        set_options(self.parsed)
+
+    def tearDown(self):
+        mock.patch.stopall()
+
+    def test_opt_dir_missing(self):
+        """Test setrev: do_setrev() option sitefile directory missing """
+        sat.cli.setrev.main.do_setrev(self.parsed)
+        self.mock_get_config_value.assert_not_called()
+        self.mock_os_path_dirname.assert_called_once_with('/sol/saturn/tethys_info.yml')
+        self.mock_os_path_exists.assert_called_once_with('/sol/saturn')
+        self.mock_os_makedirs.assert_called_once_with('/sol/saturn')
+        self.mock_open.assert_called_once_with('/sol/saturn/tethys_info.yml', 'w')
+
+    def test_opt_dir_exists(self):
+        """Test setrev: do_setrev() option sitefile directory exists """
+        self.mock_os_path_exists.return_value = True
+        sat.cli.setrev.main.do_setrev(self.parsed)
+        self.mock_get_config_value.assert_not_called()
+        self.mock_os_path_dirname.assert_called_once_with('/sol/saturn/tethys_info.yml')
+        self.mock_os_path_exists.assert_called_once_with('/sol/saturn')
+        self.mock_os_makedirs.assert_not_called()
+        self.mock_open.assert_called_once_with('/sol/saturn/tethys_info.yml', 'w')
+
+    def test_conf_dir_missing(self):
+        """Test setrev: do_setrev() config sitefile directory missing """
+        self.parsed.sitefile = None
+        self.mock_os_path_dirname.return_value = '/opt/cray/etc'
+        sat.cli.setrev.main.do_setrev(self.parsed)
+        self.mock_get_config_value.assert_called_once()
+        self.mock_os_path_dirname.assert_called_once_with('/opt/cray/etc/site_info.yml')
+        self.mock_os_path_exists.assert_called_once_with('/opt/cray/etc')
+        self.mock_os_makedirs.assert_called_once_with('/opt/cray/etc')
+        self.mock_open.assert_called_once_with('/opt/cray/etc/site_info.yml', 'w')
+
+    def test_conf_dir_exists(self):
+        """Test setrev: do_setrev() config sitefile directory exists """
+        self.parsed.sitefile = None
+        self.mock_os_path_dirname.return_value = '/opt/cray/etc'
+        self.mock_os_path_exists.return_value = True
+        sat.cli.setrev.main.do_setrev(self.parsed)
+        self.mock_get_config_value.assert_called_once()
+        self.mock_os_path_dirname.assert_called_once_with('/opt/cray/etc/site_info.yml')
+        self.mock_os_path_exists.assert_called_once_with('/opt/cray/etc')
+        self.mock_os_makedirs.assert_not_called()
+        self.mock_open.assert_called_once_with('/opt/cray/etc/site_info.yml', 'w')
+
+    def test_no_sitefile_specified(self):
+        """Test setrev: do_setrev() no sitefile specified """
+        self.parsed.sitefile = None
+        self.mock_get_config_value.return_value = {}
+        with self.assertRaises(SystemExit):
+            sat.cli.setrev.main.do_setrev(self.parsed)
+        self.mock_get_config_value.assert_called_once()
+
+    def test_file_permission_error(self):
+        """Test setrev: do_setrev() sitefile permission error"""
+        self.mock_os_path_exists.return_value = True
+        self.mock_open.side_effect = PermissionError
+        with self.assertRaises(SystemExit):
+            sat.cli.setrev.main.do_setrev(self.parsed)
+        self.mock_get_config_value.assert_not_called()
+        self.mock_os_path_dirname.assert_called_once_with('/sol/saturn/tethys_info.yml')
+        self.mock_os_path_exists.assert_called_once_with('/sol/saturn')
+        self.mock_os_makedirs.assert_not_called()
+        self.mock_open.assert_called_once_with('/sol/saturn/tethys_info.yml', 'w')
 
 
 if __name__ == '__main__':
