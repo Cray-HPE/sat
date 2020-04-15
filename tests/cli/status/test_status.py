@@ -15,7 +15,7 @@ from sat.xname import XName
 # a fake table row, representing a fake node
 # all default values are compliant with Shasta API response schemas
 def row(**kwargs):
-    status = dict(ID='x4242c0s99b0n0', NID=1, State='Ready', Flag='OK',
+    status = dict(ID='x4242c0s99b0n0', Type='Node', NID=1, State='Ready', Flag='OK',
                   Enabled=True, Arch='Others', Role='Application', NetType='OEM')
     status.update(kwargs)
 
