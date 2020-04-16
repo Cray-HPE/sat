@@ -39,5 +39,17 @@ def do_cablecheck(args):
 
     """
 
+    command_args = [args.p2p_file]
+
+    if args.nic_prefix:
+        command_args += ['-n', args.nic_prefix]
+
+    if args.link_levels:
+        command_args.append('-l')
+        command_args += args.link_levels
+
+    if args.quiet:
+        command_args.append('-q')
+
     subprocess.run(
-        ["python2", os.path.join(COMMAND_LOC, COMMAND_NAME), args.p2p_file])
+        ["python2", os.path.join(COMMAND_LOC, COMMAND_NAME)] + command_args)
