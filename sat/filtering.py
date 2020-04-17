@@ -457,3 +457,38 @@ def filter_list(dicts, query_strings):
     def filter_fn(x): return _dont_care_call(TypeError, combined_filters, x)
 
     return list(filter(filter_fn, dicts))
+
+
+def remove_constant_values(dicts, constant_value):
+    """Filters the keys in each dict to remove keys that have a constant value
+
+    Takes a list of dictionaries, which are all assumed to have the same keys,
+    and removes any keys from all the dictionaries if the key has the same value
+    for every dictionary in the list of dictionaries.
+
+    Args:
+        dicts (list): A list of dicts.
+        constant_value: A value which must match the constant value of a key for
+            that key to be removed from the dictionaries.
+
+    Returns:
+        A list of dicts with keys removed from all dicts if that key has the
+        given `constant_value` across all the dicts.
+    """
+    if not dicts:
+        return []
+
+    # All dicts are assumed to have the same keys and type
+    keys = dicts[0].keys()
+    # This is to preserve OrderedDict if given.
+    dict_type = type(dicts[0])
+
+    keys_to_keep = []
+    for key in keys:
+        if all(d[key] == constant_value for d in dicts):
+            LOGGER.info("All values for '%s' are '%s', omitting key.")
+        else:
+            keys_to_keep.append(key)
+
+    return [dict_type([(key, d[key]) for key in keys_to_keep])
+            for d in dicts]

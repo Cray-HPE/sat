@@ -22,7 +22,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
-# The value to use when a requested key is missing
-MISSING_VALUE = 'MISSING'
 # The value to use in place of the empty string.
 EMPTY_VALUE = 'EMPTY'
+# The value to use when a requested key is missing
+MISSING_VALUE = 'MISSING'

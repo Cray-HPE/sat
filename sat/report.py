@@ -9,7 +9,9 @@ from collections import OrderedDict
 
 from prettytable import PrettyTable
 
-from sat.filtering import filter_list, ParseError, is_subsequence
+from sat.config import get_config_value
+from sat.constants import EMPTY_VALUE, MISSING_VALUE
+from sat.filtering import filter_list, is_subsequence, ParseError, remove_constant_values
 from sat.util import yaml_dump, get_rst_header
 
 
@@ -22,7 +24,8 @@ class Report:
     def __init__(self, headings, title=None,
                  sort_by=None, reverse=False,
                  no_headings=False, no_borders=False,
-                 align='l', filter_strs=None):
+                 align='l', filter_strs=None,
+                 show_empty=None, show_missing=None):
         """Create a new SatTable instance.
 
         Args:
@@ -39,10 +42,24 @@ class Report:
             filter_strs: a list of strings against which the rows in the
                 report should be filtered. The queries are combined with a
                 boolean "and".
+            show_empty: If True, then show values for columns for which every
+                row has the value EMPTY_VALUE.
+            show_missing: If True, then show values for columns for which every
+                row has the value MISSING_VALUE.
         """
         self.headings = headings
         self.title = title
         self.data = []
+
+        if show_empty is not None:
+            self.show_empty = show_empty
+        else:
+            self.show_empty = get_config_value('format.show_empty')
+
+        if show_missing is not None:
+            self.show_missing = show_missing
+        else:
+            self.show_missing = get_config_value('format.show_missing')
 
         # formatting options
         self.sort_by = sort_by
@@ -175,6 +192,33 @@ class Report:
                             "to allow sorting.", self.sort_by)
                 self.data.sort(key=lambda d: str(d[self.sort_by]), reverse=self.reverse)
 
+    def remove_empty_and_missing(self, data_rows):
+        """Removes columns which have only EMPTY_VALUE or MISSING_VALUE.
+
+        Args:
+            data_rows: The list of dicts representing the rows of data in the
+                report.
+
+        Returns:
+            A tuple containing the following two values:
+                new_headings (list): list of headings that were kept
+                data_rows (list): list of dicts with keys removed for which the
+                    values are either all EMPTY_VALUE or all MISSING_VALUE.
+        """
+        if not data_rows:
+            return self.headings, data_rows
+
+        if not self.show_empty:
+            data_rows = remove_constant_values(data_rows, EMPTY_VALUE)
+        if not self.show_missing:
+            data_rows = remove_constant_values(data_rows, MISSING_VALUE)
+
+        # We could just take data_rows[0].keys(), but for extra assurance that
+        # order is maintained, take from self.headings.
+        new_headings = [heading for heading in self.headings
+                        if heading in data_rows[0].keys()]
+        return new_headings, data_rows
+
     def get_pretty_table(self):
         """Return a PrettyTable instance created from the data and format opts.
 
@@ -182,26 +226,27 @@ class Report:
             A prettytable.PrettyTable reference. Returns None if an error
             occurred.
         """
-        pt = PrettyTable()
-        pt.field_names = self.headings
-        pt.border = not self.no_borders
-        pt.header = not self.no_headings
-
         self.sort_data()
-
-        for heading in self.headings:
-            pt.align[heading] = self.align
 
         try:
             rows_to_print = filter_list(self.data, self.filter_strs)
-
-            for row in rows_to_print:
-                pt.add_row([str(r) for r in row.values()])
-
         except (KeyError, ParseError, TypeError, ValueError) as err:
             LOGGER.warning("An error occurred while filtering; "
                            "returning no output. (%s)", err)
             return None
+
+        headings, rows_to_print = self.remove_empty_and_missing(rows_to_print)
+
+        pt = PrettyTable()
+        pt.field_names = headings
+        pt.border = not self.no_borders
+        pt.header = not self.no_headings
+
+        for heading in headings:
+            pt.align[heading] = self.align
+
+        for row in rows_to_print:
+            pt.add_row([str(r) for r in row.values()])
 
         return pt
 
@@ -221,8 +266,9 @@ class Report:
                            "returning no output. (%s)", err)
             return ''
 
+        _, rows_to_print = self.remove_empty_and_missing(rows_to_print)
+
+        if not self.no_headings and self.title:
+            return yaml_dump({self.title: rows_to_print})
         else:
-            if not self.no_headings and self.title:
-                return yaml_dump({self.title: rows_to_print})
-            else:
-                return yaml_dump(rows_to_print)
+            return yaml_dump(rows_to_print)

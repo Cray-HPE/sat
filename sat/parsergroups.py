@@ -43,7 +43,23 @@ def create_format_options():
     group.add_argument(
         '--sort-by', metavar='FIELD', default=0,
         help=('Select which column to sort by. Can accept a column name '
-              'or a 0-based index. Only applies for "pretty"'))
+              'or a 0-based index.'))
+
+    group.add_argument(
+        '--show-empty',
+        help='Show values for columns even if every '
+             'value is {}.'.format(EMPTY_VALUE),
+        default=None,
+        action='store_true'
+    )
+
+    group.add_argument(
+        '--show-missing',
+        help='Show values for columns even if every '
+             'value is {}'.format(MISSING_VALUE),
+        default=None,
+        action='store_true'
+    )
 
     return parser
 
