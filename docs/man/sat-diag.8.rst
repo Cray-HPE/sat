@@ -67,8 +67,12 @@ These options must be specified after the subcommand.
         If this flag is supplied, the user will be given an interactive shell
         from which multiple diagnostic commands can be launched sequentially.
         Note that this option may only be supplied if **command** is not
-        given. At least one of **command** or **--interactive** must be supplied
-        on the command line.
+        given.
+
+        While in interactive mode, type **quit**, **exit**, or **ctrl-d** to
+        exit. **help** is also available as a quick reference.
+
+Exactly one of **command** or **--interactive** must be supplied.
 
 .. include:: _sat-xname-opts.rst
 
