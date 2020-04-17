@@ -28,8 +28,3 @@ ROUTER_MODULE_TYPE = 'RouterModule'
 # C-Series is densely liquid cooled.
 CAB_TYPE_C = 'C-Series'
 CAB_TYPE_S = 'S-Series'
-
-# The value to use when a requested key is missing
-MISSING_VALUE = 'MISSING'
-# The value to use in place of the empty string.
-EMPTY_VALUE = 'EMPTY'

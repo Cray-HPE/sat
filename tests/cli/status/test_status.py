@@ -8,7 +8,7 @@ from copy import deepcopy
 import unittest
 
 from sat.cli.status.main import API_KEYS, HEADERS, make_raw_table
-from sat.system.constants import MISSING_VALUE
+from sat.constants import MISSING_VALUE
 from sat.xname import XName
 
 

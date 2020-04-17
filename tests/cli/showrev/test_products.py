@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from sat.cli.showrev.products import get_product_versions, RELEASE_FILE_COLUMN
-from sat.system.constants import MISSING_VALUE
+from sat.constants import MISSING_VALUE
 
 SAMPLES_DIR = os.path.join(os.path.dirname(__file__), 'samples')
 

@@ -8,6 +8,7 @@ import argparse
 import logging
 from argparse import ArgumentParser
 
+from sat.constants import EMPTY_VALUE, MISSING_VALUE
 
 LOGGER = logging.getLogger(__name__)
 

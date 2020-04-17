@@ -7,7 +7,7 @@ from collections import OrderedDict
 import logging
 import os
 
-from sat.system.constants import MISSING_VALUE
+from sat.constants import MISSING_VALUE
 
 LOGGER = logging.getLogger(__name__)
 
