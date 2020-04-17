@@ -183,7 +183,7 @@ def do_diag(args):
     if not really_run:
         sys.exit(0)
 
-    username, password = sat_redfish.get_username_and_pass()
+    username, password = sat_redfish.get_username_and_pass(args.redfish_username)
     if args.interactive:
         run_diags_from_prompt(args.xnames, args, username, password)
     else:
