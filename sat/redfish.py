@@ -41,7 +41,7 @@ def get_username_and_pass(suggestion=''):
     username = suggestion or get_config_value('redfish.username')
     password = '' if suggestion else get_config_value('redfish.password')
     if not username:
-        username = input("Username (Redfish): ")
+        username = input("Redfish username: ")
         password = ''
     if not password:
         password = getpass.getpass('Password for {}: '.format(username))
