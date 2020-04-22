@@ -32,7 +32,9 @@ import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from collections import defaultdict
 
+import kubernetes
 import yaml
+from kubernetes.client.rest import ApiException
 
 from sat.apiclient import APIError, HSMClient
 from sat.config import get_config_value
@@ -278,7 +280,44 @@ def get_sles_version():
     return 'ERROR'
 
 
-def get_system_version(sitefile):
+def get_slurm_version():
+    """Get version of slurm.
+
+    Returns:
+        String representing version of slurm. Returns 'ERROR' if something
+        went wrong.
+    """
+    try:
+        kubernetes.config.load_kube_config()
+    except ApiException as err:
+        LOGGER.error('Reading kubernetes config: {}'.format(err))
+        return 'ERROR'
+
+    ns = 'user'
+    try:
+        dump = kubernetes.client.CoreV1Api().list_namespaced_pod(ns, label_selector='app=slurmctld')
+        pod = dump.items[0].metadata.name
+    except ApiException as err:
+        LOGGER.error('Could not retrieve list of pods: {}'.format(err))
+        return 'ERROR'
+
+    cmd = 'kubectl exec -n {} -c slurmctld {} -- sinfo --version'.format(ns, pod)
+    toks = shlex.split(cmd)
+
+    try:
+        output = subprocess.check_output(toks)
+        version = output.decode('utf-8').splitlines[0]
+    except IndexError:
+        LOGGER.error('Command to print slurm version returned no stdout.')
+        return 'ERROR'
+    except subprocess.CalledProcessError as e:
+        LOGGER.error('Exception when querying slurm version: {}'.format(e))
+        return 'ERROR'
+
+    return version
+
+
+def get_system_version(sitefile, substr=''):
     """Collects generic information about the system.
 
     This is the function that 'decides' what components (and their versions)
@@ -290,7 +329,7 @@ def get_system_version(sitefile):
     """
 
     zypper_versions = get_zypper_versions(
-        ['cray-lustre-client', 'slurm-slurmd', 'pbs-crayctldeploy']
+        ['cray-lustre-client', 'pbs-crayctldeploy']
     )
     sitedata = get_site_data(sitefile)
 
@@ -304,7 +343,7 @@ def get_system_version(sitefile):
         ('SLES version', get_sles_version),
         ('Serial number', lambda: sitedata['Serial number']),
         ('Site name', lambda: sitedata['Site name']),
-        ('Slurm version', lambda: zypper_versions['slurm-slurmd']),
+        ('Slurm version', get_slurm_version),
         ('System install date', lambda: sitedata['System install date']),
         ('System name', lambda: sitedata['System name']),
         ('System type', lambda: sitedata['System type']),

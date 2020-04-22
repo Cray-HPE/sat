@@ -57,7 +57,7 @@ Site name
     ``/opt/cray/etc/site_info.yml``.
 
 Slurm version
-    Version of Slurm available in the Zypper repositories.
+    Version of Slurm as indicated by slurmctld.
 
 System install date
     Manually populated by ``sat setrev`` and read back from
