@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   detect and warn if file does not appear to be as expected.
 - Included username in warning for failure to authenticate with token.
 - Moved Redfish indication in user/password prompt to left side of colon.
+- ``sat hwinv`` now reports memory in GiB rounded to 2 plaecs.
 
 ## [1.3.0] - 2020-04-09
 
