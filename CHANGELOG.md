@@ -56,6 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   either EMPTY or MISSING.
 - License and notices in files are now the MIT license.
 
+### Fixed
+- Build version in ``sat showrev`` is now read from the /etc/cray-release file
+  and the field now reads "Release version".
+
 ## [1.3.0] - 2020-04-09
 
 ### Added

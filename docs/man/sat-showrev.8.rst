@@ -29,9 +29,6 @@ site-specific information read from ``/opt/cray/etc/site_info.yml``, and various
 api calls to other Cray services. The following list details the meaning and
 source of information for each field.
 
-Build version
-    Not implemented, so it always displays None.
-
 Interconnect
     Unique list of interconnect names obtained from the Hardware State
     Manager (HSM).
@@ -44,6 +41,9 @@ Lustre
 
 PBS version
     Version of PBS available in the Zypper repositories.
+
+Release version
+    Release version as indicated by ``/etc/cray-release``.
 
 SLES version
     Version of SLES read from ``/etc/os-release`` on the local host.
