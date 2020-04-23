@@ -75,6 +75,7 @@ These options must be specified after the subcommand.
 Exactly one of **command** or **--interactive** must be supplied.
 
 .. include:: _sat-xname-opts.rst
+.. include:: _sat-redfish-opts.rst
 
 EXAMPLES
 ========
