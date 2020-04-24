@@ -7,9 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- Man page of ``sat diag`` revised to better cover interactive mode.
-
 ### Added
 - ``sat cablecheck`` supports shared ``--redfish-username`` option.
 - Ability to list drives in ``sat hwinv`` with ``--list-drives``.
@@ -17,11 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   summarizing nodes in ``sat hwinv``.
 
 ### Changed
-
+- Man page of ``sat diag`` revised to better cover interactive mode.
 - Showrev will no longer exit at the first failure to retrieve a set
   of information.
   E.g., a failure to retrieve package version info will not impact showrev's
   ability to display system revision information.
+- Improved sitefile handling by ``sat setrev`` to create directory and better
+  detect and warn if file does not appear to be as expected.
 
 ## [1.3.0] - 2020-04-09
 

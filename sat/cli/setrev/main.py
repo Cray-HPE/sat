@@ -69,19 +69,25 @@ def get_site_data(sitefile):
 
     try:
         data = yaml.safe_load(s)
-    except yaml.parser.ParserError:
-        LOGGER.warning('Site file {} is not in yaml format. ' +
-                       'It will be erased if you continue.'.format(sitefile))
+    except yaml.error.YAMLError:
+        LOGGER.warning('Site file {} is not in yaml format. '
+                       'It will be replaced if you continue.'.format(sitefile))
         return {}
 
     # ensure we parsed the file correctly.
     if type(data) is not dict:
+        LOGGER.warning('Site file {} did not contain key value pairs. '
+                       'It will be replaced if you continue.'.format(sitefile))
         return {}
 
     # yaml.safe_load will attempt 'helpful' conversions to different types,
     # and we only want strings.
     for key, value in data.items():
         data[key] = str(value)
+
+    if 'Site name' not in data:
+        LOGGER.warning('Site file {} does not contain "Site name". '
+                       'It will be replaced if you continue.'.format(sitefile))
 
     return data
 
@@ -198,7 +204,8 @@ def do_setrev(args):
 
     # check to see if we can open the file for writing.
     try:
-        stream = open(sitefile, 'w')
+        # Append so as not to erase file if we back out later.
+        stream = open(sitefile, 'a')
     except PermissionError:
         LOGGER.error('Cannot open {} for writing.'.format(sitefile))
         sys.exit(1)

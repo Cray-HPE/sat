@@ -296,13 +296,10 @@ class TestDoSetrev(unittest.TestCase):
                                                 return_value='/opt/cray/etc/site_info.yml',
                                                 autospec=True).start()
 
-        self.mock_os_path_dirname = mock.Mock()
         self.mock_os_path_dirname = mock.patch('os.path.dirname',
                                                return_value='/sol/saturn').start()
-        self.mock_os_path_exists = mock.Mock()
         self.mock_os_path_exists = mock.patch('os.path.exists',
                                               return_value=False).start()
-        self.mock_os_makedirs = mock.Mock()
         self.mock_os_makedirs = mock.patch('os.makedirs').start()
 
         self.mock_open = mock.patch('builtins.open', return_value=FakeStream(),
@@ -321,7 +318,7 @@ class TestDoSetrev(unittest.TestCase):
         self.mock_os_path_dirname.assert_called_once_with('/sol/saturn/tethys_info.yml')
         self.mock_os_path_exists.assert_called_once_with('/sol/saturn')
         self.mock_os_makedirs.assert_called_once_with('/sol/saturn')
-        self.mock_open.assert_called_once_with('/sol/saturn/tethys_info.yml', 'w')
+        self.mock_open.assert_called_once_with('/sol/saturn/tethys_info.yml', 'a')
 
     def test_opt_dir_exists(self):
         """Test setrev: do_setrev() option sitefile directory exists """
@@ -331,7 +328,7 @@ class TestDoSetrev(unittest.TestCase):
         self.mock_os_path_dirname.assert_called_once_with('/sol/saturn/tethys_info.yml')
         self.mock_os_path_exists.assert_called_once_with('/sol/saturn')
         self.mock_os_makedirs.assert_not_called()
-        self.mock_open.assert_called_once_with('/sol/saturn/tethys_info.yml', 'w')
+        self.mock_open.assert_called_once_with('/sol/saturn/tethys_info.yml', 'a')
 
     def test_conf_dir_missing(self):
         """Test setrev: do_setrev() config sitefile directory missing """
@@ -342,7 +339,7 @@ class TestDoSetrev(unittest.TestCase):
         self.mock_os_path_dirname.assert_called_once_with('/opt/cray/etc/site_info.yml')
         self.mock_os_path_exists.assert_called_once_with('/opt/cray/etc')
         self.mock_os_makedirs.assert_called_once_with('/opt/cray/etc')
-        self.mock_open.assert_called_once_with('/opt/cray/etc/site_info.yml', 'w')
+        self.mock_open.assert_called_once_with('/opt/cray/etc/site_info.yml', 'a')
 
     def test_conf_dir_exists(self):
         """Test setrev: do_setrev() config sitefile directory exists """
@@ -354,7 +351,7 @@ class TestDoSetrev(unittest.TestCase):
         self.mock_os_path_dirname.assert_called_once_with('/opt/cray/etc/site_info.yml')
         self.mock_os_path_exists.assert_called_once_with('/opt/cray/etc')
         self.mock_os_makedirs.assert_not_called()
-        self.mock_open.assert_called_once_with('/opt/cray/etc/site_info.yml', 'w')
+        self.mock_open.assert_called_once_with('/opt/cray/etc/site_info.yml', 'a')
 
     def test_no_sitefile_specified(self):
         """Test setrev: do_setrev() no sitefile specified """
@@ -374,7 +371,7 @@ class TestDoSetrev(unittest.TestCase):
         self.mock_os_path_dirname.assert_called_once_with('/sol/saturn/tethys_info.yml')
         self.mock_os_path_exists.assert_called_once_with('/sol/saturn')
         self.mock_os_makedirs.assert_not_called()
-        self.mock_open.assert_called_once_with('/sol/saturn/tethys_info.yml', 'w')
+        self.mock_open.assert_called_once_with('/sol/saturn/tethys_info.yml', 'a')
 
 
 if __name__ == '__main__':
