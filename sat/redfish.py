@@ -1,7 +1,7 @@
 """
 Functions to assist with querying a Redfish endpoint.
 
-Copyright 2019 Cray Inc. All Rights Reserved.
+Copyright 2019-2020 Cray Inc. All Rights Reserved.
 """
 
 import getpass
@@ -9,7 +9,6 @@ import getpass
 import requests
 
 from sat.config import get_config_value
-from sat.util import pester
 
 
 class RedfishQueryError(requests.exceptions.RequestException):
@@ -42,9 +41,7 @@ def get_username_and_pass(suggestion=''):
     username = suggestion or get_config_value('redfish.username')
     password = '' if suggestion else get_config_value('redfish.password')
     if not username:
-        username = pester("Username: ", "^.*$",
-                          human_readable_valid="Redfish",
-                          parse_answer=(lambda x: x))
+        username = input("Redfish username: ")
         password = ''
     if not password:
         password = getpass.getpass('Password for {}: '.format(username))

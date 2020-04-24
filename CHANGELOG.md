@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ability to display system revision information.
 - Improved sitefile handling by ``sat setrev`` to create directory and better
   detect and warn if file does not appear to be as expected.
+- Included username in warning for failure to authenticate with token.
+- Moved Redfish indication in user/password prompt to left side of colon.
 
 ## [1.3.0] - 2020-04-09
 

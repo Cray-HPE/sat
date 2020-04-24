@@ -1,7 +1,7 @@
 """
 OAuth2 authentication support.
 
-Copyright 2019 Cray Inc. All Rights Reserved.
+Copyright 2019-2020 Cray Inc. All Rights Reserved.
 """
 
 import json
@@ -51,7 +51,9 @@ class SATSession:
             client.parse_request_body_response(json.dumps(token))
         else:
             if not no_unauth_warn:
-                logging.warning('Session is not authenticated. Obtain a token with "auth" '
+                logging.warning('Session is not authenticated. ' +
+                                'Username is "{}". '.format(self.username) +
+                                'Obtain a token with "auth" ' +
                                 'subcommand, or use --token-file on the command line.')
 
         self.session = OAuth2Session(client=client, token=token, **opts)
