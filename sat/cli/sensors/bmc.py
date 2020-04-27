@@ -88,6 +88,7 @@ class BMC:
         self.type = None
         self.sub_type = None
         self.query_head = None
+        self.already_logged = False
 
         self._query_cache = {}
 
@@ -185,7 +186,7 @@ class BMC:
             LOGGER.info('Sensor query of %s; detected type, subtype: %s, %s',
                         xname, self.type, self.sub_type)
 
-        else:
+        elif not self.already_logged:
             LOGGER.error('Unable to identify %s.', xname)
 
     def add_sensor(self, sensor):
@@ -339,7 +340,7 @@ class BMC:
                 requests_rsp = self.requester.get(url, verify=False)
 
             except requests.exceptions.RequestException as err:
-                msg = 'Redfish query responded with request error: '
+                msg = 'Redfish query to {} responded with request error: '.format(self.xname)
                 wrapped_rsp = WrappedResponse(ResponseStatus.CONNECTION_ERR)
 
                 # Cleans up the message a bit if it's a yucky chain of messages, which urllib3
@@ -348,31 +349,36 @@ class BMC:
                     err = err.args[0].reason
 
                 LOGGER.error(msg + str(err))
+                self.already_logged = True
 
             else:
                 if not requests_rsp:
                     # occurs when http response status >= 400
-                    msg = 'Redfish query responded with HTTP error ({:d}): {}'.format(
-                        requests_rsp.status_code, requests_rsp.reason)
+                    msg = 'Redfish query to {} responded with HTTP error ({:d}): {}'.format(
+                        self.xname, requests_rsp.status_code, requests_rsp.reason)
                     wrapped_rsp = WrappedResponse(ResponseStatus.HTTP_ERR)
                     wrapped_rsp.response = requests_rsp
 
                     LOGGER.error(msg)
+                    self.already_logged = True
 
                 else:
                     try:
                         rsp = requests_rsp.json(**kwargs)
                     except json.decoder.JSONDecodeError:
-                        LOGGER.error('Unable to parse Redfish query response: %s', requests_rsp.text)
+                        LOGGER.error('Unable to parse response to Redfish query to %s: %s',
+                                     self.xname, requests_rsp.text)
                         wrapped_rsp = WrappedResponse(ResponseStatus.PARSE_ERR)
                         wrapped_rsp.response = requests_rsp
                     else:
                         if 'error' in rsp:
-                            msg = 'Redfish query responded with Redfish error: ' + rsp['error']['message']
+                            msg = 'Redfish query to {} responded with Redfish error: {}'.format(
+                                self.xname, rsp['error']['message'])
                             wrapped_rsp = WrappedResponse(ResponseStatus.REDFISH_ERR)
                             wrapped_rsp.response = rsp
 
                             LOGGER.error(msg)
+                            self.already_logged = True
                         else:
                             wrapped_rsp = WrappedResponse(ResponseStatus.OKAY)
                             wrapped_rsp.response = rsp
