@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - ``sat cablecheck`` supports shared ``--redfish-username`` option.
+- ``sat cablecheck`` supports ``check_hsn_cables.py``'s options.
 - Ability to list drives in ``sat hwinv`` with ``--list-drives``.
 - New fields for drive counts and total drive capacity when listing and
   summarizing nodes in ``sat hwinv``.

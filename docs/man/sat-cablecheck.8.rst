@@ -41,6 +41,16 @@ These options must be specified after the subcommand.
 **-h, --help**
         Print the help message for 'sat cablecheck'.
 
+**-l, --link-levels**
+        Link levels to check. Possible values are 0, 1, and 2. Defaults
+        to all three.
+
+**-n, --nic-prefix**
+        HSN NIC prefix. Defaults to "hsn".
+
+**-q, --quiet**
+        Limits output to the total faults found.
+
 SEE ALSO
 ========
 
