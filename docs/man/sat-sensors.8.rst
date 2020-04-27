@@ -19,7 +19,11 @@ DESCRIPTION
 ===========
 
 The sensors subcommand obtains current sensor readings from
-one or more BMCs. A Redfish username and password is required.
+one or more BMCs.
+
+This subcommand allows use of the "--xname" options. The provided
+xnames must refer to BMCs, but may be of any type (HSM types: ChassisBMC,
+NodeBMC, and RouterBMC). A Redfish username and password is required.
 
 OPTIONS
 =======

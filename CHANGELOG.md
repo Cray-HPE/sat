@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   summarizing nodes in ``sat hwinv``.
 
 ### Changed
+- Man page of ``sat sensors`` revised to be more explicit with respect to
+  supported BMC types and for style consistency.
 - Man page of ``sat diag`` revised to better cover interactive mode.
 - Showrev will no longer exit at the first failure to retrieve a set
   of information.
