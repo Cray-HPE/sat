@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ability to list drives in ``sat hwinv`` with ``--list-drives``.
 - New fields for drive counts and total drive capacity when listing and
   summarizing nodes in ``sat hwinv``.
+- New `--show-empty` and `--show-missing` options to allow override of default
+  behavior to hide columns that are all EMPTY or MISSING.
 
 ### Changed
 - Man page of ``sat sensors`` revised to be more explicit with respect to
@@ -30,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Included username in warning for failure to authenticate with token.
 - Moved Redfish indication in user/password prompt to left side of colon.
 - ``sat hwinv`` now reports memory in GiB rounded to 2 plaecs.
+- Default behavior is now to hide columns when all values for those columns are
+  either EMPTY or MISSING.
 
 ## [1.3.0] - 2020-04-09
 

@@ -20,7 +20,7 @@ def add_status_subparser(subparsers):
     format_options = sat.parsergroups.create_format_options()
     filter_options = sat.parsergroups.create_filter_options()
 
-    types=[
+    types = [
         'all',
         'Chassis',
         'ChassisBMC',

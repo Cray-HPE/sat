@@ -10,7 +10,7 @@ from sat.apiclient import APIError, HSMClient
 from sat.config import get_config_value
 from sat.report import Report
 from sat.session import SATSession
-from sat.system.constants import MISSING_VALUE
+from sat.constants import MISSING_VALUE
 from sat.xname import XName
 
 

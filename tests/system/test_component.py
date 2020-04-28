@@ -8,7 +8,7 @@ import unittest
 from unittest import mock
 
 from sat.system.component import BaseComponent, ComponentDataDict, LOGGER
-from sat.system.constants import EMPTY_VALUE, MISSING_VALUE
+from sat.constants import EMPTY_VALUE, MISSING_VALUE
 from sat.system.field import ComponentField
 from tests.common import ExtendedTestCase
 from tests.system.component_data import DEFAULT_HSM_TYPE, DEFAULT_XNAME, DEFAULT_SERIAL_NUMBER, \

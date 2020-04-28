@@ -9,7 +9,7 @@ import logging
 from inflect import engine
 
 from sat.cached_property import cached_property
-from sat.system.constants import MISSING_VALUE, EMPTY_VALUE
+from sat.constants import EMPTY_VALUE, MISSING_VALUE
 from sat.system.field import ComponentField
 from sat.xname import XName
 

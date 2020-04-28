@@ -53,6 +53,8 @@ SAT_CONFIG_SPEC = {
     'format': {
         'no_headings': OptionSpec(bool, False, None, 'no_headings'),
         'no_borders': OptionSpec(bool, False, None, 'no_borders'),
+        'show_empty': OptionSpec(bool, False, None, 'show_empty'),
+        'show_missing': OptionSpec(bool, False, None, 'show_missing'),
     },
     'general': {
         'site_info': OptionSpec(str, '/opt/cray/etc/site_info.yml', None, None),
