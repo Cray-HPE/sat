@@ -24,7 +24,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import unittest
 
-from sat.xname import XName
+from sat.xname import XName, get_matches
 
 
 class TestXName(unittest.TestCase):
@@ -133,3 +133,46 @@ class TestXNameContainsComponent(unittest.TestCase):
         slot_1 = XName('x3000c0s1')
         node_in_slot_19 = XName('x3000c0s19b0n0')
         self.assertFalse(slot_1.contains_component(node_in_slot_19))
+
+
+class TestXnameGetMatches(unittest.TestCase):
+
+    def test_get_matches_chassis(self):
+        """Test Xname get_matches() with chassis filter."""
+        filters = [XName('x1000c1'), XName('x2000c2')]
+        elems = [XName('x1000c1r1b1'), XName('x1000c2r2b2')]
+        used, unused, matches, no_matches = get_matches(filters, elems)
+        self.assertEqual({XName('x1000c1')}, used)
+        self.assertEqual({XName('x2000c2')}, unused)
+        self.assertEqual({XName('x1000c1r1b1')}, matches)
+        self.assertEqual({XName('x1000c2r2b2')}, no_matches)
+
+    def test_get_matches_bmc(self):
+        """Test Xname get_matches() with BMC filter."""
+        filters = [XName('x1000c1r1b1'), XName('x2000c2r2b2')]
+        elems = [XName('x1000c1r1b1'), XName('x1000c2r2b2')]
+        used, unused, matches, no_matches = get_matches(filters, elems)
+        self.assertEqual({XName('x1000c1r1b1')}, used)
+        self.assertEqual({XName('x2000c2r2b2')}, unused)
+        self.assertEqual({XName('x1000c1r1b1')}, matches)
+        self.assertEqual({XName('x1000c2r2b2')}, no_matches)
+
+    def test_get_matches_empty_filters(self):
+        """Test Xname get_matches() with empty filter."""
+        filters = []
+        elems = [XName('x1000c1r1b1'), XName('x1000c2r2b2')]
+        used, unused, matches, no_matches = get_matches(filters, elems)
+        self.assertEqual(set(), used)
+        self.assertEqual(set(), unused)
+        self.assertEqual(set(), matches)
+        self.assertEqual(set(elems), no_matches)
+
+    def test_get_matches_no_elems(self):
+        """Test Xname get_matches() with no elements."""
+        filters = [XName('x1000c1r1b1'), XName('x2000c2r2b2')]
+        elems = []
+        used, unused, matches, no_matches = get_matches(filters, elems)
+        self.assertEqual(set(), used)
+        self.assertEqual(set(filters), unused)
+        self.assertEqual(set(), matches)
+        self.assertEqual(set(), no_matches)

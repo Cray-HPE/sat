@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- ``sat sensors`` supports ``--types`` for BMC types.
+- ``sat sensors`` handles ``--xnames`` consistenty with ``sat linkhealth``.
 - ``sat cablecheck`` supports shared ``--redfish-username`` option.
 - ``sat cablecheck`` supports ``check_hsn_cables.py``'s options.
 - Ability to list drives in ``sat hwinv`` with ``--list-drives``.

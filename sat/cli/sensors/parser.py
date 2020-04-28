@@ -25,6 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 import sat.parsergroups
 
 from sat.cli.sensors.capture import CAPTURE_NAME
+from sat.constants import BMC_TYPES
 
 
 def add_sensors_subparser(subparsers):
@@ -45,9 +46,16 @@ def add_sensors_subparser(subparsers):
 
     sensors_parser = subparsers.add_parser(
         'sensors', help='Obtain sensor readings.',
-        description='Obtain sensor readings. IP addresses can be provided for the --xname options.',
+        description='Obtain sensor readings from BMCs (any type).',
         parents=[xname_options, format_options, filter_options, redfish_options]
     )
+
+    sensors_parser.add_argument('-t', '--types',
+                                nargs='*',
+                                choices=BMC_TYPES,
+                                default=BMC_TYPES,
+                                help='Limit the types of BMCs queried to the types listed. '
+                                     'The default is to query all types.')
 
     if CAPTURE_NAME is not None:
         capture_group = sensors_parser.add_argument_group('capture')

@@ -23,10 +23,10 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import logging
-import sys
 
 from sat.config import get_config_value
 import sat.redfish
+import sat.xname
 
 from sat.cli.sensors.sensortypes import (
     SensorsParser, VoltageMarginsParser, TemperaturesParser,
@@ -60,11 +60,10 @@ def do_sensors(args):
     Returns:
         None
     """
-    if not args.xnames:
-        LOGGER.error("No xnames were supplied.")
-        sys.exit(1)
 
     username, password = sat.redfish.get_username_and_pass(args.redfish_username)
+
+    xnames = sat.redfish.screen_xname_args(args.xnames, args.types)
 
     # If there's no capture, manager is a pass-through
     capture_mgr = CaptureManager(args)
@@ -86,7 +85,8 @@ def do_sensors(args):
 
     n = 0
 
-    for xname in args.xnames:
+    for xname in xnames:
+        xname = str(xname)
         bmc = capture_mgr.bmc_factory(xname, username, password)
         bmc.detect_type()
 
