@@ -114,7 +114,9 @@ class Node(BaseComponent):
     @cached_property
     def memory_size_gib(self):
         """float: The total memory size (in GiB) of this node."""
-        return sum([mm.capacity_mib for mm in self.memory_modules.values()]) / 1024
+        megs = sum([mm.capacity_mib for mm in self.memory_modules.values()])
+        gigs = megs / 1024
+        return round(gigs, 2)
 
     @cached_property
     def memory_module_count(self):
@@ -130,8 +132,8 @@ class Node(BaseComponent):
     def total_drive_capacity_gib(self):
         """float: The total capacity in GiB of all drives in this node"""
         try:
-            return bytes_to_gib(sum([drive.capacity_bytes
-                                     for drive in self.drives.values()]))
+            bytes = sum([drive.capacity_bytes for drive in self.drives.values()])
+            return bytes_to_gib(bytes)
         except TypeError as err:
             LOGGER.warning("Unable to compute total drive capacity for node "
                            "'%s' due to non-numeric drive capacity values: %s",
