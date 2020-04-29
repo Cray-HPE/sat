@@ -20,7 +20,7 @@
 # -- Project information -----------------------------------------------------
 
 project = u'SAT Developer Docs'
-copyright = u'2019, Cray, Inc, A Hewlett Packard Enterprise Company'
+copyright = u'2019-2020 Hewlett Packard Enterprise Development LP.'
 author = u'Cray, Inc, A Hewlett Packard Enterprise Company'
 
 # The short X.Y version

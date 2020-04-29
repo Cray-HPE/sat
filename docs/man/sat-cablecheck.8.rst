@@ -7,7 +7,7 @@ Check that cables are correctly connected within the system
 -----------------------------------------------------------
 
 :Author: Cray Inc.
-:Copyright: Copyright 2019 Cray Inc. All Rights Reserved.
+:Copyright: Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -55,3 +55,5 @@ SEE ALSO
 ========
 
 sat(8)
+
+.. include:: _notice.rst

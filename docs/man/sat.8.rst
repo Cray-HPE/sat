@@ -7,7 +7,7 @@ The System Admin Toolkit
 ------------------------
 
 :Author: Cray Inc.
-:Copyright: Copyright 2019 Cray Inc. All Rights Reserved.
+:Copyright: Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -149,3 +149,5 @@ sat-hwinv(8),
 sat-setrev(8),
 sat-showrev(8),
 sat-status(8)
+
+.. include:: _notice.rst
