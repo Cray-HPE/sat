@@ -104,10 +104,6 @@ These options must be specified after the subcommand.
         Display everything. Equivalent to specifying **--system**,
         **--products**, **--docker**, and **--packages**.
 
-**-s** *SUBSTR*, **--substr** *SUBSTR*
-        Show version information for components whose names or IDs contain
-        the substring.
-
 **--sitefile** *file*
         Specify custom site information file printed by --system. This file
         must be in a YAML format.
@@ -135,6 +131,54 @@ site_info: /opt/cray/etc/site_info.yml
 release: /opt/cray/etc/release
         Showrev parses this file to collect information for the CLE
         version, General, PE, SLES version, SAT, and Urika fields.
+
+EXAMPLES
+========
+
+Get Slurm version for system:
+
+::
+
+  # sat showrev --system --filter 'component=*slurm*'
+  ################################################################################
+  System Revision Information
+  ################################################################################
+  +---------------+-------------------------------------+
+  | component     | data                                |
+  +---------------+-------------------------------------+
+  | Slurm version | 19.05.5-1.20200309123824_9d0f0cac60 |
+  +---------------+-------------------------------------+
+
+Get Slurm versions for docker:
+
+::
+
+  # sat showrev --docker --filter 'name=*slurm*' 
+  ################################################################################
+  Installed Container Versions
+  ################################################################################
+  +--------------------------+------------+----------------------------------+
+  | name                     | short-id   | versions                         |
+  +--------------------------+------------+----------------------------------+
+  | cray-uas-sles15sp1-slurm | d6b936615b | latest                           |
+  | slurm-clients            | 331803757e | 19.05.5-2-20200330183104_a265368 |
+  | slurm-slurmctld          | 5996c2431c | 19.05.5-2-20200330183106_a265368 |
+  | slurm-slurmdbd           | 525f1f72f4 | 19.05.5-2-20200330183108_a265368 |
+  +--------------------------+------------+----------------------------------+
+
+Get Slurm versions for packages:
+
+::
+
+  # sat showrev --packages --filter 'name=*slurm*' 
+  ################################################################################
+  Installed Package Versions
+  ################################################################################
+  +---------------------+---------+
+  | name                | version |
+  +---------------------+---------+
+  | slurm-crayctldeploy | 0.3.4   |
+  +---------------------+---------+
 
 SEE ALSO
 ========

@@ -104,27 +104,6 @@ class TestContainers(unittest.TestCase):
         self.assertEqual(result, sorted(result))
         self.assertGreater(len(result), 0)
 
-    @mock.patch('sat.cli.showrev.containers.docker.from_env', FakeDockerEnv)
-    def test_get_dockers_no_match(self):
-        """get_dockers should return empty list if there was no match.
-        """
-        result = sat.cli.showrev.containers.get_dockers('idontexist')
-        self.assertEqual(result, [])
-
-    @mock.patch('sat.cli.showrev.containers.docker.from_env', FakeDockerEnv)
-    def test_get_docker_id_substring(self):
-        """get_dockers should return images whose full id contains the substr.
-        """
-        result = sat.cli.showrev.containers.get_dockers('304735eab4e4df55b236f')
-        self.assertEqual(result[0], ['statsd-exporter', '304735eab4', 'v0.6.0'])
-
-    @mock.patch('sat.cli.showrev.containers.docker.from_env', FakeDockerEnv)
-    def test_get_docker_name_substring(self):
-        """get_dockers should return images whose name contains the substr.
-        """
-        result = sat.cli.showrev.containers.get_dockers('statsd-export')
-        self.assertEqual(result[0], ['statsd-exporter', '304735eab4', 'v0.6.0'])
-
 
 if __name__ == '__main__':
     unittest.main()
