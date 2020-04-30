@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   summarizing nodes in ``sat hwinv``.
 - New `--show-empty` and `--show-missing` options to allow override of default
   behavior to hide columns that are all EMPTY or MISSING.
+- ``sat switch`` command for automation of switch enable/disable during
+  switch replacement.
 
 ### Changed
 - Man page of ``sat sensors`` revised to be more explicit with respect to

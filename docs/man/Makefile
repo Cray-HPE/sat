@@ -10,6 +10,7 @@ all: \
 	sat-setrev.8 \
 	sat-showrev.8 \
 	sat-status.8 \
+	sat-switch.8 \
 	sat.8
 
 %.8: %.8.rst

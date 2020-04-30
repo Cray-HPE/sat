@@ -112,6 +112,125 @@ class APIGatewayClient:
 
         return r
 
+    def post(self, *args, payload):
+        """Issue an HTTP POST request to resource given in `args`.
+
+        Args:
+            *args: Variable length list of path components used to construct
+                the path to POST target.
+            payload: JSON data to post.
+
+        Returns:
+            The requests.models.Response object if the request was successful.
+
+        Raises:
+            APIError: if the status code of the response is >= 400 or requests.post
+                raises a RequestException of any kind.
+        """
+
+        url = urlunparse(('https', self.host, 'apis/{}{}'.format(
+            self.base_resource_path, '/'.join(args)), '', '', ''))
+
+        LOGGER.debug("Issuing POST request to URL '%s'", url)
+
+        if self.session is None:
+            requester = requests
+        else:
+            requester = self.session.session
+
+        try:
+            r = requester.post(url, data=payload, verify=self.cert_verify)
+        except requests.exceptions.RequestException as err:
+            raise APIError("POST request to URL '{}' failed: {}".format(url, err))
+
+        if not r:
+            raise APIError("POST request to URL '{}' failed with status "
+                           "code {}: {}".format(url, r.status_code, r.reason))
+
+        LOGGER.debug("Received response to POST request to URL '%s'"
+                     "with status code: '%s': %s", url, r.status_code, r.reason)
+
+        return r
+
+    def put(self, *args, payload):
+        """Issue an HTTP PUT request to resource given in `args`.
+
+        Args:
+            *args: Variable length list of path components used to construct
+                the path to PUT target.
+            payload: JSON data to put.
+
+        Returns:
+            The requests.models.Response object if the request was successful.
+
+        Raises:
+            APIError: if the status code of the response is >= 400 or requests.put
+                raises a RequestException of any kind.
+        """
+
+        url = urlunparse(('https', self.host, 'apis/{}{}'.format(
+            self.base_resource_path, '/'.join(args)), '', '', ''))
+
+        LOGGER.debug("Issuing PUT request to URL '%s'", url)
+
+        if self.session is None:
+            requester = requests
+        else:
+            requester = self.session.session
+
+        try:
+            r = requester.put(url, data=payload, verify=self.cert_verify)
+        except requests.exceptions.RequestException as err:
+            raise APIError("PUT request to URL '{}' failed: {}".format(url, err))
+
+        if not r:
+            raise APIError("PUT request to URL '{}' failed with status "
+                           "code {}: {}".format(url, r.status_code, r.reason))
+
+        LOGGER.debug("Received response to PUT request to URL '%s'"
+                     "with status code: '%s': %s", url, r.status_code, r.reason)
+
+        return r
+
+    def delete(self, *args):
+        """Issue an HTTP DELETE resource given in `args`.
+
+        Args:
+            *args: Variable length list of path components used to construct
+                the path to DELETE target.
+
+        Returns:
+            The requests.models.Response object if the request was successful.
+
+        Raises:
+            APIError: if the status code of the response is >= 400 or requests.delete
+                raises a RequestException of any kind.
+        """
+
+        url = urlunparse(('https', self.host, 'apis/{}{}'.format(
+            self.base_resource_path, '/'.join(args)), '', '', ''))
+
+        LOGGER.debug("Issuing DELETE request to URL '%s'", url)
+
+        if self.session is None:
+            requester = requests
+        else:
+            requester = self.session.session
+
+        try:
+            r = requester.delete(url, verify=self.cert_verify)
+        except requests.exceptions.RequestException as err:
+            raise APIError("DELETE request to URL '{}' failed: {}".format(url, err))
+
+        if not r:
+            raise APIError("DELETE request to URL '{}' failed with status "
+                           "code {}: {}".format(url, r.status_code, r.reason))
+
+        LOGGER.debug("Received response to DELETE request to URL '%s'"
+                     "with status code: '%s': %s", url, r.status_code, r.reason)
+
+        return r
+
 
 class HSMClient(APIGatewayClient):
     base_resource_path = 'smd/hsm/v1/'
@@ -119,3 +238,7 @@ class HSMClient(APIGatewayClient):
 
 class FirmwareClient(APIGatewayClient):
     base_resource_path = 'fw-update/v1/'
+
+
+class FabricControllerClient(APIGatewayClient):
+    base_resource_path = 'fc/v2/'
