@@ -204,7 +204,8 @@ class TestBaseComponentProperties(unittest.TestCase):
 
     def test_location_info(self):
         """Test the location_info property."""
-        expected_value = self.raw_data['{}LocationInfo'.format(DEFAULT_HSM_TYPE)]
+        raw_location_info = self.raw_data['{}LocationInfo'.format(DEFAULT_HSM_TYPE)]
+        expected_value = ComponentDataDict(raw_location_info)
         self.assertEqual(self.component.location_info, expected_value)
 
     def test_manufacturer(self):

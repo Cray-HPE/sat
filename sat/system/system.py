@@ -27,6 +27,7 @@ import logging
 from sat.system.component import NodeComponent
 from sat.system.constants import EMPTY_STATUS, STATUS_KEY, TYPE_KEY
 from sat.system.chassis import Chassis
+from sat.system.cmm_rectifier import CMMRectifier
 from sat.system.compute_module import ComputeModule
 from sat.system.drive import Drive
 from sat.system.hsn_board import HSNBoard
@@ -55,6 +56,7 @@ class System:
 
         self.components_by_type = {
             Chassis: {},
+            CMMRectifier: {},
             ComputeModule: {},
             Drive: {},
             HSNBoard: {},

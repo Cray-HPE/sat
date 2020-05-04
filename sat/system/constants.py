@@ -33,6 +33,7 @@ EMPTY_STATUS = 'Empty'
 
 # The various known values for TYPE_KEY in HSM output
 CHASSIS_TYPE = 'Chassis'
+CMM_RECTIFIER_TYPE = 'CMMRectifier'
 COMPUTE_MODULE_TYPE = 'ComputeModule'
 DRIVE_TYPE = 'Drive'
 HSN_BOARD_TYPE = 'HSNBoard'
