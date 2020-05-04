@@ -106,8 +106,7 @@ class Node(BaseComponent):
     @cached_property
     def processor_count(self):
         """int: The number of CPUs on this node."""
-        # Use information from location info for now until Mountain processors show up in HSM
-        return self.location_info.get('ProcessorSummary', {}).get('Count', 0)
+        return len(self.processors)
 
     @cached_property
     def memory_type(self):

@@ -58,6 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Default behavior is now to hide columns when all values for those columns are
   either EMPTY or MISSING.
 - License and notices in files are now the MIT license.
+- Implementation of ``processor_count`` property of ``Node`` objects now counts
+  ``Processor`` objects instead of relying on 'LocationInfo' field in HSM.
 
 ### Fixed
 - Build version in ``sat showrev`` is now read from the /etc/cray-release file
