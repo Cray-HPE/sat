@@ -57,14 +57,14 @@ class TestAPIGatewayClient(unittest.TestCase):
     def test_create_with_host(self):
         """Test creation of APIGatewayClient w/ host."""
         api_gw_host = 'my-api-gw'
-        client = sat.apiclient.APIGatewayClient(None, api_gw_host)
+        client = sat.apiclient.APIGatewayClient(host=api_gw_host)
         self.assertEqual(client.host, api_gw_host)
 
     @mock.patch('requests.get')
     def test_get_no_params(self, mock_requests_get):
         """Test get method with no additional params."""
         api_gw_host = 'my-api-gw'
-        client = sat.apiclient.APIGatewayClient(None, api_gw_host)
+        client = sat.apiclient.APIGatewayClient(host=api_gw_host)
         path_components = ['foo', 'bar', 'baz']
         response = client.get(*path_components)
 
@@ -78,7 +78,7 @@ class TestAPIGatewayClient(unittest.TestCase):
     def test_get_with_params(self, mock_requests_get):
         """Test get method with additional params."""
         api_gw_host = 'my-api-gw'
-        client = sat.apiclient.APIGatewayClient(None, api_gw_host)
+        client = sat.apiclient.APIGatewayClient(host=api_gw_host)
         path_components = ['People']
         params = {'name': 'ryan'}
         response = client.get(*path_components, params=params)
@@ -93,7 +93,7 @@ class TestAPIGatewayClient(unittest.TestCase):
     def test_get_exception(self, mock_requests_get):
         """Test get method with exception during GET."""
         api_gw_host = 'my-api-gw'
-        client = sat.apiclient.APIGatewayClient(None, api_gw_host)
+        client = sat.apiclient.APIGatewayClient(host=api_gw_host)
         path_components = ['foo', 'bar', 'baz']
         with self.assertRaises(sat.apiclient.APIError):
             response = client.get(*path_components, params=None)
@@ -102,7 +102,7 @@ class TestAPIGatewayClient(unittest.TestCase):
     def test_post(self, mock_requests_post):
         """Test post method."""
         api_gw_host = 'my-api-gw'
-        client = sat.apiclient.APIGatewayClient(None, api_gw_host)
+        client = sat.apiclient.APIGatewayClient(host=api_gw_host)
         path_components = ['foo', 'bar', 'baz']
         payload = {}
         response = client.post(*path_components, payload=payload)
@@ -117,7 +117,7 @@ class TestAPIGatewayClient(unittest.TestCase):
     def test_post_exception(self, mock_requests_post):
         """Test post method with exception during POST."""
         api_gw_host = 'my-api-gw'
-        client = sat.apiclient.APIGatewayClient(None, api_gw_host)
+        client = sat.apiclient.APIGatewayClient(host=api_gw_host)
         path_components = ['foo', 'bar', 'baz']
         payload = {}
         with self.assertRaises(sat.apiclient.APIError):
@@ -127,7 +127,7 @@ class TestAPIGatewayClient(unittest.TestCase):
     def test_put(self, mock_requests_put):
         """Test put method."""
         api_gw_host = 'my-api-gw'
-        client = sat.apiclient.APIGatewayClient(None, api_gw_host)
+        client = sat.apiclient.APIGatewayClient(host=api_gw_host)
         path_components = ['foo', 'bar', 'baz']
         payload = {}
         response = client.put(*path_components, payload=payload)
@@ -141,7 +141,7 @@ class TestAPIGatewayClient(unittest.TestCase):
     def test_put_exception(self, mock_requests_put):
         """Test put method with exception during PUT."""
         api_gw_host = 'my-api-gw'
-        client = sat.apiclient.APIGatewayClient(None, api_gw_host)
+        client = sat.apiclient.APIGatewayClient(host=api_gw_host)
         path_components = ['foo', 'bar', 'baz']
         payload = {}
         with self.assertRaises(sat.apiclient.APIError):
@@ -151,7 +151,7 @@ class TestAPIGatewayClient(unittest.TestCase):
     def test_delete(self, mock_requests_delete):
         """Test delete method."""
         api_gw_host = 'my-api-gw'
-        client = sat.apiclient.APIGatewayClient(None, api_gw_host)
+        client = sat.apiclient.APIGatewayClient(host=api_gw_host)
         path_components = ['foo', 'bar', 'baz']
         response = client.delete(*path_components)
 
@@ -165,7 +165,7 @@ class TestAPIGatewayClient(unittest.TestCase):
     def test_delete_exception(self, mock_requests_delete):
         """Test delete method with exception during DELETE."""
         api_gw_host = 'my-api-gw'
-        client = sat.apiclient.APIGatewayClient(None, api_gw_host)
+        client = sat.apiclient.APIGatewayClient(host=api_gw_host)
         path_components = ['foo', 'bar', 'baz']
         with self.assertRaises(sat.apiclient.APIError):
             response = client.delete(*path_components)
@@ -185,7 +185,7 @@ class TestHSMClient(unittest.TestCase):
     def test_get_inventory(self, mock_requests_get):
         """Test call of get method through HSM client."""
         api_gw_host = 'my-api-gw'
-        client = sat.apiclient.HSMClient(None, 'my-api-gw')
+        client = sat.apiclient.HSMClient(host='my-api-gw')
         path_components = ['Inventory', 'Hardware']
         response = client.get(*path_components)
 

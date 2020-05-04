@@ -72,6 +72,55 @@ class APIGatewayClient:
         self.host = host
         self.cert_verify = cert_verify
 
+    def _make_req(self, *args, req_type='GET', req_param=None):
+        """Perform HTTP request with type `req_type` to resource given in `args`.
+        Args:
+            *args: Variable length list of path components used to construct
+                the path to the resource.
+            req_type (str): Type of reqest (GET, POST, PUT, or DELETE).
+            req_param: Parameter(s) depending on request type.
+
+        Returns:
+            The requests.models.Response object if the request was successful.
+
+        Raises:
+            APIError: if the status code of the response is >= 400 or request
+                raises a RequestException of any kind.
+        """
+        url = urlunparse(('https', self.host, 'apis/{}{}'.format(
+            self.base_resource_path, '/'.join(args)), '', '', ''))
+
+        LOGGER.debug("Issuing %s request to URL '%s'", req_type, url)
+
+        if self.session is None:
+            requester = requests
+        else:
+            requester = self.session.session
+
+        try:
+            if req_type == 'GET':
+                r = requester.get(url, params=req_param, verify=self.cert_verify)
+            elif req_type == 'POST':
+                r = requester.post(url, data=req_param, verify=self.cert_verify)
+            elif req_type == 'PUT':
+                r = requester.put(url, data=req_param, verify=self.cert_verify)
+            elif req_type == 'DELETE':
+                r = requester.delete(url, verify=self.cert_verify)
+            else:
+                # Internal error not expected to occur.
+                raise ValueError("Request type '{}' is invalid.".format(req_type))
+        except requests.exceptions.RequestException as err:
+            raise APIError("{} request to URL '{}' failed: {}".format(req_type, url, err))
+
+        if not r:
+            raise APIError("{} request to URL '{}' failed with status "
+                           "code {}: {}".format(req_type, url, r.status_code, r.reason))
+
+        LOGGER.debug("Received response to %s request to URL '%s'"
+                     "with status code: '%s': %s", req_type, url, r.status_code, r.reason)
+
+        return r
+
     def get(self, *args, params=None):
         """Issue an HTTP GET request to resource given in `args`.
 
@@ -88,27 +137,7 @@ class APIGatewayClient:
                 raises a RequestException of any kind.
         """
 
-        url = urlunparse(('https', self.host, 'apis/{}{}'.format(
-            self.base_resource_path, '/'.join(args)), '', '', ''))
-
-        LOGGER.debug("Issuing GET request to URL '%s'", url)
-
-        if self.session is None:
-            requester = requests
-        else:
-            requester = self.session.session
-
-        try:
-            r = requester.get(url, params=params, verify=self.cert_verify)
-        except requests.exceptions.RequestException as err:
-            raise APIError("GET request to URL '{}' failed: {}".format(url, err))
-
-        if not r:
-            raise APIError("GET request to URL '{}' failed with status "
-                           "code {}: {}".format(url, r.status_code, r.reason))
-
-        LOGGER.debug("Received response to GET request to URL '%s'"
-                     "with status code: '%s': %s", url, r.status_code, r.reason)
+        r = self._make_req(*args, req_type='GET', req_param=params)
 
         return r
 
@@ -128,27 +157,7 @@ class APIGatewayClient:
                 raises a RequestException of any kind.
         """
 
-        url = urlunparse(('https', self.host, 'apis/{}{}'.format(
-            self.base_resource_path, '/'.join(args)), '', '', ''))
-
-        LOGGER.debug("Issuing POST request to URL '%s'", url)
-
-        if self.session is None:
-            requester = requests
-        else:
-            requester = self.session.session
-
-        try:
-            r = requester.post(url, data=payload, verify=self.cert_verify)
-        except requests.exceptions.RequestException as err:
-            raise APIError("POST request to URL '{}' failed: {}".format(url, err))
-
-        if not r:
-            raise APIError("POST request to URL '{}' failed with status "
-                           "code {}: {}".format(url, r.status_code, r.reason))
-
-        LOGGER.debug("Received response to POST request to URL '%s'"
-                     "with status code: '%s': %s", url, r.status_code, r.reason)
+        r = self._make_req(*args, req_type='POST', req_param=payload)
 
         return r
 
@@ -168,27 +177,7 @@ class APIGatewayClient:
                 raises a RequestException of any kind.
         """
 
-        url = urlunparse(('https', self.host, 'apis/{}{}'.format(
-            self.base_resource_path, '/'.join(args)), '', '', ''))
-
-        LOGGER.debug("Issuing PUT request to URL '%s'", url)
-
-        if self.session is None:
-            requester = requests
-        else:
-            requester = self.session.session
-
-        try:
-            r = requester.put(url, data=payload, verify=self.cert_verify)
-        except requests.exceptions.RequestException as err:
-            raise APIError("PUT request to URL '{}' failed: {}".format(url, err))
-
-        if not r:
-            raise APIError("PUT request to URL '{}' failed with status "
-                           "code {}: {}".format(url, r.status_code, r.reason))
-
-        LOGGER.debug("Received response to PUT request to URL '%s'"
-                     "with status code: '%s': %s", url, r.status_code, r.reason)
+        r = self._make_req(*args, req_type='PUT', req_param=payload)
 
         return r
 
@@ -207,27 +196,7 @@ class APIGatewayClient:
                 raises a RequestException of any kind.
         """
 
-        url = urlunparse(('https', self.host, 'apis/{}{}'.format(
-            self.base_resource_path, '/'.join(args)), '', '', ''))
-
-        LOGGER.debug("Issuing DELETE request to URL '%s'", url)
-
-        if self.session is None:
-            requester = requests
-        else:
-            requester = self.session.session
-
-        try:
-            r = requester.delete(url, verify=self.cert_verify)
-        except requests.exceptions.RequestException as err:
-            raise APIError("DELETE request to URL '{}' failed: {}".format(url, err))
-
-        if not r:
-            raise APIError("DELETE request to URL '{}' failed with status "
-                           "code {}: {}".format(url, r.status_code, r.reason))
-
-        LOGGER.debug("Received response to DELETE request to URL '%s'"
-                     "with status code: '%s': %s", url, r.status_code, r.reason)
+        r = self._make_req(*args, req_type='DELETE')
 
         return r
 

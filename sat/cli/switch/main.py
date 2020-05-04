@@ -1,7 +1,7 @@
 """
 The main entry point for the switch subcommand.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,8 @@ import sys
 
 from sat.apiclient import APIError, FabricControllerClient
 from sat.session import SATSession
+from sat.util import pester
+from sat.xname import XName
 
 LOGGER = logging.getLogger(__name__)
 
@@ -54,11 +56,18 @@ def do_switch(args):
     """
 
     def clear_port_sets():
-        delete_port_set(portset_name)
-        for port in ports:
-            LOGGER.debug("Deleting port set {}".format(PS_PRE + port))
-            delete_port_set(PS_PRE + port)
-	
+        for ps_name in created_ps_names:
+            LOGGER.debug("Deleting port set {}".format(ps_name))
+            delete_port_set(ps_name)
+
+    if not args.dry_run and not args.action:
+        LOGGER.error("The action option is required if not a dry run, exiting.")
+        sys.exit(0)
+
+    if not (args.disruptive or args.dry_run):
+        if not pester("Enable/disable of switch can impact system. Continue?"):
+            sys.exit(0)
+
     ports = get_switch_ports(args.xname)
     if ports is None:
         sys.exit(1)
@@ -66,6 +75,7 @@ def do_switch(args):
         LOGGER.error('No ports found for switch {}'.format(args.xname))
         sys.exit(2)
 
+    created_ps_names = []
     portset = {}
     portset_name = PS_PRE + args.xname
     portset['name'] = portset_name
@@ -76,17 +86,26 @@ def do_switch(args):
 
     portsets = get_port_sets()
     if portset_name in portsets['names']:
-        LOGGER.error('Port set {} already exists, exiting.'.format(portset_name))
-        sys.exit(3)
+        if args.over_write:
+            LOGGER.error('Port set {} already exists, deleting it.'.format(portset_name))
+            delete_port_set(portset_name)
+        else:
+            LOGGER.error('Port set {} already exists, exiting.'.format(portset_name))
+            sys.exit(3)
     for port in ports:
         ps_name = PS_PRE + port
         if ps_name in portsets['names']:
-            LOGGER.error('Port set {} already exists, exiting.'.format(ps_name))
-            sys.exit(3)
+            if args.over_write:
+                LOGGER.error('Port set {} already exists, deleting it.'.format(ps_name))
+                delete_port_set(ps_name)
+            else:
+                LOGGER.error('Port set {} already exists, exiting.'.format(ps_name))
+                sys.exit(3)
 
     # Create port set for switch.
     if not create_port_set(portset):
         sys.exit(4)
+    created_ps_names.append(portset_name)
 
     # Get configuration for all of the switch ports.
     portset_config = get_port_set_config(portset_name)
@@ -100,9 +119,9 @@ def do_switch(args):
         portset['ports'] = [port]
         LOGGER.debug("Creating port set {}".format(portset['name']))
         if not create_port_set(portset):
-            # Deletion of port sets will log errors for those not created.
             clear_port_sets()
             sys.exit(4)
+        created_ps_names.append(portset['name'])
 
     port_config = {}
     for port in ports:
@@ -110,31 +129,32 @@ def do_switch(args):
             if config['xname'] == port:
                 port_config[port] = config['config']
                 break
-        if port not in port_config:
+        else:
             LOGGER.error("Failed to find config for port {}." + port)
             clear_port_sets()
             sys.exit(5)
 
-    if args.disruptive:
+    if args.dry_run:
+        LOGGER.info('Dry run, so not enabling/disabling switch {}.'.format(args.xname))
+    else:
+        if args.action == 'disable': 
+            LOGGER.info('Disabling ports on switch {}.'.format(args.xname))
+        else:
+            LOGGER.info('Enabling ports on switch {}.'.format(args.xname))
         for port in ports:
-            # Disable port if preparing to replace switch, or enable if finished.
-            if not update_port_set(PS_PRE + port, port_config[port], args.finish):
+            if not update_port_set(PS_PRE + port, port_config[port], args.action == 'enable'):
                 clear_port_sets()
                 sys.exit(6)
-    else:
-        LOGGER.info('Not disabling/enabling switch {} '
-                    'without --disruptive option.'.format(args.xname))
 
     clear_port_sets()
 
-    if args.disruptive:
-        if args.finish:
-            print('Switch has been disabled and is ready for replacment.')
+    if args.dry_run:
+        print('Dry run completed with no action to enable/disable switch.')
+    else:
+        if args.action == 'disable':
+            print('Switch has been disabled and is ready for replacement.')
         else:
             print('Switch has been enabled.')
-    else:
-        print('Trial run completed without actual disabling/enabling of switch.')
-
 
 def output_json(switch_ports, filepath):
     """Output dictionary to file in JSON format."""
@@ -146,14 +166,14 @@ def output_json(switch_ports, filepath):
         return
 
 
-def get_switch_ports(xname):
+def get_switch_ports(switch_xname):
     """Get a list of ports for a switch.
 
     Args:
-        xname: component name of switch
+        switch_xname: component name of switch
 
     Returns:
-        List of port names (xname augmented by port)
+        List of port names (switch xname augmented by port)
         Or None if there is an error with the fabric controller API
     """
     client = FabricControllerClient(SATSession())
@@ -176,19 +196,12 @@ def get_switch_ports(xname):
     if 'ports' not in portinfo:
         LOGGER.error('Key "ports" missing from fabric controller port links.')
         return None
-    if 'edge' not in portinfo['ports'] and 'fabric' not in portinfo['ports']:
-        LOGGER.error('Key "edge" and "fabric" both missing in fabric port links.')
-        return None
 
     # Create list of ports.
     ports = []
-    if 'edge' in portinfo['ports']:
-        for port in portinfo['ports']['edge']:
-            if xname in port:
-                ports.append(port)
-    if 'fabric' in portinfo['ports']:
-        for port in portinfo['ports']['fabric']:
-            if xname in port:
+    for key in portinfo['ports']:
+        for port in portinfo['ports'][key]:
+            if XName(switch_xname).contains_component(XName(port)):
                 ports.append(port)
 
     return ports
@@ -273,11 +286,8 @@ def update_port_set(portset_name, port_config, enable):
     # Example: {"autoneg": true, "enable": false,
     #           "flowControl": {"rx": true, "tx": true}, "speed": "100"}
     # Boolean values are not capitalized and speed value is a string.
-    config_json = ('{"autoneg": ' + str(port_config['autoneg']).lower() +
-                   ', "enable": ' + str(enable).lower() +
-                   ', "flowControl": {"rx": ' + str(port_config['flowControl']['rx']).lower() +
-                   ', "tx": ' + str(port_config['flowControl']['tx']).lower() +
-                   '}, "speed": "' + str(port_config['speed']) + '"}')
+    port_config['enable'] = enable
+    config_json = json.dumps(port_config)
 
     # Update port set through fabric controller gateway API.
     try:

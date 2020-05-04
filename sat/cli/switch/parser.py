@@ -1,7 +1,7 @@
 """
 The parser for the switch subcommand.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -39,14 +39,22 @@ def add_switch_subparser(subparsers):
     switch_parser.add_argument('xname', help='The xname of the switch.')
 
     switch_parser.add_argument(
+        '--action', '-a', choices=['disable', 'enable'],
+        help='Perform action to disable/enable the switch.')
+
+    switch_parser.add_argument(
         '--save-portset', '-s', action='store_true',
         help='Save switch portset JSON as <xname>-ports.json file in current directory.')
 
     switch_parser.add_argument(
-        '--finish', action='store_true',
-        help='Finish switch replacement')
+        '--disruptive', action='store_true',
+        help='Do not ask whether to continue.')
 
     switch_parser.add_argument(
-        '--disruptive', action='store_true',
-        help='Perform action to disable/enable the switch rather than a trial run.')
+        '--over-write', action='store_true',
+        help='Delete and recreate any existing SAT port sets for switch.')
+
+    switch_parser.add_argument(
+        '--dry-run', action='store_true',
+        help='Perform a dry run without enable/disable of the switch.')
 

@@ -1,7 +1,7 @@
 """
 Unit tests for sat.cli.switch
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -34,10 +34,11 @@ import sat.cli.switch.main
 def set_options(namespace):
     """Set default options for Namespace."""
     namespace.xname = 'x1000c6r7'
+    namespace.action = None
+    namespace.disruptive = True
+    namespace.dry_run = True
+    namespace.over_write = False
     namespace.save_portset = False
-    namespace.finish = False
-    namespace.disruptive = False
-
 
 class TestDoSwitch(unittest.TestCase):
     """Unit test for Switch do_switch()."""
@@ -64,6 +65,9 @@ class TestDoSwitch(unittest.TestCase):
 
         self.mock_update_port_set = mock.patch('sat.cli.switch.main.update_port_set',
                                                autospec=True).start()
+
+        self.mock_pester = mock.patch('sat.cli.switch.main.pester', autospec=True).start()
+        self.mock_pester.return_value = True
 
         self.mock_get_port_set_config = mock.patch('sat.cli.switch.main.get_port_set_config',
                                                    autospec=True).start()
@@ -140,10 +144,10 @@ class TestDoSwitch(unittest.TestCase):
         self.mock_delete_port_set.assert_called()
         self.mock_print.assert_called_once()
 
-    def test_finish(self):
-        """Test Switch: do_switch() finish"""
-        self.parsed.disruptive = True
-        self.parsed.finish = True
+    def test_enable(self):
+        """Test Switch: do_switch() enable"""
+        self.parsed.dry_run = False
+        self.parsed.action = 'enable'
         sat.cli.switch.main.do_switch(self.parsed)
         self.mock_get_switch_ports.assert_called_once()
         self.mock_get_port_sets.assert_called_once()
@@ -152,6 +156,49 @@ class TestDoSwitch(unittest.TestCase):
         self.mock_update_port_set.assert_called()
         self.mock_delete_port_set.assert_called()
         self.mock_print.assert_called_once()
+
+    def test_disable(self):
+        """Test Switch: do_switch() disable"""
+        self.parsed.dry_run = False
+        self.parsed.action = 'disable'
+        sat.cli.switch.main.do_switch(self.parsed)
+        self.mock_get_switch_ports.assert_called_once()
+        self.mock_get_port_sets.assert_called_once()
+        self.mock_create_port_set.assert_called()
+        self.mock_get_port_set_config.assert_called_once()
+        self.mock_update_port_set.assert_called()
+        self.mock_delete_port_set.assert_called()
+        self.mock_print.assert_called_once()
+
+    def test_not_disruptive_not_dry(self):
+        """Test Switch: do_switch() not disruptive and not dry run"""
+        self.parsed.disruptive = False
+        self.parsed.dry_run = False
+        self.parsed.action = 'enable'
+        sat.cli.switch.main.do_switch(self.parsed)
+        self.mock_pester.assert_called_once()
+        self.mock_get_switch_ports.assert_called_once()
+        self.mock_get_port_sets.assert_called_once()
+        self.mock_create_port_set.assert_called()
+        self.mock_get_port_set_config.assert_called_once()
+        self.mock_update_port_set.assert_called()
+        self.mock_delete_port_set.assert_called()
+        self.mock_print.assert_called_once()
+
+    def test_not_dry_without_action(self):
+        """Test Switch: do_switch() not dry run without action"""
+        self.parsed.disruptive = False
+        self.parsed.dry_run = False
+        with self.assertRaises(SystemExit):
+            sat.cli.switch.main.do_switch(self.parsed)
+        self.mock_pester.assert_not_called()
+        self.mock_get_switch_ports.assert_not_called()
+        self.mock_get_port_sets.assert_not_called()
+        self.mock_create_port_set.assert_not_called()
+        self.mock_get_port_set_config.assert_not_called()
+        self.mock_update_port_set.assert_not_called()
+        self.mock_delete_port_set.assert_not_called()
+        self.mock_print.assert_not_called()
 
     def test_get_ports_error(self):
         """Test Switch: do_switch() error getting ports"""
@@ -169,7 +216,8 @@ class TestDoSwitch(unittest.TestCase):
 
     def test_update_port_set_error(self):
         """Test Switch: do_switch() error updating port set configuration"""
-        self.parsed.disruptive = True
+        self.parsed.dry_run = False
+        self.parsed.action = 'disable'
         self.mock_update_port_set.return_value = None
         with self.assertRaises(SystemExit):
             sat.cli.switch.main.do_switch(self.parsed)
@@ -306,7 +354,7 @@ class TestGetSwitchPorts(unittest.TestCase):
             ],
             'ports': {
                 'edge': [
-                 'x3000c0r24j4p0', 'x3000c0r24j4p1', 'x3000c0r24j8p0',
+                 'x3000c0r74j4p0', 'x3000c0r74j4p1', 'x3000c0r74j8p0',
                  'x1000c6r7j100p0', 'x1000c6r7j100p1',
                  'x1000c6r7j101p0', 'x1000c6r7j101p1',
                  'x1000c6r7j102p0', 'x1000c6r7j102p1',
@@ -314,7 +362,7 @@ class TestGetSwitchPorts(unittest.TestCase):
                  'x1000c3r7j103p0', 'x1000c3r7j103p1', 'x1000c3r7j101p1'
                 ],
                 'fabric': [
-                    'x3000c0r24j31p1', 'x3000c0r24j31p0', 'x3000c0r24j1p1',
+                    'x3000c0r74j31p1', 'x3000c0r74j31p0', 'x3000c0r74j1p1',
                     'x1000c6r7j2p1', 'x1000c6r7j2p0',
                     'x1000c6r7j4p1', 'x1000c6r7j4p0',
                     'x1000c6r7j6p1', 'x1000c6r7j6p0',
@@ -432,9 +480,8 @@ class TestGetSwitchPorts(unittest.TestCase):
             ],
             'ports': {}
             }
-        with self.assertLogs(level='ERROR'):
-            result = sat.cli.switch.main.get_switch_ports('x1000c6r7')
-        self.assertEqual(result, None)
+        result = sat.cli.switch.main.get_switch_ports('x1000c6r7')
+        self.assertEqual(result, [])
 
     def tearDown(self):
         mock.patch.stopall()
