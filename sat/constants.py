@@ -26,3 +26,5 @@ OTHER DEALINGS IN THE SOFTWARE.
 EMPTY_VALUE = 'EMPTY'
 # The value to use when a requested key is missing
 MISSING_VALUE = 'MISSING'
+# HSM BMC types
+BMC_TYPES = ('NodeBMC', 'RouterBMC', 'ChassisBMC')

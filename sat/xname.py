@@ -178,3 +178,35 @@ class XName:
             if other.tokens[idx] != token:
                 return False
         return True
+
+
+def get_matches(filters, elems):
+    """Separate a list into matching and unmatched members.
+
+    Args:
+        filters: List of xnames having the type XName. If an elem in
+            elems is contained by an xname in this list, meaning it is
+            above the element xname in the hierarchy of xname components,
+            then it will be considered a match.
+        elems: List of xnames to filter.
+
+    Returns:
+        used: Set of filters that generated a match.
+        unused: Set of filters that did not generate a match.
+        matches: Set of elements that matched one or more filters.
+        no_matches: Set of elements that did not match anything.
+    """
+    used = set()
+    unused = set(filters)
+    matches = set()
+    no_matches = set(elems)
+
+    for elem in elems:
+        for filter_ in filters:
+            if filter_.contains_component(elem):
+                used.add(filter_)
+                unused.discard(filter_)
+                matches.add(elem)
+                no_matches.discard(elem)
+
+    return used, unused, matches, no_matches
