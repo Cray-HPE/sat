@@ -197,7 +197,7 @@ class BaseComponent:
     def location_info(self):
         """dict: The location info stored in the raw data."""
         location_info_key = '{}LocationInfo'.format(self.type)
-        return self.raw_data[location_info_key]
+        return ComponentDataDict(self.raw_data[location_info_key])
 
     @cached_property
     def manufacturer(self):

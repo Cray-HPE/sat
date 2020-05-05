@@ -147,6 +147,9 @@ These options list components of certain types in the system.
 **--list-drives**
         List all the drives in the system.
 
+**--list-cmm-rectifiers**
+        List all the CMM rectifiers in the system.
+
 **--node-fields** *NODE_FIELDS*
         Display the given comma-separated list of fields for each node. Omit
         this option to display all fields. This option only has an effect if
@@ -182,6 +185,9 @@ These options list components of certain types in the system.
 
 **--drive-fields** *DRIVE_FIELDS*
         Same as **--node-fields** but for drives.
+
+**--cmm-rectifier-fields** *CMM_RECTIFIER_FIELDS*
+        Same as **--node-fields** but for CMM rectifiers.
 
 .. include:: _sat-format-opts.rst
 .. include:: _sat-filter-opts.rst

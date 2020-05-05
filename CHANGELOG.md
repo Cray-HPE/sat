@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ``sat cablecheck`` supports shared ``--redfish-username`` option.
 - ``sat cablecheck`` supports ``check_hsn_cables.py``'s options.
 - Ability to list drives in ``sat hwinv`` with ``--list-drives``.
+- Ability to list CMM rectifiers in ``sat hwinv`` with ``--list-cmm-rectifiers``
 - New fields for drive counts and total drive capacity when listing and
   summarizing nodes in ``sat hwinv``.
 - New `--show-empty` and `--show-missing` options to allow override of default
@@ -57,6 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Default behavior is now to hide columns when all values for those columns are
   either EMPTY or MISSING.
 - License and notices in files are now the MIT license.
+- Implementation of ``processor_count`` property of ``Node`` objects now counts
+  ``Processor`` objects instead of relying on 'LocationInfo' field in HSM.
 
 ### Fixed
 - Build version in ``sat showrev`` is now read from the /etc/cray-release file

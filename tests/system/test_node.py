@@ -77,6 +77,19 @@ class TestNode(unittest.TestCase):
         self.node.memory_modules = {'{}d{}'.format(NODE_XNAME, index): mm
                                     for index, mm in enumerate(self.fake_mem_modules)}
 
+    def add_fake_processors(self):
+        """Add some fake processors to `self.node`."""
+        self.fake_processors = []
+        # Make the number of processors match the number in LocationInfo, just
+        # for the sake of consistency.
+        for _ in range(DEFAULT_PROCESSOR_COUNT):
+            fake_proc = mock.Mock()
+            self.fake_processors.append(fake_proc)
+        # Set the processors in the node with some xnames beneath the node, not
+        # that it should matter.
+        self.node.processors = {'{}p{}'.format(NODE_XNAME, index): proc
+                                for index, proc in enumerate(self.fake_processors)}
+
     def add_fake_drives(self):
         """Add some fake drives to `self.node`."""
         self.fake_drives = []
@@ -124,6 +137,7 @@ class TestNode(unittest.TestCase):
 
     def test_processor_count(self):
         """Test the processor_count property."""
+        self.add_fake_processors()
         self.assertEqual(DEFAULT_PROCESSOR_COUNT, self.node.processor_count)
 
     def test_memory_type(self):
