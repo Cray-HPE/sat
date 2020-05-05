@@ -95,7 +95,7 @@ def query(xname, addr, username, password):
     """
     url = 'https://{}/redfish/v1/{}'.format(xname, '/'.join(addr))
     try:
-        response = requests.get(url, auth=(username, password), verify=False)
+        response = requests.get(url, auth=(username, password))
     except requests.exceptions.ConnectionError:
         msg = 'No Redfish resource at url {}'.format(url)
         raise requests.exceptions.ConnectionError(msg)
