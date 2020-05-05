@@ -72,6 +72,55 @@ class APIGatewayClient:
         self.host = host
         self.cert_verify = cert_verify
 
+    def _make_req(self, *args, req_type='GET', req_param=None):
+        """Perform HTTP request with type `req_type` to resource given in `args`.
+        Args:
+            *args: Variable length list of path components used to construct
+                the path to the resource.
+            req_type (str): Type of reqest (GET, POST, PUT, or DELETE).
+            req_param: Parameter(s) depending on request type.
+
+        Returns:
+            The requests.models.Response object if the request was successful.
+
+        Raises:
+            APIError: if the status code of the response is >= 400 or request
+                raises a RequestException of any kind.
+        """
+        url = urlunparse(('https', self.host, 'apis/{}{}'.format(
+            self.base_resource_path, '/'.join(args)), '', '', ''))
+
+        LOGGER.debug("Issuing %s request to URL '%s'", req_type, url)
+
+        if self.session is None:
+            requester = requests
+        else:
+            requester = self.session.session
+
+        try:
+            if req_type == 'GET':
+                r = requester.get(url, params=req_param, verify=self.cert_verify)
+            elif req_type == 'POST':
+                r = requester.post(url, data=req_param, verify=self.cert_verify)
+            elif req_type == 'PUT':
+                r = requester.put(url, data=req_param, verify=self.cert_verify)
+            elif req_type == 'DELETE':
+                r = requester.delete(url, verify=self.cert_verify)
+            else:
+                # Internal error not expected to occur.
+                raise ValueError("Request type '{}' is invalid.".format(req_type))
+        except requests.exceptions.RequestException as err:
+            raise APIError("{} request to URL '{}' failed: {}".format(req_type, url, err))
+
+        if not r:
+            raise APIError("{} request to URL '{}' failed with status "
+                           "code {}: {}".format(req_type, url, r.status_code, r.reason))
+
+        LOGGER.debug("Received response to %s request to URL '%s'"
+                     "with status code: '%s': %s", req_type, url, r.status_code, r.reason)
+
+        return r
+
     def get(self, *args, params=None):
         """Issue an HTTP GET request to resource given in `args`.
 
@@ -88,27 +137,66 @@ class APIGatewayClient:
                 raises a RequestException of any kind.
         """
 
-        url = urlunparse(('https', self.host, 'apis/{}{}'.format(
-            self.base_resource_path, '/'.join(args)), '', '', ''))
+        r = self._make_req(*args, req_type='GET', req_param=params)
 
-        LOGGER.debug("Issuing GET request to URL '%s'", url)
+        return r
 
-        if self.session is None:
-            requester = requests
-        else:
-            requester = self.session.session
+    def post(self, *args, payload):
+        """Issue an HTTP POST request to resource given in `args`.
 
-        try:
-            r = requester.get(url, params=params, verify=self.cert_verify)
-        except requests.exceptions.RequestException as err:
-            raise APIError("GET request to URL '{}' failed: {}".format(url, err))
+        Args:
+            *args: Variable length list of path components used to construct
+                the path to POST target.
+            payload: JSON data to post.
 
-        if not r:
-            raise APIError("GET request to URL '{}' failed with status "
-                           "code {}: {}".format(url, r.status_code, r.reason))
+        Returns:
+            The requests.models.Response object if the request was successful.
 
-        LOGGER.debug("Received response to GET request to URL '%s'"
-                     "with status code: '%s': %s", url, r.status_code, r.reason)
+        Raises:
+            APIError: if the status code of the response is >= 400 or requests.post
+                raises a RequestException of any kind.
+        """
+
+        r = self._make_req(*args, req_type='POST', req_param=payload)
+
+        return r
+
+    def put(self, *args, payload):
+        """Issue an HTTP PUT request to resource given in `args`.
+
+        Args:
+            *args: Variable length list of path components used to construct
+                the path to PUT target.
+            payload: JSON data to put.
+
+        Returns:
+            The requests.models.Response object if the request was successful.
+
+        Raises:
+            APIError: if the status code of the response is >= 400 or requests.put
+                raises a RequestException of any kind.
+        """
+
+        r = self._make_req(*args, req_type='PUT', req_param=payload)
+
+        return r
+
+    def delete(self, *args):
+        """Issue an HTTP DELETE resource given in `args`.
+
+        Args:
+            *args: Variable length list of path components used to construct
+                the path to DELETE target.
+
+        Returns:
+            The requests.models.Response object if the request was successful.
+
+        Raises:
+            APIError: if the status code of the response is >= 400 or requests.delete
+                raises a RequestException of any kind.
+        """
+
+        r = self._make_req(*args, req_type='DELETE')
 
         return r
 
@@ -119,3 +207,7 @@ class HSMClient(APIGatewayClient):
 
 class FirmwareClient(APIGatewayClient):
     base_resource_path = 'fw-update/v1/'
+
+
+class FabricControllerClient(APIGatewayClient):
+    base_resource_path = 'fc/v2/'
