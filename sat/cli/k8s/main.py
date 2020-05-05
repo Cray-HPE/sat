@@ -21,6 +21,7 @@ LOGGER = logging.getLogger(__name__)
 
 ReplicaSet = namedtuple('ReplicaSet', ['namespace', 'name'])
 
+
 def get_co_located_replicas():
     """Get pods within a replicaset that are running on the same node.
 

@@ -22,6 +22,7 @@ class FakeReplicaSet:
         self.metadata.namespace = namespace
         self.metadata.labels = {'pod-template-hash': hash_}
 
+
 class FakeReplicaSets:
     """Mocks the return from list_replica_set_for_all_namespaces.
     """
@@ -29,7 +30,8 @@ class FakeReplicaSets:
         self.items = [
             FakeReplicaSet('replica-set1', 'namespace', 'dupes-hash'),
         ]
-    
+
+
 class FakePod:
     def __init__(self, name, node_name):
         self.metadata = Namespace()
@@ -43,6 +45,7 @@ class FakePod:
 
     def __str__(self):
         print(self.metadata.name, self.spec.node_name)
+
 
 class FakePods:
     def __init__(self):

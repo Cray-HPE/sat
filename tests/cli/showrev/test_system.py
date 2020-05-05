@@ -24,8 +24,12 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import codecs
 import os
+import subprocess
 import unittest
+from argparse import Namespace
 from unittest import mock
+
+from kubernetes.client.rest import ApiException
 
 import sat.cli.showrev.system
 
@@ -66,6 +70,9 @@ def zypper_good_xml(packages):
 
 
 class TestSystem(unittest.TestCase):
+
+    def tearDown(self):
+        mock.patch.stopall()
 
     @mock.patch('sat.cli.showrev.system.subprocess.check_output', bad_zypper_return)
     def test_get_zypper_versions_bad_return(self):
@@ -224,6 +231,64 @@ class TestSystem(unittest.TestCase):
         with mock.patch('sat.cli.showrev.system.open', mock_open):
             result = sat.cli.showrev.system.get_sles_version()
             self.assertEqual(result, 'ERROR')
+
+    def test_get_slurm_version_config_exception(self):
+        """get_slurm_version kubernetes config failure test.
+        """
+        mock.patch(
+            'sat.cli.showrev.system.kubernetes.config.load_kube_config',
+            side_effect=ApiException).start()
+
+        slurm_version = sat.cli.showrev.system.get_slurm_version()
+
+        self.assertEqual('ERROR', slurm_version)
+
+    def test_get_slurm_version_pod_exception(self):
+        """get_slurm_version kubernetes list pod exception test.
+        """
+        mock.patch(
+            'sat.cli.showrev.system.kubernetes.config.load_kube_config',
+            return_value=None).start()
+
+        mock.patch(
+            'sat.cli.showrev.system.kubernetes.client.CoreV1Api.list_namespaced_pod',
+            side_effect=ApiException).start()
+
+        slurm_version = sat.cli.showrev.system.get_slurm_version()
+        self.assertEqual('ERROR', slurm_version)
+
+    def test_get_slurm_version_subprocess_exception(self):
+        """get_slurm_version subprocess parsing had an error.
+
+        If the subprocess call within get_slurm_version returned non-zero,
+        then get_slurm_version should return 'ERROR'.
+        """
+        # These classes mock the return from 'list_namespaced_pod'.
+        class Pod:
+            def __init__(self, name):
+                self.metadata = Namespace()
+                self.metadata.name = name
+
+        class Pods:
+            def __init__(self):
+                self.items = [
+                    Pod('doesnt-matter')
+                ]
+
+        mock.patch(
+            'sat.cli.showrev.system.kubernetes.config.load_kube_config',
+            return_value=None).start()
+
+        mock.patch(
+            'sat.cli.showrev.system.kubernetes.client.CoreV1Api.list_namespaced_pod',
+            return_value=Pods()).start()
+
+        mock.patch(
+            'sat.cli.showrev.system.subprocess.check_output',
+            side_effect=subprocess.CalledProcessError(cmd=['whatever'], returncode=1)).start()
+
+        slurm_version = sat.cli.showrev.system.get_slurm_version()
+        self.assertEqual('ERROR', slurm_version)
 
 
 if __name__ == '__main__':
