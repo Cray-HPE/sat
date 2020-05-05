@@ -145,7 +145,12 @@ SEE ALSO
 sat-auth(8),
 sat-cablecheck(8),
 sat-diag(8),
+sat-firmware(8),
 sat-hwinv(8),
+sat-hwmatch(8),
+sat-k8s(8),
+sat-linkhealth(8),
+sat-sensors(8),
 sat-setrev(8),
 sat-showrev(8),
 sat-status(8)

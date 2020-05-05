@@ -34,6 +34,7 @@ Requires: slingshot-tools
 Requires: python3-argcomplete
 Requires: python3-docker
 Requires: python3-inflect < 3.0
+Requires: python3-kubernetes
 Requires: python3-parsec
 Requires: python3-PrettyTable >= 0.7.2, python3-PrettyTable < 1.0
 Requires: python3-PyYAML
