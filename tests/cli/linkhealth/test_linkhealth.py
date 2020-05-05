@@ -208,10 +208,6 @@ class TestDoLinkhealth(unittest.TestCase):
             autospec=True).start()
         self.mock_query.return_value = ('url', {'Members': []})
 
-        self.mock_disable_warnings = mock.patch(
-            'urllib3.disable_warnings',
-            autospec=True).start()
-
         self.mock_report_cls = mock.patch('sat.cli.linkhealth.main.Report',
                                           autospec=True).start()
         self.mock_report_obj = self.mock_report_cls.return_value

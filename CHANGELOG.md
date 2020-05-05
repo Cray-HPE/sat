@@ -70,6 +70,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed ``--substr`` option from ``sat showrev``, the effect of which can
   be accomplished using the general ``--filter`` option instead.
+- Removed certificate-nonvalidation warning-circumvention from ``sat diags``,
+  ``sat linkhealth``, and ``sat sensors``. Occurrence of this warning is no
+  longer normal behavior.
 
 ## [1.3.0] - 2020-04-09
 

@@ -25,7 +25,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 import logging
 import os
 import sys
-import urllib3
 from collections import defaultdict
 
 import requests
@@ -345,9 +344,6 @@ def do_linkhealth(args):
     LOGGER.debug('do_linkhealth received the following args: %s', args)
 
     username, password = redfish.get_username_and_pass(args.redfish_username)
-
-    # TODO: See SAT-140 for how we should handle this.
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     try:
         hsm_xnames = get_router_xnames()
