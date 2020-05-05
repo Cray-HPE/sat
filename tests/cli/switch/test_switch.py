@@ -37,8 +37,9 @@ def set_options(namespace):
     namespace.action = None
     namespace.disruptive = True
     namespace.dry_run = True
-    namespace.over_write = False
+    namespace.overwrite = False
     namespace.save_portset = False
+
 
 class TestDoSwitch(unittest.TestCase):
     """Unit test for Switch do_switch()."""
@@ -308,6 +309,7 @@ class TestDoSwitch(unittest.TestCase):
         self.mock_delete_port_set.assert_called()
         self.mock_print.assert_not_called()
 
+
 class TestOutputJson(unittest.TestCase):
     """Unit test for Switch output_json()."""
 
@@ -331,6 +333,7 @@ class TestOutputJson(unittest.TestCase):
         self.mock_open.side_effect = OSError
         with self.assertLogs(level='ERROR'):
             sat.cli.switch.main.output_json({}, 'filepath')
+
 
 class TestGetSwitchPorts(unittest.TestCase):
     """Unit test for Switch get_switch_ports()."""
@@ -523,6 +526,7 @@ class TestCreatePortSet(unittest.TestCase):
         with self.assertLogs(level='ERROR'):
             result = sat.cli.switch.main.create_port_set(portset)
         self.assertEqual(result, False)
+
 
 class TestGetPortSets(unittest.TestCase):
     """Unit test for Switch get_port_sets()."""

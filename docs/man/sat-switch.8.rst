@@ -38,12 +38,13 @@ These options must be specified after the subcommand.
         Print the help message for 'sat switch'.
 
 **-a, --action** {enable, disable}
-        Perform action to enable or disable the switch.
+        Perform action to enable or disable the switch. This option is
+        required if a dry run is not being performed.
 
 **--disruptive**
         Perform disable/enable action without a prompt to continue.
 
-**--over-write**
+**--overwrite**
         In the unexpected event of a port set to be created already
         existing, delete the port set and then create it. The port set
         name is prefixed by "SAT-" and includes the switch xname. Port
@@ -102,3 +103,5 @@ SEE ALSO
 ========
 
 sat(8)
+
+.. include:: _notice.rst

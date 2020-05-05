@@ -40,7 +40,7 @@ def add_switch_subparser(subparsers):
 
     switch_parser.add_argument(
         '--action', '-a', choices=['disable', 'enable'],
-        help='Perform action to disable/enable the switch.')
+        help='Perform action to disable/enable the switch. Required if not a dry run.')
 
     switch_parser.add_argument(
         '--save-portset', '-s', action='store_true',
@@ -51,10 +51,9 @@ def add_switch_subparser(subparsers):
         help='Do not ask whether to continue.')
 
     switch_parser.add_argument(
-        '--over-write', action='store_true',
+        '--overwrite', action='store_true',
         help='Delete and recreate any existing SAT port sets for switch.')
 
     switch_parser.add_argument(
         '--dry-run', action='store_true',
         help='Perform a dry run without enable/disable of the switch.')
-

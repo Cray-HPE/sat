@@ -86,7 +86,7 @@ def do_switch(args):
 
     portsets = get_port_sets()
     if portset_name in portsets['names']:
-        if args.over_write:
+        if args.overwrite:
             LOGGER.error('Port set {} already exists, deleting it.'.format(portset_name))
             delete_port_set(portset_name)
         else:
@@ -95,7 +95,7 @@ def do_switch(args):
     for port in ports:
         ps_name = PS_PRE + port
         if ps_name in portsets['names']:
-            if args.over_write:
+            if args.overwrite:
                 LOGGER.error('Port set {} already exists, deleting it.'.format(ps_name))
                 delete_port_set(ps_name)
             else:
@@ -137,7 +137,7 @@ def do_switch(args):
     if args.dry_run:
         LOGGER.info('Dry run, so not enabling/disabling switch {}.'.format(args.xname))
     else:
-        if args.action == 'disable': 
+        if args.action == 'disable':
             LOGGER.info('Disabling ports on switch {}.'.format(args.xname))
         else:
             LOGGER.info('Enabling ports on switch {}.'.format(args.xname))
@@ -155,6 +155,7 @@ def do_switch(args):
             print('Switch has been disabled and is ready for replacement.')
         else:
             print('Switch has been enabled.')
+
 
 def output_json(switch_ports, filepath):
     """Output dictionary to file in JSON format."""

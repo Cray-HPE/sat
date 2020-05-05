@@ -301,5 +301,6 @@ class TestFabricControllerClient(unittest.TestCase):
         )
         self.assertEqual(response, mock_requests_delete.return_value)
 
+
 if __name__ == '__main__':
     unittest.main()
