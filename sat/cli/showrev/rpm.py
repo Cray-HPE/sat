@@ -27,14 +27,12 @@ import shlex
 import subprocess
 
 
-def get_rpms(substr=''):
+def get_rpms():
     """Collect version information about installed rpms.
 
     Returns a list of all rpms and their versions that are installed on
     the system.
 
-    Args:
-        substr: Only return packages that contain the substr.
     Returns:
         List of lists where each entry contains the name of an rpm and its
         associated version.
@@ -54,9 +52,6 @@ def get_rpms(substr=''):
     rpms = []
     for line in packages:
         rpms.append(line.split())
-
-    if substr:
-        rpms[:] = [x for x in rpms if substr in x[0]]
 
     rpms.sort()
     return rpms

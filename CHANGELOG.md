@@ -65,6 +65,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build version in ``sat showrev`` is now read from the /etc/cray-release file
   and the field now reads "Release version".
 
+### Removed
+- Removed ``--substr`` option from ``sat showrev``, the effect of which can
+  be accomplished using the general ``--filter`` option instead.
+
 ## [1.3.0] - 2020-04-09
 
 ### Added

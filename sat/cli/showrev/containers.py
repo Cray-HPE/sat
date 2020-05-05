@@ -25,12 +25,9 @@ OTHER DEALINGS IN THE SOFTWARE.
 import docker
 
 
-def get_dockers(substr=''):
+def get_dockers():
     """Return names and version info from installed images.
 
-    Args:
-        substr: Only return information about docker images whose name or id
-            contains the substr.
     Returns:
         A list of lists; each containing 3+ entries. The first entry contains
         the docker image id. The second contains the image's base-name. The
@@ -50,17 +47,16 @@ def get_dockers(substr=''):
             fields = tags[0].split(':')
             name = fields[-2].split('/')[-1]
 
-            if not substr or substr in name or substr in full_id:
-                versions = []
-                for tag in tags:
-                    version = tag.split(':')[-1]
-                    if version not in versions and version != 'latest':
-                        versions.append(version)
+            versions = []
+            for tag in tags:
+                version = tag.split(':')[-1]
+                if version not in versions and version != 'latest':
+                    versions.append(version)
 
-                if not versions:
-                    versions.append('latest')
+            if not versions:
+                versions.append('latest')
 
-                ret.append([name, short_id, ', '.join(versions)])
+            ret.append([name, short_id, ', '.join(versions)])
 
     ret.sort()
     return ret

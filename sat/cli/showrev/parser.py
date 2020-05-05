@@ -65,11 +65,6 @@ def add_showrev_subparser(subparsers):
     showrev_parser.add_argument(
         '--packages', help='Display installed rpm versions.', action='store_true')
     showrev_parser.add_argument(
-        '-s',
-        '--substr',
-        help='Show version information for components whose names or IDs contain the substring.',
-        default='')
-    showrev_parser.add_argument(
         '--sitefile',
         help='Specify custom site information file printed by --system.',
         default='')

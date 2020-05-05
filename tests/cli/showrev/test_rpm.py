@@ -52,26 +52,12 @@ class TestRpms(unittest.TestCase):
         comp = [x.split() for x in fakerpms.decode('utf-8').splitlines()]
         self.assertEqual(result, sorted(comp))
 
-    @mock.patch('sat.cli.showrev.rpm.subprocess.check_output', return_value=fakerpms)
-    def test_get_rpms_substr_filter(self, _):
-        """Positive test case for filtering on substring.
-        """
-        result = sat.cli.showrev.rpm.get_rpms('aa')
-        self.assertEqual(result, [['aaa', '5.0.0'], ['baa', '4.0.0']])
-
     @mock.patch('sat.cli.showrev.rpm.subprocess.check_output', side_effect=CalledProcessError)
     def test_get_rpms_error(self, _):
         """get_rpms should return None if there was an error.
         """
         result = sat.cli.showrev.rpm.get_rpms()
         self.assertEqual(result, None)
-
-    @mock.patch('sat.cli.showrev.rpm.subprocess.check_output', return_value=fakerpms)
-    def test_get_rpms_no_match(self, _):
-        """get_rpms should return an empty list when there are no matches.
-        """
-        result = sat.cli.showrev.rpm.get_rpms('idontexist')
-        self.assertEqual(result, [])
 
 
 if __name__ == '__main__':

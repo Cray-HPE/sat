@@ -61,7 +61,7 @@ def do_showrev(args):
         args.products = True
 
     if args.system:
-        data = system.get_system_version(args.sitefile, args.substr)
+        data = system.get_system_version(args.sitefile)
         if not data:
             LOGGER.warning('Could not retrieve system version information.')
 
@@ -86,7 +86,7 @@ def do_showrev(args):
             reports[-1].add_rows(data)
 
     if args.docker:
-        data = containers.get_dockers(args.substr)
+        data = containers.get_dockers()
         if not data:
             LOGGER.warning(
                 'Could not retrieve list of installed docker containers.')
@@ -100,7 +100,7 @@ def do_showrev(args):
             reports[-1].add_rows(data)
 
     if args.packages:
-        data = rpm.get_rpms(args.substr)
+        data = rpm.get_rpms()
         if not data:
             LOGGER.warning('Could not retrieve list of installed rpms.')
 

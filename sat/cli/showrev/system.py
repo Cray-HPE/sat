@@ -278,15 +278,12 @@ def get_sles_version():
     return 'ERROR'
 
 
-def get_system_version(sitefile, substr=''):
+def get_system_version(sitefile):
     """Collects generic information about the system.
 
     This is the function that 'decides' what components (and their versions)
     adequately describe the 'version' of the system.
 
-    Args:
-        substr: Only return information about docker images whose name or id
-            contains the substr.
     Returns:
         A list of lists that contains version information about the
         various system components.
@@ -314,5 +311,4 @@ def get_system_version(sitefile, substr=''):
     ])
 
     return [[field_name, field_getter()]
-            for field_name, field_getter in field_getters_by_name.items()
-            if substr in field_name]
+            for field_name, field_getter in field_getters_by_name.items()]
