@@ -25,12 +25,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2020-05-06
 
 ### Added
 - ``sat sensors`` supports ``--types`` for BMC types.
 - ``sat sensors`` handles ``--xnames`` consistenty with ``sat linkhealth``.
-- ``sat cablecheck`` supports shared ``--redfish-username`` option.
+- ``sat diag`` supports shared ``--redfish-username`` option.
 - ``sat cablecheck`` supports ``check_hsn_cables.py``'s options.
 - Ability to list drives in ``sat hwinv`` with ``--list-drives``.
 - Ability to list CMM rectifiers in ``sat hwinv`` with ``--list-cmm-rectifiers``
@@ -44,38 +44,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same node.
 
 ### Changed
+- Default behavior when printing tables is now to hide columns when values for
+  those columns are either all EMPTY or all MISSING. The default behavior can be
+  overridden using the `--show-empty` and `--show-missing` options.
 - Man page of ``sat sensors`` revised to be more explicit with respect to
   supported BMC types and for style consistency.
 - Errors in ``sat sensors`` changed to be less confusing. The xname is
   included in query errors and the "unable to identify" error is omitted
   if one of these errors is logged.
 - Man page of ``sat diag`` revised to better cover interactive mode.
-- Showrev will no longer exit at the first failure to retrieve a set
-  of information.
-  E.g., a failure to retrieve package version info will not impact showrev's
-  ability to display system revision information.
+- Showrev will no longer exit at the first failure to retrieve a set of
+  information. E.g., a failure to retrieve package version info will not impact
+  showrev's ability to display system revision information.
 - Improved sitefile handling by ``sat setrev`` to create directory and better
   detect and warn if file does not appear to be as expected.
 - Included username in warning for failure to authenticate with token.
 - Moved Redfish indication in user/password prompt to left side of colon.
-- ``sat hwinv`` now reports memory in GiB rounded to 2 plaecs.
-- Default behavior is now to hide columns when all values for those columns are
-  either EMPTY or MISSING.
-- License and notices in files are now the MIT license.
+- ``sat hwinv`` now reports memory in GiB rounded to 2 places.
+- Changed project license from Cray Proprietary to MIT license and added notices
+  to all source files.
 - Implementation of ``processor_count`` property of ``Node`` objects now counts
   ``Processor`` objects instead of relying on 'LocationInfo' field in HSM.
-
-### Fixed
-- Build version in ``sat showrev`` is now read from the /etc/cray-release file
-  and the field now reads "Release version".
-- Slurm version now checked via pod.
 
 ### Removed
 - Removed ``--substr`` option from ``sat showrev``, the effect of which can
   be accomplished using the general ``--filter`` option instead.
-- Removed certificate-nonvalidation warning-circumvention from ``sat diags``,
+- Removed certificate-nonvalidation warning circumvention from ``sat diags``,
   ``sat linkhealth``, and ``sat sensors``. Occurrence of this warning is no
   longer normal behavior.
+
+### Fixed
+- Build version in ``sat showrev`` is now read from the ``/etc/cray-release``
+  file and the field now reads "Release version".
+- Slurm version now checked via pod.
 
 ## [1.3.0] - 2020-04-09
 
