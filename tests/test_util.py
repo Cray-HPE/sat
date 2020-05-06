@@ -1,7 +1,25 @@
 """
 Unit tests for sat/util.py .
 
-Copyright 2019 Cray Inc. All Rights Reserved.
+(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
 """
 from itertools import product
 import os
@@ -189,3 +207,40 @@ class TestMiscUtils(unittest.TestCase):
         self.mkdir_mock.side_effect = FileNotFoundError('Couldn\'t open it...')
         with self.assertRaises(SystemExit):
             util.get_resource_filename(self.resource)
+
+
+class TestBytesToGibibytes(unittest.TestCase):
+    """Test conversion of bytes to gibibytes"""
+    def test_power_of_2(self):
+        """Test conversion with powers of 2"""
+        exponents = [28, 30, 32, 34, 40]
+        for exponent in exponents:
+            expected_gib = 2 ** (exponent - 30)
+            self.assertEqual(util.bytes_to_gib(2 ** exponent), expected_gib)
+
+    def test_fractional_power_of_2(self):
+        """Test that rounding works with a fractional GiB value"""
+        # 2^27 bytes should be 1/8 of a byte, which converts to 0.125
+        bytes_val = 2 ** 27
+        # Note that the underlying round function uses bankers' rounding where
+        # numbers equidistant to two ints are rounded to the nearest even int
+        self.assertEqual(util.bytes_to_gib(bytes_val), 0.12)
+        self.assertEqual(util.bytes_to_gib(bytes_val, 3), 0.125)
+        self.assertEqual(util.bytes_to_gib(bytes_val, 4), 0.125)
+
+    def test_non_power_of_2(self):
+        """Test a number that is not an even power of 2."""
+        bytes_val = 2**35 + 2**27
+        self.assertEqual(util.bytes_to_gib(bytes_val), 32.12)
+        self.assertEqual(util.bytes_to_gib(bytes_val, 3), 32.125)
+
+    def test_real_value(self):
+        """Test a real value seen on a system."""
+        bytes_val = 503424483328
+        self.assertEqual(util.bytes_to_gib(bytes_val), 468.85)
+        self.assertEqual(util.bytes_to_gib(bytes_val, 3), 468.851)
+        self.assertEqual(util.bytes_to_gib(bytes_val, 4), 468.8506)
+
+
+if __name__ == '__main__':
+    unittest.main()

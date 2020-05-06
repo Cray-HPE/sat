@@ -1,14 +1,32 @@
 """
 Entry point for the sensors subcommand.
 
-Copyright 2020 Cray Inc. All Rights Reserved.
+(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import logging
-import sys
 
 from sat.config import get_config_value
 import sat.redfish
+import sat.xname
 
 from sat.cli.sensors.sensortypes import (
     SensorsParser, VoltageMarginsParser, TemperaturesParser,
@@ -42,11 +60,10 @@ def do_sensors(args):
     Returns:
         None
     """
-    if not args.xnames:
-        LOGGER.error("No xnames were supplied.")
-        sys.exit(1)
 
     username, password = sat.redfish.get_username_and_pass(args.redfish_username)
+
+    xnames = sat.redfish.screen_xname_args(args.xnames, args.types)
 
     # If there's no capture, manager is a pass-through
     capture_mgr = CaptureManager(args)
@@ -68,7 +85,8 @@ def do_sensors(args):
 
     n = 0
 
-    for xname in args.xnames:
+    for xname in xnames:
+        xname = str(xname)
         bmc = capture_mgr.bmc_factory(xname, username, password)
         bmc.detect_type()
 

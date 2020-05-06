@@ -7,7 +7,7 @@ Run L1 Rosetta diagnostics at scale
 -----------------------------------
 
 :Author: Cray Inc.
-:Copyright: Copyright 2019 Cray Inc. All Rights Reserved.
+:Copyright: Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -23,7 +23,8 @@ number of Rosetta switches. This tool accepts a list of switch xnames
 from the command line, a file, and/or stdin, and will launch a given
 command on these hosts. Switches are polled at a specific interval.
 A report is printed after all switches have completed their diagnostics,
-either to stdout (default) or to files, one for each switch.
+either to stdout (default) or to files, one for each switch. A Redfish
+username and password is required.
 
 ARGUMENTS
 =========
@@ -67,10 +68,15 @@ These options must be specified after the subcommand.
         If this flag is supplied, the user will be given an interactive shell
         from which multiple diagnostic commands can be launched sequentially.
         Note that this option may only be supplied if **command** is not
-        given. At least one of **command** or **--interactive** must be supplied
-        on the command line.
+        given.
+
+        While in interactive mode, type **quit**, **exit**, or **ctrl-d** to
+        exit. **help** is also available as a quick reference.
+
+Exactly one of **command** or **--interactive** must be supplied.
 
 .. include:: _sat-xname-opts.rst
+.. include:: _sat-redfish-opts.rst
 
 EXAMPLES
 ========
@@ -104,3 +110,5 @@ SEE ALSO
 ========
 
 sat(8)
+
+.. include:: _notice.rst

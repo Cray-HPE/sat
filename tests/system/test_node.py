@@ -1,7 +1,25 @@
 """
 Unit tests for sat.system.node.
 
-Copyright 2019-2020 Cray Inc. All Rights Reserved.
+(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
 """
 import unittest
 from unittest import mock
@@ -50,7 +68,7 @@ class TestNode(unittest.TestCase):
         self.fake_mem_modules = []
         # Give each fake memory module 32 GiB capacity
         self.mem_module_capacity_gib = 32
-        for i in range(4):
+        for _ in range(4):
             fake_mem = mock.Mock()
             fake_mem.capacity_mib = self.mem_module_capacity_gib * 1024
             self.fake_mem_modules.append(fake_mem)
@@ -58,6 +76,33 @@ class TestNode(unittest.TestCase):
         # that it should matter.
         self.node.memory_modules = {'{}d{}'.format(NODE_XNAME, index): mm
                                     for index, mm in enumerate(self.fake_mem_modules)}
+
+    def add_fake_processors(self):
+        """Add some fake processors to `self.node`."""
+        self.fake_processors = []
+        # Make the number of processors match the number in LocationInfo, just
+        # for the sake of consistency.
+        for _ in range(DEFAULT_PROCESSOR_COUNT):
+            fake_proc = mock.Mock()
+            self.fake_processors.append(fake_proc)
+        # Set the processors in the node with some xnames beneath the node, not
+        # that it should matter.
+        self.node.processors = {'{}p{}'.format(NODE_XNAME, index): proc
+                                for index, proc in enumerate(self.fake_processors)}
+
+    def add_fake_drives(self):
+        """Add some fake drives to `self.node`."""
+        self.fake_drives = []
+        # Give each fake drive a 500 GiB capacity
+        self.drive_capacity_gib = 500
+        for _ in range(4):
+            fake_drive = mock.Mock()
+            fake_drive.capacity_bytes = 500 * 2**30
+            self.fake_drives.append(fake_drive)
+        # Set the drives in the node with some xnames beneath the node, not
+        # that it should matter.
+        self.node.drives = {'{}g1k{}'.format(NODE_XNAME, index): drive
+                            for index, drive in enumerate(self.fake_drives)}
 
     def test_init(self):
         """Test initialization of a Node object."""
@@ -92,6 +137,7 @@ class TestNode(unittest.TestCase):
 
     def test_processor_count(self):
         """Test the processor_count property."""
+        self.add_fake_processors()
         self.assertEqual(DEFAULT_PROCESSOR_COUNT, self.node.processor_count)
 
     def test_memory_type(self):
@@ -128,6 +174,17 @@ class TestNode(unittest.TestCase):
         """Test the memory_module_count property."""
         self.add_fake_mem_modules()
         self.assertEqual(self.node.memory_module_count, len(self.fake_mem_modules))
+
+    def test_total_drive_capacity_gib(self):
+        """Test the total_drive_capacity_gib property."""
+        self.add_fake_drives()
+        self.assertEqual(self.node.total_drive_capacity_gib,
+                         len(self.fake_drives) * self.drive_capacity_gib)
+
+    def test_drive_count(self):
+        """Test the drive_count property."""
+        self.add_fake_drives()
+        self.assertEqual(self.node.drive_count, len(self.fake_drives))
 
     def test_bios_version(self):
         """Test the bios_version property."""

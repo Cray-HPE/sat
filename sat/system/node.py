@@ -1,16 +1,36 @@
 """
 Class to represent a node object obtained from Hardware State Manager (HSM).
 
-Copyright 2019-2020 Cray Inc. All Rights Reserved.
+(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
 """
 import logging
 
 from sat.cached_property import cached_property
 from sat.system.component import BaseComponent
 from sat.system.constants import CAB_TYPE_C, CAB_TYPE_S, NODE_TYPE
+from sat.system.drive import Drive
 from sat.system.field import ComponentField
 from sat.system.memory_module import MemoryModule
 from sat.system.processor import Processor
+from sat.util import bytes_to_gib
 
 LOGGER = logging.getLogger(__name__)
 
@@ -34,6 +54,8 @@ class Node(BaseComponent):
         ComponentField('Processor Count'),
         ComponentField('Processor Manufacturer', summarizable=True),
         ComponentField('Processor Model', summarizable=True),
+        ComponentField('Drive Count', summarizable=True),
+        ComponentField('Total Drive Capacity (GiB)', summarizable=True),
         ComponentField('BIOS Version'),
     ]
 
@@ -53,10 +75,12 @@ class Node(BaseComponent):
         # are children of this node.
         self.memory_modules = {}
         self.processors = {}
+        self.drives = {}
 
         self.children_by_type = {
             MemoryModule: self.memory_modules,
-            Processor: self.processors
+            Processor: self.processors,
+            Drive: self.drives
         }
 
     @cached_property
@@ -82,8 +106,7 @@ class Node(BaseComponent):
     @cached_property
     def processor_count(self):
         """int: The number of CPUs on this node."""
-        # Use information from location info for now until Mountain processors show up in HSM
-        return self.location_info.get('ProcessorSummary', {}).get('Count', 0)
+        return len(self.processors)
 
     @cached_property
     def memory_type(self):
@@ -108,12 +131,31 @@ class Node(BaseComponent):
     @cached_property
     def memory_size_gib(self):
         """float: The total memory size (in GiB) of this node."""
-        return sum([mm.capacity_mib for mm in self.memory_modules.values()]) / 1024
+        megs = sum([mm.capacity_mib for mm in self.memory_modules.values()])
+        gigs = megs / 1024
+        return round(gigs, 2)
 
     @cached_property
     def memory_module_count(self):
         """int: The number of memory modules this node has."""
         return len(self.memory_modules)
+
+    @cached_property
+    def drive_count(self):
+        """int: The number of drives this node has."""
+        return len(self.drives)
+
+    @cached_property
+    def total_drive_capacity_gib(self):
+        """float: The total capacity in GiB of all drives in this node"""
+        try:
+            bytes = sum([drive.capacity_bytes for drive in self.drives.values()])
+            return bytes_to_gib(bytes)
+        except TypeError as err:
+            LOGGER.warning("Unable to compute total drive capacity for node "
+                           "'%s' due to non-numeric drive capacity values: %s",
+                           self, err)
+            return 0
 
     @cached_property
     def bios_version(self):

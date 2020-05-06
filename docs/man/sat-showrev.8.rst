@@ -7,7 +7,7 @@ Print version information about the system
 ------------------------------------------
 
 :Author: Cray Inc.
-:Copyright: Copyright 2019 Cray Inc. All Rights Reserved.
+:Copyright: Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -29,9 +29,6 @@ site-specific information read from ``/opt/cray/etc/site_info.yml``, and various
 api calls to other Cray services. The following list details the meaning and
 source of information for each field.
 
-Build version
-    Not implemented, so it always displays None.
-
 Interconnect
     Unique list of interconnect names obtained from the Hardware State
     Manager (HSM).
@@ -45,6 +42,9 @@ Lustre
 PBS version
     Version of PBS available in the Zypper repositories.
 
+Release version
+    Release version as indicated by ``/etc/cray-release``.
+
 SLES version
     Version of SLES read from ``/etc/os-release`` on the local host.
 
@@ -57,7 +57,7 @@ Site name
     ``/opt/cray/etc/site_info.yml``.
 
 Slurm version
-    Version of Slurm available in the Zypper repositories.
+    Version of Slurm as indicated by slurmctld.
 
 System install date
     Manually populated by ``sat setrev`` and read back from
@@ -104,10 +104,6 @@ These options must be specified after the subcommand.
         Display everything. Equivalent to specifying **--system**,
         **--products**, **--docker**, and **--packages**.
 
-**-s** *SUBSTR*, **--substr** *SUBSTR*
-        Show version information for components whose names or IDs contain
-        the substring.
-
 **--sitefile** *file*
         Specify custom site information file printed by --system. This file
         must be in a YAML format.
@@ -136,7 +132,57 @@ release: /opt/cray/etc/release
         Showrev parses this file to collect information for the CLE
         version, General, PE, SLES version, SAT, and Urika fields.
 
+EXAMPLES
+========
+
+Get Slurm version for system:
+
+::
+
+  # sat showrev --system --filter 'component=*slurm*'
+  ################################################################################
+  System Revision Information
+  ################################################################################
+  +---------------+-------------------------------------+
+  | component     | data                                |
+  +---------------+-------------------------------------+
+  | Slurm version | 19.05.5-1.20200309123824_9d0f0cac60 |
+  +---------------+-------------------------------------+
+
+Get Slurm versions for docker:
+
+::
+
+  # sat showrev --docker --filter 'name=*slurm*' 
+  ################################################################################
+  Installed Container Versions
+  ################################################################################
+  +--------------------------+------------+----------------------------------+
+  | name                     | short-id   | versions                         |
+  +--------------------------+------------+----------------------------------+
+  | cray-uas-sles15sp1-slurm | d6b936615b | latest                           |
+  | slurm-clients            | 331803757e | 19.05.5-2-20200330183104_a265368 |
+  | slurm-slurmctld          | 5996c2431c | 19.05.5-2-20200330183106_a265368 |
+  | slurm-slurmdbd           | 525f1f72f4 | 19.05.5-2-20200330183108_a265368 |
+  +--------------------------+------------+----------------------------------+
+
+Get Slurm versions for packages:
+
+::
+
+  # sat showrev --packages --filter 'name=*slurm*' 
+  ################################################################################
+  Installed Package Versions
+  ################################################################################
+  +---------------------+---------+
+  | name                | version |
+  +---------------------+---------+
+  | slurm-crayctldeploy | 0.3.4   |
+  +---------------------+---------+
+
 SEE ALSO
 ========
 
 sat(8)
+
+.. include:: _notice.rst

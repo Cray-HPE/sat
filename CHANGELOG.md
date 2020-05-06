@@ -1,9 +1,82 @@
 # Changelog
 
+(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [2.0.0] - 2020-05-06
+
+### Added
+- ``sat sensors`` supports ``--types`` for BMC types.
+- ``sat sensors`` handles ``--xnames`` consistenty with ``sat linkhealth``.
+- ``sat diag`` supports shared ``--redfish-username`` option.
+- ``sat cablecheck`` supports ``check_hsn_cables.py``'s options.
+- Ability to list drives in ``sat hwinv`` with ``--list-drives``.
+- Ability to list CMM rectifiers in ``sat hwinv`` with ``--list-cmm-rectifiers``
+- New fields for drive counts and total drive capacity when listing and
+  summarizing nodes in ``sat hwinv``.
+- New `--show-empty` and `--show-missing` options to allow override of default
+  behavior to hide columns that are all EMPTY or MISSING.
+- ``sat switch`` command for automation of switch enable/disable during
+  switch replacement.
+- ``sat k8s`` command which currently shows replica pods spun up on the
+  same node.
+
+### Changed
+- Default behavior when printing tables is now to hide columns when values for
+  those columns are either all EMPTY or all MISSING. The default behavior can be
+  overridden using the `--show-empty` and `--show-missing` options.
+- Man page of ``sat sensors`` revised to be more explicit with respect to
+  supported BMC types and for style consistency.
+- Errors in ``sat sensors`` changed to be less confusing. The xname is
+  included in query errors and the "unable to identify" error is omitted
+  if one of these errors is logged.
+- Man page of ``sat diag`` revised to better cover interactive mode.
+- Showrev will no longer exit at the first failure to retrieve a set of
+  information. E.g., a failure to retrieve package version info will not impact
+  showrev's ability to display system revision information.
+- Improved sitefile handling by ``sat setrev`` to create directory and better
+  detect and warn if file does not appear to be as expected.
+- Included username in warning for failure to authenticate with token.
+- Moved Redfish indication in user/password prompt to left side of colon.
+- ``sat hwinv`` now reports memory in GiB rounded to 2 places.
+- Changed project license from Cray Proprietary to MIT license and added notices
+  to all source files.
+- Implementation of ``processor_count`` property of ``Node`` objects now counts
+  ``Processor`` objects instead of relying on 'LocationInfo' field in HSM.
+
+### Removed
+- Removed ``--substr`` option from ``sat showrev``, the effect of which can
+  be accomplished using the general ``--filter`` option instead.
+- Removed certificate-nonvalidation warning circumvention from ``sat diags``,
+  ``sat linkhealth``, and ``sat sensors``. Occurrence of this warning is no
+  longer normal behavior.
+
+### Fixed
+- Build version in ``sat showrev`` is now read from the ``/etc/cray-release``
+  file and the field now reads "Release version".
+- Slurm version now checked via pod.
 
 ## [1.3.0] - 2020-04-09
 
@@ -42,10 +115,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Updated ``setup.py`` to not include our ``tools`` python package and
   subpackages of our ``tests`` package.
-
-### Changed
-- Changed ``sat linkhealth`` to display "flow control config" rather than
-  "flow_control_configuration" as a column heading.
 
 ## [1.1.1] - 2020-03-20
 

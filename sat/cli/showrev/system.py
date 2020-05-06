@@ -1,7 +1,25 @@
 """
 Functions for obtaining system-level version information.
 
-Copyright 2019 Cray Inc. All Rights Reserved.
+(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import configparser
@@ -14,7 +32,9 @@ import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from collections import defaultdict
 
+import kubernetes
 import yaml
+from kubernetes.client.rest import ApiException
 
 from sat.apiclient import APIError, HSMClient
 from sat.config import get_config_value
@@ -201,8 +221,29 @@ def get_interconnects():
     return networks
 
 
-def get_build_version():
-    return None
+def get_release_version():
+    """Gets release version as found in /etc/cray-release
+
+    Returns:
+        A string containing the version, or "ERROR" if it could not be read.
+    """
+    rel_path = '/etc/cray-release'
+    s = ''
+    try:
+        with open(rel_path, 'r') as f:
+            s = '[default]' + f.read()
+    except (FileNotFoundError, AttributeError, PermissionError):
+        LOGGER.error('Could not open {} for reading.'.format(rel_path))
+        return 'ERROR'
+
+    cp = configparser.ConfigParser()
+    cp.read_string(s)
+
+    try:
+        return cp['default']['VERSION']
+    except KeyError:
+        LOGGER.error('No "VERSION" field in {}.'.format(rel_path))
+        return 'ERROR'
 
 
 def get_sles_version():
@@ -217,7 +258,7 @@ def get_sles_version():
     try:
         with open(osrel_path, 'r') as f:
             config_string = '[default]\n' + f.read()
-    except (FileNotFoundError, AttributeError):
+    except (FileNotFoundError, AttributeError, PermissionError):
         LOGGER.error('ERROR: Could not open {}.'.format(osrel_path))
         return 'ERROR'
 
@@ -239,41 +280,74 @@ def get_sles_version():
     return 'ERROR'
 
 
+def get_slurm_version():
+    """Get version of slurm.
+
+    Returns:
+        String representing version of slurm. Returns 'ERROR' if something
+        went wrong.
+    """
+    try:
+        kubernetes.config.load_kube_config()
+    except ApiException as err:
+        LOGGER.error('Reading kubernetes config: {}'.format(err))
+        return 'ERROR'
+
+    ns = 'user'
+    try:
+        dump = kubernetes.client.CoreV1Api().list_namespaced_pod(ns, label_selector='app=slurmctld')
+        pod = dump.items[0].metadata.name
+    except ApiException as err:
+        LOGGER.error('Could not retrieve list of pods: {}'.format(err))
+        return 'ERROR'
+
+    cmd = 'kubectl exec -n {} -c slurmctld {} -- sinfo --version'.format(ns, pod)
+    toks = shlex.split(cmd)
+
+    try:
+        output = subprocess.check_output(toks)
+        version = output.decode('utf-8').splitlines[0]
+    except IndexError:
+        LOGGER.error('Command to print slurm version returned no stdout.')
+        return 'ERROR'
+    except subprocess.CalledProcessError as e:
+        LOGGER.error('Exception when querying slurm version: {}'.format(e))
+        return 'ERROR'
+
+    return version
+
+
 def get_system_version(sitefile, substr=''):
     """Collects generic information about the system.
 
     This is the function that 'decides' what components (and their versions)
     adequately describe the 'version' of the system.
 
-    Args:
-        substr: Only return information about docker images whose name or id
-            contains the substr.
     Returns:
         A list of lists that contains version information about the
         various system components.
     """
 
     zypper_versions = get_zypper_versions(
-        ['cray-lustre-client', 'slurm-slurmd', 'pbs-crayctldeploy']
+        ['cray-lustre-client', 'pbs-crayctldeploy']
     )
     sitedata = get_site_data(sitefile)
 
     # keep this list in ascii-value sorted order on the keys.
     field_getters_by_name = OrderedDict([
-        ('Build version', get_build_version),
         ('Interconnect', lambda: ' '.join(get_interconnects())),
         ('Kernel', get_kernel_version),
         ('Lustre', lambda: zypper_versions['cray-lustre-client']),
         ('PBS version', lambda: zypper_versions['pbs-crayctldeploy']),
+        ('Release version', get_release_version),
         ('SLES version', get_sles_version),
         ('Serial number', lambda: sitedata['Serial number']),
         ('Site name', lambda: sitedata['Site name']),
-        ('Slurm version', lambda: zypper_versions['slurm-slurmd']),
+        ('Slurm version', get_slurm_version),
         ('System install date', lambda: sitedata['System install date']),
         ('System name', lambda: sitedata['System name']),
         ('System type', lambda: sitedata['System type']),
     ])
 
     return [[field_name, field_getter()]
-            for field_name, field_getter in field_getters_by_name.items()
-            if substr in field_name]
+            for field_name, field_getter in field_getters_by_name.items()]

@@ -1,11 +1,34 @@
 """
 Tests for output filtering mechanisms.
 
-Copyright 2019-2020 Cray Inc. All Rights Reserved.
+(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
 """
 
+from collections import OrderedDict
+import copy
 from functools import wraps
 import itertools
+import os
+import random
+import time
 from unittest import mock
 import unittest
 
@@ -212,3 +235,112 @@ class TestFilterList(unittest.TestCase):
         self.assertEqual(2, len(filtered))
         self.assertEqual({'speed': 10}, filtered[0])
         self.assertEqual({'speed': 11}, filtered[1])
+
+
+class TestRemoveConstantValues(unittest.TestCase):
+    """Test the remove_constant_values function."""
+
+    def test_no_constant_values(self):
+        """Test remove_constant_values with no constant values."""
+        people = [
+            {'first': 'Jim', 'last': 'Morrison'},
+            {'first': 'Janis', 'last': 'Joplin'},
+            {'first': 'Kurt', 'last': 'Cobain'},
+            {'first': 'Jimi', 'last': 'Hendrix'}
+        ]
+        const_removed = filtering.remove_constant_values(people, 'Morrison')
+        self.assertEqual(people, const_removed)
+
+    def test_common_but_not_constant_values(self):
+        """Test remove_constant_values with some common but not constant values."""
+        people = [
+            {'first': 'Jim', 'last': 'Morrison'},
+            {'first': 'Toni', 'last': 'Morrison'},
+            {'first': 'Janis', 'last': 'Joplin'},
+            {'first': 'Kurt', 'last': 'Cobain'},
+            {'first': 'Jimi', 'last': 'Hendrix'}
+        ]
+        const_removed = filtering.remove_constant_values(people, 'Morrison')
+        self.assertEqual(people, const_removed)
+
+    def test_constant_values(self):
+        """Test remove_constant_values with one key having a constant value."""
+        people = [
+            {'first': 'Jim', 'last': 'Morrison'},
+            {'first': 'Jim', 'last': 'Henson'},
+            {'first': 'Jim', 'last': 'Carrey'},
+            {'first': 'Jim', 'last': 'Halpert'}
+        ]
+        expected_result = [
+            {'last': 'Morrison'},
+            {'last': 'Henson'},
+            {'last': 'Carrey'},
+            {'last': 'Halpert'}
+        ]
+        const_removed = filtering.remove_constant_values(people, 'Jim')
+        self.assertEqual(expected_result, const_removed)
+
+    def test_all_constant_values(self):
+        """Test remove_constant_values with all keys having the same constant value."""
+        input_len = 5
+        people = [{'first': 'Thomas', 'last': 'Thomas'}] * input_len
+        expected_result = [dict()] * input_len
+        const_removed = filtering.remove_constant_values(people, 'Thomas')
+        self.assertEqual(expected_result, const_removed)
+
+    def test_ordered_dict(self):
+        """Test remove_constant_values with OrderedDicts and ensure type is preserved."""
+        people = [
+            OrderedDict([('first', 'Jim'), ('last', 'Morrison'),
+                         ('first', 'Janis'), ('last', 'Joplin')])
+        ]
+        const_removed = filtering.remove_constant_values(people, 'Morrison')
+        self.assertEqual(people, const_removed)
+
+    def test_empty_list(self):
+        """Test remove_constant_values with an empty list."""
+        empty = []
+        const_removed = filtering.remove_constant_values([], 'something')
+        self.assertEqual(empty, const_removed)
+
+    @unittest.skipIf(os.getenv('SAT_SKIP_PERF_TESTS'),
+                     'SAT_SKIP_PERF_TESTS is set in environment')
+    def test_performance(self):
+        """Test the performance of remove_constant_values with a lot of data."""
+        # Create a large list of people with combinations of first and last names
+        first_names = ['Jim', 'Toni', 'Janis', 'Kurt']
+        last_names = ['Morrison', 'Joplin', 'Cobain']
+        hidden = 'HIDDEN'
+
+        # This is how many DIMMs we would have in a 50-cabinet system
+        # 16 DIMMs/node * 4 nodes/slot * 8 slots/chassis * 8 chassis/cab * 50 cabs
+        num_people = 204800
+
+        people = []
+        expected_result = []
+        for i in range(num_people):
+            person = {
+                'first': first_names[i % len(first_names)],
+                'last': last_names[i % len(last_names)],
+                'ssn': hidden,
+                'age': random.randint(0, 100),
+                'bank_account_number': hidden,
+            }
+            expected_person = copy.deepcopy(person)
+            expected_person.pop('ssn')
+            expected_person.pop('bank_account_number')
+            people.append(person)
+            expected_result.append(expected_person)
+
+        start_time = time.time()
+        const_removed = filtering.remove_constant_values(people, hidden)
+        end_time = time.time()
+        duration = end_time - start_time
+
+        # A reasonable expected duration
+        expected_duration = 3
+        self.assertLessEqual(duration, expected_duration,
+                             "remove_constant_values took longer than {:d} seconds "
+                             "({:0.2f} seconds) for {:d} values".format(expected_duration,
+                                                                        duration, num_people))
+        self.assertEqual(expected_result, const_removed)

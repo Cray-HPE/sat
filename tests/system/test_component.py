@@ -1,14 +1,32 @@
 """
 Unit tests for sat.system.component.
 
-Copyright 2019 Cray Inc. All Rights Reserved.
+(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
 """
 import logging
 import unittest
 from unittest import mock
 
 from sat.system.component import BaseComponent, ComponentDataDict, LOGGER
-from sat.system.constants import EMPTY_VALUE, MISSING_VALUE
+from sat.constants import EMPTY_VALUE, MISSING_VALUE
 from sat.system.field import ComponentField
 from tests.common import ExtendedTestCase
 from tests.system.component_data import DEFAULT_HSM_TYPE, DEFAULT_XNAME, DEFAULT_SERIAL_NUMBER, \
@@ -186,7 +204,8 @@ class TestBaseComponentProperties(unittest.TestCase):
 
     def test_location_info(self):
         """Test the location_info property."""
-        expected_value = self.raw_data['{}LocationInfo'.format(DEFAULT_HSM_TYPE)]
+        raw_location_info = self.raw_data['{}LocationInfo'.format(DEFAULT_HSM_TYPE)]
+        expected_value = ComponentDataDict(raw_location_info)
         self.assertEqual(self.component.location_info, expected_value)
 
     def test_manufacturer(self):

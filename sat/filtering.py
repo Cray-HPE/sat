@@ -1,7 +1,25 @@
 """
 Generic output filtering utilities for SAT.
 
-Copyright 2019-2020 Cray Inc. All rights reserved.
+(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import fnmatch
@@ -457,3 +475,38 @@ def filter_list(dicts, query_strings):
     def filter_fn(x): return _dont_care_call(TypeError, combined_filters, x)
 
     return list(filter(filter_fn, dicts))
+
+
+def remove_constant_values(dicts, constant_value):
+    """Filters the keys in each dict to remove keys that have a constant value
+
+    Takes a list of dictionaries, which are all assumed to have the same keys,
+    and removes any keys from all the dictionaries if the key has the same value
+    for every dictionary in the list of dictionaries.
+
+    Args:
+        dicts (list): A list of dicts.
+        constant_value: A value which must match the constant value of a key for
+            that key to be removed from the dictionaries.
+
+    Returns:
+        A list of dicts with keys removed from all dicts if that key has the
+        given `constant_value` across all the dicts.
+    """
+    if not dicts:
+        return []
+
+    # All dicts are assumed to have the same keys and type
+    keys = dicts[0].keys()
+    # This is to preserve OrderedDict if given.
+    dict_type = type(dicts[0])
+
+    keys_to_keep = []
+    for key in keys:
+        if all(d[key] == constant_value for d in dicts):
+            LOGGER.info("All values for '%s' are '%s', omitting key.")
+        else:
+            keys_to_keep.append(key)
+
+    return [dict_type([(key, d[key]) for key in keys_to_keep])
+            for d in dicts]

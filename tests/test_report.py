@@ -1,14 +1,35 @@
 """
 Unit tests for sat/util.py .
 
-Copyright 2019 Cray Inc. All Rights Reserved.
+(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
 """
-import unittest
 from collections import defaultdict
+from copy import deepcopy
+import unittest
+from unittest.mock import call, Mock, patch
 
 import yaml
 
 from sat.report import Report
+from sat.constants import EMPTY_VALUE, MISSING_VALUE
 
 
 def get_report_printed_list(report):
@@ -170,12 +191,13 @@ class TestReport(unittest.TestCase):
         """
         headings = ['h1', 'h2', 'h3', 'h4', 'h5']
 
-        entries = []
-        entries.append([None, 1, 2.0, True, 'str'])
-        entries.append([1, 2.0, True, 'str', None])
-        entries.append([2.0, True, 'str', None, 1])
-        entries.append([True, 'str', None, 1, 2.0])
-        entries.append(['str', None, 1, 2.0, True])
+        entries = [
+            [None, 1, 2.0, True, 'str'],
+            [1, 2.0, True, 'str', None],
+            [2.0, True, 'str', None, 1],
+            [True, 'str', None, 1, 2.0],
+            ['str', None, 1, 2.0, True]
+        ]
 
         report = Report(headings, sort_by=0)
         report.add_rows(entries)
@@ -374,12 +396,13 @@ class TestReportFormatting(unittest.TestCase):
         """
         headings = ['h1', 'h2', 'h3', 'h4', 'h5']
 
-        entries = []
-        entries.append([None, 1, 2.0, True, 'str'])
-        entries.append([1, 2.0, True, 'str', None])
-        entries.append([2.0, True, 'str', None, 1])
-        entries.append([True, 'str', None, 1, 2.0])
-        entries.append(['str', None, 1, 2.0, True])
+        entries = [
+            [None, 1, 2.0, True, 'str'],
+            [1, 2.0, True, 'str', None],
+            [2.0, True, 'str', None, 1],
+            [True, 'str', None, 1, 2.0],
+            ['str', None, 1, 2.0, True]
+        ]
 
         str_entries = []
         for entry in entries:
@@ -393,3 +416,82 @@ class TestReportFormatting(unittest.TestCase):
 
         for expected, actual in zip(str_entries, pt_s):
             self.assertEqual(expected, actual)
+
+
+class TestReportEmptyMissingRemoval(unittest.TestCase):
+    """Test the remove_empty_and_missing method."""
+
+    def setUp(self):
+        """Create mocks and data to use for testing."""
+        mock_report = Mock(spec=Report)
+        mock_report.remove_empty_and_missing = lambda x: Report.remove_empty_and_missing(mock_report, x)
+        self.headings = ['xname', 'serial_number', 'manufacturer']
+        # Make a copy to ensure `self.headings` isn't modified
+        mock_report.headings = deepcopy(self.headings)
+        self.mock_report = mock_report
+
+        # Note that the actual values don't matter here since we're mocking
+        # remove_constant_values, which is unit tested separately.
+        self.sample_data = [
+            {
+                'xname': 'x1000c0s0b0n0',
+                'serial_number': MISSING_VALUE,
+                'manufacturer': EMPTY_VALUE
+            }
+        ]
+
+        self.mock_remove_func = patch('sat.report.remove_constant_values').start()
+        # Make it look like a single key was removed for being empty or missing
+        self.mock_remove_func.return_value = [{'xname': 'x1000c0s0b0n0'}]
+
+    def tearDown(self):
+        patch.stopall()
+
+    def test_no_data(self):
+        """Test remove_empty_and_missing with no data."""
+        in_data = []
+
+        headings, out_data = self.mock_report.remove_empty_and_missing(in_data)
+
+        # headings and data should be unaltered
+        self.assertEqual(self.headings, headings)
+        self.assertEqual(in_data, out_data)
+
+    def test_no_empty_no_missing(self):
+        """Test remove_empty_and_missing with show_empty=show_missing=False"""
+        self.mock_report.show_empty = False
+        self.mock_report.show_missing = False
+
+        headings, out_data = self.mock_report.remove_empty_and_missing(self.sample_data)
+
+        self.mock_remove_func.assert_has_calls([
+            call(self.sample_data, EMPTY_VALUE),
+            call(self.mock_remove_func.return_value, MISSING_VALUE)
+        ])
+        self.assertEqual(['xname'], headings)
+        self.assertEqual(self.mock_remove_func.return_value, out_data)
+
+    def test_show_empty_no_missing(self):
+        """Test remove_empty_and_missing with show_empty=True, show_missing=False"""
+        self.mock_report.show_empty = True
+        self.mock_report.show_missing = False
+
+        headings, out_data = self.mock_report.remove_empty_and_missing(self.sample_data)
+
+        self.mock_remove_func.assert_has_calls([
+            call(self.sample_data, MISSING_VALUE)
+        ])
+        self.assertEqual(['xname'], headings)
+        self.assertEqual(self.mock_remove_func.return_value, out_data)
+
+    def test_show_empty_show_missing(self):
+        """Test remove_empty_and_missing with show_empty=show_missing=True"""
+        self.mock_report.show_empty = True
+        self.mock_report.show_missing = True
+
+        headings, out_data = self.mock_report.remove_empty_and_missing(self.sample_data)
+
+        self.mock_remove_func.assert_not_called()
+        # headings and data should be unaltered
+        self.assertEqual(self.headings, headings)
+        self.assertEqual(self.sample_data, out_data)

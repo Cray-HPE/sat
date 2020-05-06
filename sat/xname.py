@@ -1,7 +1,25 @@
 """
 Class for representing an xname.
 
-Copyright 2019 Cray Inc. All Rights Reserved.
+(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
 """
 import re
 
@@ -10,6 +28,8 @@ from sat.cached_property import cached_property
 
 class XName:
     """An xname representing a component in the system."""
+
+    NODE_XNAME_REGEX = re.compile(r'x\d+c\d+s\d+b\d+n\d+')
 
     def __init__(self, xname_str):
         """Creates a new xname object from the given xname string.
@@ -95,6 +115,19 @@ class XName:
         """
         return self.get_ancestor(1)
 
+    def get_parent_node(self):
+        """Get the xname of the parent node of this xname, if possible.
+
+        Returns:
+            The parent node XName of this XName, or None if this XName is not
+            the child of a node XName.
+        """
+        match = self.NODE_XNAME_REGEX.match(str(self))
+        if match:
+            return XName(match.group(0))
+        else:
+            return None
+
     def __lt__(self, other):
         return self.tokens < other.tokens
 
@@ -145,3 +178,35 @@ class XName:
             if other.tokens[idx] != token:
                 return False
         return True
+
+
+def get_matches(filters, elems):
+    """Separate a list into matching and unmatched members.
+
+    Args:
+        filters: List of xnames having the type XName. If an elem in
+            elems is contained by an xname in this list, meaning it is
+            above the element xname in the hierarchy of xname components,
+            then it will be considered a match.
+        elems: List of xnames to filter.
+
+    Returns:
+        used: Set of filters that generated a match.
+        unused: Set of filters that did not generate a match.
+        matches: Set of elements that matched one or more filters.
+        no_matches: Set of elements that did not match anything.
+    """
+    used = set()
+    unused = set(filters)
+    matches = set()
+    no_matches = set(elems)
+
+    for elem in elems:
+        for filter_ in filters:
+            if filter_.contains_component(elem):
+                used.add(filter_)
+                unused.discard(filter_)
+                matches.add(elem)
+                no_matches.discard(elem)
+
+    return used, unused, matches, no_matches

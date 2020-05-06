@@ -1,12 +1,30 @@
 """
 Tests for the XName utility class.
 
-Copyright 2019 Cray Inc. All Rights Reserved.
+(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import unittest
 
-from sat.xname import XName
+from sat.xname import XName, get_matches
 
 
 class TestXName(unittest.TestCase):
@@ -45,6 +63,33 @@ class TestXName(unittest.TestCase):
         for given_xname, _, _, parent in self.examples:
             self.assertEqual(XName(given_xname).get_direct_parent(),
                              XName(parent))
+
+    def test_drive_get_node_parent(self):
+        """Test getting the parent node xname of a drive xname."""
+        drive_xname_str = 'x1000c3s5b0n1g1k1'
+        node_xname_str = drive_xname_str[:-4]
+        self.assertEqual(XName(node_xname_str),
+                         XName(drive_xname_str).get_parent_node())
+
+    def test_processor_get_node_parent(self):
+        """Test getting the parent node xname of a processor xname."""
+        proc_xname_str = 'x1000c3s5b0n1p1'
+        node_xname_str = proc_xname_str[:-2]
+        self.assertEqual(XName(node_xname_str),
+                         XName(proc_xname_str).get_parent_node())
+
+    def test_node_get_node_parent(self):
+        """Test getting the parent node xname of a node xname."""
+        node_xname_str = 'x1000c3s5b0n1'
+        # The parent node of a node should just be itself
+        self.assertEqual(XName(node_xname_str),
+                         XName(node_xname_str).get_parent_node())
+
+    def test_chassis_get_node_parent(self):
+        """Test getting the parent node xname of a drive xname."""
+        chassis_xname_str = 'x1000c3'
+        # A chassis should not find a parent node
+        self.assertEqual(None, XName(chassis_xname_str).get_parent_node())
 
 
 class TestXNameContainsComponent(unittest.TestCase):
@@ -88,3 +133,46 @@ class TestXNameContainsComponent(unittest.TestCase):
         slot_1 = XName('x3000c0s1')
         node_in_slot_19 = XName('x3000c0s19b0n0')
         self.assertFalse(slot_1.contains_component(node_in_slot_19))
+
+
+class TestXnameGetMatches(unittest.TestCase):
+
+    def test_get_matches_chassis(self):
+        """Test Xname get_matches() with chassis filter."""
+        filters = [XName('x1000c1'), XName('x2000c2')]
+        elems = [XName('x1000c1r1b1'), XName('x1000c2r2b2')]
+        used, unused, matches, no_matches = get_matches(filters, elems)
+        self.assertEqual({XName('x1000c1')}, used)
+        self.assertEqual({XName('x2000c2')}, unused)
+        self.assertEqual({XName('x1000c1r1b1')}, matches)
+        self.assertEqual({XName('x1000c2r2b2')}, no_matches)
+
+    def test_get_matches_bmc(self):
+        """Test Xname get_matches() with BMC filter."""
+        filters = [XName('x1000c1r1b1'), XName('x2000c2r2b2')]
+        elems = [XName('x1000c1r1b1'), XName('x1000c2r2b2')]
+        used, unused, matches, no_matches = get_matches(filters, elems)
+        self.assertEqual({XName('x1000c1r1b1')}, used)
+        self.assertEqual({XName('x2000c2r2b2')}, unused)
+        self.assertEqual({XName('x1000c1r1b1')}, matches)
+        self.assertEqual({XName('x1000c2r2b2')}, no_matches)
+
+    def test_get_matches_empty_filters(self):
+        """Test Xname get_matches() with empty filter."""
+        filters = []
+        elems = [XName('x1000c1r1b1'), XName('x1000c2r2b2')]
+        used, unused, matches, no_matches = get_matches(filters, elems)
+        self.assertEqual(set(), used)
+        self.assertEqual(set(), unused)
+        self.assertEqual(set(), matches)
+        self.assertEqual(set(elems), no_matches)
+
+    def test_get_matches_no_elems(self):
+        """Test Xname get_matches() with no elements."""
+        filters = [XName('x1000c1r1b1'), XName('x2000c2r2b2')]
+        elems = []
+        used, unused, matches, no_matches = get_matches(filters, elems)
+        self.assertEqual(set(), used)
+        self.assertEqual(set(filters), unused)
+        self.assertEqual(set(), matches)
+        self.assertEqual(set(), no_matches)

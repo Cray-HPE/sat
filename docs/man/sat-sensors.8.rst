@@ -7,7 +7,7 @@ Display Current Sensor Readings
 -------------------------------
 
 :Author: Cray Inc.
-:Copyright: Copyright 2020 Cray Inc. All Rights Reserved.
+:Copyright: Copyright 2020 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -21,14 +21,26 @@ DESCRIPTION
 The sensors subcommand obtains current sensor readings from
 one or more BMCs.
 
+This subcommand allows use of the "--xname" options. The provided xnames
+must refer to BMCs, which may be of any BMC type: ChassisBMC, NodeBMC, and
+RouterBMC, or components that contain such BMCs (such as a chassis). If no
+xname is specified, all BMCs are targeted.
+
+A Redfish username and password is required.
+
 OPTIONS
 =======
 
-These options must be specified after the subcommand. The xnames may also be IP
-addresses or aliases. At least one xname must be provided.
+These options must be specified after the subcommand. The xnames may also be
+. At least one xname must be provided.
 
 **-h, --help**
         Print a usage summary and exit.
+
+**-t, --types**
+        Select xnames that are of this type. Allowed types are **ChassisBMC**,
+        **NodeBMC**, and **RouterBMC**. This argument may be reused to select
+        more than one type.
 
 .. include:: _sat-xname-opts.rst
 .. include:: _sat-format-opts.rst
@@ -81,3 +93,5 @@ SEE ALSO
 ========
 
 sat(8)
+
+.. include:: _notice.rst

@@ -1,100 +1,41 @@
 """
 The main entry point for the linkhealth subcommand.
 
-Copyright 2019-2020 Cray Inc. All Rights Reserved.
+(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import logging
 import os
 import sys
-import urllib3
 from collections import defaultdict
 
 import requests
 
 from sat import redfish
-from sat.apiclient import APIError, HSMClient
 from sat.config import get_config_value
 from sat.report import Report
-from sat.session import SATSession
 from sat.xname import XName
 
 
 LOGGER = logging.getLogger(__name__)
-
-
-def get_router_xnames():
-    """Get a list of xnames that are of type RouterBMC.
-
-    Returns:
-        List of XName references.
-
-    Raises:
-        APIError: The API gateway was not available or HSM could not
-            retrieve the xnames.
-        ValueError: The payload retrieved from the API gateway was not
-            in json format.
-        KeyError: The json payload was valid but did not contain a field
-            for 'RedfishEndpoints'
-    """
-    client = HSMClient(SATSession())
-
-    try:
-        response = client.get(
-            'Inventory', 'RedfishEndpoints', params={'type': 'RouterBMC'})
-    except APIError as err:
-        raise APIError('Failed to get xnames from HSM: {}'.format(err))
-
-    try:
-        endpoints = response.json()
-        endpoints = endpoints['RedfishEndpoints']
-    except ValueError as err:
-        raise ValueError('Failed to parse JSON from hardware inventory response: {}'.format(err))
-    except KeyError:
-        raise KeyError('The response from the HSM has no entry for "RedfishEndpoints"')
-
-    # Create list of xnames.
-    xnames = []
-    for num, endpoint in enumerate(endpoints):
-        try:
-            xnames.append(XName(endpoint['ID']))
-        except KeyError:
-            LOGGER.warning('Endpoint number {} in the endpoint list lacks an '
-                           '"ID" field.'.format(num))
-
-    return xnames
-
-
-def get_matches(filters, elems):
-    """Separate a list into matching and unmatched members.
-
-    Args:
-        filters: List of xnames having the type XName. If an elem in
-            elems is contained by an xname in this list, meaning it is
-            above the element xname in the hierarchy of xname components,
-            then it will be considered a match.
-        elems: List of xnames to filter.
-
-    Returns:
-        used: Set of filters that generated a match.
-        unused: Set of filters that did not generate a match.
-        matches: Set of elements that matched one or more filters.
-        no_matches: Set of elements that did not match anything.
-    """
-    used = set()
-    unused = set(filters)
-    matches = set()
-    no_matches = set(elems)
-
-    for elem in elems:
-        for filter_ in filters:
-            if filter_.contains_component(elem):
-                used.add(filter_)
-                unused.discard(filter_)
-                matches.add(elem)
-                no_matches.discard(elem)
-
-    return used, unused, matches, no_matches
 
 
 def get_jack_port_ids(xnames, username, password):
@@ -328,39 +269,7 @@ def do_linkhealth(args):
 
     username, password = redfish.get_username_and_pass(args.redfish_username)
 
-    # TODO: See SAT-140 for how we should handle this.
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-    try:
-        hsm_xnames = get_router_xnames()
-    except (APIError, KeyError, ValueError) as err:
-        if args.xnames:
-            LOGGER.warning(err)
-            hsm_xnames = []
-        else:
-            LOGGER.error(err)
-            sys.exit(1)
-
-    if args.xnames:
-        xnames = [XName(xname) for xname in args.xnames]
-        # Filter for matches if xnames obtained from HSM.
-        if hsm_xnames:
-            used, unused, xnames, _ = get_matches(xnames, hsm_xnames)
-            if unused:
-                LOGGER.warning('The following xname filters generated no '
-                               'matches {}'.format(unused))
-        else:
-            LOGGER.warning('Could not obtain xnames from HSM, '
-                           'will proceed using the literal values in --xnames.')
-    else:
-        xnames = hsm_xnames
-
-    if not xnames:
-        if args.xnames:
-            LOGGER.error('No BMC routers discovered with matching IDs.')
-        else:
-            LOGGER.error('No BMC routers discovered.')
-        sys.exit(1)
+    xnames = redfish.screen_xname_args(args.xnames, ['RouterBMC'])
 
     # get all ports for all xnames
     xname_port_map = get_jack_port_ids(xnames, username, password)

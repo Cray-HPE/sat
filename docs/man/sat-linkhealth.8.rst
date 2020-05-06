@@ -7,7 +7,7 @@ Report on the health of Rosetta switch links.
 ---------------------------------------------
 
 :Author: Cray Inc.
-:Copyright: Copyright 2019 Cray Inc. All Rights Reserved.
+:Copyright: Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -19,8 +19,7 @@ DESCRIPTION
 ===========
 
 The linkhealth subcommand reports on the health of links for available routers.
-This information is obtained via Redfish queries, so a valid Redfish username
-and password for the target hosts is required.
+A Redfish username and password is required.
 
 This subcommand allows use of the "--xname" options. The provided xnames must
 be Router BMCs or components that contain Router BMCs. The xname of a Router BMC
@@ -107,3 +106,5 @@ SEE ALSO
 ========
 
 sat(8)
+
+.. include:: _notice.rst

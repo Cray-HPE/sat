@@ -1,7 +1,25 @@
 """
 BMC classes for the sensors subcommand.
 
-Copyright 2020 Cray Inc. All Rights Reserved.
+(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
 """
 
 from collections.abc import Mapping
@@ -13,9 +31,7 @@ import logging
 import json
 import re
 
-# TODO: This is very bad practice, but we need it for now. See: SAT-140.
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -88,6 +104,7 @@ class BMC:
         self.type = None
         self.sub_type = None
         self.query_head = None
+        self.already_logged = False
 
         self._query_cache = {}
 
@@ -185,7 +202,7 @@ class BMC:
             LOGGER.info('Sensor query of %s; detected type, subtype: %s, %s',
                         xname, self.type, self.sub_type)
 
-        else:
+        elif not self.already_logged:
             LOGGER.error('Unable to identify %s.', xname)
 
     def add_sensor(self, sensor):
@@ -336,10 +353,10 @@ class BMC:
             LOGGER.debug('Redfish Query: %s', url)
 
             try:
-                requests_rsp = self.requester.get(url, verify=False)
+                requests_rsp = self.requester.get(url)
 
             except requests.exceptions.RequestException as err:
-                msg = 'Redfish query responded with request error: '
+                msg = 'Redfish query to {} responded with request error: '.format(self.xname)
                 wrapped_rsp = WrappedResponse(ResponseStatus.CONNECTION_ERR)
 
                 # Cleans up the message a bit if it's a yucky chain of messages, which urllib3
@@ -348,31 +365,36 @@ class BMC:
                     err = err.args[0].reason
 
                 LOGGER.error(msg + str(err))
+                self.already_logged = True
 
             else:
                 if not requests_rsp:
                     # occurs when http response status >= 400
-                    msg = 'Redfish query responded with HTTP error ({:d}): {}'.format(
-                        requests_rsp.status_code, requests_rsp.reason)
+                    msg = 'Redfish query to {} responded with HTTP error ({:d}): {}'.format(
+                        self.xname, requests_rsp.status_code, requests_rsp.reason)
                     wrapped_rsp = WrappedResponse(ResponseStatus.HTTP_ERR)
                     wrapped_rsp.response = requests_rsp
 
                     LOGGER.error(msg)
+                    self.already_logged = True
 
                 else:
                     try:
                         rsp = requests_rsp.json(**kwargs)
                     except json.decoder.JSONDecodeError:
-                        LOGGER.error('Unable to parse Redfish query response: %s', requests_rsp.text)
+                        LOGGER.error('Unable to parse response to Redfish query to %s: %s',
+                                     self.xname, requests_rsp.text)
                         wrapped_rsp = WrappedResponse(ResponseStatus.PARSE_ERR)
                         wrapped_rsp.response = requests_rsp
                     else:
                         if 'error' in rsp:
-                            msg = 'Redfish query responded with Redfish error: ' + rsp['error']['message']
+                            msg = 'Redfish query to {} responded with Redfish error: {}'.format(
+                                self.xname, rsp['error']['message'])
                             wrapped_rsp = WrappedResponse(ResponseStatus.REDFISH_ERR)
                             wrapped_rsp.response = rsp
 
                             LOGGER.error(msg)
+                            self.already_logged = True
                         else:
                             wrapped_rsp = WrappedResponse(ResponseStatus.OKAY)
                             wrapped_rsp.response = rsp
