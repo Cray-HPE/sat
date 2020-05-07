@@ -77,6 +77,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build version in ``sat showrev`` is now read from the ``/etc/cray-release``
   file and the field now reads "Release version".
 - Slurm version now checked via pod.
+- Man page for ``sat showrev`` updated to describe the release directory and
+  provide an example of products output.
 
 ## [1.3.0] - 2020-04-09
 

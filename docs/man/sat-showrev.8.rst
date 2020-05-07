@@ -129,8 +129,9 @@ site_info: /opt/cray/etc/site_info.yml
         System install date, System name, and System type fields.
 
 release: /opt/cray/etc/release
-        Showrev parses this file to collect information for the CLE
-        version, General, PE, SLES version, SAT, and Urika fields.
+        Showrev parses the files in this directory to collect information for
+        the product releases. The fields shown in the output report are all
+        the fields found in these files, along with the product file name.
 
 EXAMPLES
 ========
@@ -179,6 +180,25 @@ Get Slurm versions for packages:
   +---------------------+---------+
   | slurm-crayctldeploy | 0.3.4   |
   +---------------------+---------+
+
+Get product releases:
+
+::
+
+  # sat showrev --products
+  ################################################################################
+  Product Revision Information
+  ################################################################################
+  +--------------+---------------------------------------------------+-----------+--------+---------+----------------+
+  | RELEASE_FILE | PRODUCT                                           | OS        | ARCH   | VERSION | DATE           |
+  +--------------+---------------------------------------------------+-----------+--------+---------+----------------+
+  | cle          | Cray's Linux Environment                          | SLES15SP1 | x86_64 | 1.2.0   | 20200414195912 |
+  | pe-aocc      | Cray's Programming Environment AOCC Packages      | SLES15SP1 | x86_64 | 20.05   | 20200428210309 |
+  | pe-base      | Cray's Programming Environment Base Packages      | SLES15SP1 | x86_64 | 20.05   | 20200504164850 |
+  | pe-forge     | Cray's Programming Environment Forge Packages     | SLES15SP1 | x86_64 | 20.05   | 20200428171340 |
+  | pe-intel     | Cray's Programming Environment Intel Packages     | SLES15SP1 | x86_64 | 20.05   | 20200429212329 |
+  | pe-totalview | Cray's Programming Environment Totalview Packages | SLES15SP1 | x86_64 | 20.05   | 20200428171310 |
+  +--------------+---------------------------------------------------+-----------+--------+---------+----------------+
 
 SEE ALSO
 ========
