@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Man page for ``sat showrev`` updated to describe the release directory and
   provide an example of products output.
+- Restored certificate-nonvalidation warning circumvention from ``sat diags``,
+  ``sat linkhealth``, and ``sat sensors``.
 
 ## [2.0.0] - 2020-05-06
 
