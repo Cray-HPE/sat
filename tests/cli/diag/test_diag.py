@@ -109,7 +109,7 @@ class TestRedfishQueries(DiagStatusTestCase):
         """Test if diag run requests are posted successfully."""
         self.rq_post_mock.assert_called_once_with(
             'https://x0c0r0b0/redfish/v1/Managers/BMC/Actions/Oem/CrayProcess.Schedule',
-            json={'Name': 'runMemtester', 'Options': '-h'})
+            json={'Name': 'runMemtester', 'Options': '-h'}, verify=False)
 
         for k, v in [('id', '1'), ('name', 'runMemTester'), ('taskstate', 'New')]:
             self.assertEqual(getattr(self.initial_status, k), v)
@@ -141,7 +141,7 @@ class TestRedfishQueries(DiagStatusTestCase):
     def test_can_cancel_task(self):
         """Test if we can cancel a task."""
         self.initial_status.delete()
-        self.rq_del_mock.assert_called_once_with('https://x0c0r0b0/redfish/v1/TaskService/Tasks/1')
+        self.rq_del_mock.assert_called_once_with('https://x0c0r0b0/redfish/v1/TaskService/Tasks/1', verify=False)
 
 
 if __name__ == '__main__':

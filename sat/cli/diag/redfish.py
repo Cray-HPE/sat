@@ -29,6 +29,9 @@ from urllib.parse import urljoin, urlunparse
 import inflect
 import requests
 
+# TODO: This is very bad practice, but we need it for now. See: SAT-140.
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 inf = inflect.engine()
@@ -130,7 +133,8 @@ class DiagStatus:
             LOGGER.info("Starting diagnostic %s on %s.", diag_command, xname)
 
             status = DiagStatus(xname, username, password)
-            resp = status.session.post(sched_url, json=payload)
+            # TODO: Fix SSL.
+            resp = status.session.post(sched_url, json=payload, verify=False)
 
             LOGGER.debug("POST %s returned %s", xname, resp.text)
             status._update_content(resp.text)
@@ -159,7 +163,8 @@ class DiagStatus:
         try:
             task_status_url = urlunparse(('https', self.xname, self.odata_id,
                                           '', '', ''))
-            resp = self.session.get(task_status_url)
+            # TODO: Fix SSL.
+            resp = self.session.get(task_status_url, verify=False)
             LOGGER.debug("GET %s returned %s", self.xname, resp.text)
 
             self._update_content(resp.text)
@@ -198,7 +203,8 @@ class DiagStatus:
             if hasattr(self, 'odata_id'):
                 task_status_url = urlunparse(('https', self.xname, self.odata_id,
                                               '', '', ''))
-                resp = self.session.delete(task_status_url)
+                # TODO: Fix SSL.
+                resp = self.session.delete(task_status_url, verify=False)
                 LOGGER.debug("DELETE %s returned %s", self.xname, resp.text)
             else:
                 LOGGER.info("Tried to delete diag on %s, but it doesn't seem to exist.", self.xname)
