@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Extended Kibana dashboard for rasdaemon with panels that show just errors.
+
 ### Fixed
 - Man page for ``sat showrev`` updated to describe the release directory and
   provide an example of products output.
