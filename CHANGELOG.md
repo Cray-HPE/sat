@@ -28,9 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Man page for ``sat diag`` updated to state explicitly what devices it can
+  be applied to.
 - Man page for ``sat showrev`` updated to describe the release directory and
   provide an example of products output.
-- Restored certificate-nonvalidation warning circumvention from ``sat diags``,
+- Restored certificate-nonvalidation warning circumvention from ``sat diag``,
   ``sat linkhealth``, and ``sat sensors``.
 
 ## [2.0.0] - 2020-05-06
@@ -77,7 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed ``--substr`` option from ``sat showrev``, the effect of which can
   be accomplished using the general ``--filter`` option instead.
-- Removed certificate-nonvalidation warning circumvention from ``sat diags``,
+- Removed certificate-nonvalidation warning circumvention from ``sat diag``,
   ``sat linkhealth``, and ``sat sensors``. Occurrence of this warning is no
   longer normal behavior.
 
