@@ -39,6 +39,16 @@ from sat.xname import XName
 LOGGER = logging.getLogger(__name__)
 
 
+class ResettableDefault:
+    """A callable for defaultdict() that provides mutability.
+    """
+    def __init__(self, starting_value):
+        self._value = starting_value
+    def reset(self, new_value):
+        self._value = new_value
+    def __call__(self):
+        return self._value
+
 def get_jack_port_ids(xnames, username, password):
     """Retrieve all jack-port IDs for the xnames.
 
@@ -178,7 +188,6 @@ def get_report(xname_port_map, username, password, args):
         'link_status',
         'health',
         'state',
-        'flow_control_config',
         'link_speed_mbps'
     ]
 
@@ -210,7 +219,8 @@ def get_report(xname_port_map, username, password, args):
                 LOGGER.warning('Query failed. Skipping. {}'.format(err))
                 continue
 
-            entry = defaultdict(lambda: 'MISSING')
+            default_provider = ResettableDefault('MISSING')
+            entry = defaultdict(default_provider)
             entry['xname'] = XName('{}{}'.format(xname, jackport))
 
             try:
@@ -229,6 +239,9 @@ def get_report(xname_port_map, username, password, args):
             if jack in presence_mapping[xname]:
                 entry['cable_present'] = presence_mapping[xname][jack]
 
+                if entry['cable_present'] == 'Not Present':
+                    default_provider.reset('NOT APPLICABLE')
+
             try:
                 entry['link_status'] = response['LinkStatus']
             except KeyError:
@@ -241,11 +254,6 @@ def get_report(xname_port_map, username, password, args):
 
             try:
                 entry['state'] = response['Status']['State']
-            except KeyError:
-                pass
-
-            try:
-                entry['flow_control_config'] = response['FlowControlConfiguration']
             except KeyError:
                 pass
 

@@ -29,6 +29,8 @@ specified, then all router BMCs in that chassis are targeted. If a router is
 specified, then all BMSs for the router are targeted. If no xname is specified,
 all router BMCs are targeted.
 
+Note that if a cable is unplugged, no information on speed or status will be available.
+
 OPTIONS
 =======
 
@@ -55,17 +57,17 @@ Get the health of all links in the system (note that this may not scale well to 
 ::
 
     # sat linkhealth
-    +------------------+---------------+---------------+-------------+--------+----------+----------------------------+-----------------+
-    | xname            | cable_present | physical_port | link_status | health | state    | flow_control_configuration | link_speed_mbps |
-    +------------------+---------------+---------------+-------------+--------+----------+----------------------------+-----------------+
-    | x1002c7r7b0bp8p1 | No Device     | 3             | Down        | OK     | Disabled | MISSING                    | 0               |
-    | x1002c7r7b0j1p1  | Not Present   | 4             | MISSING     | OK     | Starting | MISSING                    | MISSING         |
-    | x1002c7r7b0j2p0  | Present       | 21            | Up          | OK     | Enabled  | MISSING                    | 200000          |
-    | x1000c0r3b0bp8p1 | No Device     | 3             | Up          | OK     | Enabled  | MISSING                    | 100000          |
-    | x1000c0r3b0j1p1  | Not Present   | 4             | MISSING     | OK     | Starting | MISSING                    | MISSING         |
-    | x1000c0r3b0j2p0  | Present       | 21            | Up          | OK     | Enabled  | MISSING                    | 200000          |
-    | x1000c0r3b0j2p1  | Present       | 22            | Up          | OK     | Enabled  | MISSING                    | 200000          |
-    +------------------+---------------+---------------+-------------+--------+----------+----------------------------+-----------------+
+    +------------------+---------------+---------------+----------------+--------+----------+-----------------+
+    | xname            | cable_present | physical_port | link_status    | health | state    | link_speed_mbps |
+    +------------------+---------------+---------------+----------------+--------+----------+-----------------+
+    | x1002c7r7b0bp8p1 | No Device     | 3             | Down           | OK     | Disabled | 0               |
+    | x1002c7r7b0j1p1  | Not Present   | 4             | NOT APPLICABLE | OK     | Starting | NOT APPLICABLE  |
+    | x1002c7r7b0j2p0  | Present       | 21            | Up             | OK     | Enabled  | 200000          |
+    | x1000c0r3b0bp8p1 | No Device     | 3             | Up             | OK     | Enabled  | 100000          |
+    | x1000c0r3b0j1p1  | Not Present   | 4             | NOT APPLICABLE | OK     | Starting | NOT APPLICABLE  |
+    | x1000c0r3b0j2p0  | Present       | 21            | Up             | OK     | Enabled  | 200000          |
+    | x1000c0r3b0j2p1  | Present       | 22            | Up             | OK     | Enabled  | 200000          |
+    +------------------+---------------+---------------+----------------+--------+----------+-----------------+
 
 The **-x** option has more uses than simple output filtering because it cuts
 down the number of queries made.
@@ -75,13 +77,13 @@ Get the health of all links in a particular router:
 ::
 
     # sat linkhealth -x x1002c7r7b0
-    +------------------+---------------+---------------+-------------+--------+----------+----------------------------+-----------------+
-    | xname            | cable_present | physical_port | link_status | health | state    | flow_control_configuration | link_speed_mbps |
-    +------------------+---------------+---------------+-------------+--------+----------+----------------------------+-----------------+
-    | x1002c7r7b0bp8p1 | No Device     | 3             | Down        | OK     | Disabled | MISSING                    | 0               |
-    | x1002c7r7b0j1p1  | Not Present   | 4             | MISSING     | OK     | Starting | MISSING                    | MISSING         |
-    | x1002c7r7b0j2p0  | Present       | 21            | Up          | OK     | Enabled  | MISSING                    | 200000          |
-    +------------------+---------------+---------------+-------------+--------+----------+----------------------------+-----------------+
+    +------------------+---------------+---------------+----------------+--------+----------+-----------------+
+    | xname            | cable_present | physical_port | link_status    | health | state    | link_speed_mbps |
+    +------------------+---------------+---------------+----------------+--------+----------+-----------------+
+    | x1002c7r7b0bp8p1 | No Device     | 3             | Down           | OK     | Disabled | 0               |
+    | x1002c7r7b0j1p1  | Not Present   | 4             | NOT APPLICABLE | OK     | Starting | NOT APPLICABLE  |
+    | x1002c7r7b0j2p0  | Present       | 21            | Up             | OK     | Enabled  | 200000          |
+    +------------------+---------------+---------------+----------------+--------+----------+-----------------+
 
 Multiple routers can be queried by specifying -x multiple times.
 
@@ -94,13 +96,13 @@ If one only cares about links that are 'Present', then use the **--filter** opts
 ::
 
     # sat linkhealth --filter cable_present='present'
-    +------------------+---------------+---------------+-------------+--------+----------+----------------------------+-----------------+
-    | xname            | cable_present | physical_port | link_status | health | state    | flow_control_configuration | link_speed_mbps |
-    +------------------+---------------+---------------+-------------+--------+----------+----------------------------+-----------------+
-    | x1002c7r7b0j2p0  | Present       | 21            | Up          | OK     | Enabled  | MISSING                    | 200000          |
-    | x1000c0r3b0j2p0  | Present       | 21            | Up          | OK     | Enabled  | MISSING                    | 200000          |
-    | x1000c0r3b0j2p1  | Present       | 22            | Up          | OK     | Enabled  | MISSING                    | 200000          |
-    +------------------+---------------+---------------+-------------+--------+----------+----------------------------+-----------------+
+    +------------------+---------------+---------------+-------------+--------+----------+-----------------+
+    | xname            | cable_present | physical_port | link_status | health | state    | link_speed_mbps |
+    +------------------+---------------+---------------+-------------+--------+----------+-----------------+
+    | x1002c7r7b0j2p0  | Present       | 21            | Up          | OK     | Enabled  | 200000          |
+    | x1000c0r3b0j2p0  | Present       | 21            | Up          | OK     | Enabled  | 200000          |
+    | x1000c0r3b0j2p1  | Present       | 22            | Up          | OK     | Enabled  | 200000          |
+    +------------------+---------------+---------------+-------------+--------+----------+-----------------+
 
 SEE ALSO
 ========

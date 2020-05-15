@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Restored certificate-nonvalidation warning circumvention from ``sat diag``,
   ``sat linkhealth``, and ``sat sensors``.
 
+## Removed
+- Removed "flow_control_config" field from ``sat linkhealth``. It is no longer
+  present in Redfish, by design.
+
 ## [2.0.0] - 2020-05-06
 
 ### Added
