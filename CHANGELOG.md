@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Invoke ``check_hsn_cables.py`` without specifying Python 2.
+- ``sat hwinv`` supports exact field name matching with double quotes.
 
 ### Fixed
 - Man page for ``sat diag`` updated to state explicitly what devices it can

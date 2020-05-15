@@ -90,6 +90,15 @@ class TestComponentFieldMatches(unittest.TestCase):
         """Creates a ComponentField to work with in test methods."""
         self.cf = ComponentField('Serial Number')
 
+    def test_matches_verbatim_name(self):
+        """Tests verbatim match."""
+        self.assertTrue(self.cf.matches('"Serial Number"'))
+        self.assertFalse(self.cf.matches('"Number"'))
+
+        self.assertTrue(self.cf.matches(''))
+        self.assertFalse(self.cf.matches('"'))
+        self.assertFalse(self.cf.matches('""'))
+
     def test_matches_exact_name(self):
         """Tests that the exact pretty name matches."""
         self.assertTrue(self.cf.matches('Serial Number'))
