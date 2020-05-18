@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Extended Kibana dashboard for rasdaemon with panels that show just errors.
+
 ### Fixed
 - Man page for ``sat diag`` updated to state explicitly what devices it can
   be applied to.
