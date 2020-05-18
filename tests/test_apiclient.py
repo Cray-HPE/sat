@@ -198,33 +198,6 @@ class TestHSMClient(unittest.TestCase):
         self.assertEqual(response, mock_requests_get.return_value)
 
 
-class TestFirmwareClient(unittest.TestCase):
-    """Tests for the APIGatewayClient class: Firmware client."""
-
-    def setUp(self):
-        self.stored_config = sat.config.CONFIG
-        sat.config.CONFIG = sat.config.SATConfig('')
-
-    def tearDown(self):
-        sat.config.CONFIG = self.stored_config
-
-    @mock.patch('requests.get')
-    def test_get_firmware(self, mock_requests_get):
-        """Test call of get method through firmware client."""
-        api_gw_host = 'my-api-gw'
-        client = sat.apiclient.FirmwareClient(None, 'my-api-gw')
-        path_components = ['irrelevant', 'just-a-test']
-        response = client.get(*path_components)
-
-        mock_requests_get.assert_called_once_with(
-            get_http_url_prefix(api_gw_host) +
-            sat.apiclient.FirmwareClient.base_resource_path +
-            '/'.join(path_components),
-            params=None, verify=True
-        )
-        self.assertEqual(response, mock_requests_get.return_value)
-
-
 class TestFabricControllerClient(unittest.TestCase):
     """Tests for the APIGatewayClient class: Fabric Controller client."""
 

@@ -25,7 +25,6 @@ import logging
 import requests
 from urllib.parse import urlunparse
 
-
 from sat.config import get_config_value
 
 
@@ -203,10 +202,6 @@ class APIGatewayClient:
 
 class HSMClient(APIGatewayClient):
     base_resource_path = 'smd/hsm/v1/'
-
-
-class FirmwareClient(APIGatewayClient):
-    base_resource_path = 'fw-update/v1/'
 
 
 class FabricControllerClient(APIGatewayClient):
