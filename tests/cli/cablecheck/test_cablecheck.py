@@ -35,7 +35,7 @@ class MockRunner:
         self.args = None
 
     def run(self, args):
-        self.args = ' '.join(args[2:])
+        self.args = ' '.join(args[1:])
 
 
 class TestArgumentPassing(unittest.TestCase):

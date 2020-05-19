@@ -46,8 +46,6 @@ def do_cablecheck(args):
     output and provide output options when JSON/YAML is available (see
     Jira SSHOTSW-2453 and SAT-63).
 
-    The check_hsn_cable.py script is written in Python 2.
-
     Args:
         args: The argparse.Namespace object containing the parsed arguments
             passed to this subcommand.
@@ -69,5 +67,4 @@ def do_cablecheck(args):
     if args.quiet:
         command_args.append('-q')
 
-    subprocess.run(
-        ["python2", os.path.join(COMMAND_LOC, COMMAND_NAME)] + command_args)
+    subprocess.run([os.path.join(COMMAND_LOC, COMMAND_NAME)] + command_args)
