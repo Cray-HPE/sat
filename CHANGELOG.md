@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Extended Kibana dashboard for rasdaemon with panels that show just errors.
 - Kibana dashboard to show heartbeat losses.
 
+### Changed
+- Invoke ``check_hsn_cables.py`` without specifying Python 2.
+
 ### Fixed
 - Man page for ``sat diag`` updated to state explicitly what devices it can
   be applied to.
