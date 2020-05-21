@@ -74,9 +74,10 @@ def _add_summarize_option(option_group, singular_component, default_xnames):
     option_group.add_argument(
         '--{}-summary-fields'.format(singular_component),
         type=lambda v: v.split(','),
-        help='Summarize the {} by the given comma-separated list of fields. '
-             'Omit this option to summarize by all fields. {}'.format(plural_component,
-                                                                      effect_disclaimer),
+        help='Summarize the {0} by the given comma-separated list of fields. Enclose '
+             'a field in double quotes for exact matching. The quotes may need to be '
+             'escaped. Omit this option to summarize by all fields. {1}'.format(
+            plural_component, effect_disclaimer),
         default=[]
     )
 
@@ -112,10 +113,11 @@ def _add_list_option(option_group, singular_component):
     option_group.add_argument(
         '--{}-fields'.format(singular_component),
         type=lambda v: v.split(','),
-        help="Display the given comma-separated list of fields for each {0}. Omit this "
-             "option to display all fields. This option only has an effect if {1} are being "
-             "listed by the '--list-all' or '--list-{1}' option.".format(singular_component,
-                                                                         plural_component),
+        help="Display the given comma-separated list of fields for each {0}. Enclose "
+             "a field in double quotes for exact matching. The quotes may need to be "
+             "escaped. Omit this option to display all fields. This option only has "
+             "an effect if {1} are being listed by the '--list-all' or '--list-{1}' "
+             "option.".format(singular_component, plural_component),
         default=[]
     )
 

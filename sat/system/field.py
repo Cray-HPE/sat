@@ -52,11 +52,17 @@ class ComponentField:
     def matches(self, filter_str):
         """Returns whether this field matches the given filter string.
 
-        This canonicalizes the given filter string and then checks whether it's
-        a subsequence of this field's canonical name.
+        This canonicalizes the given filter string and then checks whether it's a
+        subsequence of this field's canonical name, unless the filter is double-
+        quoted, and then the check is for an exact match of the canonicalized
+        strings.
         """
-        return is_subsequence(self.canonicalize(filter_str),
-                              self.canonical_name)
+
+        if len(filter_str) > 1 and filter_str[0] == filter_str[-1] == '"':
+            return self.canonicalize(filter_str[1:-1]) == self.canonical_name
+        else:
+            return is_subsequence(self.canonicalize(filter_str),
+                                  self.canonical_name)
 
     @staticmethod
     def canonicalize(name):

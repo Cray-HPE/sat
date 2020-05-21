@@ -87,7 +87,8 @@ components in each category is shown depends on the value of the relevant
         and all fields that contain that subsequence will be used. A subsequence
         of a field name is a value that can be obtained by deleting characters
         from the field name while maintaining order. It is more permissive than
-        a substring.
+        a substring. Enclose a field in double quotes for exact matching. The
+        quotes may need to be escaped, such as from a shell prompt.
 
 **--proc-summary-fields** *PROC_SUMMARY_FIELDS*
         Same as **--node-summary-fields** but for processors.
@@ -160,7 +161,8 @@ These options list components of certain types in the system.
         and all fields that contain that subsequence will be displayed. A
         subsequence of a field name is a value that can be obtained by deleting
         characters from the field name while maintaining order. It is more
-        permissive than a substring.
+        permissive than a substring. Enclose a field in double quotes for exact
+        matching. The quotes may need to be escaped, such as from a shell prompt.
 
 **--chassis-fields** *CHASSIS_FIELDS*
         Same as **--node-fields** but for chassis.
@@ -268,6 +270,16 @@ with a wildcard:
 ::
 
         # sat hwinv --list-drives --filter 'xname=x3000c0s9b0n0*' --drive-fields xname,model,capacity
+
+List all nodes, displaying xname and model. The double quotes exclude fields that include "model" as a
+subsequence. Enclosing the double quotes in single quotes prevents them from being interpreted by the
+shell. Backslashes would also work.
+
+::
+
+        # sat hwinv --list-nodes --node-fields 'xname,"Model"'
+        # sat hwinv --list-nodes --node-fields xname,\"Model\"
+
 
 SEE ALSO
 ========
