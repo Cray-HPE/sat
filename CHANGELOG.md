@@ -25,18 +25,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] - 2020-05-26
 
 ### Added
 - Extended Kibana dashboard for rasdaemon with panels that show just errors.
 - Kibana dashboard to show heartbeat losses.
+- New column showing ratio of co-located replicas to running pods for a given
+  replicaset in output of ``sat k8s``.
+- Support for exact field name matching using double quotes in ``sat hwinv``.
 
 ### Changed
-- Invoke ``check_hsn_cables.py`` without specifying Python 2.
-- ``sat hwinv`` supports exact field name matching with double quotes.
-- Ratio of co-located replicas to running pods for a given replicaset.
-- Ratio of co-located replicas to running pods for a given replicaset in
-  ``sat k8s``.
+- ``sat cablecheck`` now directly executes ``check_hsn_cables.py`` instead of
+  calling with ``python2``.
+- Changed "MISSING" values to "NOT APPLICABLE" when cable is not present in
+  ``sat linkhealth``.
+
+### Removed
+- Removed "flow_control_config" field from ``sat linkhealth``. It is no longer
+  present in Redfish, by design.
 
 ### Fixed
 - Man page for ``sat diag`` updated to state explicitly what devices it can
@@ -45,10 +51,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   provide an example of products output.
 - Restored certificate-nonvalidation warning circumvention from ``sat diag``,
   ``sat linkhealth``, and ``sat sensors``.
-
-## Removed
-- Removed "flow_control_config" field from ``sat linkhealth``. It is no longer
-  present in Redfish, by design.
 
 ## [2.0.0] - 2020-05-06
 
