@@ -2,100 +2,57 @@
 The main entry point for the k8s subcommand.
 
 (C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import logging
 import sys
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 
-import kubernetes.client
-import kubernetes.config
 from kubernetes.config.config_exception import ConfigException
 from kubernetes.client.rest import ApiException
 
 from sat.config import get_config_value
 from sat.report import Report
+from sat.cli.k8s.replicaset import ReplicaSet
 
 
 LOGGER = logging.getLogger(__name__)
 
-ReplicaSet = namedtuple('ReplicaSet', ['namespace', 'name'])
-
 
 def get_co_located_replicas():
-    """Get pods within a replicaset that are running on the same node.
+    """Get each replicaset that had pods sharing nodes.
 
     Returns:
-        A dict formatted like...
-            {
-                replicaset1: {
-                    node1: [pod1, pod2],
-                    node2: [pod3, pod4],
-                },
-                replicaset2: {
-                    node1: [pod1, pod2]
-                },
-                ...
-            }
-
-        replicaset represents a ReplicaSet namedtuple, node represents
-        the name of a node, and pod represents the name of a pod.
+        A list of replicasets that had multiple pods running on the
+        same nodes.
 
     Raises:
         kubernetes.client.rest.ApiException if the call failed.
         kubernetes.config.config_exception.ConfigException if there was trouble
             reading the config.
     """
-    try:
-        kubernetes.config.load_kube_config()
-    except ConfigException as err:
-        raise ConfigException('Reading kubernetes config: {}'.format(err))
+    # This call can raise
+    replica_sets = ReplicaSet.get_all_replica_sets()
 
-    appsv1 = kubernetes.client.AppsV1Api()
-    corev1 = kubernetes.client.CoreV1Api()
-
-    try:
-        replica_sets = appsv1.list_replica_set_for_all_namespaces().items
-    except ApiException as err:
-        raise ApiException('Could not retrieve list of replicasets: {}'.format(err))
-
-    replica_counts = {}
-    for replica_set in replica_sets:
-        try:
-            hash_ = replica_set.metadata.labels['pod-template-hash']
-        except KeyError:
-            LOGGER.warning(
-                'Replicaset {} had no "pod-template-hash" field.'.format(
-                    replica_set.metadata.name))
-            continue
-
-        ns = replica_set.metadata.namespace
-
-        try:
-            label = 'pod-template-hash={}'.format(hash_)
-            pods = corev1.list_namespaced_pod(ns, label_selector=label).items
-        except ApiException as err:
-            LOGGER.warning(
-                'Could not retrieve pods in namespace {} with label selector '
-                '{}: {}'.format(ns, label, err))
-            continue
-
-        # count how many times a pod of a given replicaset is running
-        # on the same node.
-        node_pods = defaultdict(lambda: [])
-        for pod in pods:
-            if pod.status.phase == 'Running':
-                node = pod.spec.node_name
-                node_pods[node].append(pod.metadata.name)
-
-        # Don't save entries that are of len 1.
-        entry = {k: v for k, v in node_pods.items() if len(v) > 1}
-
-        if entry:
-            r = ReplicaSet(ns, replica_set.metadata.name)
-            replica_counts[r] = entry
-
-    return replica_counts
+    return [x for x in replica_sets if x.co_located_replicas]
 
 
 def create_report(dupes, args):
@@ -107,18 +64,18 @@ def create_report(dupes, args):
     Returns:
         A Report object.
     """
-    headers = ['namespace', 'replicaset', 'node', 'pods']
-    rows = [[r.namespace, r.name, n, '\n'.join(p)] for r, nodes in dupes.items() for n, p in nodes.items()]
+    headers = ['namespace', 'replicaset', 'node', 'ratio', 'pods']
+    rows = [
+            [
+                r.metadata.namespace,
+                r.metadata.name,
+                n,
+                '{}/{}'.format(len(p), len(r.running_pods)),
+                '\n'.join(p),
+            ]
+        for r in dupes for n, p in r.co_located_replicas.items()]
 
-    report = Report(
-        headers, None,
-        args.sort_by, args.reverse,
-        get_config_value('format.no_headings'),
-        get_config_value('format.no_borders'),
-        filter_strs=args.filter_strs)
-
-    report.add_rows(rows)
-    return report
+    return headers, rows
 
 
 def do_k8s(args):
@@ -140,7 +97,17 @@ def do_k8s(args):
         print('Summary: There were {} replica-sets that had pods running on '
               'the same node.'.format(len(dupes)))
     else:
-        report = create_report(dupes, args)
+        headers, rows = create_report(dupes, args)
+
+        report = Report(
+            headers, None,
+            args.sort_by, args.reverse,
+            get_config_value('format.no_headings'),
+            get_config_value('format.no_borders'),
+            filter_strs=args.filter_strs)
+
+        report.add_rows(rows)
+
         if args.format == 'yaml':
             print(report.get_yaml())
         else:
