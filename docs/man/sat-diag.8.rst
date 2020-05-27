@@ -2,9 +2,9 @@
  SAT-DIAG
 ==========
 
------------------------------------
-Run L1 Rosetta diagnostics at scale
------------------------------------
+---------------------------
+Run L1 diagnostics at scale
+---------------------------
 
 :Author: Cray Inc.
 :Copyright: Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
@@ -19,12 +19,14 @@ DESCRIPTION
 ===========
 
 The diag subcommand is used for running L1 diagnostics on an arbitrary
-number of Rosetta switches. This tool accepts a list of switch xnames
-from the command line, a file, and/or stdin, and will launch a given
-command on these hosts. Switches are polled at a specific interval.
-A report is printed after all switches have completed their diagnostics,
-either to stdout (default) or to files, one for each switch. A Redfish
-username and password is required.
+number of chassis, nodes, and switches in liquid-cooled cabinets and
+Slingshot top-of-rack switches. This tool accepts a list of xnames of
+controllers (BMCs) of the chassis, node, or switch to target. This list
+may be passed on the command line, from a file, and/or stdin, and will
+launch a given command on these controllers. Targets are polled at a
+specific interval. A report is printed after all targets have completed
+their diagnostics, either to stdout (default) or to files, one for each
+switch. A Redfish username and password is required.
 
 ARGUMENTS
 =========
@@ -42,7 +44,7 @@ These options must be specified after the subcommand.
         Display a help message and exit.
 
 **-i** *SECONDS*, **--interval** *SECONDS*
-        Specify the interval, in seconds, at which the switches
+        Specify the interval, in seconds, at which the targets
         should be polled to check the status of the diagnostics.
         Defaults to 10 seconds.
 
@@ -53,7 +55,7 @@ These options must be specified after the subcommand.
 
 **--disruptive**
         If this flag is used, the user will not be prompted
-        interactively to ask whether they wish to proceed. L1 Rosetta
+        interactively to ask whether they wish to proceed. L1
         diagnostics can disrupt production environments, so this flag
         should be used with caution. This flag is useful for running
         automated scripts which do not have interactive input.
@@ -99,12 +101,12 @@ In the example above, the file **my-xnames.txt** contains the following lines:
 
 ::
 
-        x0c0s14b0n0
-        x0c0s21b0n0
-        x0c0s24b0n0
-        x0c0s28b0n0
-        x0c0s16b0n0
-        x0c0s26b0n0
+        x9000c1b0
+        x9000c1r1b0
+        x9000c1r7b0
+        x9000c1s0b0
+        x9000c1s0b1
+        x3000c0r24b0
 
 SEE ALSO
 ========

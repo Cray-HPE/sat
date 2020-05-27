@@ -31,6 +31,9 @@ import logging
 import json
 import re
 
+# TODO: This is very bad practice, but we need it for now. See: SAT-140.
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -353,7 +356,7 @@ class BMC:
             LOGGER.debug('Redfish Query: %s', url)
 
             try:
-                requests_rsp = self.requester.get(url)
+                requests_rsp = self.requester.get(url, verify=False)
 
             except requests.exceptions.RequestException as err:
                 msg = 'Redfish query to {} responded with request error: '.format(self.xname)
