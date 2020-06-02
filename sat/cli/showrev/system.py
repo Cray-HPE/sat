@@ -300,13 +300,16 @@ def get_slurm_version():
     except ApiException as err:
         LOGGER.error('Could not retrieve list of pods: {}'.format(err))
         return 'ERROR'
+    except IndexError:
+        LOGGER.error('No pods with label app=slurmctld could be found.')
+        return 'ERROR'
 
     cmd = 'kubectl exec -n {} -c slurmctld {} -- sinfo --version'.format(ns, pod)
     toks = shlex.split(cmd)
 
     try:
         output = subprocess.check_output(toks)
-        version = output.decode('utf-8').splitlines[0]
+        version = output.decode('utf-8').splitlines()[0]
     except IndexError:
         LOGGER.error('Command to print slurm version returned no stdout.')
         return 'ERROR'
