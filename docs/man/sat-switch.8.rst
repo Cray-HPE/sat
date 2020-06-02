@@ -6,7 +6,7 @@
 Disable/enable switch before/after replacement
 ----------------------------------------------
 
-:Author: Cray Inc.
+:Author: Hewlett Packard Enterprise Development LP.
 :Copyright: Copyright 2020 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 

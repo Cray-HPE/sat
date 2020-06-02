@@ -6,7 +6,7 @@
 Run L1 diagnostics at scale
 ---------------------------
 
-:Author: Cray Inc.
+:Author: Hewlett Packard Enterprise Development LP.
 :Copyright: Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
