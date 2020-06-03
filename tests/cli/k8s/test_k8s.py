@@ -58,6 +58,28 @@ class TestK8s(unittest.TestCase):
         with self.assertRaises(ApiException):
             sat.cli.k8s.main.get_co_located_replicas()
 
+    def test_main_catch_fnf(self):
+        """The main k8s routine should exit with sys(1) on FileNotFound.
+
+        FNF can be raised by get_co_located_replicas.
+        """
+        mock.patch(
+            'sat.cli.k8s.replicaset.ReplicaSet.get_all_replica_sets',
+            side_effect=FileNotFoundError).start()
+
+        with self.assertRaises(SystemExit):
+            sat.cli.k8s.main.do_k8s([])
+
+    def test_main_catch_config_error(self):
+        """Same as above, but with ConfigException..
+        """
+        mock.patch(
+            'sat.cli.k8s.replicaset.ReplicaSet.get_all_replica_sets',
+            side_effect=ConfigException).start()
+
+        with self.assertRaises(SystemExit):
+            sat.cli.k8s.main.do_k8s([])
+
 
 if __name__ == '__main__':
     unittest.main()

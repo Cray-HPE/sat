@@ -290,6 +290,16 @@ class TestSystem(unittest.TestCase):
         slurm_version = sat.cli.showrev.system.get_slurm_version()
         self.assertEqual('ERROR', slurm_version)
 
+    def test_get_slurm_version_kube_file_not_found(self):
+        """get_slurm_version FileNotFound error when reading kube config.
+        """
+        mock.patch(
+            'sat.cli.showrev.system.kubernetes.config.load_kube_config',
+            side_effect=FileNotFoundError).start()
+
+        slurm_version = sat.cli.showrev.system.get_slurm_version()
+        self.assertEqual('ERROR', slurm_version)
+
 
 if __name__ == '__main__':
     unittest.main()

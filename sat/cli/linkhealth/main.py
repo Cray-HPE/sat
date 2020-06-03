@@ -44,10 +44,13 @@ class ResettableDefault:
     """
     def __init__(self, starting_value):
         self._value = starting_value
+
     def reset(self, new_value):
         self._value = new_value
+
     def __call__(self):
         return self._value
+
 
 def get_jack_port_ids(xnames, username, password):
     """Retrieve all jack-port IDs for the xnames.

@@ -118,6 +118,8 @@ class ReplicaSet(kubernetes.client.models.v1_replica_set.V1ReplicaSet):
             kubernetes.config.load_kube_config()
         except ConfigException as err:
             raise ConfigException('Error reading kubernetes config: {}'.format(err))
+        except FileNotFoundError as err:
+            raise FileNotFoundError('Kubernetes configuration file not found: {}'.format(err))
 
         appsv1 = kubernetes.client.AppsV1Api()
 
@@ -125,8 +127,6 @@ class ReplicaSet(kubernetes.client.models.v1_replica_set.V1ReplicaSet):
             replica_sets = appsv1.list_replica_set_for_all_namespaces().items
         except ApiException as err:
             raise ApiException('Could not retrieve list of replicasets: {}'.format(err))
-        except FileNotFoundError as err:
-            raise FileNotFoundError('Could not retrieve list of replicasets: {}'.format(err))
 
         for rs in replica_sets:
             rs.__class__ = ReplicaSet
