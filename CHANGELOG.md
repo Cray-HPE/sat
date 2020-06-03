@@ -25,6 +25,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2020-06-03
+
+### Changed
+- ``sat hwmatch`` now displays a message if no mismatches were found.
+- ``sat cablecheck`` now calls ``/usr/bin/check-hsn-cables`` which is the new
+  name of the script after a slingshot-tools packaging refactor.
+
 ## [2.1.0] - 2020-05-26
 
 ### Added

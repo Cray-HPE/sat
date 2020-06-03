@@ -159,4 +159,7 @@ def do_hwmatch(args):
         filter_strs=args.filter_strs
     )
     report.add_rows(rows)
-    print(report.get_yaml() if args.format == 'yaml' else report)
+    if not rows and args.format == 'pretty':
+        print('No mismatches found')
+    else:
+        print(report.get_yaml() if args.format == 'yaml' else report)
