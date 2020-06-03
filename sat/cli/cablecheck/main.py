@@ -22,12 +22,9 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
-import os
-import os.path
 import subprocess
 
-COMMAND_LOC = "/usr/bin/"
-COMMAND_NAME = "check_hsn_cables.py"
+COMMAND_LOC = "/usr/bin/check-hsn-cables"
 
 
 def do_cablecheck(args):
@@ -67,4 +64,4 @@ def do_cablecheck(args):
     if args.quiet:
         command_args.append('-q')
 
-    subprocess.run([os.path.join(COMMAND_LOC, COMMAND_NAME)] + command_args)
+    subprocess.run([COMMAND_LOC] + command_args)

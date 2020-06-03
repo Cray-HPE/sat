@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - ``sat hwmatch`` now displays a message if no mismatches were found.
+- ``sat cablecheck`` now calls ``/usr/bin/check-hsn-cables`` which is the new
+  name of the script after a slingshot-tools packaging refactor.
 
 ## [2.1.0] - 2020-05-26
 
