@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Author in man pages now reads HPE.
 
+### Fixed
+- Fixed critical error in ``sat showrev --system``.
+
 ## [2.1.1] - 2020-06-03
 
 ### Changed
