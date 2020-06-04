@@ -48,37 +48,8 @@ pip3 uninstall sat
 
 # Contributing
 
-If you would like to contribute to this project, please open a pull request.
+See [instructions in CONTRIBUTING.md](CONTRIBUTING.md).
 
-Contributors must follow the guidelines below:
-
-1. Include detailed commit messages that start with a short subject line,
-   followed by a blank line, followed by a longer description that documents
-   what the commit changes and why. See
-   [How to Write a Git Commit Message](https://chris.beams.io/posts/git-commit/)
-   for further helpful guidance.
-2. Organize commits into cohesive, functional units, such that each commit
-   fully implements an entire feature or bugfix, and the code works at each
-   point in the commit history. I.e., don't include multiple commits where
-   the first commit is a buggy implementation of a feature, and the following
-   commits fix bugs that exist in the first commit. It is okay to develop in
-   this way, but these commits must be squashed before opening the pull
-   request.
-3. Address feedback received in the pull request as additional commits. Then
-   once approval is attained, squash bugfixes and feedback commits into the
-   original commit(s) as appropriate per guideline #2 above. The reason for the
-   separate commits addressing feedback is that it provides an easy way for
-   reviewers to see only what changed if desired.
-4. Update the ``CHANGELOG.md`` file with your changes. This project follows the
-   conventions described by the [Keep a Changelog project](https://keepachangelog.com/en/1.0.0/).
-   Add a description of changes to the ``[Unreleased]`` section of
-   ``CHANGELOG.md``, and add them to the appropriate subsection based on the
-   type of changes: Added, Changed, Deprecated, Removed, Fixed, or Security.
-   The maintainers of this project will decide when to issue a new release, and
-   at that time, the ``[Unreleased]`` section will be renamed to indicate the
-   release version based on [Semantic Versioning](https://semver.org/), and a
-   new ``[Unreleased]`` section will be created to track changes for the next
-   release.
 
 # Copying
 
