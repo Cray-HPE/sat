@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- Removed Kibana objects, supporting scripts, and metadata. The ``sat``
+  command is not affected.
+
+## [2.1.1] - 2020-06-03
+
 ### Changed
 - Author in man pages now reads HPE.
 
