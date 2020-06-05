@@ -72,8 +72,7 @@ def create_report(dupes, args):
                 n,
                 '{}/{}'.format(len(p), len(r.running_pods)),
                 '\n'.join(p),
-            ]
-        for r in dupes for n, p in r.co_located_replicas.items()]
+            ] for r in dupes for n, p in r.co_located_replicas.items()]
 
     return headers, rows
 
@@ -89,7 +88,7 @@ def do_k8s(args):
 
     try:
         dupes = get_co_located_replicas()
-    except (ApiException, ConfigException) as err:
+    except (ApiException, ConfigException, FileNotFoundError) as err:
         LOGGER.error(err)
         sys.exit(1)
 

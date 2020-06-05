@@ -292,6 +292,9 @@ def get_slurm_version():
     except ApiException as err:
         LOGGER.error('Reading kubernetes config: {}'.format(err))
         return 'ERROR'
+    except FileNotFoundError as err:
+        LOGGER.error('Kubernetes config not found: {}'.format(err))
+        return 'ERROR'
 
     ns = 'user'
     try:

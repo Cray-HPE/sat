@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed critical error in ``sat showrev --system``.
+- k8s and showrev main routines that call functions that can raise
+  FileNotFoundError now catch the exception.
 
 ## [2.1.1] - 2020-06-03
 
