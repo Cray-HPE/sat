@@ -24,6 +24,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import configparser
 import logging
+import warnings
 import os
 import shlex
 import socket
@@ -287,6 +288,11 @@ def get_slurm_version():
         String representing version of slurm. Returns 'ERROR' if something
         went wrong.
     """
+
+    # Ignore YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated
+    # kubernetes/config/kube_config.py should use yaml.safe_load()
+    warnings.filterwarnings('ignore', category=yaml.YAMLLoadWarning)
+
     try:
         kubernetes.config.load_kube_config()
     except ApiException as err:
