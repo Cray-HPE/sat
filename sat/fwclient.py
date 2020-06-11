@@ -170,6 +170,8 @@ class FASClient(_FirmwareClient):
 
         Raises:
             APIError: If querying the FAS failed.
+            KeyError: The payload did not contain a 'snapshots' entry.
+            ValueError: The payload was invalid JSON.
         """
         try:
             response = self.get('snapshots')
@@ -195,8 +197,11 @@ class FASClient(_FirmwareClient):
 
         Raises:
             APIError: The firmware api could not be queried.
+            KeyError: The payload did not contain a 'devices' entry.
+            ValueError: The payload was invalid JSON.
         """
         response = self.get('snapshots', name)
+
         response = response.json()
 
         devices = response['devices']
@@ -217,6 +222,8 @@ class FASClient(_FirmwareClient):
 
         Raises:
             APIError: The firmware api could not be queried.
+            KeyError: The payload did not contain a 'devices' entry.
+            ValueError: The payload was invalid JSON.
         """
         descriptions = {}
         known_snaps = self.get_all_snapshot_names()
@@ -272,7 +279,7 @@ class FASClient(_FirmwareClient):
 
             try:
                 response = self.get('snapshots', name).json()
-            except APIError:
+            except APIError as err:
                 raise APIError('Error when polling the snapshot for "ready" status: {}'.format(err))
             except ValueError as err:
                 raise ValueError('The JSON received was invalid: {}'.format(err))
@@ -400,6 +407,8 @@ class FUSClient(_FirmwareClient):
 
         Raises:
             APIError: The firmware api could not be queried.
+            KeyError: If get_snapshot raised a KeyError.
+            ValueError: If get_snapshot raised a ValueError.
         """
         descriptions = {}
         known_snaps = self.get_all_snapshot_names()

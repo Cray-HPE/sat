@@ -72,6 +72,12 @@ def do_firmware(args):
             except APIError as err:
                 LOGGER.error('Getting snapshot descriptions: {}'.format(err))
                 sys.exit(1)
+            except KeyError as err:
+                LOGGER.error("The payload for %s was missing an expected entry: %s", xname, err)
+                continue
+            except ValueError as err:
+                LOGGER.error('Failed to obtain valid JSON from response for %s: %s', xname, err)
+                continue
 
             for name, snapshot in snapshots.items():
                 fw_tables[name] = client.make_fw_table(snapshot)
