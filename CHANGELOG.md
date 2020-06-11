@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- FAS support for ``sat firmware``.
+
 ### Changed
 - Author in man pages now reads HPE.
 - Split contributing guidelines to separate ``CONTRIBUTING.md`` file and added
