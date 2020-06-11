@@ -289,12 +289,12 @@ def get_slurm_version():
         went wrong.
     """
 
-    # Ignore YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated
-    # kubernetes/config/kube_config.py should use yaml.safe_load()
-    warnings.filterwarnings('ignore', category=yaml.YAMLLoadWarning)
-
     try:
-        kubernetes.config.load_kube_config()
+        with warnings.catch_warnings():
+            # Ignore YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated
+            # kubernetes/config/kube_config.py should use yaml.safe_load()
+            warnings.filterwarnings('ignore', category=yaml.YAMLLoadWarning)
+            kubernetes.config.load_kube_config()
     except ApiException as err:
         LOGGER.error('Reading kubernetes config: {}'.format(err))
         return 'ERROR'

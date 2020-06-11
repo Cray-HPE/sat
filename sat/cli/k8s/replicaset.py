@@ -117,12 +117,12 @@ class ReplicaSet(kubernetes.client.models.v1_replica_set.V1ReplicaSet):
             FileNotFoundError: The config didn't exist.
         """
 
-        # Ignore YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated
-        # kubernetes/config/kube_config.py should use yaml.safe_load()
-        warnings.filterwarnings('ignore', category=yaml.YAMLLoadWarning)
-
         try:
-            kubernetes.config.load_kube_config()
+            with warnings.catch_warnings():
+                # Ignore YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated
+                # kubernetes/config/kube_config.py should use yaml.safe_load()
+                warnings.filterwarnings('ignore', category=yaml.YAMLLoadWarning)
+                kubernetes.config.load_kube_config()
         except ConfigException as err:
             raise ConfigException('Error reading kubernetes config: {}'.format(err))
         except FileNotFoundError as err:
