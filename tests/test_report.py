@@ -69,6 +69,47 @@ class TestReport(unittest.TestCase):
         report = Report(self.headings)
         self.assertEqual(self.headings, report.headings)
 
+    def test_report_default_format(self):
+        """Verify that format attributes get correct defaults from config."""
+        mock_config_vals = {
+            'format.no_headings': Mock(),
+            'format.no_borders': Mock(),
+            'format.show_empty': Mock(),
+            'format.show_missing': Mock()
+        }
+
+        def mock_get_config_value(opt):
+            return mock_config_vals.get(opt)
+
+        with patch('sat.report.get_config_value', mock_get_config_value):
+            report = Report(['foo', 'bar'])
+
+        self.assertEqual(mock_config_vals['format.no_headings'],
+                         report.no_headings)
+        self.assertEqual(mock_config_vals['format.no_borders'],
+                         report.no_borders)
+        self.assertEqual(mock_config_vals['format.show_empty'],
+                         report.show_empty)
+        self.assertEqual(mock_config_vals['format.show_missing'],
+                         report.show_missing)
+
+    @patch('sat.report.get_config_value')
+    def test_report_specified_format(self, mock_get_config_value):
+        """Verify that format attributes get values specified from args."""
+        report = Report(
+            ['foo', 'bar'],
+            no_headings=True,
+            no_borders=True,
+            show_empty=True,
+            show_missing=True
+        )
+
+        mock_get_config_value.assert_not_called()
+        self.assertTrue(report.no_headings)
+        self.assertTrue(report.no_borders)
+        self.assertTrue(report.show_empty)
+        self.assertTrue(report.show_missing)
+
     def test_adding_single_list(self):
         """Verify that a single list can be added to a Report.
         """

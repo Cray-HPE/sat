@@ -74,6 +74,12 @@ class _FirmwareClient(APIGatewayClient):
     def make_fw_table(self, fw_devs):
         raise NotImplementedError
 
+    def get_updates(self):
+        raise NotImplementedError
+
+    def get_active_updates(self):
+        raise NotImplementedError
+
     def _make_fw_table(self, fw_devs, name, version):
         """For creating rows to be fed into a Report.
 
@@ -126,6 +132,35 @@ class _FirmwareClient(APIGatewayClient):
 # Should have the same interface as FUSClient
 class FASClient(_FirmwareClient):
     base_resource_path = 'fw-action/v1/'
+
+    def get_updates(self):
+        """Get a list of all the firmware updates on the system.
+
+        Returns:
+            A list of dicts representing firmware updates on the system.
+
+        Raises:
+            APIError: if request to get updates from FAS fails
+        """
+        try:
+            return self.get('actions').json()['actions']
+        except ValueError as err:
+            raise APIError('Unable to parse json in response from FAS: '
+                           '{}'.format(err))
+        except KeyError as err:
+            raise APIError("No 'actions' key in response from FAS.")
+
+    def get_active_updates(self):
+        """Get a list of all the active firmware updates on the system.
+
+        Returns:
+            A list of dicts representing active firmware updates on the system.
+
+        Raises:
+            APIError: if request to get updates from FAS fails
+        """
+        return [update for update in self.get_updates()
+                if update.get('state') not in ('aborted', 'completed')]
 
     def get_all_snapshot_names(self):
         """Return all snapshot names available in the FAS.
@@ -273,11 +308,39 @@ class FASClient(_FirmwareClient):
         """
         return self._make_fw_table(fw_devs, 'name', 'firmwareVersion')
 
+
 # Should have the same interface as FASClient
 class FUSClient(_FirmwareClient):
     """Class for interacting with the FUS.
     """
     base_resource_path = 'fw-update/v1/'
+
+    def get_updates(self):
+        """Get a list of all the firmware updates on the system.
+
+        Returns:
+            A list of dicts representing firmware updates on the system.
+
+        Raises:
+            APIError: if request to get updates from FUS fails
+        """
+        try:
+            return self.get('status').json()
+        except ValueError as err:
+            raise APIError('Unable to parse json in response from FUS: '
+                           '{}'.format(err))
+
+    def get_active_updates(self):
+        """Get a list of all the active firmware updates on the system.
+
+        Returns:
+            A list of dicts representing active firmware updates on the system.
+
+        Raises:
+            APIError: if request to get updates from FUS fails
+        """
+        return [update for update in self.get_updates()
+                if 'endTime' not in update]
 
     def get_all_snapshot_names(self):
         """Return all existing snapshots on the FUS.

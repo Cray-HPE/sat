@@ -25,10 +25,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.2.0] - 2020-06-11
 
 ### Added
 - FAS support for ``sat firmware``.
+- Added ``sat bootsys`` subcommand and implemented first portion of the
+  ``shutdown`` action.
 
 ### Changed
 - Author in man pages now reads HPE.
@@ -36,13 +38,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instructions for signing off on the Developer Certificate of Origin (DCO).
 
 ### Removed
-- Removed Kibana objects, supporting scripts, and metadata. The ``sat``
-  command is not affected.
+- Removed Kibana objects, supporting scripts, and metadata from RPM. The
+  ``sat`` command is not affected.
 
 ### Fixed
-- Fixed critical error in ``sat showrev --system``.
-- k8s and showrev main routines that call functions that can raise
-  FileNotFoundError now catch the exception.
+- Fixed two critical errors in ``sat showrev --system`` that resulted in an
+  uncaught ``TypeError`` or ``IndexError``.
+- ``sat k8s`` and ``sat showrev`` now catch ``FileNotFoundError`` that can be
+  raised when loading kubernetes config.
+- Suppressed ugly ``YAMLLoadWarning` that appeared when loading kubernetes
+  config in ``sat k8s`` and ``sat showrev`` commands.
 
 ## [2.1.1] - 2020-06-03
 

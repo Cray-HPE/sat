@@ -314,3 +314,76 @@ def bytes_to_gib(bytes_val, ndigits=2):
         The rounded GiB value.
     """
     return round(bytes_val / 2**30, ndigits)
+
+
+def get_val_by_path(dict_val, dotted_path, default_value=None):
+    """Get a value from a dictionary based on a dotted path.
+
+    For example, if `dict_val` is as follows:
+
+    dict_val = {
+        'foo': {
+            'bar': 'baz'
+        }
+    }
+
+    Then get_val_by_path(dict_val, 'foo.bar') would return 'baz', and something
+    like get_val_by_path(dict_val, 'no.such.keys') would return None.
+
+    Args:
+        dict_val (dict): The dictionary in which to search for the dotted path.
+        dotted_path (str): The dotted path to look for in the dictionary. The
+            dot character, '.', separates the keys to use when traversing a
+            nested dictionary.
+        default_value: The default value to return when the given dotted path
+            does not exist in the dict_val.
+
+    Returns:
+        The value that exists at the dotted path or `default_value` if no such
+        path exists in `dict_val`.
+    """
+    current_val = dict_val
+    for key in dotted_path.split('.'):
+        if key in current_val:
+            current_val = current_val[key]
+        else:
+            return default_value
+    return current_val
+
+
+def get_new_ordered_dict(orig_dict, dotted_paths, default_value=None, strip_path=True):
+    """Get a new ordered dict from a dict using the given dotted_paths.
+
+    E.g.:
+
+    > orig_dict = {
+        'foo': 'bar',
+        'baz': {
+            'bat': 'tab'
+        },
+        'other_key': 'value'
+    }
+    > get_new_ordered_dict(orig_dict, ['foo', 'baz.bat', 'nope'])
+    OrderedDict([
+        ('foo', 'bar'),
+        ('bat', 'tab'),
+        ('nope', None)
+    ])
+
+    Args:
+        orig_dict (dict): The dictionary from which to pull values when
+            constructing the new OrderedDict.
+        dotted_paths (list): The list of strings specifying the dotted paths to
+            extract and include in the new dict. See `get_val_by_path` for an
+            explanation of what a dotted path is.
+        default_value: The default value to use if one of the dotted paths does
+            not exist in `orig_dict`.
+        strip_path (bool): If True, strip off leading path components in the dotted
+            paths. If this results in duplicate keys the last one to appear in
+            `dotted_paths` wins.
+    """
+    return OrderedDict([
+        (dotted_path.rsplit('.', 1)[-1] if strip_path else dotted_path,
+         get_val_by_path(orig_dict, dotted_path, default_value))
+        for dotted_path in dotted_paths
+    ])
