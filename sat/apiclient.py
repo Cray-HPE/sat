@@ -206,3 +206,19 @@ class HSMClient(APIGatewayClient):
 
 class FabricControllerClient(APIGatewayClient):
     base_resource_path = 'fc/v2/'
+
+
+class BOSClient(APIGatewayClient):
+    base_resource_path = 'bos/v1/'
+
+
+class CFSClient(APIGatewayClient):
+    base_resource_path = 'cfs/'
+
+
+class CRUSClient(APIGatewayClient):
+    base_resource_path = 'crus/'
+
+
+class NMDClient(APIGatewayClient):
+    base_resource_path = 'v2/nmd/'
