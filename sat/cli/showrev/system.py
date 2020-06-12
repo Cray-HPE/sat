@@ -24,6 +24,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import configparser
 import logging
+import warnings
 import os
 import shlex
 import socket
@@ -287,10 +288,18 @@ def get_slurm_version():
         String representing version of slurm. Returns 'ERROR' if something
         went wrong.
     """
+
     try:
-        kubernetes.config.load_kube_config()
+        with warnings.catch_warnings():
+            # Ignore YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated
+            # kubernetes/config/kube_config.py should use yaml.safe_load()
+            warnings.filterwarnings('ignore', category=yaml.YAMLLoadWarning)
+            kubernetes.config.load_kube_config()
     except ApiException as err:
         LOGGER.error('Reading kubernetes config: {}'.format(err))
+        return 'ERROR'
+    except FileNotFoundError as err:
+        LOGGER.error('Kubernetes config not found: {}'.format(err))
         return 'ERROR'
 
     ns = 'user'
@@ -300,13 +309,16 @@ def get_slurm_version():
     except ApiException as err:
         LOGGER.error('Could not retrieve list of pods: {}'.format(err))
         return 'ERROR'
+    except IndexError:
+        LOGGER.error('No pods with label app=slurmctld could be found.')
+        return 'ERROR'
 
     cmd = 'kubectl exec -n {} -c slurmctld {} -- sinfo --version'.format(ns, pod)
     toks = shlex.split(cmd)
 
     try:
         output = subprocess.check_output(toks)
-        version = output.decode('utf-8').splitlines[0]
+        version = output.decode('utf-8').splitlines()[0]
     except IndexError:
         LOGGER.error('Command to print slurm version returned no stdout.')
         return 'ERROR'

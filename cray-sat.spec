@@ -78,9 +78,6 @@ cd -
 # generate auto-completion script
 register-python-argcomplete sat > etc/sat-completion.bash
 
-# build for Kibana
-kibana/build.sh
-
 %install
 python3 setup.py install -O1 --root="$RPM_BUILD_ROOT" --record=INSTALLED_FILES \
                              --install-scripts=/usr/bin
@@ -92,11 +89,6 @@ install -m 644 etc/sat.toml %{buildroot}/etc/sat.toml
 
 # This directory is used to hold the user-created site_info.yml
 install -m 755 -d %{buildroot}/opt/cray/etc
-
-# Install files for import into Kibana:
-install -m 755 -d %{buildroot}/opt/cray/sat
-install -m 755 -d %{buildroot}/opt/cray/sat/kibana
-install -m 644 kibana/sat-kibana.ndjson %{buildroot}/opt/cray/sat/kibana/sat-kibana.ndjson
 
 # Install ansible content for crayctldeploy subpackage
 install -m 755 -d %{buildroot}/%{ansible_framework_dir}/roles
@@ -124,9 +116,6 @@ cat INSTALLED_FILES | grep __pycache__ | xargs dirname | xargs dirname | uniq >>
 %files -f INSTALLED_FILES
 %dir /var/log/cray
 %dir /opt/cray/etc
-%dir /opt/cray/sat
-%dir /opt/cray/sat/kibana
-/opt/cray/sat/kibana/sat-kibana.ndjson
 %config(noreplace) /etc/sat.toml
 %{satmandir}/*.8.gz
 /etc/bash_completion.d/sat-completion.bash

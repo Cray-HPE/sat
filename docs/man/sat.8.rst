@@ -6,7 +6,7 @@
 The System Admin Toolkit
 ------------------------
 
-:Author: Cray Inc.
+:Author: Hewlett Packard Enterprise Development LP.
 :Copyright: Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
@@ -143,6 +143,7 @@ SEE ALSO
 ========
 
 sat-auth(8),
+sat-bootsys(8),
 sat-cablecheck(8),
 sat-diag(8),
 sat-firmware(8),

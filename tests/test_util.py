@@ -21,6 +21,7 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+from collections import OrderedDict
 from itertools import product
 import os
 from textwrap import dedent
@@ -240,6 +241,115 @@ class TestBytesToGibibytes(unittest.TestCase):
         self.assertEqual(util.bytes_to_gib(bytes_val), 468.85)
         self.assertEqual(util.bytes_to_gib(bytes_val, 3), 468.851)
         self.assertEqual(util.bytes_to_gib(bytes_val, 4), 468.8506)
+
+
+class TestGetValByPath(unittest.TestCase):
+    """Test the get_val_by_path function."""
+
+    def test_top_level_key(self):
+        """Test get_val_by_path with a top-level key."""
+        d = {'foo': 'bar'}
+        self.assertEqual('bar', util.get_val_by_path(d, 'foo'))
+
+    def test_non_existent_top_level_key(self):
+        """Test get_val_by_path with a non-existent top-level key."""
+        d = {'foo': 'bar'}
+        self.assertEqual(None, util.get_val_by_path(d, 'nope'))
+        self.assertEqual('DNE', util.get_val_by_path(d, 'nope', 'DNE'))
+
+    def test_nested_keys(self):
+        """Test get_val_by_path with nested keys."""
+        d = {
+            'foo': {
+                'bar': {
+                    'baz': 'bat'
+                }
+            }
+        }
+        self.assertEqual('bat', util.get_val_by_path(d, 'foo.bar.baz'))
+        self.assertEqual(None, util.get_val_by_path(d, 'does.not.exist'))
+
+
+class TestGetNewOrderedDict(unittest.TestCase):
+    """Test the get_new_ordered_dict function."""
+
+    def setUp(self):
+        """Set up a little nested dict for tests to use."""
+        self.orig_dict = {
+            'foo': 'bar',
+            'baz': {
+                'bat': 'tab'
+            },
+            'other_key': 'value'
+        }
+
+    def test_docstring_example(self):
+        """Test get_new_ordered_dict with the example from its docstring"""
+        new_dict = util.get_new_ordered_dict(self.orig_dict,
+                                             ['foo', 'baz.bat', 'nope'])
+        expected = OrderedDict([
+            ('foo', 'bar'),
+            ('bat', 'tab'),
+            ('nope', None)
+        ])
+        self.assertEqual(expected, new_dict)
+
+    def test_alternate_default(self):
+        """Test get_new_ordered_dict with an alternate default value."""
+        alt = 'alternate default'
+        new_dict = util.get_new_ordered_dict(self.orig_dict, ['foo', 'dne'],
+                                             default_value=alt)
+        expected = OrderedDict([
+            ('foo', 'bar'),
+            ('dne', alt)
+        ])
+        self.assertEqual(expected, new_dict)
+
+    def test_unstripped_path(self):
+        """Test get_new_ordered_dict without stripping paths."""
+        new_dict = util.get_new_ordered_dict(self.orig_dict, ['baz.bat'],
+                                             strip_path=False)
+        expected = OrderedDict([
+            ('baz.bat', 'tab')
+        ])
+        self.assertEqual(expected, new_dict)
+
+    def test_stripped_path_collision(self):
+        """Test get_new_ordered_dict with paths that collide when stripped."""
+        orig_dict = {
+            'bar': 'top',
+            'foo': {
+                'bar': 'nested'
+            }
+        }
+        self.assertEqual('top',
+                         util.get_new_ordered_dict(orig_dict,
+                                                   ['foo.bar', 'bar'])['bar'])
+        self.assertEqual('nested',
+                         util.get_new_ordered_dict(orig_dict,
+                                                   ['bar', 'foo.bar'])['bar'])
+
+    def test_example_cfs_data(self):
+        """Test get_new_ordered_dict with some example CFS data."""
+        orig_dict = {
+            'name': 'cfs_session_name',
+            'status': {
+                'session': {
+                    'status': 'complete'
+                }
+            }
+        }
+        # Throw in a path with multiple components where the first components
+        # are in the dict, but the last one is not.
+        new_dict = util.get_new_ordered_dict(orig_dict,
+                                             ['name', 'status.session.status',
+                                              'status.session.nope'])
+        expected = OrderedDict([
+            ('name', orig_dict['name']),
+            ('status', orig_dict['status']['session']['status']),
+            ('nope', None)
+        ])
+        self.assertEqual(expected, new_dict)
 
 
 if __name__ == '__main__':
