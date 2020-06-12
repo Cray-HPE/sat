@@ -41,10 +41,10 @@ class Report:
     """
     def __init__(self, headings, title=None,
                  sort_by=None, reverse=False,
-                 no_headings=False, no_borders=False,
+                 no_headings=None, no_borders=None,
                  align='l', filter_strs=None,
                  show_empty=None, show_missing=None):
-        """Create a new SatTable instance.
+        """Create a new Report instance.
 
         Args:
             headings: Headings for the table's columns.
@@ -69,27 +69,29 @@ class Report:
         self.title = title
         self.data = []
 
-        if show_empty is not None:
-            self.show_empty = show_empty
-        else:
-            self.show_empty = get_config_value('format.show_empty')
+        config_opts_by_arg_name = {
+            'no_headings': 'format.no_headings',
+            'no_borders': 'format.no_borders',
+            'show_empty': 'format.show_empty',
+            'show_missing': 'format.show_missing'
+        }
 
-        if show_missing is not None:
-            self.show_missing = show_missing
-        else:
-            self.show_missing = get_config_value('format.show_missing')
+        for arg_name, config_opt in config_opts_by_arg_name.items():
+            arg_value = locals()[arg_name]
+            if arg_value is not None:
+                setattr(self, arg_name, arg_value)
+            else:
+                setattr(self, arg_name, get_config_value(config_opt))
 
         # formatting options
         self.sort_by = sort_by
         self.reverse = reverse
-        self.no_headings = no_headings
-        self.no_borders = no_borders
         self.align = align
         self.filter_strs = filter_strs or []
 
         # find the heading to sort on
         if sort_by is not None:
-            warn_str = ('Element %s is not in %s. Output will be unsorted.')
+            warn_str = 'Element %s is not in %s. Output will be unsorted.'
             try:
                 self.sort_by = int(self.sort_by)
                 self.sort_by = self.headings[self.sort_by]
