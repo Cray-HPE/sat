@@ -169,18 +169,24 @@ class FASClient(_FirmwareClient):
             A list of snapshot names.
 
         Raises:
-            APIError: If querying the FAS failed.
-            KeyError: The payload did not contain a 'snapshots' entry.
-            ValueError: The payload was invalid JSON.
+            APIError: - If querying the FAS failed.
+                      - The payload did not contain a 'snapshots' entry.
+                      - The payload was invalid JSON.
         """
         try:
             response = self.get('snapshots')
-
         except APIError as err:
-            raise APIError('Getting all snapshots: {}'.format(err))
+            raise APIError('Contacting the FW API: {}'.format(err))
 
-        response = response.json()
-        snapshots = response['snapshots']
+        try:
+            response = response.json()
+        except ValueError as err:
+            raise APIError('The JSON payload was invalid.'.format(err))
+
+        try:
+            snapshots = response['snapshots']
+        except KeyError:
+            raise APIError('The payload was missing an entry for "snapshots".')
 
         return set([x['name'] for x in snapshots])
 
@@ -196,15 +202,24 @@ class FASClient(_FirmwareClient):
             List of dicts that can be passed to make_fw_table.
 
         Raises:
-            APIError: The firmware api could not be queried.
-            KeyError: The payload did not contain a 'devices' entry.
-            ValueError: The payload was invalid JSON.
+            APIError: - The firmware api could not be queried.
+                      - The payload did not contain a 'devices' entry.
+                      - The payload was invalid JSON.
         """
-        response = self.get('snapshots', name)
+        try:
+            response = self.get('snapshots', name)
+        except APIError as err:
+            raise APIError('Contacting the FAS for snapshot "{}": {}'.format(name, err))
 
-        response = response.json()
+        try:
+            response = response.json()
+        except ValueError as err:
+            raise APIError('The JSON payload from snapshot "{}" was invalid: {}'.format(name, err))
 
-        devices = response['devices']
+        try:
+            devices = response['devices']
+        except KeyError:
+            raise APIError('The payload from snapshot "{}" was missing a "devices" key.'.format(name))
 
         return devices
 
@@ -221,9 +236,9 @@ class FASClient(_FirmwareClient):
             the snapshots themselves. Each value may be passed to make_fw_table.
 
         Raises:
-            APIError: The firmware api could not be queried.
-            KeyError: The payload did not contain a 'devices' entry.
-            ValueError: The payload was invalid JSON.
+            APIError: - The firmware api could not be queried.
+                      - The payload did not contain a 'devices' entry.
+                      - The payload was invalid JSON.
         """
         descriptions = {}
         known_snaps = self.get_all_snapshot_names()
@@ -248,10 +263,11 @@ class FASClient(_FirmwareClient):
             A list of all devices for the specified xname.
 
         Raises:
-            APIError: If any call to the FAS failed.
-            KeyError: The payload was missing either a 'ready' field while
-                polling, or a 'devices' field.
-            ValueError: If the FAS did not indicate if the snapshot was ready.
+            APIError: If any call to the FAS failed to go through. This can also
+                raise if
+                    - The payload was missing either a 'ready' field while
+                      polling, or a 'devices' field.
+                    - If the FAS did not indicate if the snapshot was ready.
         """
         now, later = _now_and_later(10)
         name = '{}-{}-{}-{}-{}-{}-all-xnames'.format(
@@ -282,17 +298,17 @@ class FASClient(_FirmwareClient):
             except APIError as err:
                 raise APIError('Error when polling the snapshot for "ready" status: {}'.format(err))
             except ValueError as err:
-                raise ValueError('The JSON received was invalid: {}'.format(err))
+                raise APIError('The JSON received was invalid: {}'.format(err))
 
             try:
                 ready = response['ready']
             except KeyError:
-                raise KeyError('Payload returned from GET to snapshots/name did not have "ready" field.')
+                raise APIError('Payload returned from GET to snapshots/name did not have "ready" field.')
 
         try:
             return response['devices']
         except KeyError:
-            raise KeyError('The JSON payload did not contain a "devices" field.')
+            raise APIError('The JSON payload did not contain a "devices" field.')
 
     def make_fw_table(self, fw_devs):
         """For creating rows to be fed into a Report.
@@ -360,12 +376,18 @@ class FUSClient(_FirmwareClient):
         """
         try:
             response = self.get('snapshot')
-
         except APIError as err:
-            raise APIError('Getting all snapshots: {}'.format(err))
+            raise APIError('Request to FW API failed: {}'.format(err))
 
-        response = response.json()
-        snapshots = response['snapshots']
+        try:
+            response = response.json()
+        except ValueError as err:
+            raise APIError('The JSON payload was invalid: {}'.format(err))
+
+        try:
+            snapshots = response['snapshots']
+        except KeyError:
+            raise APIError('The payload was missing an entry for "snapshots".')
 
         return set([x['name'] for x in snapshots])
 
@@ -384,12 +406,24 @@ class FUSClient(_FirmwareClient):
             List of dicts that can be passed to make_fw_table.
 
         Raises:
-            APIError: The firmware api could not be queried.
+            APIError: - The firmware api could not be queried.
+                      - The payload received was invalid JSON.
+                      - The payload was missing a 'devices' entry.
         """
-        response = self.get('snapshot', name)
-        response = response.json()
+        try:
+            response = self.get('snapshot', name)
+        except APIError as err:
+            raise APIError('Request to firmware API failed for snapshot "{}": {}'.format(name, err))
 
-        devices = response['devices']
+        try:
+            response = response.json()
+        except ValueError as err:
+            raise APIError('The JSON payload was invalid for snapshot "{}": {}'.format(name, err))
+
+        try:
+            devices = response['devices']
+        except KeyError:
+            raise APIError('The payload from snapshot "{}" was missing an entry for "devices".'.format(name))
 
         return devices
 
@@ -406,9 +440,8 @@ class FUSClient(_FirmwareClient):
             the snapshots themselves. Each value may be passed to make_fw_table.
 
         Raises:
-            APIError: The firmware api could not be queried.
-            KeyError: If get_snapshot raised a KeyError.
-            ValueError: If get_snapshot raised a ValueError.
+            APIError: - The firmware api could not be queried.
+                      - If get_snapshot raised.
         """
         descriptions = {}
         known_snaps = self.get_all_snapshot_names()
@@ -430,18 +463,26 @@ class FUSClient(_FirmwareClient):
                 get 'all' xnames.
 
         Raises:
-            APIError: The call to the FUS failed.
-            ValueError: Invalid JSON was returned.
-            KeyError: There was no 'devices' field in the JSON.
+            APIError: - The call to the FUS failed.
+                      - Invalid JSON was returned.
+                      - There was no 'devices' field in the JSON.
         """
-        # can raise APIError
-        response = self.get('version', xname)
+        try:
+            response = self.get('version', xname)
+        except APIError as err:
+            raise APIError('Error contacting the FUS: {}'.format(err))
 
-        # can raise ValueError
-        response_json = response.json()
+        try:
+            response_json = response.json()
+        except ValueError as err:
+            raise APIError('The JSON received was invalid: {}'.format(err))
 
         # can raise KeyError
-        return response_json['devices']
+        try:
+            ret = response_json['devices']
+            return ret or []
+        except KeyError:
+            raise APIError('The JSON payload was missing an entry for "devices".')
 
     def make_fw_table(self, fw_devs):
         """For creating rows to be fed into a Report.

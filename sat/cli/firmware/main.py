@@ -44,7 +44,11 @@ def do_firmware(args):
             passed to this subcommand.
     """
 
-    client = create_firmware_client(SATSession())
+    try:
+        client = create_firmware_client(SATSession())
+    except APIError as err:
+        LOGGER.error(err)
+        sys.exit(1)
 
     # title is key to tables.
     fw_tables = {}
@@ -72,12 +76,6 @@ def do_firmware(args):
             except APIError as err:
                 LOGGER.error('Getting snapshot descriptions: {}'.format(err))
                 sys.exit(1)
-            except KeyError as err:
-                LOGGER.error("The payload for %s was missing an expected entry: %s", xname, err)
-                continue
-            except ValueError as err:
-                LOGGER.error('Failed to obtain valid JSON from response for %s: %s', xname, err)
-                continue
 
             for name, snapshot in snapshots.items():
                 fw_tables[name] = client.make_fw_table(snapshot)
@@ -90,27 +88,15 @@ def do_firmware(args):
             try:
                 fw_devs = client.get_device_firmwares(xname)
             except APIError as err:
-                LOGGER.error('Request to Firmware API failed for %s: %s', xname, err)
-                continue
-            except KeyError as err:
-                LOGGER.error("The payload for %s was missing an expected entry: %s", xname, err)
-                continue
-            except ValueError as err:
-                LOGGER.error('Failed to obtain valid JSON from response for %s: %s', xname, err)
-                continue
+                LOGGER.error('Error with request for xname %s: %s', xname, err)
+                sys.exit(1)
 
             fw_tables[None] += client.make_fw_table(fw_devs)
     else:
         try:
             fw_devs = client.get_device_firmwares()
         except APIError as err:
-            LOGGER.error('Request to Firmware API failed: %s', err)
-            raise SystemExit(1)
-        except KeyError as err:
-            LOGGER.error("The payload for %s was missing an expected entry: %s", xname, err)
-            raise SystemExit(1)
-        except ValueError as err:
-            LOGGER.error('Failed to obtain valid JSON from firmware version response: %s', err)
+            LOGGER.error(err)
             raise SystemExit(1)
 
         # This report won't have a title.

@@ -129,26 +129,29 @@ class TestFASClient(unittest.TestCase):
         """
         self.mock_get.side_effect = APIError
 
-        with self.assertRaises(APIError):
+        err_regex = r'Contacting the FW API'
+        with self.assertRaisesRegex(APIError, err_regex):
             self.fas_client.get_all_snapshot_names()
 
     def test_get_all_snapshot_names_key_error(self):
-        """It should raise a KeyError if the payload has no 'snapshots' entry.
+        """It should raise a if the payload has no 'snapshots' entry.
         """
         snaps = {}
         self.mock_get.return_value.json.return_value = snaps
 
-        with self.assertRaises(KeyError):
+        err_regex = r'missing an entry for'
+        with self.assertRaisesRegex(APIError, err_regex):
             self.fas_client.get_all_snapshot_names()
 
     def test_get_all_snapshot_names_value_error(self):
-        """It should raise a ValueError if the .json() call raised.
+        """It should raise a if the .json() call raised.
 
         In practice it will re-raise whatever this raises.
         """
         self.mock_get.return_value.json.side_effect = ValueError
 
-        with self.assertRaises(ValueError):
+        err_regex = r'JSON payload was invalid'
+        with self.assertRaisesRegex(APIError, err_regex):
             self.fas_client.get_all_snapshot_names()
 
     def test_get_snapshot(self):
@@ -167,29 +170,32 @@ class TestFASClient(unittest.TestCase):
         self.mock_get.assert_called_once_with('snapshots', 'test-snap')
 
     def test_get_snapshot_api_error(self):
-        """get_snapshot should raise APIError FAS query failed.
+        """get_snapshot should raise FAS query failed.
         """
         self.mock_get.side_effect = APIError
 
-        with self.assertRaises(APIError):
+        err_regex = r'Contacting the FAS for snapshot'
+        with self.assertRaisesRegex(APIError, err_regex):
             actual = self.fas_client.get_snapshot('test-snap')
 
     def test_get_snapshot_key_error(self):
-        """get_snapshot should raise KeyError if missing 'devices' key.
+        """get_snapshot should raise if missing 'devices' key.
         """
         badsnaps = {}
 
         self.mock_get.return_value.json.return_value = badsnaps
 
-        with self.assertRaises(KeyError):
+        err_regex = r'missing a "devices" key'
+        with self.assertRaisesRegex(APIError, err_regex):
             actual = self.fas_client.get_snapshot('test-snap')
 
     def test_get_snapshot_value_error(self):
-        """get_snapshot should raise ValueError if the .json() call raised.
+        """get_snapshot should raise if the .json() call raised.
         """
         self.mock_get.return_value.json.side_effect = ValueError
 
-        with self.assertRaises(ValueError):
+        err_regex = r'JSON payload from'
+        with self.assertRaisesRegex(APIError, err_regex):
             actual = self.fas_client.get_snapshot('test-snap')
 
     def test_get_snapshots(self):
@@ -245,30 +251,42 @@ class TestFASClient(unittest.TestCase):
         self.assertEqual(expected, actual)
 
     def test_get_snapshots_api_error(self):
-        """get_snapshot should raise APIError if the api couldn't be queried.
+        """get_snapshot should raise if the api couldn't be queried.
         """
         self.mock_get.side_effect = APIError
 
-        with self.assertRaises(APIError):
+        err_regex = r'Contacting the FW API'
+        with self.assertRaisesRegex(APIError, err_regex):
             actual = self.fas_client.get_snapshots(['test-snap'])
 
     def test_get_snapshots_key_error(self):
-        """get_snapshot should raise KeyError if missing 'devices' key.
+        """get_snapshot should raise if missing 'devices' key.
         """
         badsnaps = {}
+        snapshot_names = {'snap1'}
+        patch(
+            'sat.fwclient.FASClient.get_all_snapshot_names',
+            return_value=snapshot_names).start()
 
         self.mock_get.return_value.json.return_value = badsnaps
 
-        with self.assertRaises(KeyError):
-            actual = self.fas_client.get_snapshots(['test-snap'])
+        err_regex = r'was missing a "devices" key'
+        with self.assertRaisesRegex(APIError, err_regex):
+            actual = self.fas_client.get_snapshots(['snap1'])
 
     def test_get_snapshots_value_error(self):
-        """get_snapshot should raise ValueError if the .json() call raised.
+        """get_snapshot should raise if the .json() call raised.
         """
+        snapshot_names = {'snap1'}
+        patch(
+            'sat.fwclient.FASClient.get_all_snapshot_names',
+            return_value=snapshot_names).start()
+
         self.mock_get.return_value.json.side_effect = ValueError
 
-        with self.assertRaises(ValueError):
-            actual = self.fas_client.get_snapshots(['test-snap'])
+        err_regex = r'JSON payload from snapshot'
+        with self.assertRaisesRegex(APIError, err_regex):
+            actual = self.fas_client.get_snapshots(['snap1'])
 
     def test_get_device_firmwares(self):
         """Positive test case for get_device_firmwares.
@@ -313,15 +331,16 @@ class TestFASClient(unittest.TestCase):
         self.assertEqual('expected', ret)
 
     def test_get_device_firmwares_post_api_error(self):
-        """get_device_firmwares should raise APIError if the post fails.
+        """get_device_firmwares should raise if the post fails.
         """
         patch.object(APIGatewayClient, 'post', side_effect=APIError).start()
 
-        with self.assertRaises(APIError):
+        err_regex = r'Error when posting new snapshot'
+        with self.assertRaisesRegex(APIError, err_regex):
             self.fas_client.get_device_firmwares()
 
     def test_get_device_firmwares_get_api_error(self):
-        """get_device_firmwares should raise APIError if a get fails.
+        """get_device_firmwares should raise if a get fails.
         """
         self.mock_get.side_effect = APIError
 
@@ -330,11 +349,12 @@ class TestFASClient(unittest.TestCase):
         # this function calls sleep, and it doesn't need to for the test.
         patch('sat.fwclient.time.sleep').start()
 
-        with self.assertRaises(APIError):
+        err_regex = r'Error when polling the snapshot'
+        with self.assertRaisesRegex(APIError, err_regex):
             self.fas_client.get_device_firmwares()
 
     def test_get_device_firmwares_value_error(self):
-        """It should raise ValueError if invalid JSON.
+        """It should raise if invalid JSON.
         """
         self.mock_get.return_value.json.side_effect = ValueError
 
@@ -343,11 +363,12 @@ class TestFASClient(unittest.TestCase):
         # this function calls sleep, and it doesn't need to for the test.
         patch('sat.fwclient.time.sleep').start()
 
-        with self.assertRaises(ValueError):
+        err_regex = r'The JSON received'
+        with self.assertRaisesRegex(APIError, err_regex):
             self.fas_client.get_device_firmwares()
 
     def test_get_device_firmwares_key_error(self):
-        """It should KeyError if the payload is missing a 'ready' entry.
+        """It should raise if the payload is missing a 'ready' entry.
         """
         payload = {'no-ready': False}
 
@@ -364,11 +385,12 @@ class TestFASClient(unittest.TestCase):
         # this function calls sleep, and it doesn't need to for the test.
         patch('sat.fwclient.time.sleep').start()
 
-        with self.assertRaises(KeyError):
+        err_regex = r'did not have a "ready" field'
+        with self.assertRaisesRegex(APIError, err_regex):
             self.fas_client.get_device_firmwares()
 
     def test_get_device_firmwares_key_error(self):
-        """It should KeyError if the payload is missing a 'devices' entry.
+        """It should if the payload is missing a 'devices' entry.
         """
         payload = {'ready': True, 'not-devices': []}
 
@@ -385,7 +407,8 @@ class TestFASClient(unittest.TestCase):
         # this function calls sleep, and it doesn't need to for the test.
         patch('sat.fwclient.time.sleep').start()
 
-        with self.assertRaises(KeyError):
+        err_regex = r'not contain a "devices" field'
+        with self.assertRaisesRegex(APIError, err_regex):
             self.fas_client.get_device_firmwares()
 
 
@@ -474,30 +497,33 @@ class TestFUSClient(unittest.TestCase):
         self.assertEqual({'snap1', 'snap2'}, known_snaps)
 
     def test_get_all_snapshot_names_api_error(self):
-        """get_all_snapshot_names should raise APIError FUS query failed.
+        """get_all_snapshot_names should raise if the FUS query failed.
         """
         self.mock_get.side_effect = APIError
 
-        with self.assertRaises(APIError):
+        err_regex = r'Request to FW API failed'
+        with self.assertRaisesRegex(APIError, err_regex):
             self.fus_client.get_all_snapshot_names()
 
     def test_get_all_snapshot_names_key_error(self):
-        """It should raise a KeyError if the payload has no 'snapshots' entry.
+        """It should raise if the payload has no 'snapshots' entry.
         """
         snaps = {}
         self.mock_get.return_value.json.return_value = snaps
 
-        with self.assertRaises(KeyError):
+        err_regex = r'missing an entry for "snapshots"'
+        with self.assertRaisesRegex(APIError, err_regex):
             self.fus_client.get_all_snapshot_names()
 
     def test_get_all_snapshot_names_value_error(self):
-        """It should raise a ValueError if the .json() call raised.
+        """It should raise if the .json() call raised.
 
         In practice it will re-raise whatever this raises.
         """
         self.mock_get.return_value.json.side_effect = ValueError
 
-        with self.assertRaises(ValueError):
+        err_regex = r'The JSON payload was invalid'
+        with self.assertRaisesRegex(APIError, err_regex):
             self.fus_client.get_all_snapshot_names()
 
     def test_get_snapshot(self):
@@ -516,29 +542,32 @@ class TestFUSClient(unittest.TestCase):
         self.mock_get.assert_called_once_with('snapshot', 'test-snap')
 
     def test_get_snapshot_api_error(self):
-        """get_snapshot should raise APIError if the FUS query failed.
+        """get_snapshot should raise if the FUS query failed.
         """
         self.mock_get.side_effect = APIError
 
-        with self.assertRaises(APIError):
+        err_regex = r'Request to firmware API failed'
+        with self.assertRaisesRegex(APIError, err_regex):
             actual = self.fus_client.get_snapshot('test-snap')
 
     def test_get_snapshot_key_error(self):
-        """get_snapshot should raise KeyError if missing 'devices' key.
+        """get_snapshot should raise if missing 'devices' key.
         """
         badsnaps = {}
 
         self.mock_get.return_value.json.return_value = badsnaps
 
-        with self.assertRaises(KeyError):
+        err_regex = r'missing an entry for "devices"'
+        with self.assertRaisesRegex(APIError, err_regex):
             actual = self.fus_client.get_snapshot('test-snap')
 
     def test_get_snapshot_value_error(self):
-        """get_snapshot should raise ValueError if the .json() call raised.
+        """get_snapshot should raise if the .json() call raised.
         """
         self.mock_get.return_value.json.side_effect = ValueError
 
-        with self.assertRaises(ValueError):
+        err_regex = r'The JSON payload was invalid'
+        with self.assertRaisesRegex(APIError, err_regex):
             actual = self.fus_client.get_snapshot('test-snap')
 
     def test_get_snapshots(self):
@@ -585,7 +614,7 @@ class TestFUSClient(unittest.TestCase):
         snapshot_names = {'snap1', 'snap2'}
 
         patch(
-            'sat.fwclient.FASClient.get_all_snapshot_names',
+            'sat.fwclient.FUSClient.get_all_snapshot_names',
             return_value=snapshot_names).start()
 
         actual = self.fus_client.get_snapshots(['test-snap'])
@@ -594,30 +623,54 @@ class TestFUSClient(unittest.TestCase):
         self.assertEqual(expected, actual)
 
     def test_get_snapshots_api_error(self):
-        """get_snapshot should raise APIError if the api couldn't be queried.
+        """get_snapshot should raise if the api couldn't be queried.
         """
+        # mock return from get_all_snapshot_names.
+        snapshot_names = {'snap1', 'snap2'}
+
+        patch(
+            'sat.fwclient.FUSClient.get_all_snapshot_names',
+            return_value=snapshot_names).start()
+
         self.mock_get.side_effect = APIError
 
-        with self.assertRaises(APIError):
-            self.fus_client.get_snapshots(['test-snap'])
+        err_regex = r'Request to firmware API failed'
+        with self.assertRaisesRegex(APIError, err_regex):
+            self.fus_client.get_snapshots(['snap1'])
 
     def test_get_snapshots_key_error(self):
-        """get_snapshot should raise KeyError if missing 'devices' key.
+        """get_snapshot should raise if missing 'devices' key.
         """
+        # mock return from get_all_snapshot_names.
+        snapshot_names = {'snap1', 'snap2'}
+
+        patch(
+            'sat.fwclient.FUSClient.get_all_snapshot_names',
+            return_value=snapshot_names).start()
+
         badsnaps = {}
 
         self.mock_get.return_value.json.return_value = badsnaps
 
-        with self.assertRaises(KeyError):
-            self.fus_client.get_snapshots(['test-snap'])
+        err_regex = r'missing an entry for "devices"'
+        with self.assertRaisesRegex(APIError, err_regex):
+            self.fus_client.get_snapshots(['snap1'])
 
     def test_get_snapshots_value_error(self):
-        """get_snapshot should raise ValueError if the .json() call raised.
+        """get_snapshot should raise if the .json() call raised.
         """
+        # mock return from get_all_snapshot_names.
+        snapshot_names = {'snap1', 'snap2'}
+
+        patch(
+            'sat.fwclient.FUSClient.get_all_snapshot_names',
+            return_value=snapshot_names).start()
+
         self.mock_get.return_value.json.side_effect = ValueError
 
-        with self.assertRaises(ValueError):
-            self.fus_client.get_snapshots(['test-snap'])
+        err_regex = r'The JSON payload was invalid'
+        with self.assertRaisesRegex(APIError, err_regex):
+            self.fus_client.get_snapshots(['snap1'])
 
     def test_get_device_firmwares(self):
         """Positive test case for get_device_firmwares.
@@ -632,29 +685,32 @@ class TestFUSClient(unittest.TestCase):
         self.mock_get.assert_called_once_with('version', 'all')
 
     def test_get_device_firmwares_api_error(self):
-        """It should raise APIError if the FUS query fails.
+        """It should raise if the FUS query fails.
         """
         self.mock_get.side_effect = APIError
 
-        with self.assertRaises(APIError):
+        err_regex = r'Error contacting the FUS'
+        with self.assertRaisesRegex(APIError, err_regex):
             self.fus_client.get_device_firmwares()
 
     def test_get_device_firmwares_key_error(self):
-        """It should raise KeyError if the FUS query fails.
+        """It should raise if the FUS query fails.
         """
         badsnaps = {}
 
         self.mock_get.return_value.json.return_value = badsnaps
 
-        with self.assertRaises(KeyError):
+        err_regex = r'The JSON payload was missing an entry for "devices"'
+        with self.assertRaisesRegex(APIError, err_regex):
             self.fus_client.get_device_firmwares()
 
     def test_get_device_firmwares_value_error(self):
-        """It should raise ValueError if invalid JSON was received.
+        """It should raise if invalid JSON was received.
         """
         self.mock_get.return_value.json.side_effect = ValueError
 
-        with self.assertRaises(ValueError):
+        err_regex = r'The JSON received was invalid'
+        with self.assertRaisesRegex(APIError, err_regex):
             self.fus_client.get_device_firmwares()
 
 
