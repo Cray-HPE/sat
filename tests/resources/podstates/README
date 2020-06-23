@@ -1,0 +1,2 @@
+This file ensures the creation of this directory for testing bootsys,
+and that dump_pods can ignore files that don't have 'podstate' in their name.

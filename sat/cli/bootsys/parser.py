@@ -22,6 +22,8 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
+from sat.cli.bootsys.main import DEFAULT_PODSTATE
+
 
 def add_bootsys_subparser(subparsers):
     """Add the bootsys subparser to the parent parser.
@@ -47,7 +49,23 @@ def add_bootsys_subparser(subparsers):
     )
 
     bootsys_parser.add_argument(
-        '--ignore-service-failures', '-i', action='store_true',
+        '-i', '--ignore-failures', action='store_true',
+        help='Proceed with the shutdown regardless of failed steps.'
+    )
+
+    bootsys_parser.add_argument(
+        '--ignore-service-failures', action='store_true',
         help='If specified, do not fail to shutdown if querying services '
              'for active sessions fails.'
+    )
+
+    bootsys_parser.add_argument(
+        '--ignore-pod-failures', action='store_true',
+        help='Disregard any failures associated with storing pod state '
+             'while shutting down.',
+    )
+
+    bootsys_parser.add_argument(
+        '--pod-state-file', default=DEFAULT_PODSTATE,
+        help='Custom location to dump pod state data.',
     )
