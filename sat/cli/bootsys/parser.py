@@ -23,6 +23,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 
 from sat.cli.bootsys.main import DEFAULT_PODSTATE
+import sat.parsergroups
 
 
 def add_bootsys_subparser(subparsers):
@@ -36,11 +37,14 @@ def add_bootsys_subparser(subparsers):
         None
     """
 
+    redfish_opts = sat.parsergroups.create_redfish_options()
+
     bootsys_parser = subparsers.add_parser(
         'bootsys', help='Boot or shut down the system.',
         description='Boot or shut down the entire system, including the '
                     'compute nodes, user access nodes, and non-compute '
-                    'nodes running the management software.'
+                    'nodes running the management software.',
+        parents=[redfish_opts]
     )
 
     bootsys_parser.add_argument(
@@ -56,7 +60,7 @@ def add_bootsys_subparser(subparsers):
     bootsys_parser.add_argument(
         '--ignore-service-failures', action='store_true',
         help='If specified, do not fail to shutdown if querying services '
-             'for active sessions fails.'
+             'for active sessions fails.',
     )
 
     bootsys_parser.add_argument(
