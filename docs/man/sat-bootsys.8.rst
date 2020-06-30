@@ -54,12 +54,23 @@ SHUTDOWN OPTIONS
 ----------------
 These options apply to the ``shutdown`` action.
 
-**-i, --ignore-service-failures**
+**-i, --ignore-failures**
+        Same as setting --ignore-pod-failures and --ignore-service-failures.
+
+**--ignore-pod-failures**
+        Disregard any failures associated with storing pod state while
+        shutting down.
+
+**--ignore-service-failures**
         If specified, do not fail to shut down if failures are encountered while
         querying services for active sessions. This will still log warnings
         about these failures, but it will continue with the shutdown. Currently,
         there are no additional steps implemented, so it doesn't make much
         difference.
+
+**--pod-state-file**
+        Specify a custom file to write pod-state. Default is
+        /var/sat/podstates/pod-state.json.
 
 
 EXAMPLES

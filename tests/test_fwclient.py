@@ -305,7 +305,7 @@ class TestFASClient(unittest.TestCase):
             {'ready': True, 'devices': 'expected'},
         ]
 
-        self.mock_get.return_value.json.side_effect = payloads 
+        self.mock_get.return_value.json.side_effect = payloads
 
         mock_post = patch.object(APIGatewayClient, 'post').start()
 

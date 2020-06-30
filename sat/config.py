@@ -68,6 +68,9 @@ SAT_CONFIG_SPEC = {
         'username': OptionSpec(str, getpass.getuser, None, 'username'),
         'token_file': OptionSpec(str, '', None, 'token_file'),
     },
+    'bootsys': {
+        'max_pod_states': OptionSpec(int, 10, None, None),
+    },
     'format': {
         'no_headings': OptionSpec(bool, False, None, 'no_headings'),
         'no_borders': OptionSpec(bool, False, None, 'no_borders'),

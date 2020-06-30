@@ -93,6 +93,13 @@ API_GATEWAY
         value isn't provided, then SAT will use the default location as
         specified in sat-auth(8).
 
+BOOTSYS
+-------
+
+**max_pod_states**
+        Maximum number of pod-state files allowed to accumulate in
+        /var/sat/podstates. The default value is 10.
+
 FORMAT
 ------
 
