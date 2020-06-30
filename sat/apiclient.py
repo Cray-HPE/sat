@@ -115,7 +115,7 @@ class APIGatewayClient:
             raise APIError("{} request to URL '{}' failed with status "
                            "code {}: {}".format(req_type, url, r.status_code, r.reason))
 
-        LOGGER.debug("Received response to %s request to URL '%s'"
+        LOGGER.debug("Received response to %s request to URL '%s' "
                      "with status code: '%s': %s", req_type, url, r.status_code, r.reason)
 
         return r
