@@ -131,7 +131,7 @@ class _FirmwareClient(APIGatewayClient):
 
 # Should have the same interface as FUSClient
 class FASClient(_FirmwareClient):
-    base_resource_path = 'fw-action/v1/'
+    base_resource_path = 'fas/v1/'
 
     def get_updates(self):
         """Get a list of all the firmware updates on the system.
