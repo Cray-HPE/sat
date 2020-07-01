@@ -38,20 +38,18 @@ class TestLogging(unittest.TestCase):
         patching get_config_value to return values from a dict.
         """
         self.logger = logging.getLogger(__name__)
-        self.get_logger_patcher = mock.patch(
+        self.mock_get_logger = mock.patch(
             'sat.logging.logging.getLogger',
             return_value=self.logger
-        )
-        self.get_logger_patcher.start()
+        ).start()
 
         config_values = self.config_values = {
             'logging.file_name': '/var/log/cray/sat.log',
             'logging.file_level': 'debug',
             'logging.stderr_level': 'warning'
         }
-        self.config_patcher = mock.patch('sat.logging.get_config_value',
-                                         lambda opt: config_values[opt])
-        self.config_patcher.start()
+        self.mock_get_config = mock.patch('sat.logging.get_config_value',
+                                          lambda opt: config_values[opt]).start()
 
     def tearDown(self):
         """Tears down after each test method.
@@ -59,8 +57,7 @@ class TestLogging(unittest.TestCase):
         Stops the patching of getLogger and get_config_value. Removes handlers
         that may have been added by the tests to ensure a clean slate for tests.
         """
-        self.get_logger_patcher.stop()
-        self.config_patcher.stop()
+        mock.patch.stopall()
         self.logger.handlers = []
 
     def assert_configured_handlers(self):
@@ -93,6 +90,11 @@ class TestLogging(unittest.TestCase):
         """Test bootstrap_logging function."""
         bootstrap_logging()
 
+        # This should have gotten the logger named 'sat'
+        self.mock_get_logger.assert_called_once_with('sat')
+
+        self.assertEqual(logging.DEBUG, self.logger.level)
+
         # Exactly one handler of type StreamHandler should have been added.
         self.assertEqual(len(self.logger.handlers), 1)
         handler = self.logger.handlers[0]
@@ -116,6 +118,9 @@ class TestLogging(unittest.TestCase):
     def test_configure_logging(self, mock_makedirs):
         """Test configure_logging function."""
         configure_logging()
+
+        # This should have gotten the logger named 'sat'
+        self.mock_get_logger.assert_called_once_with('sat')
 
         log_dir = os.path.dirname(self.config_values['logging.file_name'])
         mock_makedirs.assert_called_once_with(log_dir, exist_ok=True)
@@ -142,6 +147,9 @@ class TestLogging(unittest.TestCase):
     def test_configure_logging_directory_fail(self, _):
         """Test configure_logging with a failure to create the log directory"""
         configure_logging()
+
+        # This should have gotten the logger named 'sat'
+        self.mock_get_logger.assert_called_once_with('sat')
 
         # Exactly one handler of type StreamHandler should have been added.
         self.assertEqual(len(self.logger.handlers), 1)

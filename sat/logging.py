@@ -55,9 +55,10 @@ def bootstrap_logging():
     Returns:
         None
     """
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)
-    _add_console_handler(root_logger, logging.WARNING)
+    sat_logger_name = __name__.split('.', 1)[0]
+    sat_logger = logging.getLogger(sat_logger_name)
+    sat_logger.setLevel(logging.DEBUG)
+    _add_console_handler(sat_logger, logging.WARNING)
 
 
 def configure_logging():
@@ -84,7 +85,8 @@ def configure_logging():
     Returns:
         None
     """
-    root_logger = logging.getLogger()
+    sat_logger_name = __name__.split('.', 1)[0]
+    sat_logger = logging.getLogger(sat_logger_name)
 
     log_file_name = get_config_value('logging.file_name')
     log_file_level = get_config_value('logging.file_level')
@@ -95,9 +97,9 @@ def configure_logging():
     log_stderr_level = getattr(logging, log_stderr_level.upper())
 
     # Remove all handlers to configure handlers according to config file
-    root_logger.handlers = []
+    sat_logger.handlers = []
 
-    _add_console_handler(root_logger, log_stderr_level)
+    _add_console_handler(sat_logger, log_stderr_level)
 
     log_dir = os.path.dirname(log_file_name)
     try:
@@ -110,4 +112,4 @@ def configure_logging():
     file_handler.setLevel(log_file_level)
     file_formatter = logging.Formatter(FILE_LOG_FORMAT)
     file_handler.setFormatter(file_formatter)
-    root_logger.addHandler(file_handler)
+    sat_logger.addHandler(file_handler)
