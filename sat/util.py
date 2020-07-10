@@ -21,6 +21,7 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+import sys
 from collections import OrderedDict
 from functools import partial
 import logging
@@ -78,6 +79,52 @@ def pester(message,
     except EOFError:
         print("\n", end="")
         return
+
+
+def pester_choices(prompt, choices):
+    """Pester for input one of the given choices is entered on stdin.
+
+    Args:
+        prompt (str): the prompt displayed to the user
+        choices (Iterable): the Iterable that defines the possible valid choices
+            for user input. Must support __contains__.
+
+    Returns:
+        The first valid answer given on stdin or None if interrupted with EOF.
+    """
+    full_prompt = '{} [{}] '.format(prompt, ','.join(choices))
+    try:
+        while True:
+            answer = input(full_prompt)
+            if answer in choices:
+                return answer
+            else:
+                print('Input must be one of the following choices: {}'.format(
+                    ', '.join(choices)))
+    except EOFError:
+        print('\n', end='')
+        return None
+
+
+def prompt_continue(action_msg):
+    """Prompt whether to continue with an action and exit if answer is no.
+
+    Args:
+        action_msg (str): Prompt whether to continue with an action. If the
+            answer is yes, print a message that we are continuing. If the answer
+            is no, then exit.
+
+    Raises:
+        SystemExit: if the user answers no to the prompt.
+    """
+    # TODO: we should add an option to be non-interactive like --disruptive
+    answer = pester_choices('Proceed with {}?'.format(action_msg),
+                            ('yes', 'no'))
+    if answer == 'yes':
+        print('Proceeding with {}.'.format(action_msg))
+    else:
+        print('Will not proceed with {}. Exiting.'.format(action_msg))
+        sys.exit(1)
 
 
 def get_pretty_printed_dict(d, min_len=0):

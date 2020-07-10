@@ -109,7 +109,7 @@ class TestAPIGatewayClient(unittest.TestCase):
 
         mock_requests_post.assert_called_once_with(
             get_http_url_prefix(api_gw_host) + '/'.join(path_components),
-            data=payload, verify=True
+            data=payload, verify=True, json=None
         )
         self.assertEqual(response, mock_requests_post.return_value)
 
@@ -237,7 +237,7 @@ class TestFabricControllerClient(unittest.TestCase):
             get_http_url_prefix(api_gw_host) +
             sat.apiclient.FabricControllerClient.base_resource_path +
             '/'.join(path_components),
-            data=payload, verify=True
+            data=payload, verify=True, json=None
         )
         self.assertEqual(response, mock_requests_post.return_value)
 

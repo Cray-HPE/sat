@@ -22,8 +22,8 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from sat.cli.bootsys.main import DEFAULT_PODSTATE
 import sat.parsergroups
+from sat.cli.bootsys.defaults import DEFAULT_PODSTATE_FILE, DEFAULT_UAN_BOS_TEMPLATE
 
 
 def add_bootsys_subparser(subparsers):
@@ -75,6 +75,30 @@ def add_bootsys_subparser(subparsers):
     )
 
     bootsys_parser.add_argument(
-        '--pod-state-file', default=DEFAULT_PODSTATE,
+        '--state-check-fail-action',
+        choices=['abort', 'skip', 'prompt', 'force'],
+        help='Action to take if a failure occurs when checking whether a BOS '
+             'session template needs an operation applied based on current node '
+             'state in HSM. Defaults to "abort".'
+    )
+
+    bootsys_parser.add_argument(
+        '--pod-state-file', default=DEFAULT_PODSTATE_FILE,
         help='Custom location to dump pod state data.',
+    )
+
+    bootsys_parser.add_argument(
+        '--cle-bos-template',
+        help='The name of the BOS session template for shutdown/boot of CLE '
+             'compute nodes. Defaults to template matching "cle-X.Y.Z".'
+    )
+
+    bootsys_parser.add_argument(
+        '--uan-bos-template',
+        help='The name of the BOS session template for shutdown/boot of User '
+             'Access Nodes (UANs). '
+             'Defaults to "{}"'.format(DEFAULT_UAN_BOS_TEMPLATE)
+        # Note that we don't want to specify the default with the `default`
+        # kwarg here because then the value from the config file could never
+        # take precedence over the command-line default.
     )
