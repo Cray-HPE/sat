@@ -185,14 +185,17 @@ def do_shutdown(args):
             LOGGER.error(msg)
             sys.exit(1)
 
-    do_service_activity_check(args)
+    if not args.dry_run:
+        do_service_activity_check(args)
 
     ssh_client = SSHClient()
     ssh_client.load_system_host_keys()
 
     username, password = redfish.get_username_and_pass(args.redfish_username)
 
-    do_mgmt_shutdown_power(ssh_client, username, password)
+    # TODO: This should be uncommented when the shutdown automation
+    # process is done being implemented.
+    # do_mgmt_shutdown_power(ssh_client, username, password, args.dry_run)
 
     print('It is safe to continue with the shutdown procedure. Please proceed.')
 

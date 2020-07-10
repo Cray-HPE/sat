@@ -1,5 +1,5 @@
 """
-Configurables used when shutting down the management cluster.
+Generic common utilities for the bootsys subcommand.
 
 (C) Copyright 2020 Hewlett Packard Enterprise Development LP.
 
@@ -22,18 +22,23 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
-import os.path
+import logging
+import shlex
+import subprocess
 
-LIVE = False
+LOGGER = logging.getLogger(__name__)
 
-THISDIR = os.path.dirname(__file__)
 
-if LIVE:
-    PLAYBOOK = '/opt/cray/crayctl/ansible_framework/main/platform-shutdown.yml'
-    WORKAROUND_PY = os.path.join(THISDIR, 'resources', 'kill_stalled_task.py')
-    REMOTE_CMD = 'shutdown -h now'
-else:
-    HOME = '/root/sat-testing'
-    PLAYBOOK = os.path.join(THISDIR, 'resources', 'testbook.yml')
-    WORKAROUND_PY = os.path.join(THISDIR, 'resources', 'benign_scr.py')
-    REMOTE_CMD = 'mkdir -p {}; touch {}'.format(HOME, os.path.join(HOME, 'helloworld_foo'))
+def set_dhcpd(state):
+    """Start or stop the dhcpd daemon.
+
+    Args:
+        - state (bool): If True, start the daemon. If False, stop it.
+
+    Returns:
+        None.
+    """
+    cmd = 'systemctl {} dhcpd'.format('start' if state else 'stop')
+    LOGGER.info('Running `%s`', cmd)
+    pc = subprocess.run(shlex.split(cmd))
+    pc.check_returncode()

@@ -32,76 +32,41 @@ from pyghmi.exceptions import IpmiException
 from pyghmi.ipmi.command import Command as ipmiCommand
 from paramiko.ssh_exception import BadHostKeyException, AuthenticationException, SSHException
 
-from sat.cli.bootsys.mgmt_shutdown_config import LIVE, REMOTE_CMD
 from sat.cli.bootsys.ansible_util import get_groups
+from sat.cli.bootsys.util import set_dhcpd
 
 LOGGER = logging.getLogger(__name__)
-
-
-# skip worker one
-OTHER_NCNS = sorted(get_groups(['managers', 'storage', 'workers']) - get_groups(['bis']))
-
-if LIVE:
-    SHUTDOWN_TIMEOUT_SECS = 10 * 60
-else:
-    SHUTDOWN_TIMEOUT_SECS = 10
-
-    SEED = 42
-    from random import Random
-    host_mask = Random(SEED).getrandbits(len(OTHER_NCNS))
+REMOTE_CMD = 'shutdown -h now'
 
 
 # Failures are logged, but otherwise ignored. They may be considered "stalled shutdowns" and
 # forcibly powered off as allowed for in the process.
-def query_powerstate(command):
-    if not LIVE:
-        n = OTHER_NCNS.index(command.bmc[:-5])
-        return bool(host_mask & (1 << n))
-    else:
-        # True if on, False if off, or raises pyghmi.exceptions.ImpiException
-        return command.get_power()['powerstate'] == 'on'
-
-
-def set_powerstate(command):
-    if not LIVE:
-        LOGGER.info('Only a test; not powering down host "%s".', command.bmc[:-5])
-    else:
-        # may raise IpmiException
-        command.set_power('off')
-
-
-# Failures are logged, but otherwise ignored. They may be considered "stalled shutdowns" and
-# forcibly powered off as allowed for in the process.
-def start_shutdown(ssh_client):
-    for host in OTHER_NCNS:
-        try:
-            ssh_client.connect(host)
-        except (BadHostKeyException, AuthenticationException, SSHException, socket.error) as err:
-            LOGGER.warning('Unable to connect to host "%s": %s', host, err)
-
-        try:
-            remote_streams = ssh_client.exec_command(REMOTE_CMD)
-        except SSHException as err:
-            LOGGER.warning('Remote execution failed for host "%s": %s', host, err)
+def start_shutdown(ncns, ssh_client, dry_run=True):
+    for host in ncns:
+        LOGGER.info('Executing command on host "%s": `%s`', host, REMOTE_CMD)
+        if dry_run:
+            continue
         else:
-            for channel in remote_streams:
-                channel.close()
+            try:
+                ssh_client.connect(host)
+            except (BadHostKeyException, AuthenticationException,
+                    SSHException, socket.error) as err:
+                LOGGER.warning('Unable to connect to host "%s": %s', host, err)
+
+            try:
+                remote_streams = ssh_client.exec_command(REMOTE_CMD)
+            except SSHException as err:
+                LOGGER.warning('Remote execution failed for host "%s": %s', host, err)
+            else:
+                for channel in remote_streams:
+                    channel.close()
 
 
-def set_dhcpd(state):
-    if LIVE:
-        cmd = 'systemctl {} dhcpd'.format('start' if state else 'stop')
-        pc = subprocess.run(shlex.split(cmd))
-
-        if pc.returncode:
-            LOGGER.warning('"%s" exited with non-zero status: %s', cmd, pc.returncode)
-
-
-def finish_shutdown(username, password):
+def finish_shutdown(ncns, username, password, dry_run=True):
     ipmi_commands = {}
     ipmi_fail = False
 
-    for host in OTHER_NCNS:
+    for host in ncns:
         try:
             ipmi_commands[host] = ipmiCommand(host+'-mgmt', username, password)
         except (IpmiException, socket.error) as err:
@@ -111,17 +76,21 @@ def finish_shutdown(username, password):
     if ipmi_fail:
         raise SystemExit(1)
 
-    pending_hosts = set(OTHER_NCNS)
+    pending_hosts = set(ncns)
 
-    set_dhcpd(True)
+    if not dry_run:
+        set_dhcpd(True)
 
     try:
-        t_end = time.time() + SHUTDOWN_TIMEOUT_SECS
+        shutdown_timeout_secs = 10 * (1 if dry_run else 60)
+        t_end = time.monotonic() + shutdown_timeout_secs
 
-        while time.time() < t_end and pending_hosts:
+        while time.monotonic() < t_end and pending_hosts:
             for host in pending_hosts:
                 try:
-                    power_state = query_powerstate(ipmi_commands[host])
+                    power_state = (False if dry_run
+                                   else ipmi_commands[host].get_power()['powerstate'] == 'on')
+
                 except IpmiException as err:
                     LOGGER.warning('Unable to power down host "%s" via IPMI: %s', host, err)
                     # Assume subsequent queries will also fail, to prevent log spam.
@@ -135,27 +104,27 @@ def finish_shutdown(username, password):
 
         for host in pending_hosts:
             LOGGER.warning(
-                'Timed out waiting for "%s" to shutdown; powering it down not-gently.', host)
-            try:
-                set_powerstate(ipmi_commands[host])
-            except IpmiException as err:
-                LOGGER.error('Unable to powerdown host "%S" via IPMI: %s', host, err)
-                ipmi_fail = True
+                'Timed out waiting for "%s" to shutdown; attempting to power it down forcibly.', host)
+            if not dry_run:
+                try:
+                    ipmi_commands[host].set_power('off')
+                except IpmiException as err:
+                    LOGGER.error('Unable to powerdown host "%S" via IPMI: %s', host, err)
+                    ipmi_fail = True
 
         if ipmi_fail:
             raise SystemExit(1)
 
     finally:
-        set_dhcpd(False)
+        if not dry_run:
+            set_dhcpd(False)
 
 
-def do_mgmt_shutdown_power(ssh_client, username, password):
+def do_mgmt_shutdown_power(ssh_client, username, password, dry_run=True):
     LOGGER.info('Sending shutdown command to NCNs.')
-    start_shutdown(ssh_client)
 
-    if not LIVE:
-        LOGGER.info('Simulated stalled-shutdown hosts: %s',
-                    ','.join([host for i, host in enumerate(OTHER_NCNS) if host_mask & (1 << i)]))
+    nonworker_ncns = sorted(get_groups(['managers', 'storage', 'workers']) - get_groups(['bis']))
+    start_shutdown(nonworker_ncns, ssh_client, dry_run)
 
-    finish_shutdown(username, password)
+    finish_shutdown(nonworker_ncns, username, password, dry_run)
     LOGGER.info('Shutdown complete.')

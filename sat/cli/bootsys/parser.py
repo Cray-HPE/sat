@@ -53,6 +53,11 @@ def add_bootsys_subparser(subparsers):
     )
 
     bootsys_parser.add_argument(
+        '--dry-run', action='store_true',
+        help='Do not run any commands, only print what would run.'
+    )
+
+    bootsys_parser.add_argument(
         '-i', '--ignore-failures', action='store_true',
         help='Proceed with the shutdown regardless of failed steps.'
     )
