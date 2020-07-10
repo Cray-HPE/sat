@@ -31,8 +31,7 @@ A Redfish username and password is required.
 OPTIONS
 =======
 
-These options must be specified after the subcommand. The xnames may also be
-. At least one xname must be provided.
+These options must be specified after the subcommand.
 
 **-h, --help**
         Print a usage summary and exit.
