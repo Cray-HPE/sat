@@ -42,24 +42,6 @@ class TestDoBoot(unittest.TestCase):
         self.assertEqual(1, cm.exception.code)
 
 
-class TestDoShutdown(unittest.TestCase):
-    """Test the do_shutdown function."""
-
-    @patch('sat.cli.bootsys.main.dump_pods')
-    @patch('builtins.print')
-    @patch('sat.cli.bootsys.main.do_service_activity_check')
-    def test_do_shutdown(self, mock_checker, mock_print, mock_dump_pods):
-        """Test the do_shutdown function."""
-        args = Mock()
-        args.pod_state_file = 'doesnt matter'
-        do_shutdown(args)
-        mock_checker.assert_called_once_with(args)
-        mock_print.assert_called_once_with(
-            'It is safe to continue with the shutdown procedure. '
-            'Please proceed.'
-        )
-
-
 class TestDoBootsys(unittest.TestCase):
     """Test the do_bootsys function."""
 

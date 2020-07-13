@@ -29,8 +29,13 @@ import sys
 from datetime import datetime
 from subprocess import CalledProcessError
 
+from paramiko.client import SSHClient
+
+from sat import redfish
+
 from sat.cli.bootsys.service_activity import do_service_activity_check
 from sat.config import get_config_value
+from sat.cli.bootsys.mgmt_shutdown_power import do_mgmt_shutdown_power
 
 
 LOGGER = logging.getLogger(__name__)
@@ -180,7 +185,18 @@ def do_shutdown(args):
             LOGGER.error(msg)
             sys.exit(1)
 
-    do_service_activity_check(args)
+    if not args.dry_run:
+        do_service_activity_check(args)
+
+    ssh_client = SSHClient()
+    ssh_client.load_system_host_keys()
+
+    username, password = redfish.get_username_and_pass(args.redfish_username)
+
+    # TODO: This should be uncommented when the shutdown automation
+    # process is done being implemented.
+    # do_mgmt_shutdown_power(ssh_client, username, password, args.dry_run)
+
     print('It is safe to continue with the shutdown procedure. Please proceed.')
 
 
