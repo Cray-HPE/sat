@@ -102,7 +102,7 @@ class TestDoShutdown(ExtendedTestCase):
         self.mock_bos_shutdowns.assert_called_once_with()
         self.mock_do_shutdown_playbook.assert_called_once_with()
         self.mock_ssh_client.load_system_host_keys.assert_called_once_with()
-        self.mock_get_user_pass.assert_called_once_with(self.args.redfish_username)
+        self.mock_get_user_pass.assert_called_once()
         self.mock_mgmt_shutdown.assert_called_once_with(
             self.mock_ssh_client, self.mock_username,
             self.mock_password, self.args.ipmi_timeout, self.args.dry_run
@@ -153,7 +153,7 @@ class TestDoShutdown(ExtendedTestCase):
                 self.mock_bos_shutdowns.assert_called_with()
                 self.mock_do_shutdown_playbook.assert_called_with()
                 self.mock_ssh_client.load_system_host_keys.assert_called_with()
-                self.mock_get_user_pass.assert_called_with(self.args.redfish_username)
+                self.mock_get_user_pass.assert_called()
                 self.mock_mgmt_shutdown.assert_called_with(
                     self.mock_ssh_client, self.mock_username,
                     self.mock_password, self.args.ipmi_timeout, self.args.dry_run

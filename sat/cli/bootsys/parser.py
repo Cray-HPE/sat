@@ -109,6 +109,12 @@ def add_bootsys_subparser(subparsers):
     )
 
     bootsys_parser.add_argument(
-        '--ssh-timeout', default=120, type=int,
+        '--ssh-timeout', default=600, type=int,
         help='Timeout waiting for SSH availability on nodes'
+    )
+
+    bootsys_parser.add_argument(
+        '--k8s-timeout', default=1800, type=int,
+        help='Timeout waiting for Kubernetes pods to return to '
+        'pre-shutdown state'
     )

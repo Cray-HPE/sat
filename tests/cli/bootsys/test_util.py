@@ -24,9 +24,9 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import itertools
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, call
 
-from sat.cli.bootsys.util import get_ncns, wait_for_nodes_powerstate
+from sat.cli.bootsys.util import get_ncns, RunningService
 
 
 class TestGetNcns(unittest.TestCase):
@@ -34,7 +34,7 @@ class TestGetNcns(unittest.TestCase):
         """Test getting NCNs without excludes"""
         all_ncns = {'foo', 'bar', 'baz'}
         with patch('sat.cli.bootsys.util.get_groups', side_effect=[all_ncns, set()]):
-            self.assertEqual(sorted(all_ncns), get_ncns([]))
+            self.assertEqual(all_ncns, get_ncns([]))
 
     def test_get_groups_with_exclude(self):
         """Test getting NCNs with exclusions"""
@@ -42,33 +42,40 @@ class TestGetNcns(unittest.TestCase):
         exclusions = {'foo'}
         with patch('sat.cli.bootsys.util.get_groups', side_effect=[all_ncns, exclusions]):
             result = get_ncns([])
-            self.assertEqual(result, sorted(['bar', 'baz']))
+            self.assertEqual(result, {'bar', 'baz'})
 
 
-class TestWaitForNodes(unittest.TestCase):
+class TestRunningService(unittest.TestCase):
+    """Tests for the RunningService class."""
     def setUp(self):
-        self.mock_monotonic = patch('sat.cli.bootsys.util.time.monotonic',
-                                    return_value=0).start()
-        mock_ipmi_on = Mock()
-        mock_ipmi_on.get_power.return_value = {'powerstate': 'on'}
+        self.svc_name = 'foo'
 
-        self.mock_ipmi_cmds = list(zip(['foo', 'bar', 'baz'],
-                                       itertools.repeat(mock_ipmi_on)))
+    @patch('sat.cli.bootsys.util.subprocess.check_call')
+    def test_systemctl_start(self, mock_check_call):
+        """Test starting systemd services."""
+        dry_svc = RunningService(self.svc_name, dry_run=True)
+        dry_svc._systemctl_start_stop(True)
+        mock_check_call.assert_not_called()
 
-    def tearDown(self):
-        patch.stopall()
+        svc = RunningService(self.svc_name, dry_run=False)
+        svc._systemctl_start_stop(True)
+        mock_check_call.assert_called_once_with(['systemctl', 'start', self.svc_name])
 
-    def test_wait_for_nodes_successful(self):
-        remaining = wait_for_nodes_powerstate(self.mock_ipmi_cmds, 'on', 1)
-        self.assertEqual(len(remaining), 0)
+    @patch('sat.cli.bootsys.util.subprocess.check_call')
+    def test_systemctl_stop(self, mock_check_call):
+        """Test stopping systemd services."""
+        dry_svc = RunningService(self.svc_name, dry_run=True)
+        dry_svc._systemctl_start_stop(False)
+        mock_check_call.assert_not_called()
 
-    def test_wait_for_nodes_with_failures(self):
-        mock_ipmi_off = Mock()
-        mock_ipmi_off.get_power.return_value = {'powerstate': 'off'}
-        self.mock_ipmi_cmds[0] = ('foo', mock_ipmi_off)
+        svc = RunningService(self.svc_name, dry_run=False)
+        svc._systemctl_start_stop(False)
+        mock_check_call.assert_called_once_with(['systemctl', 'stop', self.svc_name])
 
-        self.mock_monotonic.side_effect = itertools.count(0, 10)
+    @patch('sat.cli.bootsys.util.RunningService._systemctl_start_stop')
+    def test_running_service_context_manager(self, mock_start_stop):
+        """Test that the RunningService manager starts, then stops the service"""
+        with RunningService(self.svc_name):
+            pass
 
-        remaining = wait_for_nodes_powerstate(self.mock_ipmi_cmds, 'on', 1)
-        self.assertEqual(len(remaining), 1)
-        self.assertIn('foo', remaining)
+        mock_start_stop.assert_has_calls([call(True), call(False)])

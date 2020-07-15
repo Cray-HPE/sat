@@ -21,73 +21,31 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+from datetime import datetime
+import json
 import logging
 import os
-import shlex
-import subprocess
 import sys
-import time
-from datetime import datetime
 from subprocess import CalledProcessError
+import warnings
 
+from kubernetes.client import CoreV1Api
+from kubernetes.config import load_kube_config
+from kubernetes.config.config_exception import ConfigException
 from paramiko.client import SSHClient
-from paramiko.ssh_exception import SSHException, NoValidConnectionsError
-from pyghmi.ipmi.command import Command as IpmiCommand
-from pyghmi.exceptions import IpmiException
+from yaml import YAMLLoadWarning
 
 from sat.cli.bootsys.bos import BOSFailure, do_bos_shutdowns
 from sat.cli.bootsys.defaults import DEFAULT_PODSTATE_DIR, DEFAULT_PODSTATE_FILE
+from sat.cli.bootsys.mgmt_boot_power import do_mgmt_boot
 from sat.cli.bootsys.mgmt_shutdown_ansible import do_shutdown_playbook
 from sat.cli.bootsys.mgmt_shutdown_power import do_mgmt_shutdown_power
 from sat.cli.bootsys.service_activity import do_service_activity_check
-from sat.cli.bootsys.util import get_ncns, wait_for_nodes_powerstate, RunningService
+from sat.cli.bootsys.util import k8s_pods_to_status_dict
 from sat.config import get_config_value
 from sat.util import get_username_and_password_interactively, prompt_continue
 
-
 LOGGER = logging.getLogger(__name__)
-
-
-def wait_for_nodes_sshable(hosts, timeout):
-    """Wait until all hosts are accessible via SSH.
-
-    Args:
-        hosts ([str]): a list of hosts that should be waited on.
-        timeout: the amount of time after which waiting should
-            time out.
-
-    Returns:
-        a set of nodes which timed out.
-    """
-    ssh_client = SSHClient()
-    ssh_client.load_system_host_keys()
-
-    pending_hosts = set(hosts)
-    start_time = time.monotonic()
-
-    while pending_hosts and time.monotonic() - start_time < timeout:
-        finished_hosts = set()
-
-        for host in pending_hosts:
-            LOGGER.debug("Connecting to host %s", host)
-
-            try:
-                ssh_client.connect(host)
-
-            except (SSHException, NoValidConnectionsError):
-                pass
-
-            else:
-                finished_hosts.add(host)
-
-        pending_hosts -= finished_hosts
-        time.sleep(5)
-
-    if pending_hosts:
-        LOGGER.error("Unable to SSH into hosts: %s",
-                     ", ".join(pending_hosts))
-
-    return pending_hosts
 
 
 def do_boot(args):
@@ -100,30 +58,7 @@ def do_boot(args):
     Returns:
         None
     """
-    username, password = get_username_and_password_interactively(username_prompt='IPMI username',
-                                                                 password_prompt='IPMI password')
-
-    with RunningService('dhcpd', dry_run=args.dry_run):
-        try:
-            non_bis_ncns = get_ncns(['managers', 'storage', 'workers'], exclude=['bis'])
-
-            ipmi_commands = {ncn: IpmiCommand(ncn + '-mgmt', userid=username, password=password)
-                             for ncn in non_bis_ncns}
-
-            for ncn, ipmi_command in ipmi_commands.items():
-                LOGGER.debug('Sending IPMI power on command to NCN %s', ncn)
-                if not args.dry_run:
-                    ipmi_command.set_power('on')
-
-            if not args.dry_run:
-                remaining_nodes = wait_for_nodes_powerstate(ipmi_commands.items(),
-                                                            'on', args.ipmi_timeout)
-                nodes_powered_on = non_bis_ncns - remaining_nodes
-
-                wait_for_nodes_sshable(nodes_powered_on, args.ssh_timeout)
-
-        except IpmiException as exc:
-            LOGGER.error("Error with IPMI command: %s", exc)
+    do_mgmt_boot(args)
 
 
 def get_pods_as_json():
@@ -135,16 +70,23 @@ def get_pods_as_json():
     Raises:
         CalledProcessError: kubectl failed.
     """
-    cmd = 'kubectl get pods -A -o json'
-    toks = shlex.split(cmd)
-
+    # Load k8s configuration before trying to use API
     try:
-        kubectl_output = subprocess.check_output(toks).decode('utf-8')
-    except CalledProcessError as err:
-        raise CalledProcessError(
-            'kubectl was unable to gather pod information: {}'.format(err))
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=YAMLLoadWarning)
+            load_kube_config()
+    # Earlier versions: FileNotFoundError; later versions: ConfigException
+    except (FileNotFoundError, ConfigException) as err:
+        raise ConfigException(
+            'Failed to load kubernetes config to get pod status: '
+            '{}'.format(err)
+        )
 
-    return kubectl_output
+    k8s_api = CoreV1Api()
+    all_pods = k8s_api.list_pod_for_all_namespaces()
+    pods_dict = k8s_pods_to_status_dict(all_pods)
+
+    return json.dumps(pods_dict)
 
 
 def _new_file_name():
@@ -274,9 +216,11 @@ def do_shutdown(args):
 
     action_msg = 'shutdown of management NCNs'
     prompt_continue(action_msg)
-    username, password = get_username_and_password_interactively(args.redfish_username)
+    username, password = get_username_and_password_interactively(username_prompt='IPMI username',
+                                                                 password_prompt='IPMI password')
     ssh_client = SSHClient()
     ssh_client.load_system_host_keys()
+
     do_mgmt_shutdown_power(ssh_client, username, password, args.ipmi_timeout, args.dry_run)
     print('Succeeded with {}.'.format(action_msg))
 
