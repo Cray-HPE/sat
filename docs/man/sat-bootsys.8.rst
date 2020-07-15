@@ -84,6 +84,10 @@ These options must be specified after the subcommand.
 **-h, --help**
         Print the help message for 'sat bootsys'.
 
+**--dry-run**
+        If supplied, do not perform any destructive operations on the system.
+        (e.g. powering off, stopping services, etc.)
+
 SHUTDOWN OPTIONS
 ----------------
 These options apply to the ``shutdown`` action.
@@ -117,6 +121,19 @@ These options apply to the ``shutdown`` action.
                 skip: Skip performing an operation against the session template(s).
                 prompt: Prompt user whether to abort, skip, or force.
                 force: Do the operation against this session template anyway.
+
+**--ipmi-timeout**
+        A timeout, in seconds, after which an uncompleted
+        IPMI command is considered failed. Defaults to 120 seconds.
+
+
+BOOT OPTIONS
+------------
+
+**--ssh-timeout**
+        A timeout, in seconds, after which a node which has powered on
+        but is not accessible via SSH is considered to have failed booting.
+        Defaults to 120 seconds.
 
 EXAMPLES
 ========

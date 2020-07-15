@@ -86,7 +86,7 @@ class TestRedfishAuth(unittest.TestCase):
         self.assertEqual('pass', p)
 
     @mock.patch('sat.redfish.get_config_value', lambda x: full[x])
-    @mock.patch('sat.redfish.getpass.getpass', return_value='topsecret')
+    @mock.patch('sat.util.getpass.getpass', return_value='topsecret')
     def test_suggestion_usage(self, _):
         """It should use the suggested username and prompt for a password.
         """
@@ -95,7 +95,7 @@ class TestRedfishAuth(unittest.TestCase):
         self.assertEqual('topsecret', p)
 
     @mock.patch('sat.redfish.get_config_value', lambda x: empty[x])
-    @mock.patch('sat.redfish.getpass.getpass', return_value='topsecret')
+    @mock.patch('sat.util.getpass.getpass', return_value='topsecret')
     @mock.patch('builtins.input', return_value='yogibear')
     def test_empty_config(self, _a, _b):
         """It should prompt for both username and password if config empty.
@@ -105,7 +105,7 @@ class TestRedfishAuth(unittest.TestCase):
         self.assertEqual('topsecret', p)
 
     @mock.patch('sat.redfish.get_config_value', lambda x: withuser[x])
-    @mock.patch('sat.redfish.getpass.getpass', return_value='topsecret')
+    @mock.patch('sat.util.getpass.getpass', return_value='topsecret')
     def test_config_has_username(self, _):
         """It should only prompt for password if config has username.
         """
@@ -114,7 +114,7 @@ class TestRedfishAuth(unittest.TestCase):
         self.assertEqual('topsecret', p)
 
     @mock.patch('sat.redfish.get_config_value', lambda x: withpass[x])
-    @mock.patch('sat.redfish.getpass.getpass', return_value='topsecret')
+    @mock.patch('sat.util.getpass.getpass', return_value='topsecret')
     @mock.patch('builtins.input', return_value='yogibear')
     def test_config_has_password(self, _a, _b):
         """It should prompt for both if config is missing username.
@@ -124,7 +124,7 @@ class TestRedfishAuth(unittest.TestCase):
         self.assertEqual('topsecret', p)
 
     @mock.patch('sat.redfish.get_config_value', lambda x: withpass[x])
-    @mock.patch('sat.redfish.getpass.getpass', return_value='topsecret')
+    @mock.patch('sat.util.getpass.getpass', return_value='topsecret')
     def test_config_has_password_with_suggestion(self, _):
         """It should just prompt for password if it has been given a suggestion.
 

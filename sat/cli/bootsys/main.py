@@ -26,24 +26,72 @@ import os
 import shlex
 import subprocess
 import sys
+import time
 from datetime import datetime
 from subprocess import CalledProcessError
 
 from paramiko.client import SSHClient
+from paramiko.ssh_exception import SSHException, NoValidConnectionsError
+from pyghmi.ipmi.command import Command as IpmiCommand
+from pyghmi.exceptions import IpmiException
 
 from sat import redfish
 from sat.cli.bootsys.bos import BOSFailure, do_bos_shutdowns
 from sat.cli.bootsys.defaults import DEFAULT_PODSTATE_DIR, DEFAULT_PODSTATE_FILE
 from sat.cli.bootsys.mgmt_shutdown_power import do_mgmt_shutdown_power
 from sat.cli.bootsys.service_activity import do_service_activity_check
+from sat.cli.bootsys.util import get_ncns, wait_for_nodes_powerstate, RunningService
 from sat.config import get_config_value
-from sat.util import prompt_continue
+from sat.util import get_username_and_password_interactively, prompt_continue
+
 
 LOGGER = logging.getLogger(__name__)
 
 
+def wait_for_nodes_sshable(hosts, timeout):
+    """Wait until all hosts are accessible via SSH.
+
+    Args:
+        hosts ([str]): a list of hosts that should be waited on.
+        timeout: the amount of time after which waiting should
+            time out.
+
+    Returns:
+        a set of nodes which timed out.
+    """
+    ssh_client = SSHClient()
+    ssh_client.load_system_host_keys()
+
+    pending_hosts = set(hosts)
+    start_time = time.monotonic()
+
+    while pending_hosts and time.monotonic() - start_time < timeout:
+        finished_hosts = set()
+
+        for host in pending_hosts:
+            LOGGER.debug("Connecting to host %s", host)
+
+            try:
+                ssh_client.connect(host)
+
+            except (SSHException, NoValidConnectionsError):
+                pass
+
+            else:
+                finished_hosts.add(host)
+
+        pending_hosts -= finished_hosts
+        time.sleep(5)
+
+    if pending_hosts:
+        LOGGER.error("Unable to SSH into hosts: %s",
+                     ", ".join(pending_hosts))
+
+    return pending_hosts
+
+
 def do_boot(args):
-    """Perform a shutdown operation on the system.
+    """Perform a boot operation on the system.
 
     Args:
         args: The argparse.Namespace object containing the parsed arguments
@@ -52,8 +100,30 @@ def do_boot(args):
     Returns:
         None
     """
-    LOGGER.error("Boot not implemented.")
-    sys.exit(1)
+    username, password = get_username_and_password_interactively(username_prompt='IPMI username',
+                                                                 password_prompt='IPMI password')
+
+    with RunningService('dhcpd', dry_run=args.dry_run):
+        try:
+            non_bis_ncns = get_ncns(['managers', 'storage', 'workers'], exclude=['bis'])
+
+            ipmi_commands = {ncn: IpmiCommand(ncn + '-mgmt', userid=username, password=password)
+                             for ncn in non_bis_ncns}
+
+            for ncn, ipmi_command in ipmi_commands.items():
+                LOGGER.debug('Sending IPMI power on command to NCN %s', ncn)
+                if not args.dry_run:
+                    ipmi_command.set_power('on')
+
+            if not args.dry_run:
+                remaining_nodes = wait_for_nodes_powerstate(ipmi_commands.items(),
+                                                            'on', args.ipmi_timeout)
+                nodes_powered_on = non_bis_ncns - remaining_nodes
+
+                wait_for_nodes_sshable(nodes_powered_on, args.ssh_timeout)
+
+        except IpmiException as exc:
+            LOGGER.error("Error with IPMI command: %s", exc)
 
 
 def get_pods_as_json():
@@ -203,8 +273,11 @@ def do_shutdown(args):
     prompt_continue(action_msg)
     ssh_client = SSHClient()
     ssh_client.load_system_host_keys()
-    username, password = redfish.get_username_and_pass(args.redfish_username)
-    do_mgmt_shutdown_power(ssh_client, username, password, args.dry_run)
+    username, password = get_username_and_password_interactively(args.redfish_username)
+
+    # TODO: This should be uncommented when the shutdown automation
+    # process is done being implemented.
+    do_mgmt_shutdown_power(ssh_client, username, password, args.ipmi_timeout, args.dry_run)
 
 
 def do_bootsys(args):

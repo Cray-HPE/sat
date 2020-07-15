@@ -35,6 +35,7 @@ from sat.cli.bootsys.main import do_boot, do_bootsys, do_shutdown, dump_pods
 from tests.common import ExtendedTestCase
 
 
+@unittest.skip('Test yet to be written.')
 class TestDoBoot(unittest.TestCase):
     """Test the do_boot function (not yet implemented)."""
 
@@ -60,6 +61,7 @@ class TestDoShutdown(ExtendedTestCase):
         self.pod_state_file = '/path/to/pod-state-file'
         self.args.pod_state_file = self.pod_state_file
         self.args.ignore_pod_failures = False
+        self.args.ipmi_timeout = 1
 
         # Mock functions called in do_shutdown
         self.mock_service_activity_check = patch(
@@ -75,7 +77,7 @@ class TestDoShutdown(ExtendedTestCase):
         self.mock_ssh_client_cls.return_value = self.mock_ssh_client
         self.mock_username = 'user'
         self.mock_password = 'password'
-        self.mock_get_user_pass = patch('sat.redfish.get_username_and_pass').start()
+        self.mock_get_user_pass = patch('sat.cli.bootsys.main.get_username_and_password_interactively').start()
         self.mock_get_user_pass.return_value = self.mock_username, self.mock_password
         self.mock_mgmt_shutdown = patch('sat.cli.bootsys.main.do_mgmt_shutdown_power').start()
 
@@ -100,7 +102,7 @@ class TestDoShutdown(ExtendedTestCase):
         self.mock_get_user_pass.assert_called_once_with(self.args.redfish_username)
         self.mock_mgmt_shutdown.assert_called_once_with(
             self.mock_ssh_client, self.mock_username,
-            self.mock_password, self.args.dry_run
+            self.mock_password, self.args.ipmi_timeout, self.args.dry_run
         )
 
     def test_do_shutdown_dump_pods_errors(self):
@@ -149,7 +151,7 @@ class TestDoShutdown(ExtendedTestCase):
                 self.mock_get_user_pass.assert_called_with(self.args.redfish_username)
                 self.mock_mgmt_shutdown.assert_called_with(
                     self.mock_ssh_client, self.mock_username,
-                    self.mock_password, self.args.dry_run
+                    self.mock_password, self.args.ipmi_timeout, self.args.dry_run
                 )
 
     def test_do_shutdown_bos_failure(self):
