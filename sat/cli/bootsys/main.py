@@ -32,17 +32,14 @@ from subprocess import CalledProcessError
 from paramiko.client import SSHClient
 
 from sat import redfish
-
+from sat.cli.bootsys.bos import BOSFailure, do_bos_shutdowns
+from sat.cli.bootsys.defaults import DEFAULT_PODSTATE_DIR, DEFAULT_PODSTATE_FILE
+from sat.cli.bootsys.mgmt_shutdown_power import do_mgmt_shutdown_power
 from sat.cli.bootsys.service_activity import do_service_activity_check
 from sat.config import get_config_value
-from sat.cli.bootsys.mgmt_shutdown_power import do_mgmt_shutdown_power
-
+from sat.util import prompt_continue
 
 LOGGER = logging.getLogger(__name__)
-
-
-DEFAULT_DIR = '/var/sat/podstates/'
-DEFAULT_PODSTATE = DEFAULT_DIR + 'pod-state.json'
 
 
 def do_boot(args):
@@ -87,7 +84,7 @@ def _new_file_name():
     proving difficult to mock.
     """
     now = datetime.utcnow()
-    return os.path.join(DEFAULT_DIR, 'pod-state.{}.json'.format(now.strftime('%Y-%m-%dT%H:%M:%S')))
+    return os.path.join(DEFAULT_PODSTATE_DIR, 'pod-state.{}.json'.format(now.strftime('%Y-%m-%dT%H:%M:%S')))
 
 
 def _rotate_files():
@@ -107,19 +104,19 @@ def _rotate_files():
         f.write('')
 
     try:
-        os.remove(DEFAULT_PODSTATE)
+        os.remove(DEFAULT_PODSTATE_FILE)
     except FileNotFoundError:
         pass
 
-    os.symlink(new_file, DEFAULT_PODSTATE)
+    os.symlink(new_file, DEFAULT_PODSTATE_FILE)
 
     # the symlink will always be at the front.
-    files = [x for x in sorted(os.listdir(DEFAULT_DIR)) if x.startswith('pod-state') and x != 'pod-state.json']
+    files = [x for x in sorted(os.listdir(DEFAULT_PODSTATE_DIR)) if x.startswith('pod-state') and x != 'pod-state.json']
 
     # remove number of pod states until compliant.
     max_pod_states = get_config_value('bootsys.max_pod_states')
     for i in range(len(files) - max_pod_states):
-        os.remove(os.path.join(DEFAULT_DIR, files[i]))
+        os.remove(os.path.join(DEFAULT_PODSTATE_DIR, files[i]))
 
 
 def dump_pods(path):
@@ -143,7 +140,7 @@ def dump_pods(path):
     perm_msg = 'Insufficient permissions to write "{}".'.format(path)
 
     # move the symlink
-    if path == DEFAULT_PODSTATE:
+    if path == DEFAULT_PODSTATE_FILE:
         try:
             _rotate_files()
         except FileNotFoundError:
@@ -163,8 +160,12 @@ def dump_pods(path):
 def do_shutdown(args):
     """Perform a shutdown operation on the system.
 
-    Currently this only does the service activity check to verify that it is
-    okay to begin shutting down.
+    This first dumps pod state to a file, then checks for active sessions in
+    various services, and then does a BOS shutdown of all computes and UANs.
+
+    Then it tells the user to manually run the 'platform-shutdown.yml' ansible
+    playbook and then will proceed with shutting down the management NCNs and
+    powering them off. In the future, that manual step will be automated.
 
     Args:
         args: The argparse.Namespace object containing the parsed arguments
@@ -188,16 +189,22 @@ def do_shutdown(args):
     if not args.dry_run:
         do_service_activity_check(args)
 
+    action_msg = 'BOS shutdown of computes and UAN'
+    prompt_continue(action_msg)
+    try:
+        do_bos_shutdowns()
+    except BOSFailure as err:
+        LOGGER.error("Failed %s: %s", action_msg, err)
+        sys.exit(1)
+
+    action_msg = 'shutdown of management NCNs'
+    print("Before proceeding with {}, run 'ansible-playbook /opt/cray/crayctl/"
+          "ansible_framework/main/platform-shutdown.yml'.".format(action_msg))
+    prompt_continue(action_msg)
     ssh_client = SSHClient()
     ssh_client.load_system_host_keys()
-
     username, password = redfish.get_username_and_pass(args.redfish_username)
-
-    # TODO: This should be uncommented when the shutdown automation
-    # process is done being implemented.
-    # do_mgmt_shutdown_power(ssh_client, username, password, args.dry_run)
-
-    print('It is safe to continue with the shutdown procedure. Please proceed.')
+    do_mgmt_shutdown_power(ssh_client, username, password, args.dry_run)
 
 
 def do_bootsys(args):

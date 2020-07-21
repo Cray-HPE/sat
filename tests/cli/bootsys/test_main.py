@@ -22,12 +22,17 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 import glob
+import logging
 import os
+from subprocess import CalledProcessError
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import call, Mock, patch
 
 import sat
+import sat.cli.bootsys.defaults
+from sat.cli.bootsys.bos import BOSFailure
 from sat.cli.bootsys.main import do_boot, do_bootsys, do_shutdown, dump_pods
+from tests.common import ExtendedTestCase
 
 
 class TestDoBoot(unittest.TestCase):
@@ -42,6 +47,160 @@ class TestDoBoot(unittest.TestCase):
         self.assertEqual(1, cm.exception.code)
 
 
+class TestDoShutdown(ExtendedTestCase):
+    """Test the do_shutdown function."""
+
+    def setUp(self):
+        """Set up mocks."""
+
+        # Set up some mock arguments
+        self.args = Mock()
+        self.args.dry_run = False
+        self.args.redfish_username = None
+        self.pod_state_file = '/path/to/pod-state-file'
+        self.args.pod_state_file = self.pod_state_file
+        self.args.ignore_pod_failures = False
+
+        # Mock functions called in do_shutdown
+        self.mock_service_activity_check = patch(
+            'sat.cli.bootsys.main.do_service_activity_check'
+        ).start()
+        self.mock_print = patch('builtins.print').start()
+        self.mock_dump_pods = patch('sat.cli.bootsys.main.dump_pods').start()
+        self.mock_bos_shutdowns = patch('sat.cli.bootsys.main.do_bos_shutdowns').start()
+        self.mock_pester_choices = patch('sat.util.pester_choices').start()
+        self.mock_pester_choices.return_value = 'yes'
+        self.mock_ssh_client_cls = patch('sat.cli.bootsys.main.SSHClient').start()
+        self.mock_ssh_client = Mock()
+        self.mock_ssh_client_cls.return_value = self.mock_ssh_client
+        self.mock_username = 'user'
+        self.mock_password = 'password'
+        self.mock_get_user_pass = patch('sat.redfish.get_username_and_pass').start()
+        self.mock_get_user_pass.return_value = self.mock_username, self.mock_password
+        self.mock_mgmt_shutdown = patch('sat.cli.bootsys.main.do_mgmt_shutdown_power').start()
+
+    def tearDown(self):
+        """Stop all mocks."""
+        patch.stopall()
+
+    def test_do_shutdown_no_errors(self):
+        """Test the do_shutdown function with no errors."""
+        do_shutdown(self.args)
+
+        self.mock_service_activity_check.assert_called_once_with(self.args)
+        self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
+        self.mock_print.assert_has_calls([
+            call('Proceeding with BOS shutdown of computes and UAN.'),
+            call("Before proceeding with shutdown of management NCNs, run "
+                 "'ansible-playbook /opt/cray/crayctl/ansible_framework/main/platform-shutdown.yml'."),
+            call('Proceeding with shutdown of management NCNs.'),
+        ])
+        self.mock_bos_shutdowns.assert_called_once_with()
+        self.mock_ssh_client.load_system_host_keys.assert_called_once_with()
+        self.mock_get_user_pass.assert_called_once_with(self.args.redfish_username)
+        self.mock_mgmt_shutdown.assert_called_once_with(
+            self.mock_ssh_client, self.mock_username,
+            self.mock_password, self.args.dry_run
+        )
+
+    def test_do_shutdown_dump_pods_errors(self):
+        """Test do_shutdown with dump_pods raising various errors."""
+        possible_errors = [CalledProcessError(returncode=1, cmd='fail'),
+                           FileNotFoundError(), PermissionError()]
+
+        for err in possible_errors:
+            with self.subTest('test do_shutdown with dump_pods raising '
+                              '{}'.format(type(err))):
+                self.mock_dump_pods.side_effect = err
+
+                with self.assertLogs(level=logging.ERROR) as cm:
+                    with self.assertRaises(SystemExit):
+                        do_shutdown(self.args)
+
+                self.assert_in_element(str(err), cm.output)
+
+                self.mock_dump_pods.assert_called_with(self.pod_state_file)
+                self.mock_service_activity_check.assert_not_called()
+                self.mock_bos_shutdowns.assert_not_called()
+                self.mock_get_user_pass.assert_not_called()
+                self.mock_mgmt_shutdown.assert_not_called()
+
+    def test_do_shutdown_dump_pods_ignore_errors(self):
+        """Test do_shutdown with dump_pods raising various errors."""
+        self.args.ignore_pod_failures = True
+
+        possible_errors = [CalledProcessError(returncode=1, cmd='fail'),
+                           FileNotFoundError(), PermissionError()]
+
+        for err in possible_errors:
+            with self.subTest('test do_shutdown with dump_pods raising '
+                              '{}'.format(type(err))):
+                self.mock_dump_pods.side_effect = err
+
+                with self.assertLogs(level=logging.WARNING) as cm:
+                    do_shutdown(self.args)
+
+                self.assert_in_element(str(err), cm.output)
+
+                self.mock_dump_pods.assert_called_with(self.pod_state_file)
+                self.mock_service_activity_check.assert_called_with(self.args)
+                self.mock_bos_shutdowns.assert_called_with()
+                self.mock_ssh_client.load_system_host_keys.assert_called_with()
+                self.mock_get_user_pass.assert_called_with(self.args.redfish_username)
+                self.mock_mgmt_shutdown.assert_called_with(
+                    self.mock_ssh_client, self.mock_username,
+                    self.mock_password, self.args.dry_run
+                )
+
+    def test_do_shutdown_bos_failure(self):
+        """Test do_shutdown with do_bos_shutdown raising a BOSFailure."""
+        bos_fail_msg = 'session creation failed'
+        self.mock_bos_shutdowns.side_effect = BOSFailure(bos_fail_msg)
+
+        with self.assertLogs(level=logging.ERROR) as cm:
+            with self.assertRaises(SystemExit):
+                do_shutdown(self.args)
+
+        self.assert_in_element('Failed BOS shutdown of computes and UAN:'
+                               ' {}'.format(bos_fail_msg),
+                               cm.output)
+
+        self.mock_service_activity_check.assert_called_once_with(self.args)
+        self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
+        self.mock_print.assert_called_once_with(
+            'Proceeding with BOS shutdown of computes and UAN.'
+        )
+        self.mock_bos_shutdowns.assert_called_once_with()
+        self.mock_get_user_pass.assert_not_called()
+        self.mock_mgmt_shutdown.assert_not_called()
+
+    def test_do_shutdown_do_not_proceed_bos(self):
+        """Test do_shutdown with a 'no' answer to the first proceed prompt."""
+        self.mock_pester_choices.return_value = 'no'
+
+        with self.assertRaises(SystemExit):
+            do_shutdown(self.args)
+
+        self.mock_service_activity_check.assert_called_once_with(self.args)
+        self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
+        self.mock_bos_shutdowns.assert_not_called()
+        self.mock_get_user_pass.assert_not_called()
+        self.mock_mgmt_shutdown.assert_not_called()
+
+    def test_do_shutdown_do_not_proceed_mgmt(self):
+        """Test do_shutdown with a 'no' answer to the second proceed prompt."""
+        self.mock_pester_choices.side_effect = ['yes', 'no']
+
+        with self.assertRaises(SystemExit):
+            do_shutdown(self.args)
+
+        self.mock_service_activity_check.assert_called_once_with(self.args)
+        self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
+        self.mock_bos_shutdowns.assert_called_once_with()
+        self.mock_get_user_pass.assert_not_called()
+        self.mock_mgmt_shutdown.assert_not_called()
+
+
 class TestDoBootsys(unittest.TestCase):
     """Test the do_bootsys function."""
 
@@ -54,8 +213,8 @@ class TestDoBootsys(unittest.TestCase):
         self.default_dir = os.path.join(os.path.dirname(__file__), '../..', 'resources', 'podstates/')
         self.default_podstate = os.path.join(self.default_dir, 'pod-state.json')
 
-        patch('sat.cli.bootsys.main.DEFAULT_DIR', self.default_dir).start()
-        patch('sat.cli.bootsys.main.DEFAULT_PODSTATE', self.default_podstate).start()
+        patch('sat.cli.bootsys.main.DEFAULT_PODSTATE_DIR', self.default_dir).start()
+        patch('sat.cli.bootsys.main.DEFAULT_PODSTATE_FILE', self.default_podstate).start()
 
         self.pod_mock = patch(
             'sat.cli.bootsys.main.get_pods_as_json',
@@ -111,7 +270,7 @@ class TestDoBootsys(unittest.TestCase):
         """dump_pods should create a symlink that points to the next log.
         """
         try:
-            dump_pods(sat.cli.bootsys.main.DEFAULT_PODSTATE)
+            dump_pods(sat.cli.bootsys.main.DEFAULT_PODSTATE_FILE)
             with open(self.default_podstate, 'r') as f:
                 lines = f.read()
             self.assertEqual('hello', lines)
@@ -140,7 +299,7 @@ class TestDoBootsys(unittest.TestCase):
         # At the end of this, there should only be 5 logs plus the symlink.
         try:
             for i in range(1, 15):
-                dump_pods(sat.cli.bootsys.main.DEFAULT_PODSTATE)
+                dump_pods(sat.cli.bootsys.main.DEFAULT_PODSTATE_FILE)
 
             files = [x for x in sorted(os.listdir(self.default_dir)) if x.startswith('pod-state')]
 

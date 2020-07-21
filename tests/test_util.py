@@ -352,5 +352,70 @@ class TestGetNewOrderedDict(unittest.TestCase):
         self.assertEqual(expected, new_dict)
 
 
+class TestPesterChoices(unittest.TestCase):
+    """Test the pester_choices function."""
+
+    def setUp(self):
+        """Set up some mocks."""
+        self.mock_print = mock.patch('builtins.print').start()
+        self.mock_input = mock.patch('builtins.input').start()
+
+    def tearDown(self):
+        """Stop all patches."""
+        mock.patch.stopall()
+
+    def test_valid_answer(self):
+        """Test pester_choices with a valid answer."""
+        self.mock_input.return_value = 'yes'
+        response = util.pester_choices('Continue?', ('yes', 'no'))
+        self.mock_input.assert_called_once_with('Continue? [yes,no] ')
+        self.assertEqual('yes', response)
+
+    def test_eventual_valid_answer(self):
+        """Test pester_choices with invalid answers and then a valid answer."""
+        self.mock_input.side_effect = ['yarp', 'nope', 'nah', 'maybe']
+        response = util.pester_choices('Do you agree? ', ('yes', 'no', 'maybe'))
+        correction_msg = 'Input must be one of the following choices: yes, no, maybe'
+        self.mock_print.assert_has_calls([mock.call(correction_msg)] * 3)
+        self.assertEqual('maybe', response)
+
+    def test_eof(self):
+        """Test when interrupted by an EOFError."""
+        self.mock_input.side_effect = ['no', 'maybe', EOFError]
+        response = util.pester_choices('What is your favorite prog rock band?', ('yes',))
+        correction_msg = 'Input must be one of the following choices: yes'
+        self.mock_print.assert_has_calls([mock.call(correction_msg)] * 2)
+        self.assertEqual(response, None)
+
+
+class TestPromptContinue(unittest.TestCase):
+    """Test the prompt_continue function."""
+
+    def setUp(self):
+        """Set up some mocks."""
+        self.mock_print = mock.patch('builtins.print').start()
+        self.mock_pester_choices = mock.patch('sat.util.pester_choices').start()
+
+    def tearDown(self):
+        """Stop all patches."""
+        mock.patch.stopall()
+
+    def test_yes(self):
+        """Test prompt_continue when user answers 'yes'."""
+        self.mock_pester_choices.return_value = 'yes'
+        action_msg = 'action'
+        util.prompt_continue(action_msg)
+        self.mock_print.assert_called_once_with('Proceeding with {}.'.format(action_msg))
+
+    def test_no(self):
+        """Test prompt_continue when user answers 'no'."""
+        self.mock_pester_choices.return_value = 'no'
+        action_msg = 'action'
+        with self.assertRaises(SystemExit):
+            util.prompt_continue(action_msg)
+        self.mock_print.assert_called_once_with('Will not proceed with {}. '
+                                                'Exiting.'.format(action_msg))
+
+
 if __name__ == '__main__':
     unittest.main()

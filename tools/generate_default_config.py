@@ -33,6 +33,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import argparse
 from importlib.machinery import SourceFileLoader
+import os
 import sys
 from textwrap import dedent, indent
 
@@ -139,6 +140,8 @@ def main():
     parser = create_parser()
     args = parser.parse_args()
 
+    # Ensure we are able to find sat package. Necessary for RPM build in Jenkins
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
     config_spec = extract_config_spec(args.config_spec_file, args.spec_var_name)
 
     try:

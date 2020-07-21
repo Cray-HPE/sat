@@ -71,13 +71,15 @@ class APIGatewayClient:
         self.host = host
         self.cert_verify = cert_verify
 
-    def _make_req(self, *args, req_type='GET', req_param=None):
+    def _make_req(self, *args, req_type='GET', req_param=None, json=None):
         """Perform HTTP request with type `req_type` to resource given in `args`.
         Args:
             *args: Variable length list of path components used to construct
                 the path to the resource.
             req_type (str): Type of reqest (GET, POST, PUT, or DELETE).
             req_param: Parameter(s) depending on request type.
+            json (dict): The data dict to encode as JSON and pass as the body of
+                a POST request.
 
         Returns:
             The requests.models.Response object if the request was successful.
@@ -100,7 +102,8 @@ class APIGatewayClient:
             if req_type == 'GET':
                 r = requester.get(url, params=req_param, verify=self.cert_verify)
             elif req_type == 'POST':
-                r = requester.post(url, data=req_param, verify=self.cert_verify)
+                r = requester.post(url, data=req_param, verify=self.cert_verify,
+                                   json=json)
             elif req_type == 'PUT':
                 r = requester.put(url, data=req_param, verify=self.cert_verify)
             elif req_type == 'DELETE':
@@ -140,13 +143,14 @@ class APIGatewayClient:
 
         return r
 
-    def post(self, *args, payload):
+    def post(self, *args, payload=None, json=None):
         """Issue an HTTP POST request to resource given in `args`.
 
         Args:
             *args: Variable length list of path components used to construct
                 the path to POST target.
-            payload: JSON data to post.
+            payload: The encoded data to send as the POST body.
+            json: The data dict to encode as JSON and send as the POST body.
 
         Returns:
             The requests.models.Response object if the request was successful.
@@ -156,7 +160,7 @@ class APIGatewayClient:
                 raises a RequestException of any kind.
         """
 
-        r = self._make_req(*args, req_type='POST', req_param=payload)
+        r = self._make_req(*args, req_type='POST', req_param=payload, json=json)
 
         return r
 
@@ -210,6 +214,27 @@ class FabricControllerClient(APIGatewayClient):
 
 class BOSClient(APIGatewayClient):
     base_resource_path = 'bos/v1/'
+
+    def create_session(self, session_template, operation):
+        """Create a BOS session from a session template with an operation.
+
+        Args:
+            session_template (str): the name of the session template from which
+                to create the session.
+            operation (str): the operation to create the session with. Can be
+                one of boot, configure, reboot, shutdown.
+
+        Returns:
+            The response from the POST to 'session'.
+
+        Raises:
+            APIError: if the POST request to create the session fails.
+        """
+        request_body = {
+            'templateUuid': session_template,
+            'operation': operation
+        }
+        return self.post('session', json=request_body)
 
 
 class CFSClient(APIGatewayClient):

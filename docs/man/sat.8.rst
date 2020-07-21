@@ -100,6 +100,41 @@ BOOTSYS
         Maximum number of pod-state files allowed to accumulate in
         /var/sat/podstates. The default value is 10.
 
+**cle_bos_template**
+        The name of the BOS session template to use for shutting down and
+        booting the CLE compute nodes during a shutdown or boot action. If not
+        specified, this defaults to searching for a session template that
+        matches the pattern "cle-X.Y.Z" where X, Y, and Z are integer version
+        numbers. If this option is not specified, and more than one BOS session
+        template matches the pattern, the `bootsys` command will fail with a
+        message indicating that an explicit CLE BOS template must be specified.
+
+        This config file option can by overridden by the command-line option of
+        the same name.
+
+**uan_bos_template**
+        The name of the BOS session template to use for shutting down and
+        booting the User Access Nodes (UANs) during a shutdown or boot action.
+        If not specified, this defaults to "uan".
+
+        This config file option can by overridden by the command-line option of
+        the same name.
+
+**state_check_fail_action**
+        Action to take if a failure occurs when checking whether a BOS session
+        template needs an operation applied based on current node state in HSM.
+        The choices and their meanings are as follows:
+
+        ::
+
+                abort: Abort the entire shutdown operation. This is the default.
+                skip: Skip performing an operation against the session template(s).
+                prompt: Prompt user whether to abort, skip, or force.
+                force: Do the operation against this session template anyway.
+
+        This config file option can by overridden by the command-line option of
+        the same name.
+
 FORMAT
 ------
 
