@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ``sat bootsys shutdown`` now performs a BOS shutdown of the compute nodes and
   User Access Nodes (UANs).
 
+### Fixed
+- Fixed missing values in info messages logged from sat.filtering module.
+
 ## [2.3.0] - 2020-07-01
 
 ### Added
