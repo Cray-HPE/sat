@@ -504,7 +504,8 @@ def remove_constant_values(dicts, constant_value):
     keys_to_keep = []
     for key in keys:
         if all(d[key] == constant_value for d in dicts):
-            LOGGER.info("All values for '%s' are '%s', omitting key.")
+            LOGGER.info("All values for '%s' are '%s', omitting key.",
+                        key, constant_value)
         else:
             keys_to_keep.append(key)
 
