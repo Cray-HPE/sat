@@ -24,6 +24,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 import sys
 from collections import OrderedDict
 from functools import partial
+import getpass
 import logging
 import math
 import os
@@ -58,10 +59,11 @@ def pester(message,
     Args:
         message: a string with a prompt to be printed before asking the user.
         valid_answer: a regex string for which if message matches,
-            return some value based on the input.
+            return some value based on the input. If falsy, then the first
+            response is used for the return value.
         human_readable_valid: a human-readable version of valid_answer.
-            This is displayed at the prompt. If it is falsy
-            (e.g., None or empty string), then the regex is displayed instead.
+            This is displayed at the prompt. If either it or valid_answer is
+            falsy (e.g., None or empty string), then no guidance is given.
         parse_answer: a function taking one string argument which returns a
             value which is to be used in some higher-level conditional.
 
@@ -71,8 +73,12 @@ def pester(message,
     """
     try:
         while True:
-            answer = input("{} ({}) ".format(message, human_readable_valid or valid_answer))
-            if re.match(valid_answer, answer):
+            guidance = (" ({}) ".format(human_readable_valid)
+                        if human_readable_valid and valid_answer
+                        else "")
+
+            answer = input(message + guidance + ": ")
+            if not valid_answer or re.match(valid_answer, answer):
                 return parse_answer(answer)
             else:
                 print("Input must match '{}'. ".format(valid_answer), end="")
@@ -125,6 +131,33 @@ def prompt_continue(action_msg):
     else:
         print('Will not proceed with {}. Exiting.'.format(action_msg))
         sys.exit(1)
+
+
+def get_username_and_password_interactively(username=None, username_prompt='Username',
+                                            password=None, password_prompt='Password'):
+    """Interactively query the user for username and password.
+
+    If either username or password are given, then the user will not
+    be queried for those respective fields. If username is not given,
+    the user will be queried for both.
+
+    Args:
+        username (str): a username that is already known.
+        username_prompt (str): a prompt for querying the username.
+        password (str): a password that is already known.
+        password_prompt (str): a prompt for querying the password.
+
+    Returns:
+        (str, str) the username and password.
+
+    """
+    if username and not password:
+        return (username, getpass.getpass(password_prompt + ": "))
+    elif username and password:
+        return (username, password)
+    else:
+        return (input(username_prompt + ": "),
+                getpass.getpass(password_prompt + ": "))
 
 
 def get_pretty_printed_dict(d, min_len=0):

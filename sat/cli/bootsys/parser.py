@@ -102,3 +102,13 @@ def add_bootsys_subparser(subparsers):
         # kwarg here because then the value from the config file could never
         # take precedence over the command-line default.
     )
+
+    bootsys_parser.add_argument(
+        '--ipmi-timeout', default=120, type=int,
+        help='Timeout for IPMI power commands'
+    )
+
+    bootsys_parser.add_argument(
+        '--ssh-timeout', default=120, type=int,
+        help='Timeout waiting for SSH availability on nodes'
+    )
