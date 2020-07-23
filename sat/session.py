@@ -44,7 +44,7 @@ class SATSession:
 
     TOKEN_URI = '/keycloak/realms/{}/protocol/openid-connect/token'
     tenant = 'shasta'
-    client_id = 'cray'
+    client_id = 'shasta'
 
     def __init__(self, no_unauth_warn=False):
         """Initialize a Session. Wraps an OAuth2Session.
