@@ -40,10 +40,35 @@ from yaml import YAMLLoadWarning
 from sat.cli.bootsys.defaults import DEFAULT_PODSTATE_FILE
 from sat.cli.bootsys.power import IPMIPowerStateWaiter
 from sat.cli.bootsys.util import get_ncns, RunningService, k8s_pods_to_status_dict
-from sat.cli.bootsys.waiting import GroupWaiter
+from sat.cli.bootsys.waiting import GroupWaiter, Waiter
+from sat.report import Report
 from sat.util import get_username_and_password_interactively
 
 LOGGER = logging.getLogger(__name__)
+
+
+def load_kube_api():
+    """Get a Kubernetes CoreV1Api object.
+
+    This helper function loads the kube config and then instantiates
+    an API object.
+
+    Args: None.
+    Returns: a CoreV1Api object from the kubernetes library.
+    """
+
+    try:
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=YAMLLoadWarning)
+            load_kube_config()
+    # Earlier versions: FileNotFoundError; later versions: ConfigException
+    except (FileNotFoundError, ConfigException) as err:
+        raise ConfigException(
+            'Failed to load kubernetes config to get pod status: '
+            '{}'.format(err)
+        )
+
+    return CoreV1Api()
 
 
 class SSHAvailableWaiter(GroupWaiter):
@@ -77,6 +102,30 @@ class SSHAvailableWaiter(GroupWaiter):
             return True
 
 
+class KubernetesAPIAvailableWaiter(Waiter):
+    """A waiter which waits for the Kubernetes API to become available.
+
+    Polls the Kubernetes API endpoint until no network errors get
+    thrown, at which point the API is considered to be "up".
+    """
+    def __init__(self, timeout, poll_interval=1):
+        """See superclass documentation."""
+        super().__init__(self, timeout, poll_interval=poll_interval)
+
+        self.k8s_api = load_kube_api()
+
+    def has_completed(self):
+        """Return True if the /apis endpoint can be queried successfully and
+        False otherwise.
+        """
+        try:
+            self.k8s_api.get_api_versions()
+        except urllib3.exceptions.MaxRetryError:
+            return False
+        else:
+            return True
+
+
 class KubernetesPodStatusWaiter(GroupWaiter):
     """Implementation of a watier which waits for all pods from the
     previous shutdown to be in the same state as before following the
@@ -96,18 +145,7 @@ class KubernetesPodStatusWaiter(GroupWaiter):
         super().__init__(set(), timeout, poll_interval=poll_interval)
 
         # Load k8s configuration before trying to use API
-        try:
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=YAMLLoadWarning)
-                load_kube_config()
-        # Earlier versions: FileNotFoundError; later versions: ConfigException
-        except (FileNotFoundError, ConfigException) as err:
-            raise ConfigException(
-                'Failed to load kubernetes config to get pod status: '
-                '{}'.format(err)
-            )
-
-        self.k8s_api = CoreV1Api()
+        self.k8s_api = load_kube_api()
 
         with open(podstate_path) as podstate:
             self.previous_boot_phase = json.load(podstate)
@@ -132,13 +170,8 @@ class KubernetesPodStatusWaiter(GroupWaiter):
         Args: None.
         Returns: None.
         """
-        while not self.k8s_api_ready:
-            try:
-                all_pods = self.k8s_api.list_pod_for_all_namespaces()
-                self.k8s_pod_status = k8s_pods_to_status_dict(all_pods)
-                self.k8s_api_ready = True
-            except urllib3.exceptions.MaxRetryError:
-                time.sleep(1)
+        all_pods = self.k8s_api.list_pod_for_all_namespaces()
+        self.k8s_pod_status = k8s_pods_to_status_dict(all_pods)
 
     def on_check_action(self):
         """Update pod status before doing each check for completion."""
@@ -230,6 +263,9 @@ def do_mgmt_boot(args):
         subprocess.run(['ansible-playbook',
                         '/opt/cray/crayctl/ansible_framework/main/platform-startup.yml'],
                        check=True)
+
+    k8s_api_waiter = KubernetesAPIAvailableWaiter(60)
+    k8s_api_waiter.wait_for_completion()
 
     k8s_waiter = KubernetesPodStatusWaiter(args.k8s_timeout)
     with k8s_waiter:

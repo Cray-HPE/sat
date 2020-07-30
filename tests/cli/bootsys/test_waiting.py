@@ -26,7 +26,40 @@ import itertools
 import unittest
 from unittest.mock import MagicMock, patch
 
-from sat.cli.bootsys.waiting import GroupWaiter
+from sat.cli.bootsys.waiting import GroupWaiter, Waiter
+
+
+def get_mock_waiter(member_complete_behavior):
+    """Get a GroupWaiter class which mocks out completion checking.
+
+    This is a simple helper function for creating classes to test the
+    GroupWaiter.wait_for_completion method.
+
+    Args:
+        member_complete_behavior (bool|str -> bool):
+            if boolean, has_completed always return this value.
+            if iterable, has_completed will return the members of the iterable
+                in order of calls.
+    """
+    try:
+        return_vals = iter(member_complete_behavior)
+    except TypeError:
+        pass
+
+    class MockWaiter(Waiter):
+        def has_completed(self):
+            if 'return_vals' in locals():
+                try:
+                    return bool(next(return_vals))
+                except StopIteration:
+                    return True
+            else:
+                return bool(member_complete_behavior)
+
+        def condition_name(self):
+            return 'Testing Waiter'
+
+    return MockWaiter
 
 
 def get_mock_group_waiter(member_complete_behavior):
@@ -55,15 +88,78 @@ def get_mock_group_waiter(member_complete_behavior):
     return MockGroupWaiter
 
 
-class TestGroupWaiter(unittest.TestCase):
-    """Test the abstract GroupWaiter class."""
-
+class WaiterTestCase(unittest.TestCase):
+    """Common test class for (Group)Waiter classes."""
     def setUp(self):
         self.mock_time_monotonic = patch('sat.cli.bootsys.waiting.time.monotonic',
                                          side_effect=itertools.count(0, 1)).start()
         self.mock_time_sleep = patch('sat.cli.bootsys.waiting.time.sleep').start()
         self.mock_thread = patch('sat.cli.bootsys.waiting.Thread').start()
 
+
+class TestWaiter(WaiterTestCase):
+    """Test the abstract Waiter class."""
+
+    def test_wait_for_completion_succeeds(self):
+        """Test waiting for single condition that succeeds before timeout."""
+        SuccessfulWaiter = get_mock_waiter(True)
+        waiter = SuccessfulWaiter(10)
+        self.assertTrue(waiter.wait_for_completion())
+
+    def test_wait_for_completion_times_out(self):
+        """Test that a failing test times out."""
+        FailingWaiter = get_mock_waiter(False)
+        waiter = FailingWaiter(2)
+        self.assertFalse(waiter.wait_for_completion())
+
+    @patch('sat.cli.bootsys.waiting.Waiter.pre_wait_action')
+    @patch('sat.cli.bootsys.waiting.Waiter.post_wait_action')
+    def test_hooks_are_called(self, mock_post_wait, mock_pre_wait):
+        """Check that all user-defined hooks are always called"""
+        SuccessfulWaiter = get_mock_waiter(True)
+        instance = SuccessfulWaiter(10)
+        instance.wait_for_completion()
+
+        mock_pre_wait.assert_called_once()
+        mock_post_wait.assert_called_once()
+
+    def test_wait_async_launch_thread(self):
+        """Test that a thread is created when waiting asynchronously"""
+        SuccessfulWaiter = get_mock_waiter(True)
+        instance = SuccessfulWaiter(10)
+        instance.wait_for_completion_async()
+
+        self.mock_thread.assert_called_once_with(target=instance.wait_for_completion)
+        self.mock_thread.return_value.start.assert_called_once()
+
+    def test_wait_await_join_thread(self):
+        """Test that the waiting thread is joined when wait_..._await called"""
+        SuccessfulWaiter = get_mock_waiter(True)
+        instance = SuccessfulWaiter(10)
+
+        instance.wait_for_completion_async()
+        instance.pending = set() # This would happen during wait_for_completion
+        instance.wait_for_completion_await()
+
+        self.mock_thread.return_value.join.assert_called()
+
+    def test_wait_context_manager_works(self):
+        """Test that the GroupWaiter context manager waits in background"""
+        SuccessfulWaiter = get_mock_waiter(True)
+
+        with SuccessfulWaiter(10) as instance:
+            instance.pending = set() # This would happen during wait_for_completion
+
+        self.mock_thread.assert_called_once_with(target=instance.wait_for_completion)
+        self.mock_thread.return_value.start.assert_called_once()
+        self.mock_thread.return_value.join.assert_called()
+
+
+class TestGroupWaiter(WaiterTestCase):
+    """Test the abstract GroupWaiter class."""
+
+    def setUp(self):
+        super().setUp()
         self.members = ['foo', 'bar', 'baz']
 
     def tearDown(self):
@@ -101,34 +197,3 @@ class TestGroupWaiter(unittest.TestCase):
         mock_on_check.assert_called_once()
         mock_pre_wait.assert_called_once()
         mock_post_wait.assert_called_once()
-
-    def test_wait_async_launch_thread(self):
-        """Test that a thread is created when waiting asynchronously"""
-        SuccessfulWaiter = get_mock_group_waiter(True)
-        instance = SuccessfulWaiter(self.members, 10)
-        instance.wait_for_completion_async()
-
-        self.mock_thread.assert_called_once_with(target=instance.wait_for_completion)
-        self.mock_thread.return_value.start.assert_called_once()
-
-    def test_wait_await_join_thread(self):
-        """Test that the waiting thread is joined when wait_..._await called"""
-        SuccessfulWaiter = get_mock_group_waiter(True)
-        instance = SuccessfulWaiter(self.members, 10)
-
-        instance.wait_for_completion_async()
-        instance.pending = set() # This would happen during wait_for_completion
-        instance.wait_for_completion_await()
-
-        self.mock_thread.return_value.join.assert_called()
-
-    def test_wait_context_manager_works(self):
-        """Test that the GroupWaiter context manager waits in background"""
-        SuccessfulWaiter = get_mock_group_waiter(True)
-
-        with SuccessfulWaiter(self.members, 10) as instance:
-            instance.pending = set() # This would happen during wait_for_completion
-
-        self.mock_thread.assert_called_once_with(target=instance.wait_for_completion)
-        self.mock_thread.return_value.start.assert_called_once()
-        self.mock_thread.return_value.join.assert_called()

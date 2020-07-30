@@ -31,34 +31,19 @@ from sat.report import Report
 
 LOGGER = logging.getLogger(__file__)
 
-
-class GroupWaiter(metaclass=abc.ABCMeta):
-    """Waits for a all members of some group to reach some state.
+class Waiter(metaclass=abc.ABCMeta):
+    """Waits for a single condition to occur.
 
     Fields:
-        members (set): a set of members of an arbitrary type to wait for.
         timeout (int): the interval after which the wait operation will timeout.
         poll_interval (int): the interval, in seconds, between polls for
             completion.
+        completed (bool): True if the condition has been met, False otherwise.
     """
-
-    def __init__(self, members, timeout, poll_interval=1):
-        self.members = set(members)
-
+    def __init__(self, timeout, poll_interval=1):
         self.timeout = timeout
         self.poll_interval = poll_interval
-
-    @abc.abstractmethod
-    def member_has_completed(self, member):
-        """Check whether or not a given member has completed.
-
-        Args:
-            member: which member to check.
-
-        Returns:
-            True if completed, False if not.
-        """
-        raise NotImplementedError('{}.member_has_completed'.format(self.__class__.__name__))
+        self.completed = False
 
     @abc.abstractmethod
     def condition_name(self):
@@ -67,6 +52,15 @@ class GroupWaiter(metaclass=abc.ABCMeta):
         Returns: (str) the name of the "completed" condition
         """
         raise NotImplementedError('{}.task_name'.format(self.__class__.__name__))
+
+    @abc.abstractmethod
+    def has_completed(self):
+        """Check if the condition has occurred.
+
+        Returns: True if the condition has occurred, and
+            False otherwise.
+        """
+        raise NotImplementedError('{}.has_completed'.format(self.__class__.__name__))
 
     def pre_wait_action(self):
         """Perform some action before waiting.
@@ -88,43 +82,33 @@ class GroupWaiter(metaclass=abc.ABCMeta):
         Returns: None.
         """
 
-    def on_check_action(self):
-        """Perform some action each polling cycle before checking.
-
-        The default implementation does nothing. Implement custom
-        behaviors by overriding this method.
+    def wait_for_completion(self):
+        """Wait for the condition to be achieved or for timeout.
 
         Args: None.
-        Returns: None.
+        Returns: True if condition succeed, False if timed out.
         """
-
-    def wait_for_completion(self):
-        """Wait until all members have completed, or timeout is reached."""
         self.pre_wait_action()
 
         start_time = time.monotonic()
-        self.pending = set(self.members)
 
-        while self.pending and time.monotonic() - start_time < self.timeout:
-            completed = set()
-            self.on_check_action()
-            for member in self.pending:
-                if self.member_has_completed(member):
-                    completed.add(member)
+        while time.monotonic() - start_time < self.timeout:
+            # Store value in case we want to use it in
+            # post_wait_action.
 
-            self.pending -= completed
+            self.completed = self.has_completed()
+            if self.completed:
+                break
 
             time.sleep(self.poll_interval)
 
         self.post_wait_action()
 
-        # At this point we've either completed all members or there
-        # are some still pending which have timed out.
-        if self.pending:
+        if not self.completed:
             LOGGER.error('Waiting for condition "%s" timed out after %d seconds',
                          self.condition_name(), self.timeout)
 
-        return self.pending
+        return self.completed
 
     def wait_for_completion_async(self):
         """Begin waiting for the completion condition.
@@ -164,3 +148,80 @@ class GroupWaiter(metaclass=abc.ABCMeta):
 
     def __exit__(self, exc_type, exc_value, exc_tb):
         self.wait_for_completion_await()
+
+
+class GroupWaiter(Waiter):
+    """Waits for a all members of some group to reach some state.
+
+    Fields:
+        See superclass documentation.
+        members (set): a set of members of an arbitrary type to wait for.
+    """
+
+    def __init__(self, members, timeout, poll_interval=1):
+        self.members = set(members)
+        super().__init__(timeout, poll_interval)
+
+    @abc.abstractmethod
+    def member_has_completed(self, member):
+        """Check whether or not a given member has completed.
+
+        Args:
+            member: which member to check.
+
+        Returns:
+            True if completed, False if not.
+        """
+        raise NotImplementedError('{}.member_has_completed'.format(self.__class__.__name__))
+
+    def on_check_action(self):
+        """Perform some action each polling cycle before checking.
+
+        The default implementation does nothing. Implement custom
+        behaviors by overriding this method.
+
+        Args: None.
+        Returns: None.
+        """
+
+    def has_completed(self):
+        """Check if every member has completed.
+
+        Args: None.
+        Returns: True if every member has reached its completed state,
+            and False otherwise.
+        """
+        return all(self.member_has_completed(member)
+                   for member in self.members)
+
+    def wait_for_completion(self):
+        """Wait until all members have completed, or timeout is reached.
+
+        Args: None.
+        Returns: A set of members which did not complete if the timeout was
+            reached, or the empty set if all members complete.
+        """
+        self.pre_wait_action()
+
+        start_time = time.monotonic()
+        self.pending = set(self.members)
+
+        while self.pending and time.monotonic() - start_time < self.timeout:
+            completed = set()
+            self.on_check_action()
+            for member in self.pending:
+                if self.member_has_completed(member):
+                    completed.add(member)
+
+            self.pending -= completed
+
+            time.sleep(self.poll_interval)
+
+        # At this point we've either completed all members or there
+        # are some still pending which have timed out.
+        if self.pending:
+            LOGGER.error('Waiting for condition "%s" timed out after %d seconds',
+                         self.condition_name(), self.timeout)
+
+        self.post_wait_action()
+        return self.pending

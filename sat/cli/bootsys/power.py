@@ -56,7 +56,13 @@ class IPMIPowerStateWaiter(GroupWaiter):
         return 'IPMI power ' + self.powerstate
 
     def get_ipmi_command(self, member, command):
-        # TODO: Add docstring
+        """Get an ipmitool command to query power state.
+
+        Args:
+            member (str): the host to query
+            command (str): the ipmitool command to run
+                (typically `chassis power status`)
+        """
         # TODO: Validate user input
         return shlex.split(
             'ipmitool -I lanplus -U {} -P {} -H {}-mgmt {}'.format(
