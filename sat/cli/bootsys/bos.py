@@ -566,10 +566,11 @@ def handle_state_check_failure(failed_st, operation, fail_action):
         raise BOSFailure('{}. Aborting {} attempt.'.format(fail_msg, operation))
     elif fail_action == 'skip':
         LOGGER.warning('%s. Skipping %s.', fail_msg, operation)
+        return []
     elif fail_action == 'prompt':
         prompt = '{}. How would you like to proceed? '.format(fail_msg)
         response = pester_choices(prompt, ('skip', 'abort', 'force')) or 'abort'
-        handle_state_check_failure(failed_st, operation, response)
+        return handle_state_check_failure(failed_st, operation, response)
     elif fail_action == 'force':
         LOGGER.warning('%s. Forcing %s.', fail_msg, operation)
         return failed_st
@@ -753,8 +754,11 @@ def do_bos_shutdowns():
     # This will raise a BOSFailure if node status check fails, and the action
     # specified on the command-line or in the config file is 'abort'.
     templates_to_shutdown = get_templates_needing_operation(session_templates, 'shutdown')
-    LOGGER.debug("Found these session templates still need the 'shutdown' "
-                 "operation performed: %s", ', '.join(session_templates))
+    LOGGER.debug("Found %s needing 'shutdown' operation%s",
+                 INFLECTOR.no('session template', len(templates_to_shutdown)),
+                 ': ' + ', '.join(templates_to_shutdown) if templates_to_shutdown
+                 else '.')
 
-    # Let any exceptions raise to caller
-    do_parallel_shutdowns(templates_to_shutdown)
+    if templates_to_shutdown:
+        # Let any exceptions raise to caller
+        do_parallel_shutdowns(templates_to_shutdown)
