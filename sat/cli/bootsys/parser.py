@@ -118,3 +118,8 @@ def add_bootsys_subparser(subparsers):
         help='Timeout waiting for Kubernetes pods to return to '
         'pre-shutdown state'
     )
+
+    bootsys_parser.add_argument(
+        '--ceph-timeout', default=600, type=int,
+        help='Timeout waiting for Ceph to come up.'
+    )
