@@ -35,9 +35,9 @@ from paramiko.ssh_exception import SSHException, NoValidConnectionsError
 from pyghmi.ipmi.command import Command as IpmiCommand
 from pyghmi.exceptions import IpmiException
 
-from sat import redfish
 from sat.cli.bootsys.bos import BOSFailure, do_bos_shutdowns
 from sat.cli.bootsys.defaults import DEFAULT_PODSTATE_DIR, DEFAULT_PODSTATE_FILE
+from sat.cli.bootsys.mgmt_shutdown_ansible import do_shutdown_playbook
 from sat.cli.bootsys.mgmt_shutdown_power import do_mgmt_shutdown_power
 from sat.cli.bootsys.service_activity import do_service_activity_check
 from sat.cli.bootsys.util import get_ncns, wait_for_nodes_powerstate, RunningService
@@ -244,7 +244,7 @@ def do_shutdown(args):
     Returns:
         None
     """
-    LOGGER.debug('Capturing state of K8s pods.')
+    print('Capturing state of k8s pods.')
 
     try:
         dump_pods(args.pod_state_file)
@@ -267,17 +267,18 @@ def do_shutdown(args):
         LOGGER.error("Failed %s: %s", action_msg, err)
         sys.exit(1)
 
-    action_msg = 'shutdown of management NCNs'
-    print("Before proceeding with {}, run 'ansible-playbook /opt/cray/crayctl/"
-          "ansible_framework/main/platform-shutdown.yml'.".format(action_msg))
+    action_msg = 'shutdown of management platform services'
     prompt_continue(action_msg)
+    do_shutdown_playbook()
+    print('Succeeded with {}.'.format(action_msg))
+
+    action_msg = 'shutdown of management NCNs'
+    prompt_continue(action_msg)
+    username, password = get_username_and_password_interactively(args.redfish_username)
     ssh_client = SSHClient()
     ssh_client.load_system_host_keys()
-    username, password = get_username_and_password_interactively(args.redfish_username)
-
-    # TODO: This should be uncommented when the shutdown automation
-    # process is done being implemented.
     do_mgmt_shutdown_power(ssh_client, username, password, args.ipmi_timeout, args.dry_run)
+    print('Succeeded with {}.'.format(action_msg))
 
 
 def do_bootsys(args):
