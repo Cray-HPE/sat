@@ -28,8 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- ``sat bootsys shutdown`` now performs a BOS shutdown of the compute nodes and
-  User Access Nodes (UANs).
+- ``sat bootsys shutdown`` now performs the remaining steps required to fully
+  shut down a system, including:
+    - Shutdown of the compute nodes and User Access Nodes (UANs) using BOS.
+    - Shutdown of the platform services by running the Ansible playbook,
+      platform-shutdown.yml.
+    - Shutdown and power off of the management NCNs.
 
 ### Fixed
 - Fixed missing values in info messages logged from sat.filtering module.

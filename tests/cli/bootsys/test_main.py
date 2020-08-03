@@ -72,6 +72,7 @@ class TestDoShutdown(ExtendedTestCase):
         self.mock_bos_shutdowns = patch('sat.cli.bootsys.main.do_bos_shutdowns').start()
         self.mock_pester_choices = patch('sat.util.pester_choices').start()
         self.mock_pester_choices.return_value = 'yes'
+        self.mock_do_shutdown_playbook = patch('sat.cli.bootsys.main.do_shutdown_playbook').start()
         self.mock_ssh_client_cls = patch('sat.cli.bootsys.main.SSHClient').start()
         self.mock_ssh_client = Mock()
         self.mock_ssh_client_cls.return_value = self.mock_ssh_client
@@ -93,11 +94,13 @@ class TestDoShutdown(ExtendedTestCase):
         self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
         self.mock_print.assert_has_calls([
             call('Proceeding with BOS shutdown of computes and UAN.'),
-            call("Before proceeding with shutdown of management NCNs, run "
-                 "'ansible-playbook /opt/cray/crayctl/ansible_framework/main/platform-shutdown.yml'."),
+            call('Proceeding with shutdown of management platform services.'),
+            call('Succeeded with shutdown of management platform services.'),
             call('Proceeding with shutdown of management NCNs.'),
+            call('Succeeded with shutdown of management NCNs.')
         ])
         self.mock_bos_shutdowns.assert_called_once_with()
+        self.mock_do_shutdown_playbook.assert_called_once_with()
         self.mock_ssh_client.load_system_host_keys.assert_called_once_with()
         self.mock_get_user_pass.assert_called_once_with(self.args.redfish_username)
         self.mock_mgmt_shutdown.assert_called_once_with(
@@ -124,6 +127,7 @@ class TestDoShutdown(ExtendedTestCase):
                 self.mock_dump_pods.assert_called_with(self.pod_state_file)
                 self.mock_service_activity_check.assert_not_called()
                 self.mock_bos_shutdowns.assert_not_called()
+                self.mock_do_shutdown_playbook.assert_not_called()
                 self.mock_get_user_pass.assert_not_called()
                 self.mock_mgmt_shutdown.assert_not_called()
 
@@ -147,6 +151,7 @@ class TestDoShutdown(ExtendedTestCase):
                 self.mock_dump_pods.assert_called_with(self.pod_state_file)
                 self.mock_service_activity_check.assert_called_with(self.args)
                 self.mock_bos_shutdowns.assert_called_with()
+                self.mock_do_shutdown_playbook.assert_called_with()
                 self.mock_ssh_client.load_system_host_keys.assert_called_with()
                 self.mock_get_user_pass.assert_called_with(self.args.redfish_username)
                 self.mock_mgmt_shutdown.assert_called_with(
@@ -169,10 +174,12 @@ class TestDoShutdown(ExtendedTestCase):
 
         self.mock_service_activity_check.assert_called_once_with(self.args)
         self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
-        self.mock_print.assert_called_once_with(
-            'Proceeding with BOS shutdown of computes and UAN.'
-        )
+        self.mock_print.assert_has_calls([
+            call('Capturing state of k8s pods.'),
+            call('Proceeding with BOS shutdown of computes and UAN.')
+        ])
         self.mock_bos_shutdowns.assert_called_once_with()
+        self.mock_do_shutdown_playbook.assert_not_called()
         self.mock_get_user_pass.assert_not_called()
         self.mock_mgmt_shutdown.assert_not_called()
 
@@ -186,10 +193,11 @@ class TestDoShutdown(ExtendedTestCase):
         self.mock_service_activity_check.assert_called_once_with(self.args)
         self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
         self.mock_bos_shutdowns.assert_not_called()
+        self.mock_do_shutdown_playbook.assert_not_called()
         self.mock_get_user_pass.assert_not_called()
         self.mock_mgmt_shutdown.assert_not_called()
 
-    def test_do_shutdown_do_not_proceed_mgmt(self):
+    def test_do_shutdown_do_not_proceed_playbook(self):
         """Test do_shutdown with a 'no' answer to the second proceed prompt."""
         self.mock_pester_choices.side_effect = ['yes', 'no']
 
@@ -199,6 +207,21 @@ class TestDoShutdown(ExtendedTestCase):
         self.mock_service_activity_check.assert_called_once_with(self.args)
         self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
         self.mock_bos_shutdowns.assert_called_once_with()
+        self.mock_do_shutdown_playbook.assert_not_called()
+        self.mock_get_user_pass.assert_not_called()
+        self.mock_mgmt_shutdown.assert_not_called()
+
+    def test_do_shutdown_do_not_proceed_mgmt(self):
+        """Test do_shutdown with a 'no' answer to the second proceed prompt."""
+        self.mock_pester_choices.side_effect = ['yes', 'yes', 'no']
+
+        with self.assertRaises(SystemExit):
+            do_shutdown(self.args)
+
+        self.mock_service_activity_check.assert_called_once_with(self.args)
+        self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
+        self.mock_bos_shutdowns.assert_called_once_with()
+        self.mock_do_shutdown_playbook.assert_called_once_with()
         self.mock_get_user_pass.assert_not_called()
         self.mock_mgmt_shutdown.assert_not_called()
 
