@@ -31,6 +31,7 @@ from sat.report import Report
 
 LOGGER = logging.getLogger(__file__)
 
+
 class Waiter(metaclass=abc.ABCMeta):
     """Waits for a single condition to occur.
 
@@ -51,7 +52,7 @@ class Waiter(metaclass=abc.ABCMeta):
 
         Returns: (str) the name of the "completed" condition
         """
-        raise NotImplementedError('{}.task_name'.format(self.__class__.__name__))
+        raise NotImplementedError('{}.condition_name'.format(self.__class__.__name__))
 
     @abc.abstractmethod
     def has_completed(self):

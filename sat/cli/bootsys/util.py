@@ -121,7 +121,7 @@ def k8s_pods_to_status_dict(v1_pod_list):
         v1_pod_list: a V1PodList object from the kubernetes library
 
     Returns:
-        a dict in the above form.
+        a defaultdict in the above form
 
     """
     pods_dict = defaultdict(dict)

@@ -24,8 +24,8 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import json
 import logging
+import socket
 import subprocess
-import time
 import urllib3
 import warnings
 
@@ -33,7 +33,7 @@ from kubernetes.client import CoreV1Api
 from kubernetes.config import load_kube_config
 from kubernetes.config.config_exception import ConfigException
 from paramiko.client import SSHClient
-from paramiko.ssh_exception import SSHException, NoValidConnectionsError
+from paramiko.ssh_exception import SSHException
 from pyghmi.exceptions import IpmiException
 from yaml import YAMLLoadWarning
 
@@ -53,10 +53,13 @@ def load_kube_api():
     This helper function loads the kube config and then instantiates
     an API object.
 
-    Args: None.
-    Returns: a CoreV1Api object from the kubernetes library.
-    """
+    Returns:
+        CoreV1Api: the API object from the kubernetes library.
 
+    Raises:
+        kubernetes.config.config_exception.ConfigException: if failed to load
+            kubernetes configuration.
+    """
     try:
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=YAMLLoadWarning)
@@ -72,8 +75,8 @@ def load_kube_api():
 
 
 class SSHAvailableWaiter(GroupWaiter):
-    """Implementation of a waiter which waits for all member nodes to be
-    accessible via SSH."""
+    """A waiter which waits for all member nodes to be accessible via SSH.
+    """
 
     def __init__(self, members, timeout, poll_interval=1):
         self.ssh_client = SSHClient()
@@ -96,7 +99,7 @@ class SSHAvailableWaiter(GroupWaiter):
         """
         try:
             self.ssh_client.connect(member)
-        except (SSHException, NoValidConnectionsError):
+        except (SSHException, socket.error):
             return False
         else:
             return True
@@ -109,17 +112,25 @@ class KubernetesAPIAvailableWaiter(Waiter):
     thrown, at which point the API is considered to be "up".
     """
     def __init__(self, timeout, poll_interval=1):
-        """See superclass documentation."""
-        super().__init__(self, timeout, poll_interval=poll_interval)
+        """See superclass documentation.
+
+        Raises:
+            kubernetes.config.config_exception.ConfigException: if failed to load
+                kubernetes configuration.
+        """
+        super().__init__(timeout, poll_interval=poll_interval)
 
         self.k8s_api = load_kube_api()
+
+    def condition_name(self):
+        return 'Kubernetes API available'
 
     def has_completed(self):
         """Return True if the /apis endpoint can be queried successfully and
         False otherwise.
         """
         try:
-            self.k8s_api.get_api_versions()
+            self.k8s_api.get_api_resources()
         except urllib3.exceptions.MaxRetryError:
             return False
         else:
@@ -127,9 +138,12 @@ class KubernetesAPIAvailableWaiter(Waiter):
 
 
 class KubernetesPodStatusWaiter(GroupWaiter):
-    """Implementation of a watier which waits for all pods from the
-    previous shutdown to be in the same state as before following the
-    boot."""
+    """A waiter which waits for pods to reach expected state.
+
+    This waits for all pods to be in the same state they were in before the
+    previous shutdown and for any new pods to be in the 'Running' or 'Complete'
+    state.
+    """
 
     def __init__(self, timeout, poll_interval=10,
                  podstate_path=DEFAULT_PODSTATE_FILE):
@@ -152,7 +166,6 @@ class KubernetesPodStatusWaiter(GroupWaiter):
 
         self.new_pods = set()  # pods not present when shut down
 
-        self.k8s_api_ready = False
         self.update_k8s_pod_status()
         self.members = [(ns, name)
                         for ns, names in self.k8s_pod_status.items()
@@ -188,7 +201,7 @@ class KubernetesPodStatusWaiter(GroupWaiter):
         A pod is considered to have "completed" if either a pod with
         its name was present at the previous shutdown, and the current
         pod has reached the same state as its counterpart, or if the
-        pod was not present, if its state is either "Running" or
+        pod was not present, and its state is either "Running" or
         "Succeeded".
         """
         ns, name = member
@@ -264,10 +277,22 @@ def do_mgmt_boot(args):
                         '/opt/cray/crayctl/ansible_framework/main/platform-startup.yml'],
                        check=True)
 
-    k8s_api_waiter = KubernetesAPIAvailableWaiter(60)
+    try:
+        k8s_api_waiter = KubernetesAPIAvailableWaiter(60)
+    except ConfigException as err:
+        LOGGER.error("Failed to load kubernetes config while waiting for kubernetes "
+                     "API to become available: %s", err)
+        raise SystemExit(1)
     k8s_api_waiter.wait_for_completion()
 
-    k8s_waiter = KubernetesPodStatusWaiter(args.k8s_timeout)
+    try:
+        k8s_waiter = KubernetesPodStatusWaiter(args.k8s_timeout)
+    except ConfigException as err:
+        # Unlikely, given that we loaded the config earlier, but could happen
+        LOGGER.error("Failed to load kubernetes config while waiting for pods "
+                     "to reach expected states: %s", err)
+        raise SystemExit(1)
+
     with k8s_waiter:
         print('Check ceph status here.')
 

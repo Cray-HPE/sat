@@ -68,7 +68,9 @@ def get_pods_as_json():
         K8s pod information as a JSON string.
 
     Raises:
-        CalledProcessError: kubectl failed.
+        subprocess.CalledProcessError: if kubectl failed
+        kubernetes.config.config_exception.ConfigException: if failed to load
+            kubernetes config.
     """
     # Load k8s configuration before trying to use API
     try:
@@ -190,7 +192,7 @@ def do_shutdown(args):
 
     try:
         dump_pods(args.pod_state_file)
-    except (CalledProcessError, FileNotFoundError, PermissionError) as err:
+    except (CalledProcessError, ConfigException, FileNotFoundError, PermissionError) as err:
         msg = str(err)
         if args.ignore_pod_failures:
             LOGGER.warning(msg)

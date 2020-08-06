@@ -36,16 +36,19 @@ class IPMIPowerStateWaiter(GroupWaiter):
 
     Waits for all members to reach the given IPMI power state."""
 
-    def __init__(self, members, powerstate, timeout, username, password,
+    def __init__(self, members, power_state, timeout, username, password,
                  send_command=False, poll_interval=1):
         """Constructor for an IPMIPowerStateWaiter object.
 
-        Args: see parent class.
-            powerstate (str): either 'on' or 'off', corresponds the desired
+        Args:
+            power_state (str): either 'on' or 'off', corresponds the desired
                 IPMI power state.
             send_command (bool): if True, send a 'power on' or 'power off' command
-                to each node before waiting."""
-        self.powerstate = powerstate
+                to each node before waiting.
+            username (str): the username to use when running ipmitool commands
+            password (str): the password to use when running ipmitool commands
+        """
+        self.power_state = power_state
         self.username = username
         self.password = password
         self.send_command = send_command
@@ -53,17 +56,18 @@ class IPMIPowerStateWaiter(GroupWaiter):
         super().__init__(members, timeout, poll_interval=poll_interval)
 
     def condition_name(self):
-        return 'IPMI power ' + self.powerstate
+        return 'IPMI power ' + self.power_state
 
     def get_ipmi_command(self, member, command):
-        """Get an ipmitool command to query power state.
+        """Get the full command-line for an ipmitool command.
 
         Args:
             member (str): the host to query
-            command (str): the ipmitool command to run
-                (typically `chassis power status`)
+            command (str): the ipmitool command to run, e.g. `chassis power status`
+
+        Returns:
+            The command to run, split into a list of args by shlex.split.
         """
-        # TODO: Validate user input
         return shlex.split(
             'ipmitool -I lanplus -U {} -P {} -H {}-mgmt {}'.format(
                 self.username, self.password, member, command
@@ -82,41 +86,43 @@ class IPMIPowerStateWaiter(GroupWaiter):
             proc = subprocess.run(ipmi_command, stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE, encoding='utf-8')
         except OSError as err:
-            # TODO: do the smart thing
+            # TODO (SAT-552): Improve handling of ipmitool errors
             LOGGER.error('Unable to find ipmitool: %s', err)
-            return True
+            return False
 
         if proc.returncode:
-            # TODO: do a similar smart thing
+            # TODO (SAT-552): Improve handling of ipmitool errors
             LOGGER.error('ipmitool command failed with code %s: stderr: %s',
-                           proc.returncode, proc.stderr)
-            return True
+                         proc.returncode, proc.stderr)
+            return False
 
-        # TODO: Extract the power state more reliably
-        return self.powerstate in proc.stdout
+        return self.power_state in proc.stdout
 
     def pre_wait_action(self):
-        """Send IPMI power-on commands to given hosts.
+        """Send IPMI power commands to given hosts.
 
-        Args: None.
-        Returns: None.
+        This will issue IPMI power commands to put the given hosts in the power
+        state given by `self.power_state`.
+
+        Returns:
+            None
         """
         LOGGER.debug("Entered pre_wait_action with self.send_command: %s.", self.send_command)
         if self.send_command:
             for member in self.members:
-                LOGGER.info('Sending IPMI power %s command to host %s', self.powerstate, member)
+                LOGGER.info('Sending IPMI power %s command to host %s', self.power_state, member)
                 ipmi_command = self.get_ipmi_command(member,
-                                                     'chassis power {}'.format(self.powerstate))
+                                                     'chassis power {}'.format(self.power_state))
                 try:
                     proc = subprocess.run(ipmi_command, stdout=subprocess.PIPE,
                                           stderr=subprocess.PIPE, encoding='utf-8')
                 except OSError as err:
-                    # TODO: do the smart thing
+                    # TODO (SAT-552): Improve handling of ipmitool errors
                     LOGGER.error('Unable to find ipmitool: %s', err)
                     return
 
                 if proc.returncode:
-                    # TODO: do a similar smart thing
+                    # TODO (SAT-552): Improve handling of ipmitool errors
                     LOGGER.error('ipmitool command failed with code %s: stderr: %s',
                                  proc.returncode, proc.stderr)
-                    return None
+                    return

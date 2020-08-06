@@ -43,6 +43,7 @@ Requires: python3-PyYAML
 Requires: python3-requests < 3.0
 Requires: python3-requests-oauthlib
 Requires: python3-toml >= 0.10.0, python3-toml < 1.0
+Requires: python3-urllib3 >= 1.0, python3-urllib3 < 2.0
 BuildRequires: python3-argcomplete
 BuildRequires: python3-docutils
 

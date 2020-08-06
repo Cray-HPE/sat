@@ -81,7 +81,7 @@ class TestIPMIPowerStateWaiter(WaiterTestCase):
         """Test that we skip future checks on failing nodes."""
         self.mock_subprocess_run.return_value.returncode = 1
         waiter = IPMIPowerStateWaiter(self.members, 'on', self.timeout, self.username, self.password)
-        self.assertTrue(waiter.member_has_completed('groucho'))
+        self.assertFalse(waiter.member_has_completed('groucho'))
 
 
 class TestSSHAvailableWaiter(WaiterTestCase):
