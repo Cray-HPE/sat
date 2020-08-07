@@ -69,10 +69,10 @@ class SATSession:
             client.parse_request_body_response(json.dumps(token))
         else:
             if not no_unauth_warn:
-                logging.warning('Session is not authenticated. ' +
-                                'Username is "{}". '.format(self.username) +
-                                'Obtain a token with "auth" ' +
-                                'subcommand, or use --token-file on the command line.')
+                LOGGER.warning('Session is not authenticated. ' +
+                               'Username is "{}". '.format(self.username) +
+                               'Obtain a token with "auth" ' +
+                               'subcommand, or use --token-file on the command line.')
 
         self.session = OAuth2Session(client=client, token=token, **opts)
 
