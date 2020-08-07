@@ -24,13 +24,13 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import itertools
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from sat.cli.bootsys.waiting import GroupWaiter, Waiter
 
 
 def get_mock_waiter(member_complete_behavior):
-    """Get a GroupWaiter class which mocks out completion checking.
+    """Get a Waiter class which mocks out completion checking.
 
     This is a simple helper function for creating classes to test the
     GroupWaiter.wait_for_completion method.
@@ -96,6 +96,9 @@ class WaiterTestCase(unittest.TestCase):
         self.mock_time_sleep = patch('sat.cli.bootsys.waiting.time.sleep').start()
         self.mock_thread = patch('sat.cli.bootsys.waiting.Thread').start()
 
+    def tearDown(self):
+        patch.stopall()
+
 
 class TestWaiter(WaiterTestCase):
     """Test the abstract Waiter class."""
@@ -138,7 +141,6 @@ class TestWaiter(WaiterTestCase):
         instance = SuccessfulWaiter(10)
 
         instance.wait_for_completion_async()
-        instance.pending = set() # This would happen during wait_for_completion
         instance.wait_for_completion_await()
 
         self.mock_thread.return_value.join.assert_called()
@@ -148,7 +150,7 @@ class TestWaiter(WaiterTestCase):
         SuccessfulWaiter = get_mock_waiter(True)
 
         with SuccessfulWaiter(10) as instance:
-            instance.pending = set() # This would happen during wait_for_completion
+            pass
 
         self.mock_thread.assert_called_once_with(target=instance.wait_for_completion)
         self.mock_thread.return_value.start.assert_called_once()

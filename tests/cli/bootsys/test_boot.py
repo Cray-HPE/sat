@@ -28,6 +28,7 @@ from paramiko.ssh_exception import SSHException, NoValidConnectionsError
 from sat.cli.bootsys.power import IPMIPowerStateWaiter
 from sat.cli.bootsys.mgmt_boot_power import SSHAvailableWaiter, KubernetesPodStatusWaiter
 
+
 class WaiterTestCase(unittest.TestCase):
     def setUp(self):
         self.mock_time_monotonic = patch('sat.cli.bootsys.waiting.time.monotonic').start()
@@ -110,7 +111,8 @@ class TestSSHAvailableWaiter(WaiterTestCase):
     def test_ssh_not_available_no_valid_connection(self):
         """Test the SSH waiter detects node isn't available due to no valid connection"""
         waiter = SSHAvailableWaiter(self.members, self.timeout)
-        self.mock_ssh_client.return_value.connect.side_effect = NoValidConnectionsError({('127.0.0.1', '22'): 'Something happened'})
+        self.mock_ssh_client.return_value.connect.side_effect = NoValidConnectionsError(
+            {('127.0.0.1', '22'): 'Something happened'})
         self.assertFalse(waiter.member_has_completed('groucho'))
 
 
@@ -161,7 +163,6 @@ class TestK8sPodWaiter(WaiterTestCase):
 
         waiter = KubernetesPodStatusWaiter(self.timeout)
         self.assertFalse(waiter.member_has_completed(('galaxies', 'm83')))
-
 
     def test_k8s_pod_waiter_new_pod(self):
         """Test if a new pod is considered completed if it succeeded."""

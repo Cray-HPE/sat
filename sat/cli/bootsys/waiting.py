@@ -27,16 +27,14 @@ import logging
 from threading import Thread
 import time
 
-from sat.report import Report
-
 LOGGER = logging.getLogger(__file__)
 
 
 class Waiter(metaclass=abc.ABCMeta):
     """Waits for a single condition to occur.
 
-    Fields:
-        timeout (int): the interval after which the wait operation will timeout.
+    Attributes:
+        timeout (int): the timeout, in seconds, for the wait operation
         poll_interval (int): the interval, in seconds, between polls for
             completion.
         completed (bool): True if the condition has been met, False otherwise.
@@ -45,12 +43,14 @@ class Waiter(metaclass=abc.ABCMeta):
         self.timeout = timeout
         self.poll_interval = poll_interval
         self.completed = False
+        self._waiter_thread = None
 
     @abc.abstractmethod
     def condition_name(self):
         """The name of the condition being waited for.
 
-        Returns: (str) the name of the "completed" condition
+        Returns:
+            str: the name of the "completed" condition
         """
         raise NotImplementedError('{}.condition_name'.format(self.__class__.__name__))
 
@@ -58,8 +58,8 @@ class Waiter(metaclass=abc.ABCMeta):
     def has_completed(self):
         """Check if the condition has occurred.
 
-        Returns: True if the condition has occurred, and
-            False otherwise.
+        Returns:
+            True if the condition has occurred, and False otherwise.
         """
         raise NotImplementedError('{}.has_completed'.format(self.__class__.__name__))
 
@@ -68,9 +68,6 @@ class Waiter(metaclass=abc.ABCMeta):
 
         The default implementation does nothing. Implement custom
         behaviors by overriding this method.
-
-        Args: None.
-        Returns: None.
         """
 
     def post_wait_action(self):
@@ -78,25 +75,20 @@ class Waiter(metaclass=abc.ABCMeta):
 
         The default implementation does nothing. Implement custom
         behaviors by overriding this method.
-
-        Args: None.
-        Returns: None.
         """
 
     def wait_for_completion(self):
         """Wait for the condition to be achieved or for timeout.
 
-        Args: None.
-        Returns: True if condition succeed, False if timed out.
+        Returns:
+            bool: True if condition succeeded, False if timed out.
         """
         self.pre_wait_action()
 
         start_time = time.monotonic()
 
         while time.monotonic() - start_time < self.timeout:
-            # Store value in case we want to use it in
-            # post_wait_action.
-
+            # Store value in case we want to use it in post_wait_action.
             self.completed = self.has_completed()
             if self.completed:
                 break
@@ -114,34 +106,30 @@ class Waiter(metaclass=abc.ABCMeta):
     def wait_for_completion_async(self):
         """Begin waiting for the completion condition.
 
-        This will spawn a new thread which will run
-        GroupWaiter.wait_for_completion in another thread, and will
-        immediately yield control back to the calling thread. To clean
-        up the thread, the method
-        GroupWaiter.wait_for_completion_await should be called.
+        This will spawn a new thread which will run Waiter.wait_for_completion
+        in another thread, and will immediately yield control back to the
+        calling thread. To clean up the thread, the method
+        Waiter.wait_for_completion_await should be called.
 
-        Args: None.
-        Returns: None.
+        Returns:
+            None
         """
-        self.waiter_thread = Thread(target=self.wait_for_completion)
-        self.waiter_thread.start()
+        self._waiter_thread = Thread(target=self.wait_for_completion)
+        self._waiter_thread.start()
 
     def wait_for_completion_await(self):
-        """Clean up waiting thread and return pending members.
+        """Clean up waiting thread.
 
-        This will join the thread and return the still-pending members
-        after the timeout (i.e., the return value from
-        GroupWaiter.wait_for_completion).
+        This will join the waiting thread. This expects the method
+        Waiter.wait_for_completion_async to have been called previously.
 
-        Note: this will fail if wait_for_completion_async was not
-        called previously.
-
-        Args: None.
-        Returns: set of members which have not completed.
-
+        Returns:
+            None.
         """
-        self.waiter_thread.join()
-        return self.pending
+        if self._waiter_thread is None:
+            raise RuntimeError('wait_for_completion_async must be called before '
+                               'wait_for_completion_await.')
+        self._waiter_thread.join()
 
     def __enter__(self):
         self.wait_for_completion_async()
@@ -154,13 +142,16 @@ class Waiter(metaclass=abc.ABCMeta):
 class GroupWaiter(Waiter):
     """Waits for a all members of some group to reach some state.
 
-    Fields:
-        See superclass documentation.
+    Attributes:
         members (set): a set of members of an arbitrary type to wait for.
+        timeout (int): the timeout, in seconds, for the wait operation
+        poll_interval (int): the interval, in seconds, between polls for
+            completion.
     """
 
     def __init__(self, members, timeout, poll_interval=1):
         self.members = set(members)
+        self.pending = set(self.members)
         super().__init__(timeout, poll_interval)
 
     @abc.abstractmethod
@@ -198,14 +189,13 @@ class GroupWaiter(Waiter):
     def wait_for_completion(self):
         """Wait until all members have completed, or timeout is reached.
 
-        Args: None.
-        Returns: A set of members which did not complete if the timeout was
-            reached, or the empty set if all members complete.
+        Returns:
+            set: A set of members which did not complete if the timeout was
+                reached, or the empty set if all members complete.
         """
         self.pre_wait_action()
 
         start_time = time.monotonic()
-        self.pending = set(self.members)
 
         while self.pending and time.monotonic() - start_time < self.timeout:
             completed = set()

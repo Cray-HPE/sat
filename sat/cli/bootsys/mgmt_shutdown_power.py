@@ -82,21 +82,21 @@ def finish_shutdown(hosts, username, password, timeout, dry_run=True):
         timeout (int): timeout, in seconds, after which to hard power off.
         dry_run (bool): if True, don't run any IPMI commands, just log.
     """
-    ipmi_commands = {}
-
     if not dry_run:
-        with RunningService('dhcpd', dry_run=dry_run):
-            pending_hosts = IPMIPowerStateWaiter(hosts, 'off', timeout, username, password)
+        with RunningService('dhcpd', dry_run=dry_run, sleep_after_start=5):
+            ipmi_waiter = IPMIPowerStateWaiter(hosts, 'off', timeout, username, password)
+            pending_hosts = ipmi_waiter.wait_for_completion()
 
-            # TODO: Make log message and below conditional on pending_hosts being non-empty
-            LOGGER.warning('Forcibly powering off nodes: %s', ', '.join(pending_hosts))
+            if pending_hosts:
+                LOGGER.warning('Forcibly powering off nodes: %s', ', '.join(pending_hosts))
 
-            # Confirm all nodes have actually turned off.
-            failed_hosts = IPMIPowerStateWaiter(pending_hosts, 'off', timeout, username, password,
-                                                send_command=True).wait_for_completion()
+                # Confirm all nodes have actually turned off.
+                failed_hosts = IPMIPowerStateWaiter(pending_hosts, 'off', timeout, username, password,
+                                                    send_command=True).wait_for_completion()
 
-            if failed_hosts:
-                LOGGER.error("Could not power off nodes: %s", ", ".join(failed_hosts))
+                if failed_hosts:
+                    LOGGER.error('The following nodes failed to reach powered '
+                                 'off state: %s', ', '.join(failed_hosts))
 
 
 def do_mgmt_shutdown_power(ssh_client, username, password, timeout, dry_run=True):

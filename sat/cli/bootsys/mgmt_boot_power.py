@@ -34,7 +34,6 @@ from kubernetes.config import load_kube_config
 from kubernetes.config.config_exception import ConfigException
 from paramiko.client import SSHClient
 from paramiko.ssh_exception import SSHException
-from pyghmi.exceptions import IpmiException
 from yaml import YAMLLoadWarning
 
 from sat.cli.bootsys.defaults import DEFAULT_PODSTATE_FILE
@@ -249,33 +248,36 @@ def do_mgmt_boot(args):
     username, password = get_username_and_password_interactively(username_prompt='IPMI username',
                                                                  password_prompt='IPMI password')
 
-    with RunningService('dhcpd', dry_run=args.dry_run):
-        try:
-            non_bis_ncns = get_ncns(['managers', 'storage', 'workers'], exclude=['bis'])
+    with RunningService('dhcpd', dry_run=args.dry_run, sleep_after_start=5):
+        non_bis_ncns = get_ncns(['managers', 'storage', 'workers'], exclude=['bis'])
 
-            if not args.dry_run:
-                # TODO: Probably should not send a power on if it's already on.
-                ipmi_waiter = IPMIPowerStateWaiter(non_bis_ncns, 'on', args.ipmi_timeout,
-                                                   username, password, send_command=True)
-                remaining_nodes = ipmi_waiter.wait_for_completion()
+        if not args.dry_run:
+            # TODO (SAT-555): Probably should not send a power on if it's already on.
+            ipmi_waiter = IPMIPowerStateWaiter(non_bis_ncns, 'on', args.ipmi_timeout,
+                                               username, password, send_command=True)
+            remaining_nodes = ipmi_waiter.wait_for_completion()
 
-                ssh_waiter = SSHAvailableWaiter(non_bis_ncns - remaining_nodes, args.ssh_timeout)
-                inaccessible_nodes = ssh_waiter.wait_for_completion()
+            ssh_waiter = SSHAvailableWaiter(non_bis_ncns - remaining_nodes, args.ssh_timeout)
+            inaccessible_nodes = ssh_waiter.wait_for_completion()
 
-                if inaccessible_nodes:
-                    LOGGER.error('NCNs inaccessible after power on: %s',
-                                 ', '.join(inaccessible_nodes))
-                    # Have to exit here because playbook will fail if nodes are
-                    # not available for SSH.
-                    raise SystemExit(1)
-
-        except IpmiException as exc:
-            LOGGER.error("Error with IPMI command: %s", exc)
+            if inaccessible_nodes:
+                LOGGER.error('Unable to reach the following NCNs via SSH '
+                             'after powering them on: %s. Troubleshoot the '
+                             'issue and then try again.',
+                             ', '.join(inaccessible_nodes))
+                # Have to exit here because playbook will fail if nodes are
+                # not available for SSH.
+                raise SystemExit(1)
 
     if not args.dry_run:
-        subprocess.run(['ansible-playbook',
-                        '/opt/cray/crayctl/ansible_framework/main/platform-startup.yml'],
-                       check=True)
+        try:
+            subprocess.run(['ansible-playbook',
+                            '/opt/cray/crayctl/ansible_framework/main/platform-startup.yml'],
+                           check=True)
+        except subprocess.CalledProcessError as err:
+            LOGGER.error('Ansible playbook to start platform services failed. '
+                         'Aborting boot attempt: %s', err)
+            raise SystemExit(1)
 
     try:
         k8s_api_waiter = KubernetesAPIAvailableWaiter(60)
@@ -297,4 +299,6 @@ def do_mgmt_boot(args):
         print('Check ceph status here.')
 
     if k8s_waiter.pending:
-        LOGGER.error('Kubernetes pods failed to restore: %s', ', '.join(k8s_waiter.pending))
+        LOGGER.error('The following kubernetes pods failed to reach their '
+                     'expected states: %s', ', '.join(k8s_waiter.pending))
+        raise SystemExit(1)

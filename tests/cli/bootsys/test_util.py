@@ -22,9 +22,8 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
-import itertools
 import unittest
-from unittest.mock import Mock, patch, call
+from unittest.mock import patch, call
 
 from sat.cli.bootsys.util import get_ncns, RunningService
 
@@ -72,10 +71,23 @@ class TestRunningService(unittest.TestCase):
         svc._systemctl_start_stop(False)
         mock_check_call.assert_called_once_with(['systemctl', 'stop', self.svc_name])
 
+    @patch('time.sleep')
     @patch('sat.cli.bootsys.util.RunningService._systemctl_start_stop')
-    def test_running_service_context_manager(self, mock_start_stop):
+    def test_running_service_context_manager(self, mock_start_stop, mock_sleep):
         """Test that the RunningService manager starts, then stops the service"""
         with RunningService(self.svc_name):
             pass
 
         mock_start_stop.assert_has_calls([call(True), call(False)])
+        mock_sleep.assert_not_called()
+
+    @patch('time.sleep')
+    @patch('sat.cli.bootsys.util.RunningService._systemctl_start_stop')
+    def test_running_service_context_manager_sleep(self, mock_start_stop, mock_sleep):
+        """Test that the RunningService manager starts, sleeps, then stops the service"""
+        sleep_time = 5
+        with RunningService(self.svc_name, sleep_after_start=sleep_time):
+            pass
+
+        mock_start_stop.assert_has_calls([call(True), call(False)])
+        mock_sleep.assert_called_once_with(sleep_time)
