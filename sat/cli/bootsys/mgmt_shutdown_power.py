@@ -25,11 +25,10 @@ OTHER DEALINGS IN THE SOFTWARE.
 import logging
 import socket
 
-from pyghmi.exceptions import IpmiException
-from pyghmi.ipmi.command import Command as IpmiCommand
 from paramiko.ssh_exception import BadHostKeyException, AuthenticationException, SSHException
 
-from sat.cli.bootsys.util import get_ncns, wait_for_nodes_powerstate, RunningService
+from sat.cli.bootsys.power import IPMIPowerStateWaiter
+from sat.cli.bootsys.util import get_ncns, RunningService
 
 LOGGER = logging.getLogger(__name__)
 
@@ -83,35 +82,21 @@ def finish_shutdown(hosts, username, password, timeout, dry_run=True):
         timeout (int): timeout, in seconds, after which to hard power off.
         dry_run (bool): if True, don't run any IPMI commands, just log.
     """
-    ipmi_commands = {}
-
     if not dry_run:
-        with RunningService('dhcpd', dry_run=dry_run):
-            failed_hosts = set()
-            for host in hosts:
-                try:
-                    ipmi_commands[host] = IpmiCommand(host + '-mgmt', userid=username, password=password)
-                except (IpmiException, socket.error) as err:
-                    LOGGER.error('Failed to initiate IPMI session with host "%s": %s', host, err)
-                    failed_hosts.add(host)
+        with RunningService('dhcpd', dry_run=dry_run, sleep_after_start=5):
+            ipmi_waiter = IPMIPowerStateWaiter(hosts, 'off', timeout, username, password)
+            pending_hosts = ipmi_waiter.wait_for_completion()
 
-            pending_hosts = wait_for_nodes_powerstate(ipmi_commands.items(), 'off', timeout)
+            if pending_hosts:
+                LOGGER.warning('Forcibly powering off nodes: %s', ', '.join(pending_hosts))
 
-            for host in pending_hosts:
-                LOGGER.warning(
-                    'Timed out waiting for "%s" to shutdown; attempting to power it down forcibly.', host)
-                try:
-                    ipmi_commands[host].set_power('off')
+                # Confirm all nodes have actually turned off.
+                failed_hosts = IPMIPowerStateWaiter(pending_hosts, 'off', timeout, username, password,
+                                                    send_command=True).wait_for_completion()
 
-                except IpmiException as err:
-                    LOGGER.error('Unable to powerdown host "%S" via IPMI: %s', host, err)
-                    failed_hosts.add(host)
-
-            # Confirm all nodes have actually turned off.
-            wait_for_nodes_powerstate(ipmi_commands.items(), 'off', timeout)
-
-            if failed_hosts:
-                LOGGER.error("Could not power off nodes: %s", ", ".join(failed_hosts))
+                if failed_hosts:
+                    LOGGER.error('The following nodes failed to reach powered '
+                                 'off state: %s', ', '.join(failed_hosts))
 
 
 def do_mgmt_shutdown_power(ssh_client, username, password, timeout, dry_run=True):

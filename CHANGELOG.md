@@ -34,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Shutdown of the platform services by running the Ansible playbook,
       platform-shutdown.yml.
     - Shutdown and power off of the management NCNs.
+- ``sat bootsys boot`` implements the beginning portion of the system boot,
+  including:
+    - Power on and boot of management NCNs.
+    - Waiting for management NCNs to be accessible via ssh.
+    - Execution of Ansible playbook that starts platform services.
+    - Waiting for kubernetes pods to reach expected states.
 
 ### Fixed
 - Fixed missing values in info messages logged from sat.filtering module.

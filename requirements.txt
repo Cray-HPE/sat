@@ -25,8 +25,8 @@ kubernetes
 paramiko >= 2.4.2
 parsec == 3.5.0
 prettytable >= 0.7.2, < 1.0
-pyghmi >= 1.0.44
 pyyaml
 requests < 3.0
 requests-oauthlib
 toml == 0.10.0
+urllib3 >= 1.0, < 2.0
