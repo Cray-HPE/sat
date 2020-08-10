@@ -35,16 +35,35 @@ from sat.cli.bootsys.main import do_boot, do_bootsys, do_shutdown, dump_pods
 from tests.common import ExtendedTestCase
 
 
-@unittest.skip('Test yet to be written.')
 class TestDoBoot(unittest.TestCase):
-    """Test the do_boot function (not yet implemented)."""
+    """Test the do_boot function."""
+
+    def setUp(self):
+        """Mock the functions called by do_boot."""
+        self.mock_do_mgmt_boot = patch('sat.cli.bootsys.main.do_mgmt_boot').start()
+        self.mock_do_bos_operations = patch('sat.cli.bootsys.main.do_bos_operations').start()
+
+    def tearDown(self):
+        """Stop all patches."""
+        patch.stopall()
 
     def test_do_boot(self):
-        """Test the do_boot function, which is unimplemented."""
+        """Test the do_boot function happy path."""
         args = Mock()
+        do_boot(args)
+        self.mock_do_mgmt_boot.assert_called_once_with(args)
+        self.mock_do_bos_operations.assert_called_once_with('boot')
+
+    def test_do_boot_bos_failure(self):
+        """Test the do_boot function with a BOS failure to boot nodes."""
+        args = Mock()
+        self.mock_do_bos_operations.side_effect = BOSFailure
+
         with self.assertRaises(SystemExit) as cm:
             do_boot(args)
 
+        self.mock_do_mgmt_boot.assert_called_once_with(args)
+        self.mock_do_bos_operations.assert_called_once_with('boot')
         self.assertEqual(1, cm.exception.code)
 
 
@@ -69,7 +88,7 @@ class TestDoShutdown(ExtendedTestCase):
         ).start()
         self.mock_print = patch('builtins.print').start()
         self.mock_dump_pods = patch('sat.cli.bootsys.main.dump_pods').start()
-        self.mock_bos_shutdowns = patch('sat.cli.bootsys.main.do_bos_shutdowns').start()
+        self.mock_bos_operations = patch('sat.cli.bootsys.main.do_bos_operations').start()
         self.mock_pester_choices = patch('sat.util.pester_choices').start()
         self.mock_pester_choices.return_value = 'yes'
         self.mock_do_shutdown_playbook = patch('sat.cli.bootsys.main.do_shutdown_playbook').start()
@@ -99,7 +118,7 @@ class TestDoShutdown(ExtendedTestCase):
             call('Proceeding with shutdown of management NCNs.'),
             call('Succeeded with shutdown of management NCNs.')
         ])
-        self.mock_bos_shutdowns.assert_called_once_with()
+        self.mock_bos_operations.assert_called_once_with('shutdown')
         self.mock_do_shutdown_playbook.assert_called_once_with()
         self.mock_ssh_client.load_system_host_keys.assert_called_once_with()
         self.mock_get_user_pass.assert_called_once()
@@ -126,7 +145,7 @@ class TestDoShutdown(ExtendedTestCase):
 
                 self.mock_dump_pods.assert_called_with(self.pod_state_file)
                 self.mock_service_activity_check.assert_not_called()
-                self.mock_bos_shutdowns.assert_not_called()
+                self.mock_bos_operations.assert_not_called()
                 self.mock_do_shutdown_playbook.assert_not_called()
                 self.mock_get_user_pass.assert_not_called()
                 self.mock_mgmt_shutdown.assert_not_called()
@@ -150,7 +169,7 @@ class TestDoShutdown(ExtendedTestCase):
 
                 self.mock_dump_pods.assert_called_with(self.pod_state_file)
                 self.mock_service_activity_check.assert_called_with(self.args)
-                self.mock_bos_shutdowns.assert_called_with()
+                self.mock_bos_operations.assert_called_with('shutdown')
                 self.mock_do_shutdown_playbook.assert_called_with()
                 self.mock_ssh_client.load_system_host_keys.assert_called_with()
                 self.mock_get_user_pass.assert_called()
@@ -162,7 +181,7 @@ class TestDoShutdown(ExtendedTestCase):
     def test_do_shutdown_bos_failure(self):
         """Test do_shutdown with do_bos_shutdown raising a BOSFailure."""
         bos_fail_msg = 'session creation failed'
-        self.mock_bos_shutdowns.side_effect = BOSFailure(bos_fail_msg)
+        self.mock_bos_operations.side_effect = BOSFailure(bos_fail_msg)
 
         with self.assertLogs(level=logging.ERROR) as cm:
             with self.assertRaises(SystemExit):
@@ -178,7 +197,7 @@ class TestDoShutdown(ExtendedTestCase):
             call('Capturing state of k8s pods.'),
             call('Proceeding with BOS shutdown of computes and UAN.')
         ])
-        self.mock_bos_shutdowns.assert_called_once_with()
+        self.mock_bos_operations.assert_called_once_with('shutdown')
         self.mock_do_shutdown_playbook.assert_not_called()
         self.mock_get_user_pass.assert_not_called()
         self.mock_mgmt_shutdown.assert_not_called()
@@ -192,7 +211,7 @@ class TestDoShutdown(ExtendedTestCase):
 
         self.mock_service_activity_check.assert_called_once_with(self.args)
         self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
-        self.mock_bos_shutdowns.assert_not_called()
+        self.mock_bos_operations.assert_not_called()
         self.mock_do_shutdown_playbook.assert_not_called()
         self.mock_get_user_pass.assert_not_called()
         self.mock_mgmt_shutdown.assert_not_called()
@@ -206,7 +225,7 @@ class TestDoShutdown(ExtendedTestCase):
 
         self.mock_service_activity_check.assert_called_once_with(self.args)
         self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
-        self.mock_bos_shutdowns.assert_called_once_with()
+        self.mock_bos_operations.assert_called_once_with('shutdown')
         self.mock_do_shutdown_playbook.assert_not_called()
         self.mock_get_user_pass.assert_not_called()
         self.mock_mgmt_shutdown.assert_not_called()
@@ -220,7 +239,7 @@ class TestDoShutdown(ExtendedTestCase):
 
         self.mock_service_activity_check.assert_called_once_with(self.args)
         self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
-        self.mock_bos_shutdowns.assert_called_once_with()
+        self.mock_bos_operations.assert_called_once_with('shutdown')
         self.mock_do_shutdown_playbook.assert_called_once_with()
         self.mock_get_user_pass.assert_not_called()
         self.mock_mgmt_shutdown.assert_not_called()

@@ -34,6 +34,7 @@ from inflect import engine
 from sat.apiclient import APIError, BOSClient, HSMClient
 from sat.cli.bootsys.defaults import (
     CLE_BOS_TEMPLATE_REGEX,
+    BOS_BOOT_TIMEOUT,
     BOS_SHUTDOWN_TIMEOUT,
     PARALLEL_CHECK_INTERVAL
 )
@@ -43,11 +44,14 @@ from sat.util import get_val_by_path, pester_choices
 
 LOGGER = logging.getLogger(__name__)
 
+SHUTDOWN_OPERATION = 'shutdown'
+BOOT_OPERATION = 'boot'
+SUPPORTED_BOS_OPERATIONS = (SHUTDOWN_OPERATION, BOOT_OPERATION)
 INFLECTOR = engine()
 
 
 class BOSFailure(Exception):
-    """An error occurred while using BOS to shutdown computes and UANs."""
+    """An error occurred while using BOS to operate on computes and UANs."""
     pass
 
 
@@ -361,52 +365,52 @@ class BOSSessionThread(Thread):
         self.monitor_status_kubectl()
 
 
-def do_parallel_shutdowns(session_templates):
-    """Perform shutdown actions against the session templates in parallel.
+def do_parallel_bos_operations(session_templates, operation):
+    """Perform BOS operation against the session templates in parallel.
 
     Args:
         session_templates (list): A list of BOS session template names to use
-            to create BOS sessions with the 'shutdown' action.
+            to create BOS sessions with the given `operation`.
+        operation (str): The operation to perform on the given BOS session
+            templates. Can be either 'shutdown' or 'boot'.
 
     Returns:
         None
 
     Raises:
-        BOSFailure: if the shutdown operations fail.
+        BOSFailure: if the given operation fails.
     """
     bos_session_threads = []
     results = {}
+    template_plural = INFLECTOR.plural('session template', len(session_templates))
+    session_plural = INFLECTOR.plural('session', len(session_templates))
 
-    LOGGER.debug('Doing parallel shutdown with session templates: %s',
+    LOGGER.debug('Doing parallel %s with %s: %s', operation, template_plural,
                  ', '.join(session_templates))
 
     for session_template in session_templates:
         bos_session_threads.append(
-            BOSSessionThread(session_template, 'shutdown', results)
+            BOSSessionThread(session_template, operation, results)
         )
 
-    shutdown_start_time = time()
-    shutdown_elapsed_time = 0
+    start_time = time()
+    elapsed_time = 0
     for thread in bos_session_threads:
         thread.start()
 
-    print(
-        'Started shutdown operations with BOS session templates: {}. Waiting '
-        'up to {} seconds for sessions to complete.'.format(
-            ', '.join(session_templates),
-            BOS_SHUTDOWN_TIMEOUT
-        )
-    )
+    print(f'Started {operation} operation on BOS '
+          f'{template_plural}: {", ".join(session_templates)}.')
+    bos_timeout = BOS_SHUTDOWN_TIMEOUT if operation == 'shutdown' else BOS_BOOT_TIMEOUT
+    print(f'Waiting up to {bos_timeout} seconds for {session_plural} to complete.')
 
     active_session_templates = list(results.keys())
     failed_session_templates = []
     just_finished = []
 
-    while active_session_templates and shutdown_elapsed_time < BOS_SHUTDOWN_TIMEOUT:
+    while active_session_templates and elapsed_time < bos_timeout:
         if just_finished:
-            print('Still waiting on sessions for session {}: {}'.format(
-                INFLECTOR.plural('template', len(active_session_templates)),
-                ', '.join(active_session_templates)))
+            print(f'Still waiting on {session_plural} for {template_plural}: '
+                  f'{", ".join(active_session_templates)}')
         just_finished = []
 
         for session_template in active_session_templates:
@@ -414,25 +418,25 @@ def do_parallel_shutdowns(session_templates):
 
             if session_results['failed']:
                 LOGGER.error(
-                    "Shutdown with BOS session template '%s' failed: %s",
-                    session_template, session_results['fail_msg']
+                    "Operation '%s' failed on BOS session template '%s': %s",
+                    operation, session_template, session_results['fail_msg']
                 )
                 failed_session_templates.append(session_template)
                 just_finished.append(session_template)
             elif session_results['complete']:
-                print("Shutdown with BOS session template '{}' "
-                      "completed.".format(session_template))
+                print(f'{operation.title()} with BOS session template '
+                      f'{session_template} completed.')
                 just_finished.append(session_template)
 
         for finished in just_finished:
             active_session_templates.remove(finished)
 
         sleep(PARALLEL_CHECK_INTERVAL)
-        shutdown_elapsed_time = time() - shutdown_start_time
+        elapsed_time = time() - start_time
 
     if active_session_templates:
-        LOGGER.error('BOS shutdowns timed out after %s seconds for session %s: %s.',
-                     BOS_SHUTDOWN_TIMEOUT,
+        LOGGER.error('BOS %s timed out after %s seconds for session %s: %s.',
+                     operation, bos_timeout,
                      INFLECTOR.plural('template', len(active_session_templates)),
                      ', '.join(active_session_templates))
 
@@ -446,10 +450,9 @@ def do_parallel_shutdowns(session_templates):
 
     if failed_session_templates:
         raise BOSFailure(
-            'Shutdown operation failed or timed out for session {}: {}'.format(
-                INFLECTOR.plural('template', len(failed_session_templates)),
-                ', '.join(failed_session_templates)
-            )
+            f'{operation.title()} failed or timed out for session '
+            f'{INFLECTOR.plural("template", len(failed_session_templates))}: '
+            f'{", ".join(failed_session_templates)}'
         )
 
     print('All BOS sessions completed.')
@@ -600,9 +603,9 @@ def get_templates_needing_operation(session_templates, operation):
             states of nodes in the BOS session template boot sets.
     """
     # Get the state nodes should be in after the operation is performed
-    if operation == 'boot':
+    if operation == BOOT_OPERATION:
         end_state = 'Ready'
-    elif operation == 'shutdown':
+    elif operation == SHUTDOWN_OPERATION:
         end_state = 'Off'
     else:
         raise ValueError("Unknown operation '{}'".format(operation))
@@ -717,14 +720,13 @@ def get_session_templates():
 
     if cle_bos_template == uan_bos_template:
         # It is expected that computes and UANs use different session templates,
-        # but if they are the same, don't do two shutdown operations against a
-        # single session template.
+        # but if they are the same, don't do the operation twice against it.
         LOGGER.info('The cle_bos_template and uan_bos_template are the same '
-                    '(%s), so issuing only one shutdown.', cle_bos_template)
+                    '(%s), so only one session will be created.', cle_bos_template)
         session_templates = [cle_bos_template]
     # Not all systems may have UANs
     elif uan_bos_template == '':
-        LOGGER.info('Skipping shutdown of UANs since the empty string was '
+        LOGGER.info('Skipping operation on UANs since the empty string was '
                     'specified for the uan_bos_template.')
         session_templates = [cle_bos_template]
     else:
@@ -733,32 +735,42 @@ def get_session_templates():
     return session_templates
 
 
-def do_bos_shutdowns():
-    """Shut down the compute nodes and UANs using BOS.
+def do_bos_operations(operation):
+    """Perform a BOS operation on the compute node and UAN session templates.
+
+    Args:
+        operation (str): The operation to perform on the compute node and UAN
+            session templates. Valid operations are 'boot' and 'shutdown'.
 
     Returns:
         None
 
     Raises:
         BOSFailure: if there was a failure in getting BOS session templates or
-            in performing the shutdowns, or if there was a failure querying HSM
+            in performing the operations, or if there was a failure querying HSM
             for the current state of nodes in the BOS session templates, and the
             failure action is 'abort'.
+        ValueError: if given an invalid value for `operation`.
     """
+    if operation not in SUPPORTED_BOS_OPERATIONS:
+        raise ValueError(f"Invalid operation '{operation}' given. Valid "
+                         f"operations: {', '.join(SUPPORTED_BOS_OPERATIONS)}")
+
     session_templates = get_session_templates()
     # TODO (SAT-509): Validate computes and UANs in session templates
 
-    LOGGER.debug("Checking whether session templates still need the 'shutdown' "
-                 "operation performed: %s", ', '.join(session_templates))
+    LOGGER.debug(f"Checking whether session "
+                 f"{INFLECTOR.plural('template', len(session_templates))} "
+                 f"still need the '{operation}' operation performed: "
+                 f"{', '.join(session_templates)}")
 
     # This will raise a BOSFailure if node status check fails, and the action
     # specified on the command-line or in the config file is 'abort'.
-    templates_to_shutdown = get_templates_needing_operation(session_templates, 'shutdown')
-    LOGGER.debug("Found %s needing 'shutdown' operation%s",
-                 INFLECTOR.no('session template', len(templates_to_shutdown)),
-                 ': ' + ', '.join(templates_to_shutdown) if templates_to_shutdown
-                 else '.')
+    templates_to_use = get_templates_needing_operation(session_templates, operation)
+    LOGGER.debug(f"Found {INFLECTOR.no('session template', len(templates_to_use))} "
+                 f"needing '{operation} performed"
+                 f"{': ' + ', '.join(templates_to_use) if templates_to_use else '.'}")
 
-    if templates_to_shutdown:
+    if templates_to_use:
         # Let any exceptions raise to caller
-        do_parallel_shutdowns(templates_to_shutdown)
+        do_parallel_bos_operations(templates_to_use, operation)
