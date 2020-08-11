@@ -23,11 +23,12 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 from collections import defaultdict
 import logging
+import posixpath
 from random import choices, randint
 import shlex
 import subprocess
 from threading import Event, Thread
-from time import sleep, time
+from time import sleep, monotonic
 
 from inflect import engine
 
@@ -114,7 +115,7 @@ def boa_job_successful(boa_job_id):
 
 class BOSSessionThread(Thread):
 
-    def __init__(self, session_template, operation, full_results_dict):
+    def __init__(self, session_template, operation):
         """Create a new BOSSessionThread that creates and monitors a BOS session
 
         Args:
@@ -122,9 +123,6 @@ class BOSSessionThread(Thread):
                 create the session.
             operation (str): the operation to use when creating the session from the
                 session template.
-            full_results_dict (dict): the dictionary where this thread should
-                periodically post its results. This thread should *only* write
-                its results as the value of the `session_template` key.
         """
         super().__init__()
         self._stop_event = Event()
@@ -132,14 +130,9 @@ class BOSSessionThread(Thread):
         self.operation = operation
         self.session_id = None
         self.boa_job_id = None
-        self.results_dict = {
-            'complete': False,
-            'failed': False,
-            'fail_msg': '',
-            'session_id': None,
-            'boa_job_id': None
-        }
-        full_results_dict[session_template] = self.results_dict
+        self.complete = False
+        self.failed = False
+        self.fail_msg = ''
         self.bos_client = BOSClient(SATSession())
 
         # Keep track of how many times we fail to query status in a row.
@@ -166,9 +159,9 @@ class BOSSessionThread(Thread):
         Returns:
             None
         """
-        self.results_dict['complete'] = True
-        self.results_dict['failed'] = True
-        self.results_dict['fail_msg'] = fail_msg
+        self.complete = True
+        self.failed = True
+        self.fail_msg = fail_msg
 
     def record_stat_failure(self):
         """Record a status check failure, and set failed if max consecutive
@@ -186,7 +179,7 @@ class BOSSessionThread(Thread):
         """Create a BOS session with self.session_template and self.operation.
 
         If a fatal error occurs, the mark_failed method is called to update
-        the state and failure message in `self.results_dict`.
+        the complete, failed, and fail_msg attributes.
 
         Returns:
             None
@@ -198,21 +191,27 @@ class BOSSessionThread(Thread):
             self.mark_failed('Failed to create BOS session: {}'.format(str(err)))
             return
 
-        msg_template = ("Unable to get BOS session ID and BOA job ID from "
-                        "response to session creation {}")
+        msg_prefix = ('Unable to get BOS session ID and BOA job ID from '
+                      'response to session creation')
         try:
             link = response['links'][0]
         except KeyError:
-            self.mark_failed(msg_template.format("due to missing 'links' key."))
+            self.mark_failed(f"{msg_prefix} due to missing 'links' key.")
         except IndexError:
-            self.mark_failed(msg_template.format("due to empty 'links' array."))
+            self.mark_failed(f"{msg_prefix} due to empty 'links' array.")
         else:
+            missing_keys = []
             try:
-                self.results_dict['session_id'] = self.session_id = link['href']
-                self.results_dict['boa_job_id'] = self.boa_job_id = link['jobId']
+                self.session_id = posixpath.basename(link['href'])
             except KeyError as err:
-                self.mark_failed(msg_template.format(
-                    "due to missing '{}' key.".format(err)))
+                missing_keys.append(str(err))
+            try:
+                self.boa_job_id = link['jobId']
+            except KeyError as err:
+                missing_keys.append(str(err))
+            if missing_keys:
+                self.mark_failed(f'{msg_prefix} due to missing key(s) in BOS '
+                                 f'response: {", ".join(missing_keys)}')
 
     def monitor_status_kubectl(self):
         """Monitor the status of the BOS session using a 'kubectl wait' command.
@@ -223,7 +222,8 @@ class BOSSessionThread(Thread):
         'kubectl logs' to determine if it was successful or not.
 
         Once the BOA job is completed, this method returns, and results are
-        stored in self.results_dict to be examined by the coordinating thread.
+        stored in the thread attributes to be examined by the coordinating
+        thread.
 
         Returns:
             None
@@ -234,7 +234,7 @@ class BOSSessionThread(Thread):
             '--timeout=0 job/{}'.format(self.boa_job_id)
         )
 
-        while not self.results_dict['complete'] and not self.stopped():
+        while not self.complete and not self.stopped():
             sleep(self.check_interval)
 
             LOGGER.debug("Waiting for BOA k8s job with job ID %s to complete.",
@@ -269,7 +269,7 @@ class BOSSessionThread(Thread):
                 continue
 
             if success:
-                self.results_dict['complete'] = True
+                self.complete = True
             else:
                 self.mark_failed(
                     'BOS session with id {} and session template {} '
@@ -284,13 +284,13 @@ class BOSSessionThread(Thread):
         BOS session is complete and successful or failed.
 
         Once the BOS session is reported to be complete, this method returns,
-        and results are stored in self.results_dict to be examined by the
+        and results are stored in the thread attributes to be examined by the
         coordinating thread.
 
         Returns:
             None
         """
-        while not self.results_dict['complete'] and not self.stopped():
+        while not self.complete and not self.stopped():
             sleep(self.check_interval)
 
             LOGGER.debug("Querying status of BOS session with ID '%s'",
@@ -317,12 +317,12 @@ class BOSSessionThread(Thread):
 
             if complete:
                 if error_count == 0:
-                    self.results_dict['complete'] = True
+                    self.complete = True
                 else:
                     self.mark_failed(
-                        'BOS session with id {} and session template {} failed '
-                        'with error_count={}.'.format(
-                            self.session_id, self.session_template, error_count)
+                        f'BOS session with id {self.session_id} and session '
+                        f'template {self.session_template} failed with '
+                        f'error_count={error_count}.'
                     )
 
     def create_session_fake(self):
@@ -335,7 +335,7 @@ class BOSSessionThread(Thread):
         LOGGER.debug("Creating a fake BOS session from session template '%s' "
                      " with fake id %s.", self.session_template,
                      fake_session_id)
-        self.results_dict['session_id'] = self.session_id = fake_session_id
+        self.session_id = fake_session_id
 
     def monitor_status_fake(self):
         """Fake the monitoring of a BOS session.
@@ -345,15 +345,15 @@ class BOSSessionThread(Thread):
         """
         rand_duration = randint(60, 120)
         sleep(rand_duration)
-        self.results_dict['complete'] = True
+        self.complete = True
 
     def run(self):
         """Run this thread's action.
 
         This thread will create a new BOS session against the given session
         template with the given operation, and then it will monitor the status
-        of that session and periodically update the value stored under the key
-        `self.session_template` in `self.results_dict`.
+        of that session and periodically update the complete, failed, and
+        fail_msg attributes as appropriate.
         """
         self.create_session()
 
@@ -380,20 +380,16 @@ def do_parallel_bos_operations(session_templates, operation):
     Raises:
         BOSFailure: if the given operation fails.
     """
-    bos_session_threads = []
-    results = {}
     template_plural = INFLECTOR.plural('session template', len(session_templates))
     session_plural = INFLECTOR.plural('session', len(session_templates))
 
     LOGGER.debug('Doing parallel %s with %s: %s', operation, template_plural,
                  ', '.join(session_templates))
 
-    for session_template in session_templates:
-        bos_session_threads.append(
-            BOSSessionThread(session_template, operation, results)
-        )
+    bos_session_threads = [BOSSessionThread(session_template, operation)
+                           for session_template in session_templates]
 
-    start_time = time()
+    start_time = monotonic()
     elapsed_time = 0
     for thread in bos_session_threads:
         thread.start()
@@ -403,46 +399,44 @@ def do_parallel_bos_operations(session_templates, operation):
     bos_timeout = BOS_SHUTDOWN_TIMEOUT if operation == 'shutdown' else BOS_BOOT_TIMEOUT
     print(f'Waiting up to {bos_timeout} seconds for {session_plural} to complete.')
 
-    active_session_templates = list(results.keys())
+    active_threads = {t.session_template: t for t in bos_session_threads}
     failed_session_templates = []
     just_finished = []
 
-    while active_session_templates and elapsed_time < bos_timeout:
+    while active_threads and elapsed_time < bos_timeout:
         if just_finished:
-            print(f'Still waiting on {session_plural} for {template_plural}: '
-                  f'{", ".join(active_session_templates)}')
+            print(f'Still waiting on session(s) for template(s): '
+                  f'{", ".join(active_threads.keys())}')
         just_finished = []
 
-        for session_template in active_session_templates:
-            session_results = results[session_template]
-
-            if session_results['failed']:
+        for session_template, thread in active_threads.items():
+            if thread.failed:
                 LOGGER.error(
                     "Operation '%s' failed on BOS session template '%s': %s",
-                    operation, session_template, session_results['fail_msg']
+                    operation, session_template, thread.fail_msg
                 )
                 failed_session_templates.append(session_template)
                 just_finished.append(session_template)
-            elif session_results['complete']:
+            elif thread.complete:
                 print(f'{operation.title()} with BOS session template '
                       f'{session_template} completed.')
                 just_finished.append(session_template)
 
         for finished in just_finished:
-            active_session_templates.remove(finished)
+            del active_threads[finished]
 
         sleep(PARALLEL_CHECK_INTERVAL)
-        elapsed_time = time() - start_time
+        elapsed_time = monotonic() - start_time
 
-    if active_session_templates:
+    if active_threads:
         LOGGER.error('BOS %s timed out after %s seconds for session %s: %s.',
                      operation, bos_timeout,
-                     INFLECTOR.plural('template', len(active_session_templates)),
-                     ', '.join(active_session_templates))
+                     INFLECTOR.plural('template', len(active_threads)),
+                     ', '.join(active_threads.keys()))
 
-        failed_session_templates.extend(active_session_templates)
+        failed_session_templates.extend(active_threads.keys())
 
-        for thread in bos_session_threads:
+        for thread in active_threads.values():
             thread.stop()
 
     for thread in bos_session_threads:
