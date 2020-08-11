@@ -77,6 +77,16 @@ class Waiter(metaclass=abc.ABCMeta):
         behaviors by overriding this method.
         """
 
+    def on_check_action(self):
+        """Perform some action each polling cycle before checking.
+
+        The default implementation does nothing. Implement custom
+        behaviors by overriding this method.
+
+        Args: None.
+        Returns: None.
+        """
+
     def wait_for_completion(self):
         """Wait for the condition to be achieved or for timeout.
 
@@ -88,6 +98,8 @@ class Waiter(metaclass=abc.ABCMeta):
         start_time = time.monotonic()
 
         while time.monotonic() - start_time < self.timeout:
+            self.on_check_action()
+
             # Store value in case we want to use it in post_wait_action.
             self.completed = self.has_completed()
             if self.completed:
@@ -165,16 +177,6 @@ class GroupWaiter(Waiter):
             True if completed, False if not.
         """
         raise NotImplementedError('{}.member_has_completed'.format(self.__class__.__name__))
-
-    def on_check_action(self):
-        """Perform some action each polling cycle before checking.
-
-        The default implementation does nothing. Implement custom
-        behaviors by overriding this method.
-
-        Args: None.
-        Returns: None.
-        """
 
     def has_completed(self):
         """Check if every member has completed.

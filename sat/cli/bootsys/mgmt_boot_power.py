@@ -24,6 +24,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import json
 import logging
+import re
 import socket
 import subprocess
 import urllib3
@@ -278,6 +279,75 @@ class KubernetesPodStatusWaiter(GroupWaiter):
         return self.k8s_pod_status[ns][name] == self.previous_boot_phase[ns][name]
 
 
+class BGPSpineStatusWaiter(Waiter):
+    """Waits for the BGP peers to become established."""
+    def condition_name(self):
+        return "Spine BGP routes established"
+
+    @staticmethod
+    def all_established(stdout):
+        """Very simple check to ensure all peers are established.
+
+        This parses the peer states using a basic regular expression
+        which matches the state/peer pairs, and then checks if they
+        are all "ESTABLISHED".
+
+        Args:
+            stdout (str): The stdout of the 'spine-bgp-status.yml'
+                ansible playbook
+
+        Returns:
+            True if it is believed that all peers have been established,
+                or False otherwise.
+        """
+        return all(status == 'ESTABLISHED' for status in
+                   re.findall(r'(ESTABLISHED|ACTIVE|OPENSENT|OPENCONFIRM|IDLE)/[0-9]+', stdout))
+
+    @staticmethod
+    def run_ansible_playbook(playbook_path):
+        """Run the playbook at the given path and return stdout.
+
+        Args:
+            playbook_path (str): the path to the Ansible playbook to run.
+        Returns: the stdout returned from running the Ansible playbook.
+        """
+        ANSIBLE_CMD = ['ansible-playbook', playbook_path]
+        ansible_result = subprocess.run(ANSIBLE_CMD, capture_output=True, check=True, encoding='utf-8')
+        return ansible_result.stdout
+
+    @staticmethod
+    def get_spine_status():
+        """Simple helper function to get spine BGP status.
+
+        Runs BGPSpineStatusWaiter.run_ansible_playbook() with the
+        spine-bgp-status.yml playbook.
+
+        Args: None.
+        Returns: The stdout resulting when running the spine-bgp-status.yml
+            playbook.
+        """
+        return BGPSpineStatusWaiter.run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/spine-bgp-status.yml')
+
+    def pre_wait_action(self):
+        # Do one quick check for establishment prior to waiting, and
+        # reset the BGP routes if need be.
+        spine_bgp_status = BGPSpineStatusWaiter.get_spine_status()
+        self.completed = BGPSpineStatusWaiter.all_established(spine_bgp_status)
+        if not self.completed:
+            LOGGER.info('Screen scrape indicated BGP peers are idle. Resetting.')
+            BGPSpineStatusWaiter.run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/metallb-bgp-reset.yml')
+
+    def has_completed(self):
+        try:
+            spine_status_output = BGPSpineStatusWaiter.get_spine_status()
+            return BGPSpineStatusWaiter.all_established()
+
+        except subprocess.CalledProcessError as cpe:
+            LOGGER.error("Couldn't run spine-bgp-status.yml playbook: %s", cpe)
+
+        return False
+
+
 def do_mgmt_boot(args):
     """Run the bootup process for the management cluster.
 
@@ -346,6 +416,9 @@ def do_mgmt_boot(args):
     with k8s_waiter:
         ceph_waiter = CephHealthWaiter(args.ceph_timeout)
         ceph_waiter.wait_for_completion()
+
+        bgp_waiter = BGPSpineStatusWaiter(args.bgp_timeout)
+        bgp_waiter.wait_for_completion()
 
     if k8s_waiter.pending:
         LOGGER.error('The following kubernetes pods failed to reach their '
