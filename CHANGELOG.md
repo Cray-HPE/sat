@@ -47,6 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   public client for authentication.
 - Respect configured stderr log level and stop emitting duplicate log messages
   to stderr.
+- Fixed typos on ``sat linkhealth`` and ``sat status`` man pages.
+- Added show_empty and show_missing FORMAT config file options to ``sat`` man page.
+- Added sat-switch subcommand to ``sat`` man page.
 
 ## [2.3.0] - 2020-07-01
 
