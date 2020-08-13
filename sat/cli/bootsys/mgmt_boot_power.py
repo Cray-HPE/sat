@@ -136,6 +136,54 @@ class KubernetesAPIAvailableWaiter(Waiter):
             return True
 
 
+class CephHealthWaiter(Waiter):
+    """Waiter for the Ceph cluster health status."""
+
+    def __init__(self, timeout, poll_interval=1):
+        self.host = 'ncn-m001'
+
+        self.ssh_client = SSHClient()
+        self.ssh_client.load_system_host_keys()
+        self.ssh_client.connect(self.host)
+
+        super().__init__(timeout, poll_interval=poll_interval)
+
+    def condition_name(self):
+        return "Ceph cluster in healthy state"
+
+    def has_completed(self):
+        try:
+            ceph_command = 'ceph -s --format=json'
+            _, stdout, _ = self.ssh_client.exec_command(ceph_command)
+
+        except SSHException:
+            LOGGER.error('Failed to execute command "%s" on host "%s".', ceph_command, self.host)
+            return False
+
+        try:
+            rsp_dict = json.load(stdout)
+
+        except json.decoder.JSONDecodeError as jde:
+            LOGGER.error('Received malformed response from Ceph: %s', jde)
+            return False
+
+        try:
+            # TODO: If the Ceph health criteria are updated, this will
+            # need to be changes. (See SAT-559 for further
+            # information.)
+            return rsp_dict['health']['status'] == 'HEALTH_OK'
+
+        except KeyError:
+            LOGGER.error('Ceph JSON response is well-formed, but has an unexpected schema.')
+
+            if 'health' not in rsp_dict:
+                LOGGER.error('Missing top-level "health" key in Ceph JSON response.')
+            elif 'status' not in rsp_dict['health']:
+                LOGGER.error('Missing "status" key under "health" key in Ceph JSON response.')
+
+            return False
+
+
 class KubernetesPodStatusWaiter(GroupWaiter):
     """A waiter which waits for pods to reach expected state.
 
@@ -296,7 +344,8 @@ def do_mgmt_boot(args):
         raise SystemExit(1)
 
     with k8s_waiter:
-        print('Check ceph status here.')
+        ceph_waiter = CephHealthWaiter(args.ceph_timeout)
+        ceph_waiter.wait_for_completion()
 
     if k8s_waiter.pending:
         LOGGER.error('The following kubernetes pods failed to reach their '

@@ -21,12 +21,16 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+from io import StringIO
+import json
 import unittest
 from unittest.mock import MagicMock, patch
 
 from paramiko.ssh_exception import SSHException, NoValidConnectionsError
+
 from sat.cli.bootsys.power import IPMIPowerStateWaiter
-from sat.cli.bootsys.mgmt_boot_power import SSHAvailableWaiter, KubernetesPodStatusWaiter
+from sat.cli.bootsys.mgmt_boot_power import SSHAvailableWaiter, KubernetesPodStatusWaiter, \
+    CephHealthWaiter
 
 
 class WaiterTestCase(unittest.TestCase):
@@ -172,3 +176,52 @@ class TestK8sPodWaiter(WaiterTestCase):
 
         waiter = KubernetesPodStatusWaiter(self.timeout)
         self.assertFalse(waiter.member_has_completed(('galaxies', 'andromeda')))
+
+
+class TestCephWaiter(WaiterTestCase):
+    def setUp(self):
+        self.mock_ssh_client = patch('sat.cli.bootsys.mgmt_boot_power.SSHClient').start()
+
+        # TODO: if the Ceph health criteria change, these will need to
+        # be modified. (See SAT-559 for further information.)
+        self.HEALTH_OK = StringIO('{"health": {"status": "HEALTH_OK"}}')
+        self.HEALTH_WARN = StringIO('{"health": {"status": "HEALTH_WARN"}}')
+
+        self.mock_ssh_client.return_value.exec_command.return_value = (None, self.HEALTH_OK, None)
+
+        self.waiter = CephHealthWaiter(10)
+
+        super().setUp()
+
+    def test_ceph_health_connects_ssh(self):
+        """Test that CephHealthWaiter connects over SSH properly."""
+        self.waiter.has_completed()
+        self.mock_ssh_client.return_value.load_system_host_keys.assert_called_once()
+        self.mock_ssh_client.return_value.connect.assert_called_once_with(self.waiter.host)
+        self.mock_ssh_client.return_value.exec_command.assert_called_once()
+
+    def test_ceph_health_is_ready(self):
+        """Test that Ceph readiness is detected."""
+        self.assertTrue(self.waiter.has_completed())
+
+    def test_ceph_health_is_not_ready(self):
+        """Test that Ceph not being ready is detected."""
+        self.mock_ssh_client.return_value.exec_command.return_value = (None, self.HEALTH_WARN, None)
+        self.assertFalse(self.waiter.has_completed())
+
+    def test_ceph_health_ssh_broken(self):
+        """Test that Ceph health is not complete if there's an SSH problem."""
+        self.mock_ssh_client.return_value.exec_command.side_effect = SSHException()
+        self.assertFalse(self.waiter.has_completed())
+
+    @patch('sat.cli.bootsys.mgmt_boot_power.json.loads')
+    def test_ceph_health_malformed_json(self, mock_json_loads):
+
+        """Test that Ceph health is not complete if Ceph returns malformed JSON."""
+        mock_json_loads.side_effect = json.decoder.JSONDecodeError('bad json', 'it is wrong', 0)
+        self.assertFalse(self.waiter.has_completed())
+
+    def test_ceph_health_json_bad_schema(self):
+        """Test that Ceph health is not complete if the JSON schema is incorrect."""
+        self.mock_ssh_client.return_value.exec_command.return_value = (None, StringIO('{"foo": {"bar": "baz"}'), None)
+        self.assertFalse(self.waiter.has_completed())
