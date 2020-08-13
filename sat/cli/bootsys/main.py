@@ -35,7 +35,7 @@ from kubernetes.config.config_exception import ConfigException
 from paramiko.client import SSHClient
 from yaml import YAMLLoadWarning
 
-from sat.cli.bootsys.bos import BOSFailure, do_bos_shutdowns
+from sat.cli.bootsys.bos import BOSFailure, do_bos_operations
 from sat.cli.bootsys.defaults import DEFAULT_PODSTATE_DIR, DEFAULT_PODSTATE_FILE
 from sat.cli.bootsys.mgmt_boot_power import do_mgmt_boot
 from sat.cli.bootsys.mgmt_shutdown_ansible import do_shutdown_playbook
@@ -59,6 +59,12 @@ def do_boot(args):
         None
     """
     do_mgmt_boot(args)
+
+    try:
+        do_bos_operations('boot')
+    except BOSFailure as err:
+        LOGGER.error("Failed BOS boot of computes and UAN: %s", err)
+        sys.exit(1)
 
 
 def get_pods_as_json():
@@ -206,7 +212,7 @@ def do_shutdown(args):
     action_msg = 'BOS shutdown of computes and UAN'
     prompt_continue(action_msg)
     try:
-        do_bos_shutdowns()
+        do_bos_operations('shutdown')
     except BOSFailure as err:
         LOGGER.error("Failed %s: %s", action_msg, err)
         sys.exit(1)

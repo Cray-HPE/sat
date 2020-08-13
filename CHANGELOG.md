@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Waiting for management NCNs to be accessible via ssh.
     - Execution of Ansible playbook that starts platform services.
     - Waiting for kubernetes pods to reach expected states.
+    - Boot of the compute nodes and User Access Nodes (UANs) using BOS.
 
 ### Fixed
 - Fixed missing values in info messages logged from sat.filtering module.

@@ -148,6 +148,22 @@ class TestBOSSessionThread(unittest.TestCase):
         self.mock_bos_client = Mock()
         patch('sat.cli.bootsys.bos.BOSClient', return_value=self.mock_bos_client).start()
         patch('sat.cli.bootsys.bos.SATSession').start()
+
+        self.mock_session_id = '0123456789abcdef'
+        self.mock_create_response = {
+            'operation': 'boot',  # Not used, doesn't have to match
+            'templateUuid': 'template_uuid',  # Not used, doesn't have to match
+            'links': [
+                {
+                    'href': f'v1/session/{self.mock_session_id}',
+                    'jobId': f'boa-{self.mock_session_id}',
+                    'rel': 'session',
+                    'type': 'GET'
+                }
+            ]
+        }
+        self.mock_bos_client.create_session.return_value.json.return_value = self.mock_create_response
+
         self.mock_check_interval = patch(
             'sat.cli.bootsys.bos.PARALLEL_CHECK_INTERVAL', 3).start()
 
@@ -157,25 +173,18 @@ class TestBOSSessionThread(unittest.TestCase):
 
     def test_init(self):
         """Test creation of a BOSSessionThread."""
-        full_results = {}
         session_template = 'cle-1.3.0'
         operation = 'shutdown'
 
-        bos_thread = BOSSessionThread(session_template, operation, full_results)
+        bos_thread = BOSSessionThread(session_template, operation)
 
-        expected_full_results = {
-            session_template: {
-                'complete': False,
-                'failed': False,
-                'fail_msg': '',
-                'session_id': None,
-                'boa_job_id': None
-            }
-        }
-
-        self.assertEqual(expected_full_results, full_results)
         self.assertEqual(session_template, bos_thread.session_template)
         self.assertEqual(operation, bos_thread.operation)
+        self.assertEqual(False, bos_thread.complete)
+        self.assertEqual(False, bos_thread.failed)
+        self.assertEqual('', bos_thread.fail_msg)
+        self.assertEqual(None, bos_thread.session_id)
+        self.assertEqual(None, bos_thread.boa_job_id)
         self.assertEqual(3, bos_thread.max_consec_fails)
         self.assertEqual(0, bos_thread.consec_stat_fails)
         self.assertEqual(self.mock_check_interval, bos_thread.check_interval)
@@ -183,25 +192,24 @@ class TestBOSSessionThread(unittest.TestCase):
 
     def test_stop(self):
         """Test stop method of BOSSessionThread."""
-        bos_thread = BOSSessionThread('cle-1.3.0', 'boot', {})
+        bos_thread = BOSSessionThread('cle-1.3.0', 'boot')
         self.assertFalse(bos_thread.stopped())
         bos_thread.stop()
         self.assertTrue(bos_thread.stopped())
 
     def test_mark_failed(self):
         """Test mark_failed method of BOSSessionThread."""
-        full_results = {}
         session_template = 'uan'
-        bos_thread = BOSSessionThread(session_template, 'boot', full_results)
+        bos_thread = BOSSessionThread(session_template, 'boot')
         fail_msg = 'the bos session failed'
         bos_thread.mark_failed(fail_msg)
-        self.assertTrue(full_results[session_template]['failed'])
-        self.assertTrue(full_results[session_template]['complete'])
-        self.assertEqual(fail_msg, full_results[session_template]['fail_msg'])
+        self.assertTrue(bos_thread.failed)
+        self.assertTrue(bos_thread.complete)
+        self.assertEqual(fail_msg, bos_thread.fail_msg)
 
     def test_record_stat_failure(self):
         """Test record_stat_failure method of BOSSessionThread."""
-        bos_thread = BOSSessionThread('uan', 'shutdown', {})
+        bos_thread = BOSSessionThread('uan', 'shutdown')
         with patch.object(bos_thread, 'mark_failed') as mock_mark_failed:
             for _ in range(bos_thread.max_consec_fails):
                 bos_thread.record_stat_failure()
@@ -212,6 +220,14 @@ class TestBOSSessionThread(unittest.TestCase):
                 'Aborting because session status query failed {} times in a '
                 'row.'.format(bos_thread.max_consec_fails + 1)
             )
+
+    def test_create_session(self):
+        """Test create_session method of BOSSessionThread."""
+        bos_thread = BOSSessionThread('cle-1.3.0', 'boot')
+        bos_thread.create_session()
+        self.assertEqual(self.mock_session_id, bos_thread.session_id)
+        self.assertEqual(self.mock_create_response['links'][0]['jobId'],
+                         bos_thread.boa_job_id)
 
 
 if __name__ == '__main__':
