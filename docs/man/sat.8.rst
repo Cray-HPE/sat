@@ -144,6 +144,12 @@ FORMAT
 **no_borders**
         If "true", then omit borders from tabular output. Defaults to "false".
 
+**show_empty**
+        If "true", then show values for columns even if every value is EMPTY. Defaults to "false".
+
+**show_missing**
+        If "true", then show values for columns even if every value is MISSING. Defaults to "false".
+
 GENERAL
 -------
 
@@ -196,6 +202,7 @@ sat-linkhealth(8),
 sat-sensors(8),
 sat-setrev(8),
 sat-showrev(8),
-sat-status(8)
+sat-status(8),
+sat-switch(8)
 
 .. include:: _notice.rst

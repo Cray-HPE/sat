@@ -28,7 +28,7 @@ OPTIONS
 These options must be specified after the subcommand.
 
 **--types** *type [type]...*
-        Specify the a list of types to query. The default is for 'Node' only. 
+        Specify a list of types to query. The default is for 'Node' only. 
         The types that may be specified are...
 
             all, Chassis, ChassisBMC, ComputeModule, HSNBoard, Node, NodeBMC,
