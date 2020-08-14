@@ -355,6 +355,30 @@ class BGPSpineStatusWaiter(Waiter):
         return False
 
 
+class HSNBringupWaiter(Waiter):
+    """Run the HSN bringup script and wait for it to be brought up."""
+
+    def condition_name(self):
+        return "HSN bringup"
+
+    def pre_wait_action(self):
+        run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/ncmp_hsn_bringup.yaml')
+
+    def has_completed(self):
+        STATUS_SCRIPT_PATH = '/opt/cray/bringup-fabric/status.sh'
+        try:
+            status = subprocess.run([STATUS_SCRIPT_PATH],
+                                    capture_output=True, check=True, encoding='utf-8')
+        except subprocess.CalledProcessError as cpe:
+            LOGGER.error('Could not run fabric bringup status script "%s"; %s',
+                         STATUS_SCRIPT_PATH, cpe)
+            return True # Don't keep polling here if we can't run the script.
+
+        # Check each line of the form '<title>: <num> / <denom>'
+        return all(int(denom) >= int(num) > 0 and int(num) == int(denom) for num, denom
+                   in re.findall(r'\w+:\s+(\d)\s*/\s*(\d)', status.stdout))
+
+
 def do_mgmt_boot(args):
     """Run the bootup process for the management cluster.
 
@@ -421,9 +445,9 @@ def do_mgmt_boot(args):
         raise SystemExit(1)
 
     with k8s_waiter:
-        ceph_bgp_waiter = SimultaneousWaiter([CephHealthWaiter, BGPSpineStatusWaiter],
-                                             max(args.ceph_timeout, args.bgp_timeout))
-        ceph_bgp_waiter.wait_for_completion()
+        ceph_bgp_hsn_waiter = SimultaneousWaiter([CephHealthWaiter, BGPSpineStatusWaiter, HSNBringupWaiter],
+                                                 max(args.ceph_timeout, args.bgp_timeout, args.hsn_timeout))
+        ceph_bgp_hsn_waiter.wait_for_completion()
 
     if k8s_waiter.pending:
         LOGGER.error('The following kubernetes pods failed to reach their '

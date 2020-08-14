@@ -32,7 +32,7 @@ from paramiko.ssh_exception import SSHException, NoValidConnectionsError
 
 from sat.cli.bootsys.power import IPMIPowerStateWaiter
 from sat.cli.bootsys.mgmt_boot_power import SSHAvailableWaiter, KubernetesPodStatusWaiter, \
-    CephHealthWaiter, BGPSpineStatusWaiter, run_ansible_playbook
+    CephHealthWaiter, HSNBringupWaiter, BGPSpineStatusWaiter, run_ansible_playbook
 
 
 class WaiterTestCase(unittest.TestCase):
@@ -366,3 +366,49 @@ class TestBGPSpineStatusWaiter(WaiterTestCase):
         mock_spine_status.return_value = self.COMPLETE_OUTPUT
         spine_waiter = BGPSpineStatusWaiter(10)
         self.assertTrue(spine_waiter.wait_for_completion())
+
+
+class TestHSNBringupWaiter(WaiterTestCase):
+    """Test the HSN bringup waiter"""
+    def setUp(self):
+        self.mock_subprocess_run = patch('sat.cli.bootsys.mgmt_boot_power.subprocess.run').start()
+        self.waiter = HSNBringupWaiter(1)
+
+    @patch('sat.cli.bootsys.mgmt_boot_power.run_ansible_playbook')
+    def test_runs_ansible_playbook(self, mock_run_playbook):
+        self.waiter.pre_wait_action()
+        mock_run_playbook.assert_called_once()
+
+    def test_hsn_bringup_succeeds(self):
+        """Test HSN bringup detects when all edge, local, and global complete."""
+        self.mock_subprocess_run.return_value.stdout = dedent("""\
+        Edge: 544 / 544
+        Local: 1056 / 1056
+        Global: 224/ 224
+        """)
+        self.assertTrue(self.waiter.has_completed())
+
+    def test_hsn_bringup_strange_output(self):
+        """Test HSN bringup waiter behavior when nothing is detected."""
+        self.mock_subprocess_run.return_value.stdout = dedent("""\
+        Edge: 0 / 0
+        Local: 0 / 0
+        Global: 0 / 0
+        Ports Reported: 0 / 0
+        """)
+        self.assertFalse(self.waiter.has_completed())
+
+    def test_hsn_bringup_not_complete(self):
+        """Test HSN bringup detects when the bringup isn't completed."""
+        self.mock_subprocess_run.return_value.stdout = dedent("""\
+        Edge: 1 / 544
+        Local: 140 / 1056
+        Global: 128 / 224
+        Ports Reported: 64 / 1024
+        """)
+        self.assertFalse(self.waiter.has_completed())
+
+    def test_hsn_bringup_command_fails(self):
+        self.mock_subprocess_run.side_effect = subprocess.CalledProcessError(1, 'something went wrong')
+
+        self.assertTrue(self.waiter.has_completed())
