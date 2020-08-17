@@ -81,7 +81,8 @@ def run_ansible_playbook(playbook_path):
         playbook_path (str): the path to the Ansible playbook to run.
 
     Returns:
-        the stdout returned from running the Ansible playbook.
+        a string containing the stdout returned from running the Ansible
+            playbook, or None if there was an exception.
     """
     ANSIBLE_CMD = ['ansible-playbook', playbook_path]
     try:
