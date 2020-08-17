@@ -32,7 +32,7 @@ from paramiko.ssh_exception import SSHException, NoValidConnectionsError
 
 from sat.cli.bootsys.power import IPMIPowerStateWaiter
 from sat.cli.bootsys.mgmt_boot_power import SSHAvailableWaiter, KubernetesPodStatusWaiter, \
-    CephHealthWaiter, BGPSpineStatusWaiter
+    CephHealthWaiter, BGPSpineStatusWaiter, run_ansible_playbook
 
 
 class WaiterTestCase(unittest.TestCase):
@@ -329,17 +329,17 @@ class TestBGPSpineStatusWaiter(WaiterTestCase):
         self.assertFalse(BGPSpineStatusWaiter.all_established(self.INCOMPLETE_OUTPUT))
 
     def test_running_playbook(self):
-        """Test running an Ansible playbook through the BGP waiter."""
+        """Test running an Ansible playbook."""
         stdout = 'some output'
         self.mock_subprocess_run.return_value.stdout = stdout
 
         path = '/foo/bar/baz/quux.yml'
-        returned_stdout = BGPSpineStatusWaiter.run_ansible_playbook(path)
+        returned_stdout = run_ansible_playbook(path)
         self.mock_subprocess_run.assert_called_once_with(['ansible-playbook', path],
                                                          capture_output=True, check=True, encoding='utf-8')
         self.assertEqual(stdout, returned_stdout)
 
-    @patch('sat.cli.bootsys.mgmt_boot_power.BGPSpineStatusWaiter.run_ansible_playbook')
+    @patch('sat.cli.bootsys.mgmt_boot_power.run_ansible_playbook')
     def test_get_spine_status(self, mock_run_playbook):
         """Test the get_spine_status helper function."""
         result = 'result of running playbook'
@@ -347,6 +347,12 @@ class TestBGPSpineStatusWaiter(WaiterTestCase):
 
         self.assertEqual(BGPSpineStatusWaiter.get_spine_status(), result)
         mock_run_playbook.assert_called_once_with('/opt/cray/crayctl/ansible_framework/main/spine-bgp-status.yml')
+
+    @patch('sat.cli.bootsys.mgmt_boot_power.BGPSpineStatusWaiter.get_spine_status')
+    def test_completion_successful(self, mock_spine_status):
+        """Test the BGP waiter when the BGP peers have been established."""
+        mock_spine_status.return_value = self.COMPLETE_OUTPUT
+        self.assertTrue(BGPSpineStatusWaiter(10).has_completed())
 
     def test_completion_when_called_process_error(self):
         """Test the BGP waiter when there's an issue running ansible-playbook."""

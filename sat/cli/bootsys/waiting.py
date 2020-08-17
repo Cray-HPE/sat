@@ -140,12 +140,65 @@ class Waiter(metaclass=abc.ABCMeta):
                                'wait_for_completion_await.')
         self._waiter_thread.join()
 
+    def is_waiting_async(self):
+        """Check if this waiter is currently waiting asynchronously.
+
+        If wait_for_completion_async() has been called and the waiter
+        thread has not finished, this returns True. Otherwise, this
+        returns False.
+        """
+        return (self._waiter_thread is not None
+                and self._waiter_thread.is_alive())
+
     def __enter__(self):
         self.wait_for_completion_async()
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
         self.wait_for_completion_await()
+
+
+class SimultaneousWaiter(Waiter):
+    """Waits for multiple conditions concurrently.
+
+    This class can be used to synthesize multiple waiters into a
+    single waiter; this essentially combines multiple awaited
+    conditions with a logical "and", and waits for the combined
+    conditions concurrently.
+    """
+
+    def __init__(self, waiter_classes, timeout, poll_interval=1, **kwargs):
+        """Construct a new SimultaneousWaiter.
+
+        Args:
+            waiter_classes ([type]): classes of Waiters to wait for.
+            timeout (int): timeout waiting for all conditions.
+            poll_interval (int): the interval, in seconds, at which to
+               poll for completion.
+        """
+        self._subwaiters = []
+        for WaiterClass in waiter_classes:
+            if not issubclass(WaiterClass, Waiter):
+                raise TypeError(f'All classes must be subclasses of Waiter. '
+                                '({WaiterClass.__name__})')
+            self._subwaiters.append(WaiterClass(timeout, poll_interval=poll_interval))
+
+        super().__init__(timeout, poll_interval=poll_interval)
+
+    def condition_name(self):
+        conditions = ', '.join(waiter.condition_name() for waiter in self._subwaiters)
+        return f"Simultaneous conditions: {conditions}"
+
+    def pre_wait_action(self):
+        for waiter in self._subwaiters:
+            waiter.wait_for_completion_async()
+
+    def has_completed(self):
+        return all(waiter.completed for waiter in self._subwaiters)
+
+    def post_wait_action(self):
+        for waiter in self._subwaiters:
+            waiter.wait_for_completion_await()
 
 
 class GroupWaiter(Waiter):

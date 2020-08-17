@@ -40,7 +40,7 @@ from yaml import YAMLLoadWarning
 from sat.cli.bootsys.defaults import DEFAULT_PODSTATE_FILE
 from sat.cli.bootsys.power import IPMIPowerStateWaiter
 from sat.cli.bootsys.util import get_ncns, RunningService, k8s_pods_to_status_dict
-from sat.cli.bootsys.waiting import GroupWaiter, Waiter
+from sat.cli.bootsys.waiting import GroupWaiter, SimultaneousWaiter, Waiter
 from sat.report import Report
 from sat.util import get_username_and_password_interactively
 
@@ -420,11 +420,9 @@ def do_mgmt_boot(args):
         raise SystemExit(1)
 
     with k8s_waiter:
-        ceph_waiter = CephHealthWaiter(args.ceph_timeout)
-        ceph_waiter.wait_for_completion()
-
-        bgp_waiter = BGPSpineStatusWaiter(args.bgp_timeout)
-        bgp_waiter.wait_for_completion()
+        ceph_bgp_waiter = SimultaneousWaiter([CephHealthWaiter, BGPSpineStatusWaiter],
+                                             max(args.ceph_timeout, args.bgp_timeout))
+        ceph_bgp_waiter.wait_for_completion()
 
     if k8s_waiter.pending:
         LOGGER.error('The following kubernetes pods failed to reach their '
