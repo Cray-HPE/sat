@@ -227,6 +227,7 @@ class TestCephWaiter(WaiterTestCase):
         self.mock_ssh_client.return_value.exec_command.return_value = (None, StringIO('{"foo": {"bar": "baz"}'), None)
         self.assertFalse(self.waiter.has_completed())
 
+
 class TestBGPSpineStatusWaiter(WaiterTestCase):
     """Tests for the spine BGP status waiting functionality."""
 
@@ -351,3 +352,11 @@ class TestBGPSpineStatusWaiter(WaiterTestCase):
         """Test the BGP waiter when there's an issue running ansible-playbook."""
         self.mock_subprocess_run.side_effect = subprocess.CalledProcessError(1, 'something went wrong')
         self.assertFalse(BGPSpineStatusWaiter(10).has_completed())
+
+    @patch('sat.cli.bootsys.mgmt_boot_power.BGPSpineStatusWaiter.get_spine_status')
+    @patch('sat.cli.bootsys.mgmt_boot_power.run_ansible_playbook')
+    def test_waiting_for_bgp_completion(self, mock_run_playbook, mock_spine_status):
+        """Test waiting for successful BGP peering"""
+        mock_spine_status.return_value = self.COMPLETE_OUTPUT
+        spine_waiter = BGPSpineStatusWaiter(10)
+        self.assertTrue(spine_waiter.wait_for_completion())

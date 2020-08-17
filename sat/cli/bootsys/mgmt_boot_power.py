@@ -74,6 +74,23 @@ def load_kube_api():
     return CoreV1Api()
 
 
+def run_ansible_playbook(playbook_path):
+    """Run the playbook at the given path and return stdout.
+
+    Args:
+        playbook_path (str): the path to the Ansible playbook to run.
+
+    Returns:
+        the stdout returned from running the Ansible playbook.
+    """
+    ANSIBLE_CMD = ['ansible-playbook', playbook_path]
+    try:
+        ansible_result = subprocess.run(ANSIBLE_CMD, capture_output=True, check=True, encoding='utf-8')
+        return ansible_result.stdout
+    except subprocess.CalledProcessError as cpe:
+        LOGGER.error('Could not run ansible playbook at "%s": %s', playbook_path, cpe)
+
+
 class SSHAvailableWaiter(GroupWaiter):
     """A waiter which waits for all member nodes to be accessible via SSH.
     """
@@ -300,33 +317,22 @@ class BGPSpineStatusWaiter(Waiter):
             True if it is believed that all peers have been established,
                 or False otherwise.
         """
-        return all(status == 'ESTABLISHED' for status in
-                   re.findall(r'(ESTABLISHED|ACTIVE|OPENSENT|OPENCONFIRM|IDLE)/[0-9]+', stdout))
-
-    @staticmethod
-    def run_ansible_playbook(playbook_path):
-        """Run the playbook at the given path and return stdout.
-
-        Args:
-            playbook_path (str): the path to the Ansible playbook to run.
-        Returns: the stdout returned from running the Ansible playbook.
-        """
-        ANSIBLE_CMD = ['ansible-playbook', playbook_path]
-        ansible_result = subprocess.run(ANSIBLE_CMD, capture_output=True, check=True, encoding='utf-8')
-        return ansible_result.stdout
+        status_pair_re = r'(ESTABLISHED|ACTIVE|OPENSENT|OPENCONFIRM|IDLE)/[0-9]+'
+        return stdout and all(status == 'ESTABLISHED' for status in
+                              re.findall(status_pair_re, stdout))
 
     @staticmethod
     def get_spine_status():
         """Simple helper function to get spine BGP status.
 
-        Runs BGPSpineStatusWaiter.run_ansible_playbook() with the
+        Runs run_ansible_playbook() with the
         spine-bgp-status.yml playbook.
 
         Args: None.
         Returns: The stdout resulting when running the spine-bgp-status.yml
             playbook.
         """
-        return BGPSpineStatusWaiter.run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/spine-bgp-status.yml')
+        return run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/spine-bgp-status.yml')
 
     def pre_wait_action(self):
         # Do one quick check for establishment prior to waiting, and
@@ -335,12 +341,12 @@ class BGPSpineStatusWaiter(Waiter):
         self.completed = BGPSpineStatusWaiter.all_established(spine_bgp_status)
         if not self.completed:
             LOGGER.info('Screen scrape indicated BGP peers are idle. Resetting.')
-            BGPSpineStatusWaiter.run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/metallb-bgp-reset.yml')
+            run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/metallb-bgp-reset.yml')
 
     def has_completed(self):
         try:
             spine_status_output = BGPSpineStatusWaiter.get_spine_status()
-            return BGPSpineStatusWaiter.all_established()
+            return BGPSpineStatusWaiter.all_established(spine_status_output)
 
         except subprocess.CalledProcessError as cpe:
             LOGGER.error("Couldn't run spine-bgp-status.yml playbook: %s", cpe)

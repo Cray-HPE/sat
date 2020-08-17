@@ -29,7 +29,7 @@ from unittest.mock import patch
 from sat.cli.bootsys.waiting import GroupWaiter, Waiter
 
 
-def get_mock_waiter(member_complete_behavior):
+def get_mock_waiter(complete_behavior):
     """Get a Waiter class which mocks out completion checking.
 
     This is a simple helper function for creating classes to test the
@@ -42,7 +42,7 @@ def get_mock_waiter(member_complete_behavior):
                 in order of calls.
     """
     try:
-        return_vals = iter(member_complete_behavior)
+        return_vals = iter(complete_behavior)
     except TypeError:
         pass
 
@@ -54,7 +54,7 @@ def get_mock_waiter(member_complete_behavior):
                 except StopIteration:
                     return True
             else:
-                return bool(member_complete_behavior)
+                return bool(complete_behavior)
 
         def condition_name(self):
             return 'Testing Waiter'

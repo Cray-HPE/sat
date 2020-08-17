@@ -82,9 +82,6 @@ class Waiter(metaclass=abc.ABCMeta):
 
         The default implementation does nothing. Implement custom
         behaviors by overriding this method.
-
-        Args: None.
-        Returns: None.
         """
 
     def wait_for_completion(self):
