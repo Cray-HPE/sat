@@ -24,6 +24,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import json
 import logging
+import re
 import socket
 import subprocess
 import urllib3
@@ -39,7 +40,7 @@ from yaml import YAMLLoadWarning
 from sat.cli.bootsys.defaults import DEFAULT_PODSTATE_FILE
 from sat.cli.bootsys.power import IPMIPowerStateWaiter
 from sat.cli.bootsys.util import get_ncns, RunningService, k8s_pods_to_status_dict
-from sat.cli.bootsys.waiting import GroupWaiter, Waiter
+from sat.cli.bootsys.waiting import GroupWaiter, SimultaneousWaiter, Waiter
 from sat.report import Report
 from sat.util import get_username_and_password_interactively
 
@@ -71,6 +72,24 @@ def load_kube_api():
         )
 
     return CoreV1Api()
+
+
+def run_ansible_playbook(playbook_path):
+    """Run the playbook at the given path and return stdout.
+
+    Args:
+        playbook_path (str): the path to the Ansible playbook to run.
+
+    Returns:
+        a string containing the stdout returned from running the Ansible
+            playbook, or None if there was an exception.
+    """
+    ANSIBLE_CMD = ['ansible-playbook', playbook_path]
+    try:
+        ansible_result = subprocess.run(ANSIBLE_CMD, capture_output=True, check=True, encoding='utf-8')
+        return ansible_result.stdout
+    except subprocess.CalledProcessError as cpe:
+        LOGGER.error('Could not run ansible playbook at "%s": %s', playbook_path, cpe)
 
 
 class SSHAvailableWaiter(GroupWaiter):
@@ -278,6 +297,64 @@ class KubernetesPodStatusWaiter(GroupWaiter):
         return self.k8s_pod_status[ns][name] == self.previous_boot_phase[ns][name]
 
 
+class BGPSpineStatusWaiter(Waiter):
+    """Waits for the BGP peers to become established."""
+    def condition_name(self):
+        return "Spine BGP routes established"
+
+    @staticmethod
+    def all_established(stdout):
+        """Very simple check to ensure all peers are established.
+
+        This parses the peer states using a basic regular expression
+        which matches the state/peer pairs, and then checks if they
+        are all "ESTABLISHED".
+
+        Args:
+            stdout (str): The stdout of the 'spine-bgp-status.yml'
+                ansible playbook
+
+        Returns:
+            True if it is believed that all peers have been established,
+                or False otherwise.
+        """
+        status_pair_re = r'(ESTABLISHED|ACTIVE|OPENSENT|OPENCONFIRM|IDLE)/[0-9]+'
+        return stdout and all(status == 'ESTABLISHED' for status in
+                              re.findall(status_pair_re, stdout))
+
+    @staticmethod
+    def get_spine_status():
+        """Simple helper function to get spine BGP status.
+
+        Runs run_ansible_playbook() with the
+        spine-bgp-status.yml playbook.
+
+        Args: None.
+        Returns: The stdout resulting when running the spine-bgp-status.yml
+            playbook.
+        """
+        return run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/spine-bgp-status.yml')
+
+    def pre_wait_action(self):
+        # Do one quick check for establishment prior to waiting, and
+        # reset the BGP routes if need be.
+        spine_bgp_status = BGPSpineStatusWaiter.get_spine_status()
+        self.completed = BGPSpineStatusWaiter.all_established(spine_bgp_status)
+        if not self.completed:
+            LOGGER.info('Screen scrape indicated BGP peers are idle. Resetting.')
+            run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/metallb-bgp-reset.yml')
+
+    def has_completed(self):
+        try:
+            spine_status_output = BGPSpineStatusWaiter.get_spine_status()
+            return BGPSpineStatusWaiter.all_established(spine_status_output)
+
+        except subprocess.CalledProcessError as cpe:
+            LOGGER.error("Couldn't run spine-bgp-status.yml playbook: %s", cpe)
+
+        return False
+
+
 def do_mgmt_boot(args):
     """Run the bootup process for the management cluster.
 
@@ -344,8 +421,9 @@ def do_mgmt_boot(args):
         raise SystemExit(1)
 
     with k8s_waiter:
-        ceph_waiter = CephHealthWaiter(args.ceph_timeout)
-        ceph_waiter.wait_for_completion()
+        ceph_bgp_waiter = SimultaneousWaiter([CephHealthWaiter, BGPSpineStatusWaiter],
+                                             max(args.ceph_timeout, args.bgp_timeout))
+        ceph_bgp_waiter.wait_for_completion()
 
     if k8s_waiter.pending:
         LOGGER.error('The following kubernetes pods failed to reach their '

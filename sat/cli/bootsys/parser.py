@@ -123,3 +123,8 @@ def add_bootsys_subparser(subparsers):
         '--ceph-timeout', default=600, type=int,
         help='Timeout waiting for Ceph to come up.'
     )
+
+    bootsys_parser.add_argument(
+        '--bgp-timeout', default=600, type=int,
+        help='Timeout waiting for BGP routes to become established.'
+    )

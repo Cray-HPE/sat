@@ -24,12 +24,12 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import itertools
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
-from sat.cli.bootsys.waiting import GroupWaiter, Waiter
+from sat.cli.bootsys.waiting import GroupWaiter, SimultaneousWaiter, Waiter
 
 
-def get_mock_waiter(member_complete_behavior):
+def get_mock_waiter(complete_behavior):
     """Get a Waiter class which mocks out completion checking.
 
     This is a simple helper function for creating classes to test the
@@ -42,7 +42,7 @@ def get_mock_waiter(member_complete_behavior):
                 in order of calls.
     """
     try:
-        return_vals = iter(member_complete_behavior)
+        return_vals = iter(complete_behavior)
     except TypeError:
         pass
 
@@ -54,7 +54,7 @@ def get_mock_waiter(member_complete_behavior):
                 except StopIteration:
                     return True
             else:
-                return bool(member_complete_behavior)
+                return bool(complete_behavior)
 
         def condition_name(self):
             return 'Testing Waiter'
@@ -94,7 +94,10 @@ class WaiterTestCase(unittest.TestCase):
         self.mock_time_monotonic = patch('sat.cli.bootsys.waiting.time.monotonic',
                                          side_effect=itertools.count(0, 1)).start()
         self.mock_time_sleep = patch('sat.cli.bootsys.waiting.time.sleep').start()
-        self.mock_thread = patch('sat.cli.bootsys.waiting.Thread').start()
+
+        self.mock_thread_patcher = patch('sat.cli.bootsys.waiting.Thread')
+        self.mock_thread = self.mock_thread_patcher.start()
+        self.mock_thread.return_value.is_alive.side_effect = [True, False]
 
     def tearDown(self):
         patch.stopall()
@@ -155,6 +158,54 @@ class TestWaiter(WaiterTestCase):
         self.mock_thread.assert_called_once_with(target=instance.wait_for_completion)
         self.mock_thread.return_value.start.assert_called_once()
         self.mock_thread.return_value.join.assert_called()
+
+    def test_is_waiting_async(self):
+        """Test if an async waiter is waiting"""
+
+        SuccessfulWaiter = get_mock_waiter(True)
+
+        instance = SuccessfulWaiter(10)
+        self.assertFalse(instance.is_waiting_async())
+        instance.wait_for_completion_async()
+        self.assertTrue(instance.is_waiting_async())
+        self.assertFalse(instance.is_waiting_async())
+
+
+class TestSimulWaiter(WaiterTestCase):
+    """Test the abstract SimultaneousWaiter class."""
+    def setUp(self):
+        super().setUp()
+
+    def test_init_with_bad_class(self):
+        """Test the SimultaneousWaiter only accepts Waiter subclasses"""
+        with self.assertRaises(TypeError):
+            SimultaneousWaiter(Mock())
+
+    def test_starts_threads(self):
+        """Test the SimultaneousWaiter starts and cleans up threads"""
+        SuccessfulWaiter = get_mock_waiter(True)
+        sw = SimultaneousWaiter([SuccessfulWaiter], 10)
+        sw.wait_for_completion()
+        self.mock_thread.assert_called_once()
+        self.mock_thread.return_value.join.assert_called()
+
+    def test_simul_waiter_completed(self):
+        """Test waiting for multiple conditions"""
+        self.mock_thread_patcher.stop()
+
+        EventualWaiter = get_mock_waiter([False, True])
+        SuccessfulWaiter = get_mock_waiter(True)
+        sw = SimultaneousWaiter([EventualWaiter, SuccessfulWaiter], 3)
+        self.assertTrue(sw.wait_for_completion())
+
+    def test_simul_waiter_failed(self):
+        """Test failing to wait for one of multiple simultaneous conditions."""
+        self.mock_thread_patcher.stop()
+
+        NotFastEnoughWaiter = get_mock_waiter([False, True])
+        SuccessfulWaiter = get_mock_waiter(True)
+        sw = SimultaneousWaiter([NotFastEnoughWaiter, SuccessfulWaiter], 2)
+        self.assertFalse(sw.wait_for_completion())
 
 
 class TestGroupWaiter(WaiterTestCase):
