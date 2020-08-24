@@ -23,9 +23,9 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 from io import StringIO
 import json
+import logging
 import subprocess
 from textwrap import dedent
-import unittest
 from unittest.mock import MagicMock, patch
 
 from paramiko.ssh_exception import SSHException, NoValidConnectionsError
@@ -33,9 +33,10 @@ from paramiko.ssh_exception import SSHException, NoValidConnectionsError
 from sat.cli.bootsys.power import IPMIPowerStateWaiter
 from sat.cli.bootsys.mgmt_boot_power import SSHAvailableWaiter, KubernetesPodStatusWaiter, \
     CephHealthWaiter, HSNBringupWaiter, BGPSpineStatusWaiter, run_ansible_playbook
+from tests.common import ExtendedTestCase
 
 
-class WaiterTestCase(unittest.TestCase):
+class WaiterTestCase(ExtendedTestCase):
     def setUp(self):
         self.mock_time_monotonic = patch('sat.cli.bootsys.waiting.time.monotonic').start()
         self.mock_time_sleep = patch('sat.cli.bootsys.waiting.time.sleep').start()
@@ -336,7 +337,8 @@ class TestBGPSpineStatusWaiter(WaiterTestCase):
         path = '/foo/bar/baz/quux.yml'
         returned_stdout = run_ansible_playbook(path)
         self.mock_subprocess_run.assert_called_once_with(['ansible-playbook', path],
-                                                         capture_output=True, check=True, encoding='utf-8')
+                                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                                         check=True, encoding='utf-8')
         self.assertEqual(stdout, returned_stdout)
 
     @patch('sat.cli.bootsys.mgmt_boot_power.run_ansible_playbook')
@@ -379,6 +381,16 @@ class TestHSNBringupWaiter(WaiterTestCase):
         self.waiter.pre_wait_action()
         mock_run_playbook.assert_called_once()
 
+    def test_parse_hsn_status_output(self):
+        """Test the parsing of status script output."""
+        output = dedent("""\
+        Edge: 64 / 64
+        Local: 128 / 256
+        Global: 8 / 8
+        """)
+        expected = [[64, 64], [128, 256], [8, 8]]
+        self.assertEqual(expected, HSNBringupWaiter.parse_hsn_status_output(output))
+
     def test_hsn_bringup_succeeds(self):
         """Test HSN bringup detects when all edge, local, and global complete."""
         self.mock_subprocess_run.return_value.stdout = dedent("""\
@@ -408,7 +420,18 @@ class TestHSNBringupWaiter(WaiterTestCase):
         """)
         self.assertFalse(self.waiter.has_completed())
 
-    def test_hsn_bringup_command_fails(self):
-        self.mock_subprocess_run.side_effect = subprocess.CalledProcessError(1, 'something went wrong')
+    def test_hsn_bringup_no_matches(self):
+        """Test that the HSN bringup waiter logs an error if status output is empty."""
+        self.mock_subprocess_run.return_value.stdout = ''
+        with self.assertLogs(level=logging.ERROR) as cm:
+            has_completed = self.waiter.has_completed()
+        self.assert_in_element('Could not parse status info', cm.output)
+        self.assertTrue(has_completed)
 
-        self.assertTrue(self.waiter.has_completed())
+    def test_hsn_bringup_command_fails(self):
+        """Test that the HSN bringup waiter logs an error if status script fails."""
+        self.mock_subprocess_run.side_effect = subprocess.CalledProcessError(1, 'something went wrong')
+        with self.assertLogs(level=logging.ERROR) as cm:
+            has_completed = self.waiter.has_completed()
+        self.assert_in_element('Could not run fabric bringup status script', cm.output)
+        self.assertTrue(has_completed)
