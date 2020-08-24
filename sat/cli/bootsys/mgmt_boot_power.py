@@ -86,7 +86,8 @@ def run_ansible_playbook(playbook_path):
     """
     ANSIBLE_CMD = ['ansible-playbook', playbook_path]
     try:
-        ansible_result = subprocess.run(ANSIBLE_CMD, capture_output=True, check=True, encoding='utf-8')
+        ansible_result = subprocess.run(ANSIBLE_CMD, stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE, check=True, encoding='utf-8')
         return ansible_result.stdout
     except subprocess.CalledProcessError as cpe:
         LOGGER.error('Could not run ansible playbook at "%s": %s', playbook_path, cpe)
@@ -355,6 +356,53 @@ class BGPSpineStatusWaiter(Waiter):
         return False
 
 
+class HSNBringupWaiter(Waiter):
+    """Run the HSN bringup script and wait for it to be brought up."""
+
+    STATUS_SCRIPT_PATH = '/opt/cray/bringup-fabric/status.sh'
+
+    def condition_name(self):
+        return "HSN bringup"
+
+    def pre_wait_action(self):
+        run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/ncmp_hsn_bringup.yaml')
+
+    @staticmethod
+    def parse_hsn_status_output(output):
+        """Parse the output of STATUS_SCRIPT_PATH into a list of lists of ints.
+
+        Args:
+            output (str): the output of HSNBringupWaiter.STATUS_SCRIPT_PATH
+
+        Returns:
+            A list of lists where each list has these two components for
+            each type of link reported by that script (edge, local, global):
+                [links_up, total_links]
+            Each of these will be converted to int.
+        """
+        # Parse each line of the form '<title>: <links_up> / <total_links>'
+        return list(map(lambda l: [int(i) for i in l],
+                    re.findall(r'\w+:\s+(\d+)\s*/\s*(\d+)', output)))
+
+    def has_completed(self):
+        try:
+            status = subprocess.run([self.STATUS_SCRIPT_PATH], stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, check=True, encoding='utf-8')
+        except subprocess.CalledProcessError as cpe:
+            LOGGER.error('Could not run fabric bringup status script "%s"; %s',
+                         self.STATUS_SCRIPT_PATH, cpe)
+            return True  # Don't keep polling here if we can't run the script.
+
+        port_status = HSNBringupWaiter.parse_hsn_status_output(status.stdout)
+        if not port_status:
+            LOGGER.error('Could not parse status info from the output of fabric '
+                         'bringup status script "%s".', self.STATUS_SCRIPT_PATH)
+            return True  # Don't keep polling here if script gives no output
+
+        return all(0 < up_links == total_links
+                   for up_links, total_links in port_status)
+
+
 def do_mgmt_boot(args):
     """Run the bootup process for the management cluster.
 
@@ -421,9 +469,9 @@ def do_mgmt_boot(args):
         raise SystemExit(1)
 
     with k8s_waiter:
-        ceph_bgp_waiter = SimultaneousWaiter([CephHealthWaiter, BGPSpineStatusWaiter],
-                                             max(args.ceph_timeout, args.bgp_timeout))
-        ceph_bgp_waiter.wait_for_completion()
+        ceph_bgp_hsn_waiter = SimultaneousWaiter([CephHealthWaiter, BGPSpineStatusWaiter, HSNBringupWaiter],
+                                                 max(args.ceph_timeout, args.bgp_timeout, args.hsn_timeout))
+        ceph_bgp_hsn_waiter.wait_for_completion()
 
     if k8s_waiter.pending:
         LOGGER.error('The following kubernetes pods failed to reach their '

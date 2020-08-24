@@ -128,3 +128,8 @@ def add_bootsys_subparser(subparsers):
         '--bgp-timeout', default=600, type=int,
         help='Timeout waiting for BGP routes to become established.'
     )
+
+    bootsys_parser.add_argument(
+        '--hsn-timeout', default=600, type=int,
+        help='Timeout waiting for HSN bringup'
+    )
