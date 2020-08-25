@@ -38,8 +38,9 @@ from paramiko.ssh_exception import SSHException
 from yaml import YAMLLoadWarning
 
 from sat.cli.bootsys.defaults import DEFAULT_PODSTATE_FILE
+from sat.cli.bootsys.mgmt_hosts import do_disable_hosts_entries
 from sat.cli.bootsys.power import IPMIPowerStateWaiter
-from sat.cli.bootsys.util import get_ncns, RunningService, k8s_pods_to_status_dict
+from sat.cli.bootsys.util import get_ncns, RunningService, k8s_pods_to_status_dict, run_ansible_playbook
 from sat.cli.bootsys.waiting import GroupWaiter, SimultaneousWaiter, Waiter
 from sat.report import Report
 from sat.util import get_username_and_password_interactively
@@ -72,25 +73,6 @@ def load_kube_api():
         )
 
     return CoreV1Api()
-
-
-def run_ansible_playbook(playbook_path):
-    """Run the playbook at the given path and return stdout.
-
-    Args:
-        playbook_path (str): the path to the Ansible playbook to run.
-
-    Returns:
-        a string containing the stdout returned from running the Ansible
-            playbook, or None if there was an exception.
-    """
-    ANSIBLE_CMD = ['ansible-playbook', playbook_path]
-    try:
-        ansible_result = subprocess.run(ANSIBLE_CMD, stdout=subprocess.PIPE,
-                                        stderr=subprocess.PIPE, check=True, encoding='utf-8')
-        return ansible_result.stdout
-    except subprocess.CalledProcessError as cpe:
-        LOGGER.error('Could not run ansible playbook at "%s": %s', playbook_path, cpe)
 
 
 class SSHAvailableWaiter(GroupWaiter):
@@ -300,6 +282,7 @@ class KubernetesPodStatusWaiter(GroupWaiter):
 
 class BGPSpineStatusWaiter(Waiter):
     """Waits for the BGP peers to become established."""
+
     def condition_name(self):
         return "Spine BGP routes established"
 
@@ -334,7 +317,8 @@ class BGPSpineStatusWaiter(Waiter):
         Returns: The stdout resulting when running the spine-bgp-status.yml
             playbook.
         """
-        return run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/spine-bgp-status.yml')
+        return run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/spine-bgp-status.yml',
+                                    exit_on_err=False)
 
     def pre_wait_action(self):
         # Do one quick check for establishment prior to waiting, and
@@ -343,7 +327,8 @@ class BGPSpineStatusWaiter(Waiter):
         self.completed = BGPSpineStatusWaiter.all_established(spine_bgp_status)
         if not self.completed:
             LOGGER.info('Screen scrape indicated BGP peers are idle. Resetting.')
-            run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/metallb-bgp-reset.yml')
+            run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/metallb-bgp-reset.yml',
+                                 exit_on_err=False)
 
     def has_completed(self):
         try:
@@ -365,7 +350,8 @@ class HSNBringupWaiter(Waiter):
         return "HSN bringup"
 
     def pre_wait_action(self):
-        run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/ncmp_hsn_bringup.yaml')
+        run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/ncmp_hsn_bringup.yaml',
+                             exit_on_err=False)
 
     @staticmethod
     def parse_hsn_status_output(output):
@@ -441,6 +427,9 @@ def do_mgmt_boot(args):
                 # Have to exit here because playbook will fail if nodes are
                 # not available for SSH.
                 raise SystemExit(1)
+
+    LOGGER.info('Disabling entries in /etc/hosts to prepare for starting DNS.')
+    do_disable_hosts_entries()
 
     if not args.dry_run:
         try:

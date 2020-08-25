@@ -1,5 +1,5 @@
 """
-Run an Ansible playbook to shutdown platform services on the management cluster.
+This module handles enabling and disabling entries in /etc/hosts.
 
 (C) Copyright 2020 Hewlett Packard Enterprise Development LP.
 
@@ -27,8 +27,35 @@ from sat.cli.bootsys.util import run_ansible_playbook
 
 LOGGER = logging.getLogger(__name__)
 
-SHUTDOWN_PLAYBOOK = '/opt/cray/crayctl/ansible_framework/main/platform-shutdown.yml'
+ENABLE_PLAYBOOK = '/opt/cray/crayctl/ansible_framework/main/enable-dns-conflict-hosts.yml'
+DISABLE_PLAYBOOK = '/opt/cray/crayctl/ansible_framework/main/disable-dns-conflict-hosts.yml'
 
 
-def do_shutdown_playbook():
-    run_ansible_playbook(SHUTDOWN_PLAYBOOK, '--skip-tags prompt')
+def do_enable_hosts_entries():
+    """
+    Run an ansible playbook that enables all entries in the /etc/hosts file
+    that would normally conflict with DNS entries.
+
+    This needs to be done after all platform services are stopped in order to
+    provide a resolution for the hostnames of the form 'ncn-{m,s,w}###-mgmt' so
+    that we can reach the nodes to issue IPMI commands to view the console and
+    power them off.
+
+    Raises:
+        SystemExit: if the ansible playbook fails.
+    """
+    run_ansible_playbook(ENABLE_PLAYBOOK)
+
+
+def do_disable_hosts_entries():
+    """
+    Run an ansible playbook that disables all entries in the /etc/hosts file
+    that conflict with DNS entries.
+
+    This needs to be done before starting platform services in order to avoid
+    conflicting with the DNS resolution.
+
+    Raises:
+        SystemExit: if ansible playbook fails.
+    """
+    run_ansible_playbook(DISABLE_PLAYBOOK)

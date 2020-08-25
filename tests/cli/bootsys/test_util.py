@@ -21,11 +21,11 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-
+import subprocess
 import unittest
 from unittest.mock import patch, call
 
-from sat.cli.bootsys.util import get_ncns, RunningService
+from sat.cli.bootsys.util import get_ncns, RunningService, run_ansible_playbook
 
 
 class TestGetNcns(unittest.TestCase):
@@ -91,3 +91,49 @@ class TestRunningService(unittest.TestCase):
 
         mock_start_stop.assert_has_calls([call(True), call(False)])
         mock_sleep.assert_called_once_with(sleep_time)
+
+
+class TestRunAnsiblePlaybok(unittest.TestCase):
+
+    def setUp(self):
+        self.mock_subprocess_run = patch('sat.cli.bootsys.util.subprocess.run').start()
+
+    def tearDown(self):
+        patch.stopall()
+
+    def test_running_playbook(self):
+        """Test running a successful Ansible playbook."""
+        stdout = 'some output'
+        self.mock_subprocess_run.return_value.stdout = stdout
+        self.mock_subprocess_run.return_value.returncode = 0
+
+        path = '/foo/bar/baz/quux.yml'
+        returned_stdout = run_ansible_playbook(path)
+        self.mock_subprocess_run.assert_called_once_with(['ansible-playbook', path],
+                                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                                         encoding='utf-8')
+        self.assertEqual(stdout, returned_stdout)
+
+    def test_running_playbook_os_error_exit(self):
+        """Test running Ansible playbook with OSError causes SystemExit."""
+        self.mock_subprocess_run.side_effect = OSError
+
+        with self.assertRaises(SystemExit):
+            run_ansible_playbook('playbook.yml')
+
+    def test_running_playbook_failure_exit(self):
+        """Test running Ansible playbook that fails causes SystemExit"""
+        self.mock_subprocess_run.return_value.returncode = 1
+
+        with self.assertRaises(SystemExit):
+            run_ansible_playbook('playbook.yml')
+
+    def test_running_playbook_os_error_no_exit(self):
+        """Test running Ansible playbook with OSError and exit_on_err=False."""
+        self.mock_subprocess_run.side_effect = OSError
+        self.assertIsNone(run_ansible_playbook('playbook.yml', exit_on_err=False))
+
+    def test_running_playbook_failure_no_exit(self):
+        """Test running Ansible playbook that fails with exit_on_err=False."""
+        self.mock_subprocess_run.return_value.returncode = 1
+        self.assertIsNone(run_ansible_playbook('playbook.yml', exit_on_err=False))

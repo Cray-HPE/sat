@@ -92,6 +92,7 @@ class TestDoShutdown(ExtendedTestCase):
         self.mock_pester_choices = patch('sat.util.pester_choices').start()
         self.mock_pester_choices.return_value = 'yes'
         self.mock_do_shutdown_playbook = patch('sat.cli.bootsys.main.do_shutdown_playbook').start()
+        self.mock_do_enable_hosts = patch('sat.cli.bootsys.main.do_enable_hosts_entries').start()
         self.mock_ssh_client_cls = patch('sat.cli.bootsys.main.SSHClient').start()
         self.mock_ssh_client = Mock()
         self.mock_ssh_client_cls.return_value = self.mock_ssh_client
@@ -115,11 +116,13 @@ class TestDoShutdown(ExtendedTestCase):
             call('Proceeding with BOS shutdown of computes and UAN.'),
             call('Proceeding with shutdown of management platform services.'),
             call('Succeeded with shutdown of management platform services.'),
+            call('Enabling required entries in /etc/hosts for NCN mgmt interfaces.'),
             call('Proceeding with shutdown of management NCNs.'),
             call('Succeeded with shutdown of management NCNs.')
         ])
         self.mock_bos_operations.assert_called_once_with('shutdown')
         self.mock_do_shutdown_playbook.assert_called_once_with()
+        self.mock_do_enable_hosts.assert_called_once_with()
         self.mock_ssh_client.load_system_host_keys.assert_called_once_with()
         self.mock_get_user_pass.assert_called_once()
         self.mock_mgmt_shutdown.assert_called_once_with(
@@ -147,6 +150,7 @@ class TestDoShutdown(ExtendedTestCase):
                 self.mock_service_activity_check.assert_not_called()
                 self.mock_bos_operations.assert_not_called()
                 self.mock_do_shutdown_playbook.assert_not_called()
+                self.mock_do_enable_hosts.assert_not_called()
                 self.mock_get_user_pass.assert_not_called()
                 self.mock_mgmt_shutdown.assert_not_called()
 
@@ -171,6 +175,7 @@ class TestDoShutdown(ExtendedTestCase):
                 self.mock_service_activity_check.assert_called_with(self.args)
                 self.mock_bos_operations.assert_called_with('shutdown')
                 self.mock_do_shutdown_playbook.assert_called_with()
+                self.mock_do_enable_hosts.assert_called_with()
                 self.mock_ssh_client.load_system_host_keys.assert_called_with()
                 self.mock_get_user_pass.assert_called()
                 self.mock_mgmt_shutdown.assert_called_with(
@@ -199,6 +204,7 @@ class TestDoShutdown(ExtendedTestCase):
         ])
         self.mock_bos_operations.assert_called_once_with('shutdown')
         self.mock_do_shutdown_playbook.assert_not_called()
+        self.mock_do_enable_hosts.assert_not_called()
         self.mock_get_user_pass.assert_not_called()
         self.mock_mgmt_shutdown.assert_not_called()
 
@@ -213,6 +219,7 @@ class TestDoShutdown(ExtendedTestCase):
         self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
         self.mock_bos_operations.assert_not_called()
         self.mock_do_shutdown_playbook.assert_not_called()
+        self.mock_do_enable_hosts.assert_not_called()
         self.mock_get_user_pass.assert_not_called()
         self.mock_mgmt_shutdown.assert_not_called()
 
@@ -227,6 +234,7 @@ class TestDoShutdown(ExtendedTestCase):
         self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
         self.mock_bos_operations.assert_called_once_with('shutdown')
         self.mock_do_shutdown_playbook.assert_not_called()
+        self.mock_do_enable_hosts.assert_not_called()
         self.mock_get_user_pass.assert_not_called()
         self.mock_mgmt_shutdown.assert_not_called()
 
@@ -241,6 +249,7 @@ class TestDoShutdown(ExtendedTestCase):
         self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
         self.mock_bos_operations.assert_called_once_with('shutdown')
         self.mock_do_shutdown_playbook.assert_called_once_with()
+        self.mock_do_enable_hosts.assert_called_once_with()
         self.mock_get_user_pass.assert_not_called()
         self.mock_mgmt_shutdown.assert_not_called()
 

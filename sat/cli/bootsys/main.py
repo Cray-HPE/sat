@@ -38,6 +38,7 @@ from yaml import YAMLLoadWarning
 from sat.cli.bootsys.bos import BOSFailure, do_bos_operations
 from sat.cli.bootsys.defaults import DEFAULT_PODSTATE_DIR, DEFAULT_PODSTATE_FILE
 from sat.cli.bootsys.mgmt_boot_power import do_mgmt_boot
+from sat.cli.bootsys.mgmt_hosts import do_enable_hosts_entries
 from sat.cli.bootsys.mgmt_shutdown_ansible import do_shutdown_playbook
 from sat.cli.bootsys.mgmt_shutdown_power import do_mgmt_shutdown_power
 from sat.cli.bootsys.service_activity import do_service_activity_check
@@ -221,6 +222,9 @@ def do_shutdown(args):
     prompt_continue(action_msg)
     do_shutdown_playbook()
     print('Succeeded with {}.'.format(action_msg))
+
+    print('Enabling required entries in /etc/hosts for NCN mgmt interfaces.')
+    do_enable_hosts_entries()
 
     action_msg = 'shutdown of management NCNs'
     prompt_continue(action_msg)

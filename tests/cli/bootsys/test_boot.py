@@ -329,18 +329,6 @@ class TestBGPSpineStatusWaiter(WaiterTestCase):
         """Test if idle BGP peers are detected."""
         self.assertFalse(BGPSpineStatusWaiter.all_established(self.INCOMPLETE_OUTPUT))
 
-    def test_running_playbook(self):
-        """Test running an Ansible playbook."""
-        stdout = 'some output'
-        self.mock_subprocess_run.return_value.stdout = stdout
-
-        path = '/foo/bar/baz/quux.yml'
-        returned_stdout = run_ansible_playbook(path)
-        self.mock_subprocess_run.assert_called_once_with(['ansible-playbook', path],
-                                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                                         check=True, encoding='utf-8')
-        self.assertEqual(stdout, returned_stdout)
-
     @patch('sat.cli.bootsys.mgmt_boot_power.run_ansible_playbook')
     def test_get_spine_status(self, mock_run_playbook):
         """Test the get_spine_status helper function."""
@@ -348,7 +336,8 @@ class TestBGPSpineStatusWaiter(WaiterTestCase):
         mock_run_playbook.return_value = result
 
         self.assertEqual(BGPSpineStatusWaiter.get_spine_status(), result)
-        mock_run_playbook.assert_called_once_with('/opt/cray/crayctl/ansible_framework/main/spine-bgp-status.yml')
+        mock_run_playbook.assert_called_once_with('/opt/cray/crayctl/ansible_framework/main/spine-bgp-status.yml',
+                                                  exit_on_err=False)
 
     @patch('sat.cli.bootsys.mgmt_boot_power.BGPSpineStatusWaiter.get_spine_status')
     def test_completion_successful(self, mock_spine_status):
