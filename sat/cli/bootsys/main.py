@@ -44,7 +44,7 @@ from sat.cli.bootsys.mgmt_shutdown_power import do_mgmt_shutdown_power
 from sat.cli.bootsys.service_activity import do_service_activity_check
 from sat.cli.bootsys.util import k8s_pods_to_status_dict
 from sat.config import get_config_value
-from sat.util import get_username_and_password_interactively, prompt_continue
+from sat.util import BeginEndLogger, get_username_and_password_interactively, prompt_continue
 
 LOGGER = logging.getLogger(__name__)
 
@@ -189,31 +189,34 @@ def do_shutdown(args):
         None
     """
     print('Capturing state of k8s pods.')
-
-    try:
-        dump_pods(args.pod_state_file)
-    except (CalledProcessError, ConfigException, FileNotFoundError, PermissionError) as err:
-        msg = str(err)
-        if args.ignore_pod_failures:
-            LOGGER.warning(msg)
-        else:
-            LOGGER.error(msg)
-            sys.exit(1)
+    with BeginEndLogger('kubernetes pod state capture'):
+        try:
+            dump_pods(args.pod_state_file)
+        except (CalledProcessError, ConfigException, FileNotFoundError, PermissionError) as err:
+            msg = str(err)
+            if args.ignore_pod_failures:
+                LOGGER.warning(msg)
+            else:
+                LOGGER.error(msg)
+                sys.exit(1)
 
     if not args.dry_run:
-        do_service_activity_check(args)
+        with BeginEndLogger('service activity check'):
+            do_service_activity_check(args)
 
     action_msg = 'BOS shutdown of computes and UAN'
     prompt_continue(action_msg)
     try:
-        do_bos_operations('shutdown')
+        with BeginEndLogger(action_msg):
+            do_bos_operations('shutdown')
     except BOSFailure as err:
         LOGGER.error("Failed %s: %s", action_msg, err)
         sys.exit(1)
 
     action_msg = 'shutdown of management platform services'
     prompt_continue(action_msg)
-    do_shutdown_playbook()
+    with BeginEndLogger(action_msg):
+        do_shutdown_playbook()
     print('Succeeded with {}.'.format(action_msg))
 
     print('Enabling required entries in /etc/hosts for NCN mgmt interfaces.')
@@ -226,7 +229,8 @@ def do_shutdown(args):
     ssh_client = SSHClient()
     ssh_client.load_system_host_keys()
 
-    do_mgmt_shutdown_power(ssh_client, username, password, args.ipmi_timeout, args.dry_run)
+    with BeginEndLogger(action_msg):
+        do_mgmt_shutdown_power(ssh_client, username, password, args.ipmi_timeout, args.dry_run)
     print('Succeeded with {}.'.format(action_msg))
 
 

@@ -23,12 +23,14 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 from collections import OrderedDict
 from itertools import product
+import logging
 import os
 from textwrap import dedent
 from unittest import mock
 import unittest
 
 from sat import util
+from tests.common import ExtendedTestCase
 
 PT_BORDERS_ON = False
 PT_ALIGN = 'l'
@@ -415,6 +417,38 @@ class TestPromptContinue(unittest.TestCase):
             util.prompt_continue(action_msg)
         self.mock_print.assert_called_once_with('Will not proceed with {}. '
                                                 'Exiting.'.format(action_msg))
+
+
+class TestBeginEndLogger(ExtendedTestCase):
+    """Test the BeginEndLogger context manager class."""
+
+    def setUp(self):
+        """Set up some mocks."""
+        self.mock_monotonic = mock.patch('time.monotonic').start()
+        self.time_vals = [0, 10]
+        self.mock_monotonic.side_effect = self.time_vals
+
+    def tearDown(self):
+        """Stop mock patching."""
+        mock.patch.stopall()
+
+    def test_logged_messages_and_duration(self):
+        """Test the messages and duration logged by BeginEndLogger."""
+        my_stage = 'the test'
+        with self.assertLogs(level=logging.DEBUG) as cm:
+            with util.BeginEndLogger(my_stage):
+                pass  # NOSONAR
+
+        self.assert_in_element(f'BEGIN: {my_stage}', cm.output)
+        self.assert_in_element(f'END: {my_stage}. Duration: 0:00:10', cm.output)
+
+    def test_logged_messages_custom_level(self):
+        """Test the messages and duration logged by BeginEndLogger with custom level."""
+        with self.assertLogs(level=logging.INFO) as cm:
+            with util.BeginEndLogger('test', level=logging.INFO):
+                pass  # NOSONAR
+
+        self.assertEqual(2, len(cm.output))
 
 
 if __name__ == '__main__':

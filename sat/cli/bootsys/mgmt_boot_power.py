@@ -43,7 +43,7 @@ from sat.cli.bootsys.power import IPMIPowerStateWaiter
 from sat.cli.bootsys.util import get_ncns, RunningService, k8s_pods_to_status_dict, run_ansible_playbook
 from sat.cli.bootsys.waiting import GroupWaiter, SimultaneousWaiter, Waiter
 from sat.report import Report
-from sat.util import get_username_and_password_interactively
+from sat.util import BeginEndLogger, get_username_and_password_interactively
 
 LOGGER = logging.getLogger(__name__)
 
@@ -432,7 +432,8 @@ def do_mgmt_boot(args):
     do_disable_hosts_entries()
 
     if not args.dry_run:
-        run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/platform-startup.yml')
+        with BeginEndLogger('platform-startup.yml ansible playbook'):
+            run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/platform-startup.yml')
 
     try:
         k8s_api_waiter = KubernetesAPIAvailableWaiter(60)
@@ -440,7 +441,8 @@ def do_mgmt_boot(args):
         LOGGER.error("Failed to load kubernetes config while waiting for kubernetes "
                      "API to become available: %s", err)
         raise SystemExit(1)
-    k8s_api_waiter.wait_for_completion()
+    with BeginEndLogger('wait for k8s API available'):
+        k8s_api_waiter.wait_for_completion()
 
     try:
         k8s_waiter = KubernetesPodStatusWaiter(args.k8s_timeout)
@@ -450,10 +452,11 @@ def do_mgmt_boot(args):
                      "to reach expected states: %s", err)
         raise SystemExit(1)
 
-    with k8s_waiter:
+    with BeginEndLogger('wait for k8s pods healthy'), k8s_waiter:
         ceph_bgp_hsn_waiter = SimultaneousWaiter([CephHealthWaiter, BGPSpineStatusWaiter, HSNBringupWaiter],
                                                  max(args.ceph_timeout, args.bgp_timeout, args.hsn_timeout))
-        ceph_bgp_hsn_waiter.wait_for_completion()
+        with BeginEndLogger('wait for ceph health, BGP peering sessions, HSN up'):
+            ceph_bgp_hsn_waiter.wait_for_completion()
 
     if k8s_waiter.pending:
         LOGGER.error('The following kubernetes pods failed to reach their '
