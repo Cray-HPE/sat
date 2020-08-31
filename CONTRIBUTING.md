@@ -36,6 +36,11 @@ Contributors must follow the guidelines below:
    new ``[Unreleased]`` section will be created to track changes for the next
    release.
 
+# Developer Documentation
+
+See [Developer Documentation in this repository](./docs/developer/README.md) for
+more information.
+
 # Copying
 
 (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.

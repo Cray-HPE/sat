@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Boot of the compute nodes and User Access Nodes (UANs) using BOS.
 - Debug logging for every stage of `sat bootsys` operations including duration
   of each stage.
+- Developer documentation in markdown format.
 
 ### Fixed
 - Fixed missing values in info messages logged from sat.filtering module.
