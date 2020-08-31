@@ -179,14 +179,7 @@ def dump_pods(path):
 
 
 def do_shutdown(args):
-    """Perform a shutdown operation on the system.
-
-    This first dumps pod state to a file, then checks for active sessions in
-    various services, and then does a BOS shutdown of all computes and UANs.
-
-    Then it tells the user to manually run the 'platform-shutdown.yml' ansible
-    playbook and then will proceed with shutting down the management NCNs and
-    powering them off. In the future, that manual step will be automated.
+    """Perform a full-system shutdown operation.
 
     Args:
         args: The argparse.Namespace object containing the parsed arguments
