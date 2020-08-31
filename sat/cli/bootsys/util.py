@@ -183,5 +183,5 @@ def run_ansible_playbook(playbook_file, opts='', exit_on_err=True):
         else:
             return
     else:
-        LOGGER.info('Ansible playbook completed successfully.')
+        LOGGER.info('Ansible playbook %s completed successfully.', playbook_file)
         return proc.stdout
