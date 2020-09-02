@@ -432,14 +432,7 @@ def do_mgmt_boot(args):
     do_disable_hosts_entries()
 
     if not args.dry_run:
-        try:
-            subprocess.run(['ansible-playbook',
-                            '/opt/cray/crayctl/ansible_framework/main/platform-startup.yml'],
-                           check=True)
-        except subprocess.CalledProcessError as err:
-            LOGGER.error('Ansible playbook to start platform services failed. '
-                         'Aborting boot attempt: %s', err)
-            raise SystemExit(1)
+        run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/platform-startup.yml')
 
     try:
         k8s_api_waiter = KubernetesAPIAvailableWaiter(60)

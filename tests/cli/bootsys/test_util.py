@@ -114,6 +114,19 @@ class TestRunAnsiblePlaybok(unittest.TestCase):
                                                          encoding='utf-8')
         self.assertEqual(stdout, returned_stdout)
 
+    def test_running_playbook_with_opts(self):
+        """Test running a playbook with some options."""
+        stdout = 'some output'
+        self.mock_subprocess_run.return_value.stdout = stdout
+        self.mock_subprocess_run.return_value.returncode = 0
+
+        path = 'playbook.yml'
+        returned_stdout = run_ansible_playbook(path, opts='--skip-tags prompt')
+        self.mock_subprocess_run.assert_called_once_with(['ansible-playbook', '--skip-tags', 'prompt', path],
+                                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                                         encoding='utf-8')
+        self.assertEqual(stdout, returned_stdout)
+
     def test_running_playbook_os_error_exit(self):
         """Test running Ansible playbook with OSError causes SystemExit."""
         self.mock_subprocess_run.side_effect = OSError

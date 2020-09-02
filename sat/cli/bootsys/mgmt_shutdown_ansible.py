@@ -21,11 +21,7 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-import logging
-
 from sat.cli.bootsys.util import run_ansible_playbook
-
-LOGGER = logging.getLogger(__name__)
 
 SHUTDOWN_PLAYBOOK = '/opt/cray/crayctl/ansible_framework/main/platform-shutdown.yml'
 
