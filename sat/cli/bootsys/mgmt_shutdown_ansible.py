@@ -21,28 +21,10 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-import logging
-import shlex
-import subprocess
+from sat.cli.bootsys.util import run_ansible_playbook
 
-LOGGER = logging.getLogger(__name__)
-
-PLAYBOOK = '/opt/cray/crayctl/ansible_framework/main/platform-shutdown.yml'
+SHUTDOWN_PLAYBOOK = '/opt/cray/crayctl/ansible_framework/main/platform-shutdown.yml'
 
 
 def do_shutdown_playbook():
-    cmd = 'ansible-playbook --skip-tags prompt {}'.format(PLAYBOOK)
-    LOGGER.debug('Invoking Ansible: %s', cmd)
-
-    try:
-        proc = subprocess.run(shlex.split(cmd), stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE, encoding='utf-8')
-    except OSError as err:
-        LOGGER.error("Failed to invoke '%s': %s", cmd, err)
-        raise SystemExit(1)
-
-    if proc.returncode:
-        LOGGER.error("Command '%s' failed. stderr: %s", cmd, proc.stderr)
-        raise SystemExit(1)
-
-    LOGGER.info('Ansible playbook complete.')
+    run_ansible_playbook(SHUTDOWN_PLAYBOOK, '--skip-tags prompt')

@@ -38,6 +38,7 @@ from yaml import YAMLLoadWarning
 from sat.cli.bootsys.bos import BOSFailure, do_bos_operations
 from sat.cli.bootsys.defaults import DEFAULT_PODSTATE_DIR, DEFAULT_PODSTATE_FILE
 from sat.cli.bootsys.mgmt_boot_power import do_mgmt_boot
+from sat.cli.bootsys.mgmt_hosts import do_enable_hosts_entries
 from sat.cli.bootsys.mgmt_shutdown_ansible import do_shutdown_playbook
 from sat.cli.bootsys.mgmt_shutdown_power import do_mgmt_shutdown_power
 from sat.cli.bootsys.service_activity import do_service_activity_check
@@ -178,14 +179,7 @@ def dump_pods(path):
 
 
 def do_shutdown(args):
-    """Perform a shutdown operation on the system.
-
-    This first dumps pod state to a file, then checks for active sessions in
-    various services, and then does a BOS shutdown of all computes and UANs.
-
-    Then it tells the user to manually run the 'platform-shutdown.yml' ansible
-    playbook and then will proceed with shutting down the management NCNs and
-    powering them off. In the future, that manual step will be automated.
+    """Perform a full-system shutdown operation.
 
     Args:
         args: The argparse.Namespace object containing the parsed arguments
@@ -221,6 +215,9 @@ def do_shutdown(args):
     prompt_continue(action_msg)
     do_shutdown_playbook()
     print('Succeeded with {}.'.format(action_msg))
+
+    print('Enabling required entries in /etc/hosts for NCN mgmt interfaces.')
+    do_enable_hosts_entries()
 
     action_msg = 'shutdown of management NCNs'
     prompt_continue(action_msg)

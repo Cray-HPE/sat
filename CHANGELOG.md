@@ -33,11 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Shutdown of the compute nodes and User Access Nodes (UANs) using BOS.
     - Shutdown of the platform services by running the Ansible playbook,
       platform-shutdown.yml.
+    - Enabling of hosts in hosts file after platform services are stopped.
     - Shutdown and power off of the management NCNs.
 - ``sat bootsys boot`` implements the beginning portion of the system boot,
   including:
     - Power on and boot of management NCNs.
     - Waiting for management NCNs to be accessible via ssh.
+    - Disabling of hosts in hosts file after NCNs are booted.
     - Execution of Ansible playbook that starts platform services.
     - Waiting for kubernetes pods to reach expected states.
     - Boot of the compute nodes and User Access Nodes (UANs) using BOS.
