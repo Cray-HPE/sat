@@ -23,6 +23,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 import sys
 from collections import OrderedDict
+from datetime import timedelta
 from functools import partial
 import getpass
 import logging
@@ -30,6 +31,7 @@ import math
 import os
 import os.path
 import re
+import time
 
 # Logic borrowed from imps to get the most efficient YAML available
 try:
@@ -467,3 +469,41 @@ def get_new_ordered_dict(orig_dict, dotted_paths, default_value=None, strip_path
          get_val_by_path(orig_dict, dotted_path, default_value))
         for dotted_path in dotted_paths
     ])
+
+
+class BeginEndLogger:
+    """A context manager that logs a message when entering and exiting context.
+
+    The message logged at the beginning will be prefixed with 'BEGIN: ', and the
+    message logged at the end will be prefixed with 'END: '
+    """
+
+    def __init__(self, msg, logger=None, level=logging.DEBUG):
+        """Create a new BeginEndLogger context manager.
+
+        Args:
+            msg (str): The message to log
+            logger (logging.Logger): The logger to use to log beginning and end
+                messages. If None, defaults to the sat.util logger defined in
+                this module.
+            level (int): The log level to use for the begin and end log messages.
+                Defaults to logging.DEBUG.
+        """
+        self.msg = msg
+        if logger is None:
+            self.logger = LOGGER
+        else:
+            self.logger = logger
+        self.level = level
+        self.start_time = None
+
+    def __enter__(self):
+        """Log a beginning message and record the start time."""
+        self.start_time = time.monotonic()
+        self.logger.log(self.level, 'BEGIN: %s', self.msg)
+
+    def __exit__(self, type_, value, traceback):
+        """Log an end message including the duration."""
+        duration_seconds = time.monotonic() - self.start_time
+        duration = timedelta(seconds=duration_seconds)
+        self.logger.log(self.level, 'END: %s. Duration: %s', self.msg, duration)
