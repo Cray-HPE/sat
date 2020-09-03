@@ -91,6 +91,10 @@ def do_firmware(args):
                 LOGGER.error('Error with request for xname %s: %s', xname, err)
                 sys.exit(1)
 
+            if not fw_devs:
+                LOGGER.error('No firmware found for xname %s', xname)
+                sys.exit(1)
+
             fw_tables[None] += client.make_fw_table(fw_devs)
     else:
         try:
