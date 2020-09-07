@@ -23,10 +23,14 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 import re
 
-# The default directory where pod state is stored and read from
-DEFAULT_PODSTATE_DIR = '/var/sat/podstates/'
-# The default file where pod stats is stored and read from
-DEFAULT_PODSTATE_FILE = DEFAULT_PODSTATE_DIR + 'pod-state.json'
+# The default directory where pre-shutdown state is captured (currently k8s pod
+# states, HSN status). This can be overridden on the command-line.
+DEFAULT_STATE_DIR = '/var/sat/bootsys/'
+
+# The directory within DEFAULT_STATE_DIR where pod state is stored and read from
+POD_STATE_DIR = 'pod-states/'
+# The prefix used for files that record pod states.
+POD_STATE_FILE_PREFIX = 'pod-states'
 
 # The regex matching standard CLE session templates, e.g. cle-1.3.0
 CLE_BOS_TEMPLATE_REGEX = re.compile(r'^cle-\d+.\d+.\d+$')

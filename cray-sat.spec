@@ -92,8 +92,10 @@ install -m 644 etc/sat.toml %{buildroot}/etc/sat.toml
 # This directory is used to hold the user-created site_info.yml
 install -m 755 -d %{buildroot}/opt/cray/etc
 
+# Holds state dumps gathered during shutdown.
+install -m 755 -d %{buildroot}/var/sat/bootsys
 # Holds pod state dumps gathered during shutdown.
-install -m 755 -d %{buildroot}/var/sat/podstates
+install -m 755 -d %{buildroot}/var/sat/bootsys/pod-states
 
 # Install ansible content for crayctldeploy subpackage
 install -m 755 -d %{buildroot}/%{ansible_framework_dir}/roles
@@ -121,7 +123,8 @@ cat INSTALLED_FILES | grep __pycache__ | xargs dirname | xargs dirname | uniq >>
 %files -f INSTALLED_FILES
 %dir /var/log/cray
 %dir /opt/cray/etc
-%dir /var/sat/podstates
+%dir /var/sat/bootsys
+%dir /var/sat/bootsys/pod-states
 %config(noreplace) /etc/sat.toml
 %{satmandir}/*.8.gz
 /etc/bash_completion.d/sat-completion.bash

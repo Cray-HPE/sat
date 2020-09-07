@@ -148,8 +148,8 @@ class TestK8sPodWaiter(WaiterTestCase):
             }
         }
 
-        patch('builtins.open').start()
-        patch('sat.cli.bootsys.mgmt_boot_power.json.load', return_value=self.mocked_pod_dump).start()
+        mock_recorder = patch('sat.cli.bootsys.mgmt_boot_power.PodStateRecorder').start()
+        mock_recorder.get_state_data.return_value = self.mocked_pod_dump
 
         super().setUp()
 
