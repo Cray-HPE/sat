@@ -23,7 +23,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import sat.parsergroups
-from sat.cli.bootsys.defaults import DEFAULT_PODSTATE_FILE, DEFAULT_UAN_BOS_TEMPLATE
+from sat.cli.bootsys.defaults import DEFAULT_UAN_BOS_TEMPLATE
 
 
 def add_bootsys_subparser(subparsers):
@@ -80,11 +80,6 @@ def add_bootsys_subparser(subparsers):
         help='Action to take if a failure occurs when checking whether a BOS '
              'session template needs an operation applied based on current node '
              'state in HSM. Defaults to "abort".'
-    )
-
-    bootsys_parser.add_argument(
-        '--pod-state-file', default=DEFAULT_PODSTATE_FILE,
-        help='Custom location to dump pod state data.',
     )
 
     bootsys_parser.add_argument(

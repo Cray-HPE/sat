@@ -21,29 +21,18 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-from datetime import datetime
-import json
 import logging
-import os
 import sys
-from subprocess import CalledProcessError
-import warnings
 
-from kubernetes.client import CoreV1Api
-from kubernetes.config import load_kube_config
-from kubernetes.config.config_exception import ConfigException
 from paramiko.client import SSHClient
-from yaml import YAMLLoadWarning
 
 from sat.cli.bootsys.bos import BOSFailure, do_bos_operations
-from sat.cli.bootsys.defaults import DEFAULT_PODSTATE_DIR, DEFAULT_PODSTATE_FILE
 from sat.cli.bootsys.mgmt_boot_power import do_mgmt_boot
 from sat.cli.bootsys.mgmt_hosts import do_enable_hosts_entries
 from sat.cli.bootsys.mgmt_shutdown_ansible import do_shutdown_playbook
 from sat.cli.bootsys.mgmt_shutdown_power import do_mgmt_shutdown_power
+from sat.cli.bootsys.state_recorder import PodStateRecorder, StateError
 from sat.cli.bootsys.service_activity import do_service_activity_check
-from sat.cli.bootsys.util import k8s_pods_to_status_dict
-from sat.config import get_config_value
 from sat.util import BeginEndLogger, get_username_and_password_interactively, prompt_continue
 
 LOGGER = logging.getLogger(__name__)
@@ -68,116 +57,6 @@ def do_boot(args):
         sys.exit(1)
 
 
-def get_pods_as_json():
-    """Get K8s pod information as a JSON string.
-
-    Returns:
-        K8s pod information as a JSON string.
-
-    Raises:
-        subprocess.CalledProcessError: if kubectl failed
-        kubernetes.config.config_exception.ConfigException: if failed to load
-            kubernetes config.
-    """
-    # Load k8s configuration before trying to use API
-    try:
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', category=YAMLLoadWarning)
-            load_kube_config()
-    # Earlier versions: FileNotFoundError; later versions: ConfigException
-    except (FileNotFoundError, ConfigException) as err:
-        raise ConfigException(
-            'Failed to load kubernetes config to get pod status: '
-            '{}'.format(err)
-        )
-
-    k8s_api = CoreV1Api()
-    all_pods = k8s_api.list_pod_for_all_namespaces()
-    pods_dict = k8s_pods_to_status_dict(all_pods)
-
-    return json.dumps(pods_dict)
-
-
-def _new_file_name():
-    """Helper function for _rotate_files. Returns the new filename.
-
-    This function was created to help testing since datetime.utc was
-    proving difficult to mock.
-    """
-    now = datetime.utcnow()
-    return os.path.join(DEFAULT_PODSTATE_DIR, 'pod-state.{}.json'.format(now.strftime('%Y-%m-%dT%H:%M:%S')))
-
-
-def _rotate_files():
-    """Helper function for dump_pods.
-
-    Create a new podstate file and redirect the symlink. Also removes
-    podstate files until compliant with the config setting.
-
-    Raises:
-        FileNotFoundError: The directory was never created during install.
-        PermissionError: User was not root.
-    """
-    new_file = _new_file_name()
-
-    # create the new entry and redirect symlink.
-    with open(new_file, 'w') as f:
-        f.write('')
-
-    try:
-        os.remove(DEFAULT_PODSTATE_FILE)
-    except FileNotFoundError:
-        pass
-
-    os.symlink(new_file, DEFAULT_PODSTATE_FILE)
-
-    # the symlink will always be at the front.
-    files = [x for x in sorted(os.listdir(DEFAULT_PODSTATE_DIR)) if x.startswith('pod-state') and x != 'pod-state.json']
-
-    # remove number of pod states until compliant.
-    max_pod_states = get_config_value('bootsys.max_pod_states')
-    for i in range(len(files) - max_pod_states):
-        os.remove(os.path.join(DEFAULT_PODSTATE_DIR, files[i]))
-
-
-def dump_pods(path):
-    """Dump pod info to a file.
-
-    If the pod file is the same as the default, then check the count of
-    files in the dir against config.bootsys.max_pod_states
-
-    Args:
-        path: Output file.
-
-    Raises:
-        CalledProcessError: Can be raised by get_pods_as_json.
-        FileNotFoundError: The file could not be created.
-        PermissionError: Did not have permission to write to the file.
-    """
-    # this can raise
-    lines = get_pods_as_json()
-
-    fnf_msg = 'Containing directory for "{}" does not exist.'.format(path)
-    perm_msg = 'Insufficient permissions to write "{}".'.format(path)
-
-    # move the symlink
-    if path == DEFAULT_PODSTATE_FILE:
-        try:
-            _rotate_files()
-        except FileNotFoundError:
-            raise FileNotFoundError(fnf_msg)
-        except PermissionError:
-            raise PermissionError(perm_msg)
-
-    try:
-        with open(path, 'w') as f:
-            f.write(lines)
-    except FileNotFoundError:
-        raise FileNotFoundError(fnf_msg)
-    except PermissionError:
-        raise PermissionError(perm_msg)
-
-
 def do_shutdown(args):
     """Perform a full-system shutdown operation.
 
@@ -191,8 +70,8 @@ def do_shutdown(args):
     print('Capturing state of k8s pods.')
     with BeginEndLogger('kubernetes pod state capture'):
         try:
-            dump_pods(args.pod_state_file)
-        except (CalledProcessError, ConfigException, FileNotFoundError, PermissionError) as err:
+            PodStateRecorder().dump_state()
+        except StateError as err:
             msg = str(err)
             if args.ignore_pod_failures:
                 LOGGER.warning(msg)

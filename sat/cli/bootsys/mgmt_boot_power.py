@@ -37,9 +37,9 @@ from paramiko.client import SSHClient
 from paramiko.ssh_exception import SSHException
 from yaml import YAMLLoadWarning
 
-from sat.cli.bootsys.defaults import DEFAULT_PODSTATE_FILE
 from sat.cli.bootsys.mgmt_hosts import do_disable_hosts_entries
 from sat.cli.bootsys.power import IPMIPowerStateWaiter
+from sat.cli.bootsys.state_recorder import PodStateRecorder
 from sat.cli.bootsys.util import get_ncns, RunningService, k8s_pods_to_status_dict, run_ansible_playbook
 from sat.cli.bootsys.waiting import GroupWaiter, SimultaneousWaiter, Waiter
 from sat.report import Report
@@ -194,15 +194,10 @@ class KubernetesPodStatusWaiter(GroupWaiter):
     state.
     """
 
-    def __init__(self, timeout, poll_interval=10,
-                 podstate_path=DEFAULT_PODSTATE_FILE):
+    def __init__(self, timeout, poll_interval=10):
         """Initialize the Kubernetes waiter.
 
         See GroupWaiter documentation.
-
-        Args:
-            podstate_path (str): a path to the file containing the
-                state of the pods from the previous shutdown.
         """
 
         super().__init__(set(), timeout, poll_interval=poll_interval)
@@ -210,8 +205,9 @@ class KubernetesPodStatusWaiter(GroupWaiter):
         # Load k8s configuration before trying to use API
         self.k8s_api = load_kube_api()
 
-        with open(podstate_path) as podstate:
-            self.previous_boot_phase = json.load(podstate)
+        # TODO: Handle StateError and PodStateError here
+        pod_state_recorder = PodStateRecorder()
+        self.previous_boot_phase = pod_state_recorder.get_stored_state()
 
         self.new_pods = set()  # pods not present when shut down
 

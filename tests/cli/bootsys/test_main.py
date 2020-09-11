@@ -31,7 +31,8 @@ from unittest.mock import call, Mock, patch
 import sat
 import sat.cli.bootsys.defaults
 from sat.cli.bootsys.bos import BOSFailure
-from sat.cli.bootsys.main import do_boot, do_bootsys, do_shutdown, dump_pods
+from sat.cli.bootsys.main import do_boot, do_bootsys, do_shutdown
+from sat.cli.bootsys.state_recorder import StateError
 from tests.common import ExtendedTestCase
 
 
@@ -77,8 +78,6 @@ class TestDoShutdown(ExtendedTestCase):
         self.args = Mock()
         self.args.dry_run = False
         self.args.redfish_username = None
-        self.pod_state_file = '/path/to/pod-state-file'
-        self.args.pod_state_file = self.pod_state_file
         self.args.ignore_pod_failures = False
         self.args.ipmi_timeout = 1
 
@@ -87,7 +86,7 @@ class TestDoShutdown(ExtendedTestCase):
             'sat.cli.bootsys.main.do_service_activity_check'
         ).start()
         self.mock_print = patch('builtins.print').start()
-        self.mock_dump_pods = patch('sat.cli.bootsys.main.dump_pods').start()
+        self.mock_pod_state_recorder = patch('sat.cli.bootsys.main.PodStateRecorder').start().return_value
         self.mock_bos_operations = patch('sat.cli.bootsys.main.do_bos_operations').start()
         self.mock_pester_choices = patch('sat.util.pester_choices').start()
         self.mock_pester_choices.return_value = 'yes'
@@ -111,7 +110,7 @@ class TestDoShutdown(ExtendedTestCase):
         do_shutdown(self.args)
 
         self.mock_service_activity_check.assert_called_once_with(self.args)
-        self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
+        self.mock_pod_state_recorder.dump_state.assert_called_once()
         self.mock_print.assert_has_calls([
             call('Proceeding with BOS shutdown of computes and UAN.'),
             call('Proceeding with shutdown of management platform services.'),
@@ -130,58 +129,48 @@ class TestDoShutdown(ExtendedTestCase):
             self.mock_password, self.args.ipmi_timeout, self.args.dry_run
         )
 
-    def test_do_shutdown_dump_pods_errors(self):
-        """Test do_shutdown with dump_pods raising various errors."""
-        possible_errors = [CalledProcessError(returncode=1, cmd='fail'),
-                           FileNotFoundError(), PermissionError()]
+    def test_do_shutdown_dump_pods_error(self):
+        """Test do_shutdown with pod dumping raising a StateError."""
+        err = StateError("failed to capture pod state")
+        self.mock_pod_state_recorder.dump_state.side_effect = err
 
-        for err in possible_errors:
-            with self.subTest('test do_shutdown with dump_pods raising '
-                              '{}'.format(type(err))):
-                self.mock_dump_pods.side_effect = err
+        with self.assertLogs(level=logging.ERROR) as cm:
+            with self.assertRaises(SystemExit):
+                do_shutdown(self.args)
 
-                with self.assertLogs(level=logging.ERROR) as cm:
-                    with self.assertRaises(SystemExit):
-                        do_shutdown(self.args)
+        self.assert_in_element(str(err), cm.output)
 
-                self.assert_in_element(str(err), cm.output)
-
-                self.mock_dump_pods.assert_called_with(self.pod_state_file)
-                self.mock_service_activity_check.assert_not_called()
-                self.mock_bos_operations.assert_not_called()
-                self.mock_do_shutdown_playbook.assert_not_called()
-                self.mock_do_enable_hosts.assert_not_called()
-                self.mock_get_user_pass.assert_not_called()
-                self.mock_mgmt_shutdown.assert_not_called()
+        self.mock_pod_state_recorder.dump_state.assert_called_once()
+        self.mock_service_activity_check.assert_not_called()
+        self.mock_bos_operations.assert_not_called()
+        self.mock_do_shutdown_playbook.assert_not_called()
+        self.mock_do_enable_hosts.assert_not_called()
+        self.mock_get_user_pass.assert_not_called()
+        self.mock_mgmt_shutdown.assert_not_called()
 
     def test_do_shutdown_dump_pods_ignore_errors(self):
-        """Test do_shutdown with dump_pods raising various errors."""
+        """Test do_shutdown while ignoring pod dump errors."""
         self.args.ignore_pod_failures = True
 
-        possible_errors = [CalledProcessError(returncode=1, cmd='fail'),
-                           FileNotFoundError(), PermissionError()]
+        err = StateError("failed to capture pod state")
+        self.mock_pod_state_recorder.dump_state.side_effect = err
 
-        for err in possible_errors:
-            with self.subTest('test do_shutdown with dump_pods raising '
-                              '{}'.format(type(err))):
-                self.mock_dump_pods.side_effect = err
+        with self.assertLogs(level=logging.WARNING) as cm:
+            do_shutdown(self.args)
 
-                with self.assertLogs(level=logging.WARNING) as cm:
-                    do_shutdown(self.args)
+        self.assert_in_element(str(err), cm.output)
 
-                self.assert_in_element(str(err), cm.output)
-
-                self.mock_dump_pods.assert_called_with(self.pod_state_file)
-                self.mock_service_activity_check.assert_called_with(self.args)
-                self.mock_bos_operations.assert_called_with('shutdown')
-                self.mock_do_shutdown_playbook.assert_called_with()
-                self.mock_do_enable_hosts.assert_called_with()
-                self.mock_ssh_client.load_system_host_keys.assert_called_with()
-                self.mock_get_user_pass.assert_called()
-                self.mock_mgmt_shutdown.assert_called_with(
-                    self.mock_ssh_client, self.mock_username,
-                    self.mock_password, self.args.ipmi_timeout, self.args.dry_run
-                )
+        self.mock_pod_state_recorder.dump_state.assert_called_once()
+        self.mock_service_activity_check.assert_called_with(self.args)
+        self.mock_bos_operations.assert_called_with('shutdown')
+        self.mock_do_shutdown_playbook.assert_called_with()
+        self.mock_do_enable_hosts.assert_called_with()
+        self.mock_ssh_client.load_system_host_keys.assert_called_with()
+        self.mock_get_user_pass.assert_called()
+        self.mock_mgmt_shutdown.assert_called_with(
+            self.mock_ssh_client, self.mock_username,
+            self.mock_password, self.args.ipmi_timeout, self.args.dry_run
+        )
 
     def test_do_shutdown_bos_failure(self):
         """Test do_shutdown with do_bos_shutdown raising a BOSFailure."""
@@ -197,7 +186,7 @@ class TestDoShutdown(ExtendedTestCase):
                                cm.output)
 
         self.mock_service_activity_check.assert_called_once_with(self.args)
-        self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
+        self.mock_pod_state_recorder.dump_state.assert_called_once()
         self.mock_print.assert_has_calls([
             call('Capturing state of k8s pods.'),
             call('Proceeding with BOS shutdown of computes and UAN.')
@@ -216,7 +205,7 @@ class TestDoShutdown(ExtendedTestCase):
             do_shutdown(self.args)
 
         self.mock_service_activity_check.assert_called_once_with(self.args)
-        self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
+        self.mock_pod_state_recorder.dump_state.assert_called_once()
         self.mock_bos_operations.assert_not_called()
         self.mock_do_shutdown_playbook.assert_not_called()
         self.mock_do_enable_hosts.assert_not_called()
@@ -231,7 +220,7 @@ class TestDoShutdown(ExtendedTestCase):
             do_shutdown(self.args)
 
         self.mock_service_activity_check.assert_called_once_with(self.args)
-        self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
+        self.mock_pod_state_recorder.dump_state.assert_called_once()
         self.mock_bos_operations.assert_called_once_with('shutdown')
         self.mock_do_shutdown_playbook.assert_not_called()
         self.mock_do_enable_hosts.assert_not_called()
@@ -246,7 +235,7 @@ class TestDoShutdown(ExtendedTestCase):
             do_shutdown(self.args)
 
         self.mock_service_activity_check.assert_called_once_with(self.args)
-        self.mock_dump_pods.assert_called_once_with(self.pod_state_file)
+        self.mock_pod_state_recorder.dump_state.assert_called_once()
         self.mock_bos_operations.assert_called_once_with('shutdown')
         self.mock_do_shutdown_playbook.assert_called_once_with()
         self.mock_do_enable_hosts.assert_called_once_with()
@@ -262,16 +251,6 @@ class TestDoBootsys(unittest.TestCase):
         """
         self.mock_do_boot = patch('sat.cli.bootsys.main.do_boot').start()
         self.mock_do_shutdown = patch('sat.cli.bootsys.main.do_shutdown').start()
-
-        self.default_dir = os.path.join(os.path.dirname(__file__), '../..', 'resources', 'podstates/')
-        self.default_podstate = os.path.join(self.default_dir, 'pod-state.json')
-
-        patch('sat.cli.bootsys.main.DEFAULT_PODSTATE_DIR', self.default_dir).start()
-        patch('sat.cli.bootsys.main.DEFAULT_PODSTATE_FILE', self.default_podstate).start()
-
-        self.pod_mock = patch(
-            'sat.cli.bootsys.main.get_pods_as_json',
-            return_value='hello').start()
 
     def tearDown(self):
         """Stop all patches."""
@@ -299,72 +278,6 @@ class TestDoBootsys(unittest.TestCase):
         self.assertEqual(1, cm.exception.code)
         self.mock_do_boot.assert_not_called()
         self.mock_do_shutdown.assert_not_called()
-
-    def test_dump_pods_custom_path(self):
-        """dump_pods should write text to a custom file location.
-
-        More specifically, it should write the output of get_pods_as_json.
-        """
-        dir_in = self.default_dir
-        outfile = os.path.join(dir_in, 'custom-path')
-
-        try:
-            dump_pods(outfile)
-
-            with open(outfile, 'r') as f:
-                lines = f.read()
-
-            self.assertEqual('hello', lines)
-
-        finally:
-            os.remove(outfile)
-
-    def test_dump_pods_default(self):
-        """dump_pods should create a symlink that points to the next log.
-        """
-        try:
-            dump_pods(sat.cli.bootsys.main.DEFAULT_PODSTATE_FILE)
-            with open(self.default_podstate, 'r') as f:
-                lines = f.read()
-            self.assertEqual('hello', lines)
-
-        finally:
-            files = glob.glob(self.default_dir + 'pod-state*')
-            for f in files:
-                os.remove(f)
-
-    def test_dump_pods_rotating_logs(self):
-        """dump_pods should rotate the logs.
-
-        A maximum number of logs should be kept as specified
-        in the config file.
-        """
-        class MockNamer:
-            _num = -1
-            @classmethod
-            def genName(cls):
-                MockNamer._num = MockNamer._num + 1
-                return self.default_dir + 'pod-state.{:02d}.json'.format(MockNamer._num)
-
-        patch('sat.cli.bootsys.main._new_file_name', MockNamer.genName).start()
-        patch('sat.cli.bootsys.main.get_config_value', return_value=5).start()
-
-        # At the end of this, there should only be 5 logs plus the symlink.
-        try:
-            for i in range(1, 15):
-                dump_pods(sat.cli.bootsys.main.DEFAULT_PODSTATE_FILE)
-
-            files = [x for x in sorted(os.listdir(self.default_dir)) if x.startswith('pod-state')]
-
-            # There should be 6 files left including the symlink, and the earliest
-            # should appear first.
-            self.assertEqual(6, len(files))
-            self.assertEqual('pod-state.09.json', files[0])
-
-        finally:
-            files = glob.glob(self.default_dir + 'pod-state*')
-            for f in files:
-                os.remove(f)
 
 
 if __name__ == '__main__':
