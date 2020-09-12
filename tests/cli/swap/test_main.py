@@ -1,5 +1,5 @@
 """
-The main entry point for the switch subcommand.
+Unit tests for sat.cli.swap.main
 
 (C) Copyright 2020 Hewlett Packard Enterprise Development LP.
 
@@ -22,16 +22,35 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
-import warnings
+import unittest
+from unittest import mock
+from argparse import Namespace
 
-from sat.cli.swap.switch import swap_switch
+from sat.cli.swap.main import do_swap
 
 
-def do_switch(args):
+def set_options(namespace):
+    namespace.target = 'cable'
 
-    # DeprecationWarnings are ignored by default, so force this to be displayed
-    warnings.simplefilter('once', category=DeprecationWarning)
-    warnings.warn('The "sat switch" command is deprecated and will be removed in a future release. '
-                  'Please use "sat swap switch" instead.', DeprecationWarning)
 
-    swap_switch(args)
+class TestSwapMain(unittest.TestCase):
+
+    def setUp(self):
+        self.fake_swap_cable = mock.patch('sat.cli.swap.main.swap_cable').start()
+        self.fake_swap_switch = mock.patch('sat.cli.swap.main.swap_switch').start()
+        self.fake_args = Namespace()
+        set_options(self.fake_args)
+
+    def tearDown(self):
+        mock.patch.stopall()
+
+    def test_swap_cable(self):
+        """Running swap cable calls the swap cable function"""
+        do_swap(self.fake_args)
+        self.fake_swap_cable.assert_called_with(self.fake_args)
+
+    def test_swap_switch(self):
+        """Running swap switch calls the swap switch function"""
+        self.fake_args.target = 'switch'
+        do_swap(self.fake_args)
+        self.fake_swap_switch.assert_called_with(self.fake_args)

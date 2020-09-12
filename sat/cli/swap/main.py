@@ -1,5 +1,5 @@
 """
-The main entry point for the switch subcommand.
+The main entry point for the swap command.
 
 (C) Copyright 2020 Hewlett Packard Enterprise Development LP.
 
@@ -22,16 +22,21 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
-import warnings
-
 from sat.cli.swap.switch import swap_switch
+from sat.cli.swap.cable import swap_cable
 
 
-def do_switch(args):
+def do_swap(args):
+    """Perform the specified swap action
 
-    # DeprecationWarnings are ignored by default, so force this to be displayed
-    warnings.simplefilter('once', category=DeprecationWarning)
-    warnings.warn('The "sat switch" command is deprecated and will be removed in a future release. '
-                  'Please use "sat swap switch" instead.', DeprecationWarning)
+    Args:
+        args: an argparse Namespace object
 
-    swap_switch(args)
+    Returns:
+        None
+    """
+
+    if args.target == 'cable':
+        swap_cable(args)
+    elif args.target == 'switch':
+        swap_switch(args)

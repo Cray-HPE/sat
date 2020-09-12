@@ -18,6 +18,10 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
+Note: The 'sat switch' subcommand is deprecated and will be removed in
+a future release.  Please use the equivalent 'sat swap switch' command.
+For more information, please see sat-swap(8).
+
 The switch subcommand disables the ports on a switch, or enables the
 ports on a switch. This can be used during switch replacement, or for
 other purposes where disabling/enabling all of the ports on a switch
@@ -27,7 +31,7 @@ ARGUMENTS
 =========
 
 *xname*
-        The xname of the switch (also called router).
+        The xname of the switch.
 
 OPTIONS
 =======
@@ -66,12 +70,14 @@ These options must be specified after the subcommand.
 EXIT STATUS
 ===========
 
-| 1: Error getting ports for system
-| 2: No ports found for the switch
-| 3: Port set to be created already exists
-| 4: Creation of port set failed
-| 5: Problem getting port configuration
-| 6: Disable/enable of port set failed
+| 1: An invalid combination of options was given
+| 2: Error getting ports for system
+| 3: No ports found for the switch
+| 4: Port set to be created already exists
+| 5: Creation of port set failed
+| 6: Deletion of existing port set failed
+| 7: Problem getting port configuration
+| 8: Disable/enable of port set failed
 
 EXAMPLES
 ========
@@ -103,5 +109,6 @@ SEE ALSO
 ========
 
 sat(8)
+sat-swap(8)
 
 .. include:: _notice.rst

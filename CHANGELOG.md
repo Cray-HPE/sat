@@ -46,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Debug logging for every stage of `sat bootsys` operations including duration
   of each stage.
 - Developer documentation in markdown format.
+- Added ``sat swap`` subcommand for swapping cables and switches.  The
+  existing functionality of ``sat switch`` is now duplicated under
+  ``sat swap switch``, and ``sat switch`` is deprecated.  Changed
+  exit codes of ``sat switch`` to align with ``sat swap``.
 
 ### Fixed
 - Fixed missing values in info messages logged from sat.filtering module.
