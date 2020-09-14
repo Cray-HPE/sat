@@ -27,6 +27,7 @@ import unittest
 from unittest.mock import call, patch, Mock
 
 from sat.cli.bootsys.state_recorder import (
+    HSNStateRecorder,
     PodStateError, PodStateRecorder,
     StateError, StateRecorder
 )
@@ -372,6 +373,40 @@ class TestPodStateRecorder(unittest.TestCase):
 
         with self.assertRaisesRegex(PodStateError, 'Failed to load kubernetes config'):
             PodStateRecorder().get_state_data()
+
+
+class TestHSNStateRecorder(unittest.TestCase):
+    """Test the HSNStateRecorder class."""
+
+    def setUp(self):
+        """Set up mocks."""
+        self.max_hsn_states = 10
+        self.mock_get_config_value = patch('sat.cli.bootsys.state_recorder.get_config_value').start()
+        self.mock_get_config_value.return_value = self.max_hsn_states
+
+        patch('sat.cli.bootsys.state_recorder.SATSession').start()
+        mock_fc_class = patch('sat.cli.bootsys.state_recorder.FabricControllerClient').start()
+        self.mock_fc_client = mock_fc_class.return_value
+
+    def tearDown(self):
+        """Stop all patches."""
+        patch.stopall()
+
+    def test_init(self):
+        """Test creation of a new HSNStateRecorder."""
+        hsr = HSNStateRecorder()
+        self.mock_get_config_value.assert_called_once_with('bootsys.max_hsn_states')
+        self.assertEqual(hsr.dir_path, '/var/sat/bootsys/hsn-states/')
+        self.assertEqual(hsr.file_prefix, 'hsn-state')
+        self.assertEqual(hsr.file_suffix, '.json')
+        self.assertEqual(hsr.num_to_keep, self.max_hsn_states)
+
+    def test_get_state_data(self):
+        """Test the successful case for get_state_data."""
+        hsr = HSNStateRecorder()
+        state_data = hsr.get_state_data()
+        self.assertEqual(self.mock_fc_client.get_fabric_edge_ports_enabled_status.return_value,
+                         state_data)
 
 
 if __name__ == '__main__':

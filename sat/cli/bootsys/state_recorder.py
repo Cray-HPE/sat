@@ -32,7 +32,13 @@ from kubernetes.client import CoreV1Api
 from kubernetes.config import load_kube_config, ConfigException
 from yaml import YAMLLoadWarning
 
-from sat.cli.bootsys.defaults import DEFAULT_STATE_DIR, POD_STATE_DIR, POD_STATE_FILE_PREFIX
+from sat.apiclient import FabricControllerClient
+from sat.session import SATSession
+from sat.cli.bootsys.defaults import (
+    DEFAULT_STATE_DIR,
+    POD_STATE_DIR, POD_STATE_FILE_PREFIX,
+    HSN_STATE_DIR, HSN_STATE_FILE_PREFIX
+)
 from sat.cli.bootsys.util import k8s_pods_to_status_dict
 from sat.config import get_config_value
 
@@ -228,6 +234,7 @@ class StateRecorder(ABC):
 
 
 class PodStateRecorder(StateRecorder):
+    """Records the state of k8s pods based on the k8s API."""
 
     def __init__(self):
         pod_state_dir = os.path.join(DEFAULT_STATE_DIR, POD_STATE_DIR)
@@ -256,3 +263,27 @@ class PodStateRecorder(StateRecorder):
         k8s_api = CoreV1Api()
         all_pods = k8s_api.list_pod_for_all_namespaces()
         return k8s_pods_to_status_dict(all_pods)
+
+
+class HSNStateRecorder(StateRecorder):
+    """Records the state of the High-speed Network (HSN) according to the fabric controller API."""
+
+    def __init__(self):
+        hsn_state_dir = os.path.join(DEFAULT_STATE_DIR, HSN_STATE_DIR)
+        num_to_keep = get_config_value('bootsys.max_hsn_states')
+        super().__init__(hsn_state_dir, HSN_STATE_FILE_PREFIX, num_to_keep)
+
+        self.fabric_client = FabricControllerClient(SATSession())
+
+    def get_state_data(self):
+        """Get HSN state information in a dictionary.
+
+        Queries the fabric controller API to get the state of all the links in
+        the high-speed network (HSN).
+
+        Returns:
+            HSN state information as a dictionary mapping from HSN port set name
+            to a dictionary mapping from xname strings to booleans indicating
+            whether that port is enabled or not.
+        """
+        return self.fabric_client.get_fabric_edge_ports_enabled_status()

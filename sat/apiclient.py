@@ -26,6 +26,7 @@ import requests
 from urllib.parse import urlunparse
 
 from sat.config import get_config_value
+from sat.util import get_val_by_path
 
 
 LOGGER = logging.getLogger(__name__)
@@ -210,6 +211,70 @@ class HSMClient(APIGatewayClient):
 
 class FabricControllerClient(APIGatewayClient):
     base_resource_path = 'fc/v2/'
+
+    def get_port_set_enabled_status(self, port_set):
+        """Get the enabled status of the ports in the given port set.
+
+        Args:
+            port_set (str): the name of the given port set.
+
+        Returns:
+            A dictionary mapping from port xname (str) to enabled status (bool).
+
+        Raises:
+            APIError: if the request to the fabric controller API fails, the
+                response cannot be parsed as JSON, or the response is missing
+                the required 'ports' key.
+        """
+        enabled_by_xname = {}
+
+        try:
+            port_set_state = self.get('port-sets', port_set, 'status').json()
+        except APIError as err:
+            raise APIError(f'Fabric controller API request for port status of '
+                           f'port set {port_set} failed: {err}')
+        except ValueError as err:
+            raise APIError(f'Failed to parse JSON from fabric controller API '
+                           f'response when getting status of port set {port_set}: {err}')
+
+        try:
+            port_states = port_set_state['ports']
+        except KeyError as err:
+            raise APIError(f'Failed to get port status for port set {port_set} due to '
+                           f'missing key {err} in response from fabric controller API.')
+
+        for port in port_states:
+            port_xname = port.get('xname')
+            port_enabled = get_val_by_path(port, 'status.enable')
+            if port_xname is None or port_enabled is None:
+                LOGGER.warning(f'Unable to get xname and/or enabled status of port '
+                               f'from port entry: {port}')
+            else:
+                enabled_by_xname[port_xname] = port_enabled
+
+        return enabled_by_xname
+
+    def get_fabric_edge_ports_enabled_status(self):
+        """Gets the enabled status of the ports in the fabric-ports and edge-ports port sets.
+
+        Returns:
+            HSN state information as a dictionary mapping from HSN port set name
+            to a dictionary mapping from xname strings to booleans indicating
+            whether that port is enabled or not. If we fail to get enabled status
+            for a port set, it is omitted from the returned dictionary, and a
+            warning is logged.
+        """
+        port_sets = ['edge-ports', 'fabric-ports']
+        port_states_by_port_set = {}
+
+        for port_set in port_sets:
+            try:
+                port_states_by_port_set[port_set] = self.get_port_set_enabled_status(port_set)
+            except APIError as err:
+                LOGGER.warning(f'Failed to get port status for port set {port_set}: {err}')
+                continue
+
+        return port_states_by_port_set
 
 
 class BOSClient(APIGatewayClient):

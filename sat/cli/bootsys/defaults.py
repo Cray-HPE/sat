@@ -32,6 +32,11 @@ POD_STATE_DIR = 'pod-states/'
 # The prefix used for files that record pod states.
 POD_STATE_FILE_PREFIX = 'pod-states'
 
+# The directory within DEFAULT_STATE_DIR where high-speed network (HSN) state is stored and read from
+HSN_STATE_DIR = 'hsn-states/'
+# The prefix used for files that record HSN state
+HSN_STATE_FILE_PREFIX = 'hsn-state'
+
 # The regex matching standard CLE session templates, e.g. cle-1.3.0
 CLE_BOS_TEMPLATE_REGEX = re.compile(r'^cle-\d+.\d+.\d+$')
 # The name of the standard UAN session template
