@@ -211,6 +211,29 @@ class HSMClient(APIGatewayClient):
 
 class FabricControllerClient(APIGatewayClient):
     base_resource_path = 'fc/v2/'
+    default_port_set_names = ['fabric-ports', 'edge-ports']
+
+    def get_fabric_edge_ports(self):
+        """Get all the fabric and edge ports in the system.
+
+        Returns:
+            A dict mapping from the default fabric and edge port set names to a
+            list of ports in that port set.
+        """
+        ports_by_port_set = {}
+        for port_set in self.default_port_set_names:
+            try:
+                ports_by_port_set[port_set] = self.get('port-sets', port_set).json()['ports']
+            except APIError as err:
+                LOGGER.warning(f'Failed to get ports for port set {port_set}: {err}')
+            except ValueError as err:
+                LOGGER.warning(f'Failed to parse response from fabric controller API '
+                               f'when getting ports for port set {port_set}: {err}')
+            except KeyError as err:
+                LOGGER.warning(f'Response from fabric controller API was missing the '
+                               f'{err} key.')
+
+        return ports_by_port_set
 
     def get_port_set_enabled_status(self, port_set):
         """Get the enabled status of the ports in the given port set.
@@ -260,14 +283,14 @@ class FabricControllerClient(APIGatewayClient):
         Returns:
             HSN state information as a dictionary mapping from HSN port set name
             to a dictionary mapping from xname strings to booleans indicating
-            whether that port is enabled or not. If we fail to get enabled status
-            for a port set, it is omitted from the returned dictionary, and a
-            warning is logged.
+            whether that port is enabled or not.
+
+            If we fail to get enabled status for a port set, it is omitted from the
+            returned dictionary, and a warning is logged.
         """
-        port_sets = ['edge-ports', 'fabric-ports']
         port_states_by_port_set = {}
 
-        for port_set in port_sets:
+        for port_set in self.default_port_set_names:
             try:
                 port_states_by_port_set[port_set] = self.get_port_set_enabled_status(port_set)
             except APIError as err:

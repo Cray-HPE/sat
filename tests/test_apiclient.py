@@ -253,6 +253,49 @@ class TestFabricControllerClient(ExtendedTestCase):
     def tearDown(self):
         mock.patch.stopall()
 
+    def test_get_fabric_edge_ports(self):
+        """Test getting all fabric and edge ports."""
+        expected = {
+            'fabric-ports': ['x3000c0r24j4p0', 'x3000c0r24j4p1'],
+            'edge-ports': ['x3000c0r24j8p0', 'x3000c0r24j8p1']
+        }
+        actual = self.fabric_client.get_fabric_edge_ports()
+        self.assertEqual(expected, actual)
+
+    def test_get_fabric_edge_ports_api_error(self):
+        """Test getting all fabric and edge ports when there is an APIError."""
+        self.get_api_err = True
+        with self.assertLogs(level=logging.WARNING) as cm:
+            actual = self.fabric_client.get_fabric_edge_ports()
+
+        self.assertEqual(2, len(cm.output))
+        self.assert_in_element('Failed to get ports for port set', cm.output)
+        self.assertEqual({}, actual)
+
+    def test_get_fabric_edge_ports_bad_json(self):
+        """Test getting all fabric and edge ports when the response JSON cannot be parsed."""
+        self.json_value_err = True
+        with self.assertLogs(level=logging.WARNING) as cm:
+            actual = self.fabric_client.get_fabric_edge_ports()
+
+        self.assertEqual(2, len(cm.output))
+        self.assert_in_element('Failed to parse response', cm.output)
+        self.assertEqual({}, actual)
+
+    def test_get_fabric_edge_ports_missing_key(self):
+        """Test getting all fabric and edge ports when there is a missing 'ports' key."""
+        del self.mock_port_sets['fabric-ports']['ports']
+        expected = {
+            'edge-ports': ['x3000c0r24j8p0', 'x3000c0r24j8p1']
+        }
+
+        with self.assertLogs(level=logging.WARNING) as cm:
+            actual = self.fabric_client.get_fabric_edge_ports()
+        self.assertEqual(1, len(cm.output))
+        self.assert_in_element("Response from fabric controller API was missing "
+                               "the 'ports' key", cm.output)
+        self.assertEqual(expected, actual)
+
     def test_get_fabric_edge_ports_status(self):
         """Test getting enabled status of fabric and edge ports."""
         expected = {

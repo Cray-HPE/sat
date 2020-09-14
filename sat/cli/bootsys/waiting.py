@@ -249,6 +249,10 @@ class GroupWaiter(Waiter):
 
         start_time = time.monotonic()
 
+        # Ensure we set this to a set of all members before starting to wait
+        # because children classes may set `self.members` after `__init__`.
+        self.pending = set(self.members)
+
         while self.pending and time.monotonic() - start_time < self.timeout:
             completed = set()
             self.on_check_action()

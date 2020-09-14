@@ -22,6 +22,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
+from collections import namedtuple
 import json
 import logging
 import re
@@ -37,12 +38,15 @@ from paramiko.client import SSHClient
 from paramiko.ssh_exception import SSHException
 from yaml import YAMLLoadWarning
 
+from sat.apiclient import FabricControllerClient
+from sat.cached_property import cached_property
 from sat.cli.bootsys.mgmt_hosts import do_disable_hosts_entries
 from sat.cli.bootsys.power import IPMIPowerStateWaiter
-from sat.cli.bootsys.state_recorder import PodStateRecorder
+from sat.cli.bootsys.state_recorder import PodStateRecorder, HSNStateRecorder, StateError
 from sat.cli.bootsys.util import get_ncns, RunningService, k8s_pods_to_status_dict, run_ansible_playbook
 from sat.cli.bootsys.waiting import GroupWaiter, SimultaneousWaiter, Waiter
 from sat.report import Report
+from sat.session import SATSession
 from sat.util import BeginEndLogger, get_username_and_password_interactively
 
 LOGGER = logging.getLogger(__name__)
@@ -337,10 +341,20 @@ class BGPSpineStatusWaiter(Waiter):
         return False
 
 
-class HSNBringupWaiter(Waiter):
+# A representation of a port in a port set.
+HSNPort = namedtuple('HSNPort', ('port_set', 'port_xname'))
+
+
+class HSNBringupWaiter(GroupWaiter):
     """Run the HSN bringup script and wait for it to be brought up."""
 
-    STATUS_SCRIPT_PATH = '/opt/cray/bringup-fabric/status.sh'
+    def __init__(self, timeout, poll_interval=1):
+        """Create a new HSNBringupWaiter."""
+        super().__init__(set(), timeout, poll_interval)
+        self.fabric_client = FabricControllerClient(SATSession())
+        self.hsn_state_recorder = HSNStateRecorder()
+        # dict mapping from port set name to dict mapping from port xname to enabled status
+        self.current_hsn_state = {}
 
     def condition_name(self):
         return "HSN bringup"
@@ -349,40 +363,56 @@ class HSNBringupWaiter(Waiter):
         run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/ncmp_hsn_bringup.yaml',
                              exit_on_err=False)
 
-    @staticmethod
-    def parse_hsn_status_output(output):
-        """Parse the output of STATUS_SCRIPT_PATH into a list of lists of ints.
+        # Populate members with known members from fabric controller API
+        self.members = {HSNPort(port_set, port_xname)
+                        for port_set, port_xnames in self.fabric_client.get_fabric_edge_ports().items()
+                        for port_xname in port_xnames}
+
+    def on_check_action(self):
+        """Get the latest HSN state from the fabric controller API."""
+        self.current_hsn_state = self.fabric_client.get_fabric_edge_ports_enabled_status()
+
+    @cached_property
+    def stored_hsn_state(self):
+        """dict: HSN state from the file where it was saved prior to shutdown
+
+        Will be a dict mapping from the port set names ('fabric-ports', 'edge-ports')
+        to a dict mapping from port xnames (str) to port enabled status (bool). Will
+        be the empty dict if there is a failure to load the saved state.
+        """
+        try:
+            return self.hsn_state_recorder.get_stored_state()
+        except StateError as err:
+            LOGGER.warning(f'Failed to get HSN state from prior to shutdown; '
+                           f'will wait for all links to come up: {err}')
+            return {}
+
+    def member_has_completed(self, member):
+        """Get whether the given member has completed.
 
         Args:
-            output (str): the output of HSNBringupWaiter.STATUS_SCRIPT_PATH
+            member (HSNPort): the port to check for completion.
 
         Returns:
-            A list of lists where each list has these two components for
-            each type of link reported by that script (edge, local, global):
-                [links_up, total_links]
-            Each of these will be converted to int.
+            True if the port status is enabled or if the port was disabled
+            before the shutdown. False otherwise.
         """
-        # Parse each line of the form '<title>: <links_up> / <total_links>'
-        return list(map(lambda l: [int(i) for i in l],
-                    re.findall(r'\w+:\s+(\d+)\s*/\s*(\d+)', output)))
-
-    def has_completed(self):
         try:
-            status = subprocess.run([self.STATUS_SCRIPT_PATH], stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE, check=True, encoding='utf-8')
-        except subprocess.CalledProcessError as cpe:
-            LOGGER.error('Could not run fabric bringup status script "%s"; %s',
-                         self.STATUS_SCRIPT_PATH, cpe)
-            return True  # Don't keep polling here if we can't run the script.
+            expected_state = self.stored_hsn_state[member.port_set][member.port_xname]
+        except KeyError:
+            # If the port was not known before shutdown, assume it should be enabled.
+            # E.g., this could happen if a switch or cable was added while the system
+            # was shut down.
+            expected_state = True
 
-        port_status = HSNBringupWaiter.parse_hsn_status_output(status.stdout)
-        if not port_status:
-            LOGGER.error('Could not parse status info from the output of fabric '
-                         'bringup status script "%s".', self.STATUS_SCRIPT_PATH)
-            return True  # Don't keep polling here if script gives no output
+        try:
+            current_state = self.current_hsn_state[member.port_set][member.port_xname]
+        except KeyError:
+            # If no state is reported for this port, then it is not healthy
+            return False
 
-        return all(0 < up_links == total_links
-                   for up_links, total_links in port_status)
+        # if expected state is true, then current state must be true
+        return current_state or not expected_state
 
 
 def do_mgmt_boot(args):
