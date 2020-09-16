@@ -23,8 +23,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 from io import StringIO
 import json
-import logging
-import subprocess
 from textwrap import dedent
 from unittest.mock import MagicMock, patch
 
@@ -319,7 +317,7 @@ class TestBGPSpineStatusWaiter(WaiterTestCase):
     """)
 
     def setUp(self):
-        self.mock_subprocess_run = patch('sat.cli.bootsys.mgmt_boot_power.subprocess.run').start()
+        self.mock_run_playbook = patch('sat.cli.bootsys.mgmt_boot_power.run_ansible_playbook').start()
 
     def test_spine_bgp_established(self):
         """Test if established BGP peers are recognized."""
@@ -329,15 +327,14 @@ class TestBGPSpineStatusWaiter(WaiterTestCase):
         """Test if idle BGP peers are detected."""
         self.assertFalse(BGPSpineStatusWaiter.all_established(self.INCOMPLETE_OUTPUT))
 
-    @patch('sat.cli.bootsys.mgmt_boot_power.run_ansible_playbook')
-    def test_get_spine_status(self, mock_run_playbook):
+    def test_get_spine_status(self):
         """Test the get_spine_status helper function."""
         result = 'result of running playbook'
-        mock_run_playbook.return_value = result
+        self.mock_run_playbook.return_value = result
 
         self.assertEqual(BGPSpineStatusWaiter.get_spine_status(), result)
-        mock_run_playbook.assert_called_once_with('/opt/cray/crayctl/ansible_framework/main/spine-bgp-status.yml',
-                                                  exit_on_err=False)
+        self.mock_run_playbook.assert_called_once_with('/opt/cray/crayctl/ansible_framework/main/spine-bgp-status.yml',
+                                                       exit_on_err=False)
 
     @patch('sat.cli.bootsys.mgmt_boot_power.BGPSpineStatusWaiter.get_spine_status')
     def test_completion_successful(self, mock_spine_status):
@@ -347,12 +344,11 @@ class TestBGPSpineStatusWaiter(WaiterTestCase):
 
     def test_completion_when_called_process_error(self):
         """Test the BGP waiter when there's an issue running ansible-playbook."""
-        self.mock_subprocess_run.side_effect = subprocess.CalledProcessError(1, 'something went wrong')
+        self.mock_run_playbook.return_value = None
         self.assertFalse(BGPSpineStatusWaiter(10).has_completed())
 
     @patch('sat.cli.bootsys.mgmt_boot_power.BGPSpineStatusWaiter.get_spine_status')
-    @patch('sat.cli.bootsys.mgmt_boot_power.run_ansible_playbook')
-    def test_waiting_for_bgp_completion(self, mock_run_playbook, mock_spine_status):
+    def test_waiting_for_bgp_completion(self, mock_spine_status):
         """Test waiting for successful BGP peering"""
         mock_spine_status.return_value = self.COMPLETE_OUTPUT
         spine_waiter = BGPSpineStatusWaiter(10)

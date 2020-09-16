@@ -27,7 +27,6 @@ import json
 import logging
 import re
 import socket
-import subprocess
 import urllib3
 import warnings
 
@@ -310,12 +309,11 @@ class BGPSpineStatusWaiter(Waiter):
     def get_spine_status():
         """Simple helper function to get spine BGP status.
 
-        Runs run_ansible_playbook() with the
-        spine-bgp-status.yml playbook.
+        Runs run_ansible_playbook() with the spine-bgp-status.yml playbook.
 
         Args: None.
         Returns: The stdout resulting when running the spine-bgp-status.yml
-            playbook.
+            playbook or None if it fails.
         """
         return run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/spine-bgp-status.yml',
                                     exit_on_err=False)
@@ -331,14 +329,11 @@ class BGPSpineStatusWaiter(Waiter):
                                  exit_on_err=False)
 
     def has_completed(self):
-        try:
-            spine_status_output = BGPSpineStatusWaiter.get_spine_status()
-            return BGPSpineStatusWaiter.all_established(spine_status_output)
-
-        except subprocess.CalledProcessError as cpe:
-            LOGGER.error("Couldn't run spine-bgp-status.yml playbook: %s", cpe)
-
-        return False
+        spine_status_output = BGPSpineStatusWaiter.get_spine_status()
+        if spine_status_output is None:
+            LOGGER.error('Failed to run spine-bgp-status.yml playbook.')
+            return False
+        return BGPSpineStatusWaiter.all_established(spine_status_output)
 
 
 # A representation of a port in a port set.
