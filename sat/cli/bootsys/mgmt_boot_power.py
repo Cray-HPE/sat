@@ -208,12 +208,9 @@ class KubernetesPodStatusWaiter(GroupWaiter):
         # Load k8s configuration before trying to use API
         self.k8s_api = load_kube_api()
 
-        # TODO: Handle StateError and PodStateError here
-        pod_state_recorder = PodStateRecorder()
-        self.previous_boot_phase = pod_state_recorder.get_stored_state()
-
         self.new_pods = set()  # pods not present when shut down
 
+        self.k8s_pod_status = {}
         self.update_k8s_pod_status()
         self.members = [(ns, name)
                         for ns, names in self.k8s_pod_status.items()
@@ -221,6 +218,17 @@ class KubernetesPodStatusWaiter(GroupWaiter):
 
     def condition_name(self):
         return 'Kubernetes pods restored to state from previous shutdown'
+
+    @cached_property
+    def stored_k8s_pod_status(self):
+        """The status of k8s pods that was stored to a file during the previous shutdown."""
+        try:
+            return PodStateRecorder().get_stored_state()
+        except StateError as err:
+            LOGGER.warning(f'Failed to get k8s pod state from prior to shutdown; '
+                           f'will wait for all k8s pods to reach "Running" or "Completed" '
+                           f'states: {err}')
+            return {}
 
     def update_k8s_pod_status(self):
         """Helper function to grab the status of all pods.
@@ -258,14 +266,14 @@ class KubernetesPodStatusWaiter(GroupWaiter):
         if member in self.new_pods:
             return simple_answer
 
-        elif ns not in self.previous_boot_phase:
+        elif ns not in self.stored_k8s_pod_status:
             LOGGER.warning('Namespace "%s" was not present at last shutdown; '
                            'waiting for "Succeeded" or "Running" phase for all constituents.',
                            ns)
             self.new_pods.add(member)
             return simple_answer
 
-        elif name not in self.previous_boot_phase[ns]:
+        elif name not in self.stored_k8s_pod_status[ns]:
             LOGGER.warning('Pod "%s" from namespace "%s" was not present at last shutdown; '
                            'waiting for "Succeeded" or "Running" phase.',
                            name, ns)
@@ -276,7 +284,7 @@ class KubernetesPodStatusWaiter(GroupWaiter):
         # last shutdown and had the same name. Thus we should be able
         # to tell if it's "completed" if it is in the same state as it
         # was at the last shutdown.
-        return self.k8s_pod_status[ns][name] == self.previous_boot_phase[ns][name]
+        return self.k8s_pod_status[ns][name] == self.stored_k8s_pod_status[ns][name]
 
 
 class BGPSpineStatusWaiter(Waiter):
