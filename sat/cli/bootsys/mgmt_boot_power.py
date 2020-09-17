@@ -491,8 +491,10 @@ def do_mgmt_boot(args):
             ceph_bgp_waiter.wait_for_completion()
 
     if k8s_waiter.pending:
-        LOGGER.error('The following kubernetes pods failed to reach their '
-                     'expected states: %s', ', '.join(k8s_waiter.pending))
+        pending_pods = [f'{" ".join(pod)}' for pod in k8s_waiter.pending]
+        LOGGER.error(f'The following kubernetes {INF.plural("pod", len(pending_pods))} '
+                     f'failed to reach their expected states: '
+                     f'{", ".join(pending_pods)}')
         raise SystemExit(1)
 
     hsn_waiter = HSNBringupWaiter(args.hsn_timeout)
