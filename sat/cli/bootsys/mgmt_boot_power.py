@@ -23,6 +23,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 
 from collections import namedtuple
+import inflect
 import json
 import logging
 import re
@@ -49,6 +50,8 @@ from sat.session import SATSession
 from sat.util import BeginEndLogger, get_username_and_password_interactively
 
 LOGGER = logging.getLogger(__name__)
+
+INF = inflect.engine()
 
 
 def load_kube_api():
@@ -482,12 +485,22 @@ def do_mgmt_boot(args):
         raise SystemExit(1)
 
     with BeginEndLogger('wait for k8s pods healthy'), k8s_waiter:
-        ceph_bgp_hsn_waiter = SimultaneousWaiter([CephHealthWaiter, BGPSpineStatusWaiter, HSNBringupWaiter],
-                                                 max(args.ceph_timeout, args.bgp_timeout, args.hsn_timeout))
-        with BeginEndLogger('wait for ceph health, BGP peering sessions, HSN up'):
-            ceph_bgp_hsn_waiter.wait_for_completion()
+        ceph_bgp_waiter = SimultaneousWaiter([CephHealthWaiter, BGPSpineStatusWaiter],
+                                             max(args.ceph_timeout, args.bgp_timeout))
+        with BeginEndLogger('wait for ceph healthy and BGP peering sessions established'):
+            ceph_bgp_waiter.wait_for_completion()
 
     if k8s_waiter.pending:
         LOGGER.error('The following kubernetes pods failed to reach their '
                      'expected states: %s', ', '.join(k8s_waiter.pending))
         raise SystemExit(1)
+
+    hsn_waiter = HSNBringupWaiter(args.hsn_timeout)
+    with BeginEndLogger('bring up HSN and wait for healthy'):
+        hsn_waiter.wait_for_completion()
+
+    num_pending = len(hsn_waiter.pending)
+    if hsn_waiter.pending:
+        LOGGER.error(f'The following HSN {INF.plural("port", num_pending)} '
+                     f'{INF.plural_verb("is", num_pending)} not enabled: '
+                     f'{", ".join(port.port_xname for port in hsn_waiter.pending)}')
