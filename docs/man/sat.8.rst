@@ -96,9 +96,19 @@ API_GATEWAY
 BOOTSYS
 -------
 
+**max_hsn_states**
+        Maximum number of hsn-state files allowed to accumulate in
+        /var/sat/bootsys/hsn-states. These files record the state of the
+        high-speed network at the time the system was shut down, and the latest
+        one is used to verify when the HSN is up after reboot. The default value
+        is 10.
+
 **max_pod_states**
         Maximum number of pod-state files allowed to accumulate in
-        /var/sat/podstates. The default value is 10.
+        /var/sat/bootsys/pod-states. These files record the state of all pods in
+        kubernetes at the time the system is shut down, and the latest one is
+        used to verify when the pods are up after reboot. The default value is
+        10.
 
 **cle_bos_template**
         The name of the BOS session template to use for shutting down and

@@ -92,6 +92,7 @@ SAT_CONFIG_SPEC = {
         'token_file': OptionSpec(str, '', None, 'token_file'),
     },
     'bootsys': {
+        'max_hsn_states': OptionSpec(int, 10, None, None),
         'max_pod_states': OptionSpec(int, 10, None, None),
         'cle_bos_template': OptionSpec(str, '', None, 'cle_bos_template'),
         'uan_bos_template': OptionSpec(str, DEFAULT_UAN_BOS_TEMPLATE, None,

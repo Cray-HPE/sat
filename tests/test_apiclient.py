@@ -21,7 +21,7 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-
+import logging
 from unittest import mock
 import unittest
 
@@ -29,6 +29,7 @@ import requests
 
 import sat.apiclient
 import sat.config
+from tests.common import ExtendedTestCase
 
 
 def get_http_url_prefix(hostname):
@@ -198,81 +199,149 @@ class TestHSMClient(unittest.TestCase):
         self.assertEqual(response, mock_requests_get.return_value)
 
 
-class TestFabricControllerClient(unittest.TestCase):
+class TestFabricControllerClient(ExtendedTestCase):
     """Tests for the APIGatewayClient class: Fabric Controller client."""
 
     def setUp(self):
-        self.stored_config = sat.config.CONFIG
-        sat.config.CONFIG = sat.config.SATConfig('')
+        mock.patch('sat.apiclient.get_config_value').start()
+
+        self.mock_port_sets = {
+            'fabric-ports': {'ports': ['x3000c0r24j4p0', 'x3000c0r24j4p1']},
+            'edge-ports': {'ports': ['x3000c0r24j8p0', 'x3000c0r24j8p1']}
+        }
+        self.mock_port_set_status = {
+            'fabric-ports': {
+                'ports': [
+                    {'xname': 'x3000c0r24j4p0', 'status': {'enable': True}},
+                    {'xname': 'x3000c0r24j4p1', 'status': {'enable': False}}
+                ]
+            },
+            'edge-ports': {
+                'ports': [
+                    {'xname': 'x3000c0r24j8p0', 'status': {'enable': True}},
+                    {'xname': 'x3000c0r24j8p1', 'status': {'enable': False}}
+                ]
+            }
+        }
+
+        self.json_value_err = False
+        self.get_api_err = False
+
+        def mock_fc_get(_, *args):
+            mock_response = mock.Mock()
+            if self.get_api_err:
+                raise sat.apiclient.APIError("simulated failure")
+            elif self.json_value_err:
+                mock_response.json.side_effect = ValueError('simulated json parse error')
+            elif len(args) == 2 and args[0] == 'port-sets':
+                # This should give a description of the port set
+                mock_response.json.return_value = self.mock_port_sets[args[1]]
+            elif len(args) == 3 and args[0] == 'port-sets' and args[-1] == 'status':
+                # This should give the status of the port set
+                mock_response.json.return_value = self.mock_port_set_status[args[1]]
+            else:
+                raise AssertionError(f'Unexpected args received by get method: {args}')
+            return mock_response
+
+        self.mock_fc_get = mock.patch('sat.apiclient.APIGatewayClient.get', mock_fc_get).start()
+
+        self.fabric_client = sat.apiclient.FabricControllerClient()
+
+        self.fabric_status_fail_msg = 'Failed to get port status for port set fabric-ports'
+        self.edge_status_fail_msg = 'Failed to get port status for port set edge-ports'
 
     def tearDown(self):
-        sat.config.CONFIG = self.stored_config
+        mock.patch.stopall()
 
-    @mock.patch('requests.get')
-    def test_get_fabric_cont(self, mock_requests_get):
-        """Test call of get method through fabric controller client."""
-        api_gw_host = 'my-api-gw'
-        client = sat.apiclient.FabricControllerClient(None, 'my-api-gw')
-        path_components = ['irrelevant', 'just-a-test']
-        response = client.get(*path_components)
+    def test_get_fabric_edge_ports(self):
+        """Test getting all fabric and edge ports."""
+        expected = {
+            'fabric-ports': ['x3000c0r24j4p0', 'x3000c0r24j4p1'],
+            'edge-ports': ['x3000c0r24j8p0', 'x3000c0r24j8p1']
+        }
+        actual = self.fabric_client.get_fabric_edge_ports()
+        self.assertEqual(expected, actual)
 
-        mock_requests_get.assert_called_once_with(
-            get_http_url_prefix(api_gw_host) +
-            sat.apiclient.FabricControllerClient.base_resource_path +
-            '/'.join(path_components),
-            params=None, verify=True
-        )
-        self.assertEqual(response, mock_requests_get.return_value)
+    def test_get_fabric_edge_ports_api_error(self):
+        """Test getting all fabric and edge ports when there is an APIError."""
+        self.get_api_err = True
+        with self.assertLogs(level=logging.WARNING) as cm:
+            actual = self.fabric_client.get_fabric_edge_ports()
 
-    @mock.patch('requests.post')
-    def test_post_fabric_cont(self, mock_requests_post):
-        """Test call of post method through fabric controller client."""
-        api_gw_host = 'my-api-gw'
-        client = sat.apiclient.FabricControllerClient(None, 'my-api-gw')
-        path_components = ['irrelevant', 'just-a-test']
-        payload = {}
-        response = client.post(*path_components, payload=payload)
+        self.assertEqual(2, len(cm.output))
+        self.assert_in_element('Failed to get ports for port set', cm.output)
+        self.assertEqual({}, actual)
 
-        mock_requests_post.assert_called_once_with(
-            get_http_url_prefix(api_gw_host) +
-            sat.apiclient.FabricControllerClient.base_resource_path +
-            '/'.join(path_components),
-            data=payload, verify=True, json=None
-        )
-        self.assertEqual(response, mock_requests_post.return_value)
+    def test_get_fabric_edge_ports_bad_json(self):
+        """Test getting all fabric and edge ports when the response JSON cannot be parsed."""
+        self.json_value_err = True
+        with self.assertLogs(level=logging.WARNING) as cm:
+            actual = self.fabric_client.get_fabric_edge_ports()
 
-    @mock.patch('requests.put')
-    def test_put_fabric_cont(self, mock_requests_put):
-        """Test call of put method through fabric controller client."""
-        api_gw_host = 'my-api-gw'
-        client = sat.apiclient.FabricControllerClient(None, 'my-api-gw')
-        path_components = ['irrelevant', 'just-a-test']
-        payload = {}
-        response = client.put(*path_components, payload=payload)
+        self.assertEqual(2, len(cm.output))
+        self.assert_in_element('Failed to parse response', cm.output)
+        self.assertEqual({}, actual)
 
-        mock_requests_put.assert_called_once_with(
-            get_http_url_prefix(api_gw_host) +
-            sat.apiclient.FabricControllerClient.base_resource_path +
-            '/'.join(path_components),
-            data=payload, verify=True
-        )
-        self.assertEqual(response, mock_requests_put.return_value)
+    def test_get_fabric_edge_ports_missing_key(self):
+        """Test getting all fabric and edge ports when there is a missing 'ports' key."""
+        del self.mock_port_sets['fabric-ports']['ports']
+        expected = {
+            'edge-ports': ['x3000c0r24j8p0', 'x3000c0r24j8p1']
+        }
 
-    @mock.patch('requests.delete')
-    def test_delete_fabric_cont(self, mock_requests_delete):
-        """Test call of delete method through fabric controller client."""
-        api_gw_host = 'my-api-gw'
-        client = sat.apiclient.FabricControllerClient(None, 'my-api-gw')
-        path_components = ['irrelevant', 'just-a-test']
-        response = client.delete(*path_components)
+        with self.assertLogs(level=logging.WARNING) as cm:
+            actual = self.fabric_client.get_fabric_edge_ports()
+        self.assertEqual(1, len(cm.output))
+        self.assert_in_element("Response from fabric controller API was missing "
+                               "the 'ports' key", cm.output)
+        self.assertEqual(expected, actual)
 
-        mock_requests_delete.assert_called_once_with(
-            get_http_url_prefix(api_gw_host) +
-            sat.apiclient.FabricControllerClient.base_resource_path +
-            '/'.join(path_components),
-            verify=True
-        )
-        self.assertEqual(response, mock_requests_delete.return_value)
+    def test_get_fabric_edge_ports_status(self):
+        """Test getting enabled status of fabric and edge ports."""
+        expected = {
+            'fabric-ports': {'x3000c0r24j4p0': True, 'x3000c0r24j4p1': False},
+            'edge-ports': {'x3000c0r24j8p0': True, 'x3000c0r24j8p1': False}
+        }
+        actual = self.fabric_client.get_fabric_edge_ports_enabled_status()
+        self.assertEqual(expected, actual)
+
+    def test_get_fabric_edge_ports_status_api_error(self):
+        """Test getting enabled status of fabric and edge ports w/ APIError."""
+        self.get_api_err = True
+
+        with self.assertLogs(level=logging.WARNING) as cm:
+            actual = self.fabric_client.get_fabric_edge_ports_enabled_status()
+
+        self.assertEqual(2, len(cm.output))
+        self.assert_in_element(self.fabric_status_fail_msg, cm.output)
+        self.assert_in_element(self.edge_status_fail_msg, cm.output)
+        self.assertEqual({}, actual)
+
+    def test_get_fabric_edge_ports_status_bad_json(self):
+        """Test getting enabled status of fabric and edge ports w/ JSON parse error."""
+        self.json_value_err = True
+
+        with self.assertLogs(level=logging.WARNING) as cm:
+            actual = self.fabric_client.get_fabric_edge_ports_enabled_status()
+
+        self.assertEqual(2, len(cm.output))
+        self.assert_in_element(self.fabric_status_fail_msg, cm.output)
+        self.assert_in_element(self.edge_status_fail_msg, cm.output)
+        self.assertEqual({}, actual)
+
+    def test_get_fabric_edge_ports_status_missing_key(self):
+        """Test getting enabled status of fabric and edge ports w/ missing 'ports' key."""
+        del self.mock_port_set_status['fabric-ports']['ports']
+        expected = {
+            'edge-ports': {'x3000c0r24j8p0': True, 'x3000c0r24j8p1': False}
+        }
+
+        with self.assertLogs(level=logging.WARNING) as cm:
+            actual = self.fabric_client.get_fabric_edge_ports_enabled_status()
+
+        self.assertEqual(1, len(cm.output))
+        self.assert_in_element(self.fabric_status_fail_msg, cm.output)
+        self.assertEqual(expected, actual)
 
 
 if __name__ == '__main__':
