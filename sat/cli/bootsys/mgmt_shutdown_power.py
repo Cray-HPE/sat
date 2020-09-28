@@ -27,6 +27,7 @@ import socket
 
 from paramiko.ssh_exception import BadHostKeyException, AuthenticationException, SSHException
 
+from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger
 from sat.cli.bootsys.power import IPMIPowerStateWaiter
 from sat.cli.bootsys.util import get_ncns, RunningService
 
@@ -103,7 +104,8 @@ def do_mgmt_shutdown_power(ssh_client, username, password, timeout, dry_run=True
     LOGGER.info('Sending shutdown command to hosts.')
 
     non_bis_hosts = get_ncns(['managers', 'storage', 'workers'], exclude=['bis'])
-    start_shutdown(non_bis_hosts, ssh_client, dry_run)
+    with IPMIConsoleLogger(non_bis_hosts):
+        start_shutdown(non_bis_hosts, ssh_client, dry_run)
 
-    finish_shutdown(non_bis_hosts, username, password, timeout, dry_run)
-    LOGGER.info('Shutdown complete.')
+        finish_shutdown(non_bis_hosts, username, password, timeout, dry_run)
+        LOGGER.info('Shutdown complete.')
