@@ -100,13 +100,14 @@ def add_bootsys_subparser(subparsers):
 
     bootsys_parser.add_argument(
         '--capmc-timeout', default=120, type=int,
-        help='Timeout for compute nodes and application nodes to reach powered '
-             'off state if they had to be powered off with CAPMC.'
+        help='Timeout, in seconds, for compute nodes and application nodes to reach '
+             'the powered off state if they had to be powered off with CAPMC.'
     )
 
     bootsys_parser.add_argument(
         '--ipmi-timeout', default=120, type=int,
-        help='Timeout for IPMI power commands'
+        help='Timeout, in seconds, for nodes to reach desired power state after '
+             'IPMI power commands are issued.'
     )
 
     bootsys_parser.add_argument(
