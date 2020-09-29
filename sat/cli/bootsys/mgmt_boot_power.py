@@ -43,7 +43,7 @@ from sat.cached_property import cached_property
 from sat.cli.bootsys.mgmt_hosts import do_disable_hosts_entries
 from sat.cli.bootsys.power import IPMIPowerStateWaiter
 from sat.cli.bootsys.state_recorder import PodStateRecorder, HSNStateRecorder, StateError
-from sat.cli.bootsys.util import get_ncns, RunningService, k8s_pods_to_status_dict, run_ansible_playbook
+from sat.cli.bootsys.util import get_groups, get_ncns, RunningService, k8s_pods_to_status_dict, run_ansible_playbook
 from sat.cli.bootsys.waiting import GroupWaiter, SimultaneousWaiter, Waiter
 from sat.report import Report
 from sat.session import SATSession
@@ -421,6 +421,50 @@ class HSNBringupWaiter(GroupWaiter):
         return current_state or not expected_state
 
 
+def restart_ceph_services():
+    """Restart ceph services on the storage nodes.
+
+    This uses the ansible inventory to get the list of nodes designated as
+    'storage' nodes.
+
+    It iterates first over the nodes on which to restart the services,
+    and then over the services to restart, restarting all the services for
+    one node before proceeding to the next node.  This is different from the
+    documented Shasta 1.3 procedure, on which this function is based.  The
+    documented procedure restarts one service across all the nodes before
+    proceeding to the next service.
+
+    Raises:
+        SystemExit: if connecting to one of the hosts failed, or if restarting
+            one of the services failed
+    """
+    storage_nodes = get_groups(['storage'])
+    ceph_services = ['ceph-mon.target', 'ceph-mgr.target', 'ceph-mds.target']
+    ssh_client = SSHClient()
+    ssh_client.load_system_host_keys()
+
+    for storage_node in storage_nodes:
+        try:
+            ssh_client.connect(storage_node)
+        except (SSHException, socket.error) as err:
+            LOGGER.error(f'Connecting to {storage_node} failed.  Error: {err}')
+            raise SystemExit(1)
+
+        for ceph_service in ceph_services:
+            command = f'systemctl restart {ceph_service}'
+            try:
+                _, stdout, stderr = ssh_client.exec_command(f'systemctl restart {ceph_service}')
+            except SSHException as err:
+                LOGGER.error(f'Command "{command}" failed.  Host: {storage_node}.  Error: {err}')
+                raise SystemExit(1)
+
+            # Command may run successfully but still return nonzero, which is an error.
+            # Checking return status also blocks until the command completes.
+            if stdout.channel.recv_exit_status():
+                LOGGER.error(f'Command "{command}" failed.  Host: {storage_node}.  Stderr: {stderr.read()}')
+                raise SystemExit(1)
+
+
 def do_mgmt_boot(args):
     """Run the bootup process for the management cluster.
 
@@ -466,6 +510,8 @@ def do_mgmt_boot(args):
     if not args.dry_run:
         with BeginEndLogger('platform-startup.yml ansible playbook'):
             run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/platform-startup.yml')
+        with BeginEndLogger('restart ceph services on storage nodes'):
+            restart_ceph_services()
 
     try:
         k8s_api_waiter = KubernetesAPIAvailableWaiter(60)

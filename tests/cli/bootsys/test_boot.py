@@ -23,14 +23,15 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 from io import StringIO
 import json
+import logging
 from textwrap import dedent
-from unittest.mock import MagicMock, patch
+from unittest.mock import call, MagicMock, Mock, patch
 
 from paramiko.ssh_exception import SSHException, NoValidConnectionsError
 
 from sat.cli.bootsys.power import IPMIPowerStateWaiter
 from sat.cli.bootsys.mgmt_boot_power import SSHAvailableWaiter, KubernetesPodStatusWaiter, \
-    CephHealthWaiter, HSNBringupWaiter, HSNPort, BGPSpineStatusWaiter, StateError
+    CephHealthWaiter, HSNBringupWaiter, HSNPort, BGPSpineStatusWaiter, StateError, restart_ceph_services
 from tests.common import ExtendedTestCase
 
 
@@ -505,3 +506,86 @@ class TestHSNBringupWaiter(WaiterTestCase):
         """Test that a port that was missing before shutdown, disabled after is not complete."""
         self.waiter.on_check_action()
         self.assertFalse(self.waiter.member_has_completed(HSNPort('edge-ports', 'x3000c0r24j16p1')))
+
+
+class TestRestartCephServices(ExtendedTestCase):
+    """Test restart_ceph_services()"""
+
+    def setUp(self):
+        self.mock_ssh_client_cls = patch('sat.cli.bootsys.mgmt_boot_power.SSHClient').start()
+        self.mock_ssh_client = self.mock_ssh_client_cls.return_value
+        self.mock_connect = self.mock_ssh_client.connect
+        self.mock_load_system_host_keys = self.mock_ssh_client.load_system_host_keys
+        self.mock_exec_command = self.mock_ssh_client.exec_command
+        self.mock_stdin, self.mock_stdout, self.mock_stderr = Mock(), Mock(), Mock()
+        self.mock_stdin.channel.recv_exit_status.return_value = 0
+        self.mock_stdout.channel.recv_exit_status.return_value = 0
+        self.mock_stderr.channel.recv_exit_status.return_value = 0
+        self.mock_exec_command.return_value = (self.mock_stdin, self.mock_stdout, self.mock_stderr)
+
+        self.mock_get_groups = patch('sat.cli.bootsys.mgmt_boot_power.get_groups').start()
+        self.hosts = ['ncn-s001', 'ncn-s002', 'ncn-s003']
+        self.mock_get_groups.return_value = self.hosts
+
+        self.services_to_restart = ['ceph-mon.target', 'ceph-mgr.target', 'ceph-mds.target']
+
+    def tearDown(self):
+        """Stop all patches."""
+        patch.stopall()
+
+    def assert_client(self):
+        """Helper for test cases to assert that the SSH client was initialized correctly"""
+        self.mock_get_groups.assert_called_once_with(['storage'])
+        self.mock_ssh_client_cls.assert_called_once()
+        self.mock_load_system_host_keys.assert_called_once()
+
+    def test_basic_restart(self):
+        """Test a basic invocation of restart_ceph_services"""
+        restart_ceph_services()
+        self.assert_client()
+        self.mock_connect.assert_has_calls([call(host) for host in self.hosts])
+        self.mock_exec_command.assert_has_calls([call(f'systemctl restart {service}')
+                                                 for service in self.services_to_restart] * len(self.hosts))
+
+    def test_connect_failed(self):
+        """Test when connecting to a host fails"""
+        self.mock_connect.side_effect = SSHException('the system is down')
+        with self.assertRaises(SystemExit):
+            with self.assertLogs(level=logging.ERROR) as cm:
+                restart_ceph_services()
+
+        self.assert_client()
+        self.mock_connect.assert_called_once_with(self.hosts[0])
+        self.assert_in_element(f'Connecting to {self.hosts[0]} failed.  Error: the system is down', cm.output)
+
+    def test_command_failed(self):
+        """Test when running a command fails"""
+        self.mock_exec_command.side_effect = SSHException('the system crashed')
+        with self.assertRaises(SystemExit):
+            with self.assertLogs(level=logging.ERROR) as cm:
+                restart_ceph_services()
+
+        self.assert_client()
+        self.mock_connect.assert_called_once_with(self.hosts[0])
+        self.mock_exec_command.assert_called_once_with(f'systemctl restart ceph-mon.target')
+        self.assert_in_element(f'Command "systemctl restart ceph-mon.target" failed.  Host: {self.hosts[0]}.  '
+                               f'Error: the system crashed', cm.output)
+
+    def test_command_exit_nonzero(self):
+        """Test when running a command completes but returns a nonzero exit code"""
+        self.mock_stdout.read.return_value = ''
+        self.mock_stderr.read.return_value = 'command failed!'
+        # stdin/stderr/stdout all have recv_exit_status() set on a nonzero return
+        self.mock_stdin.chanel.recv_exit_status.return_value = 1
+        self.mock_stdout.channel.recv_exit_status.return_value = 1
+        self.mock_stderr.channel.recv_exit_status.return_value = 1
+
+        with self.assertRaises(SystemExit):
+            with self.assertLogs(level=logging.ERROR) as cm:
+                restart_ceph_services()
+
+        self.assert_client()
+        self.mock_connect.assert_called_once_with(self.hosts[0])
+        self.mock_exec_command.assert_called_once_with('systemctl restart ceph-mon.target')
+        self.assert_in_element(f'Command "systemctl restart ceph-mon.target" failed.  Host: {self.hosts[0]}.  '
+                               f'Stderr: command failed!', cm.output)
