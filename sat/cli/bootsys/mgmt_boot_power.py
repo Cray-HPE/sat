@@ -40,6 +40,7 @@ from yaml import YAMLLoadWarning
 
 from sat.apiclient import FabricControllerClient
 from sat.cached_property import cached_property
+from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger
 from sat.cli.bootsys.mgmt_hosts import do_disable_hosts_entries
 from sat.cli.bootsys.power import IPMIPowerStateWaiter
 from sat.cli.bootsys.state_recorder import PodStateRecorder, HSNStateRecorder, StateError
@@ -490,19 +491,20 @@ def do_mgmt_boot(args):
             # TODO (SAT-555): Probably should not send a power on if it's already on.
             ipmi_waiter = IPMIPowerStateWaiter(non_bis_ncns, 'on', args.ipmi_timeout,
                                                username, password, send_command=True)
-            remaining_nodes = ipmi_waiter.wait_for_completion()
+            with IPMIConsoleLogger(non_bis_ncns):
+                remaining_nodes = ipmi_waiter.wait_for_completion()
 
-            ssh_waiter = SSHAvailableWaiter(non_bis_ncns - remaining_nodes, args.ssh_timeout)
-            inaccessible_nodes = ssh_waiter.wait_for_completion()
+                ssh_waiter = SSHAvailableWaiter(non_bis_ncns - remaining_nodes, args.ssh_timeout)
+                inaccessible_nodes = ssh_waiter.wait_for_completion()
 
-            if inaccessible_nodes:
-                LOGGER.error('Unable to reach the following NCNs via SSH '
-                             'after powering them on: %s. Troubleshoot the '
-                             'issue and then try again.',
-                             ', '.join(inaccessible_nodes))
-                # Have to exit here because playbook will fail if nodes are
-                # not available for SSH.
-                raise SystemExit(1)
+                if inaccessible_nodes:
+                    LOGGER.error('Unable to reach the following NCNs via SSH '
+                                 'after powering them on: %s. Troubleshoot the '
+                                 'issue and then try again.',
+                                 ', '.join(inaccessible_nodes))
+                    # Have to exit here because playbook will fail if nodes are
+                    # not available for SSH.
+                    raise SystemExit(1)
 
     LOGGER.info('Disabling entries in /etc/hosts to prepare for starting DNS.')
     do_disable_hosts_entries()
