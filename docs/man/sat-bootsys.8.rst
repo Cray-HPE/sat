@@ -84,10 +84,6 @@ These options must be specified after the subcommand.
 **-h, --help**
         Print the help message for 'sat bootsys'.
 
-**--dry-run**
-        If supplied, do not perform any destructive operations on the system.
-        (e.g. powering off, stopping services, etc.)
-
 SHUTDOWN AND BOOT OPTIONS
 -------------------------
 These options apply to both the ``shutdown`` and ``boot`` actions.
@@ -108,7 +104,7 @@ These options apply to both the ``shutdown`` and ``boot`` actions.
         A timeout, in seconds, for nodes to reach the desired power state after
         IPMI power commands are issued. This applies only to the management
         NCNs, which are the only nodes that are powered on/off directly with
-        IPMI. The default is 120 seconds.
+        IPMI. The default is 300 seconds.
 
 **--capmc-timeout** *CAPMC_TIMEOUT*
         A timeout, in seconds, for components to reach desired power state after

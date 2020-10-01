@@ -26,5 +26,5 @@ from sat.cli.bootsys.util import run_ansible_playbook
 SHUTDOWN_PLAYBOOK = '/opt/cray/crayctl/ansible_framework/main/platform-shutdown.yml'
 
 
-def do_shutdown_playbook():
+def do_shutdown_playbook(args):
     run_ansible_playbook(SHUTDOWN_PLAYBOOK, '--skip-tags prompt')

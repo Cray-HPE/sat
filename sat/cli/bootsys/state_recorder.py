@@ -25,6 +25,7 @@ from abc import ABC, abstractmethod
 import json
 import logging
 import os
+import sys
 import warnings
 from datetime import datetime
 
@@ -41,6 +42,7 @@ from sat.cli.bootsys.defaults import (
 )
 from sat.cli.bootsys.util import k8s_pods_to_status_dict
 from sat.config import get_config_value
+from sat.util import BeginEndLogger
 
 
 LOGGER = logging.getLogger(__name__)
@@ -287,3 +289,17 @@ class HSNStateRecorder(StateRecorder):
             whether that port is enabled or not.
         """
         return self.fabric_client.get_fabric_edge_ports_enabled_status()
+
+
+def do_state_capture(args):
+    print('Capturing state of k8s pods.')
+    with BeginEndLogger('kubernetes pod state capture'):
+        try:
+            PodStateRecorder().dump_state()
+        except StateError as err:
+            msg = str(err)
+            if args.ignore_pod_failures:
+                LOGGER.warning(msg)
+            else:
+                LOGGER.error(msg)
+                sys.exit(1)

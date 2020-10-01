@@ -24,6 +24,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import sat.parsergroups
 from sat.cli.bootsys.defaults import DEFAULT_UAN_BOS_TEMPLATE
+from sat.cli.bootsys.stages import STAGES_BY_ACTION
 
 
 def add_bootsys_subparser(subparsers):
@@ -52,9 +53,17 @@ def add_bootsys_subparser(subparsers):
         choices=['boot', 'shutdown']
     )
 
-    bootsys_parser.add_argument(
-        '--dry-run', action='store_true',
-        help='Do not run any commands, only print what would run.'
+    stage_group = bootsys_parser.add_mutually_exclusive_group(required=True)
+
+    # TODO: choices are not categorized by boot/shutdown
+    stage_group.add_argument(
+        '--stage', help='Specify the stage of bootsys to run.',
+        choices=set(STAGES_BY_ACTION['boot'] + STAGES_BY_ACTION['shutdown'])
+    )
+
+    stage_group.add_argument(
+        '--list-stages',
+        help='List the stages of bootsys that can be run for the given action.'
     )
 
     bootsys_parser.add_argument(
@@ -111,7 +120,7 @@ def add_bootsys_subparser(subparsers):
     )
 
     bootsys_parser.add_argument(
-        '--ipmi-timeout', default=120, type=int,
+        '--ipmi-timeout', default=300, type=int,
         help='Timeout, in seconds, for nodes to reach desired power state after '
              'IPMI power commands are issued.'
     )

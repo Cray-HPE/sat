@@ -768,3 +768,11 @@ def do_bos_operations(operation):
     if templates_to_use:
         # Let any exceptions raise to caller
         do_parallel_bos_operations(templates_to_use, operation)
+
+
+def do_bos_shutdowns(args):
+    do_bos_operations('shutdown')
+
+
+def do_bos_boots(args):
+    do_bos_operations('boot')

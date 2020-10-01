@@ -41,11 +41,11 @@ from yaml import YAMLLoadWarning
 from sat.apiclient import FabricControllerClient
 from sat.cached_property import cached_property
 from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger
-from sat.cli.bootsys.mgmt_hosts import do_disable_hosts_entries
+from sat.cli.bootsys.mgmt_hosts import do_enable_hosts_entries, do_disable_hosts_entries
 from sat.cli.bootsys.power import IPMIPowerStateWaiter
 from sat.cli.bootsys.state_recorder import PodStateRecorder, HSNStateRecorder, StateError
 from sat.cli.bootsys.util import get_groups, get_ncns, RunningService, k8s_pods_to_status_dict, run_ansible_playbook
-from sat.cli.bootsys.waiting import GroupWaiter, SimultaneousWaiter, Waiter
+from sat.cli.bootsys.waiting import GroupWaiter, Waiter
 from sat.report import Report
 from sat.session import SATSession
 from sat.util import BeginEndLogger, get_username_and_password_interactively
@@ -466,27 +466,35 @@ def restart_ceph_services():
                 raise SystemExit(1)
 
 
-def do_mgmt_boot(args):
-    """Run the bootup process for the management cluster.
-
-    This will send IPMI power on commands to the NCNs, check if they
-    can be accessed by SSH, run the platform-startup ansible playbook,
-    and then wait until all Kubernetes pods have been restored to the
-    same state as before the previous shutdown.
+def do_bgp_check(args):
+    """Run BGP playbooks and wait for BGP peering sessions to be established
 
     Args:
-        args (Namespace): the argparse.Namespace object passed from the
-            argument parser.
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this stage.
+    """
+    with BeginEndLogger('Wait for BGP peering sessions established'):
+        bgp_waiter = BGPSpineStatusWaiter(args.bgp_timeout)
+        bgp_waiter.wait_for_completion()
 
-    Raises:
-        SystemExit if a fatal error is encountered.
+
+def do_power_on_ncns(args):
+    """Power on NCNs.
+
+    This stage also enables/disables entries in the hosts file, starts/stops
+    IPMI console logging, and starts/stops dhcpd on the worker node on which
+    the stage is running.
+
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this stage.
     """
     username, password = get_username_and_password_interactively(username_prompt='IPMI username',
                                                                  password_prompt='IPMI password')
 
     do_enable_hosts_entries()
 
-    with RunningService('dhcpd', dry_run=args.dry_run, sleep_after_start=5):
+    with RunningService('dhcpd', sleep_after_start=5):
         master_nodes = get_ncns(['managers'])
         storage_nodes = get_ncns(['storage'])
         worker_nodes = get_ncns(['workers'], exclude=['bis'])
@@ -516,12 +524,26 @@ def do_mgmt_boot(args):
     LOGGER.info('Disabling entries in /etc/hosts to prepare for starting DNS.')
     do_disable_hosts_entries()
 
-    if not args.dry_run:
-        with BeginEndLogger('platform-startup.yml ansible playbook'):
-            run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/platform-startup.yml')
-        with BeginEndLogger('restart ceph services on storage nodes'):
-            restart_ceph_services()
 
+# TODO: slightly disorganized to have this here with do_shutdown_playbook in mgmt_shutdown_ansible
+def do_platform_startup_playbook(args):
+    """Run ansible playbook to start platform services
+
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this stage.
+    """
+    with BeginEndLogger('platform-startup.yml ansible playbook'):
+        run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/platform-startup.yml')
+
+
+def do_k8s_check(args):
+    """Wait for Kubernetes API and pods to appear healthy.
+
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this stage.
+    """
     try:
         k8s_api_waiter = KubernetesAPIAvailableWaiter(60)
     except ConfigException as err:
@@ -539,11 +561,7 @@ def do_mgmt_boot(args):
                      "to reach expected states: %s", err)
         raise SystemExit(1)
 
-    with BeginEndLogger('wait for k8s pods healthy'), k8s_waiter:
-        ceph_bgp_waiter = SimultaneousWaiter([CephHealthWaiter, BGPSpineStatusWaiter],
-                                             max(args.ceph_timeout, args.bgp_timeout))
-        with BeginEndLogger('wait for ceph healthy and BGP peering sessions established'):
-            ceph_bgp_waiter.wait_for_completion()
+    k8s_waiter.wait_for_completion()
 
     if k8s_waiter.pending:
         pending_pods = [f'{" ".join(pod)}' for pod in k8s_waiter.pending]
@@ -552,6 +570,29 @@ def do_mgmt_boot(args):
                      f'{", ".join(pending_pods)}')
         raise SystemExit(1)
 
+
+def do_ceph_check(args):
+    """Restart Ceph services and wait for Ceph health.
+
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this stage.
+    """
+    with BeginEndLogger('restart ceph services on storage nodes'):
+        restart_ceph_services()
+
+    with BeginEndLogger('wait for ceph health'):
+        ceph_waiter = CephHealthWaiter(args.ceph_timeout)
+        ceph_waiter.wait_for_completion()
+
+
+def do_hsn_bringup(args):
+    """Bring up HSN and wait for it to be healthy.
+
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this stage.
+    """
     hsn_waiter = HSNBringupWaiter(args.hsn_timeout)
     with BeginEndLogger('bring up HSN and wait for healthy'):
         hsn_waiter.wait_for_completion()
