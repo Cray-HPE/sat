@@ -484,17 +484,24 @@ def do_mgmt_boot(args):
     username, password = get_username_and_password_interactively(username_prompt='IPMI username',
                                                                  password_prompt='IPMI password')
 
+    do_enable_hosts_entries()
+
     with RunningService('dhcpd', dry_run=args.dry_run, sleep_after_start=5):
-        non_bis_ncns = get_ncns(['managers', 'storage', 'workers'], exclude=['bis'])
+        master_nodes = get_ncns(['managers'])
+        storage_nodes = get_ncns(['storage'])
+        worker_nodes = get_ncns(['workers'], exclude=['bis'])
+        ncn_groups = [master_nodes, storage_nodes, worker_nodes]
+        # flatten lists of ncn groups
+        non_bis_ncns = sum(ncn_groups)
+        with IPMIConsoleLogger(non_bis_ncns):
+            for ncn_group in ncn_groups:
 
-        if not args.dry_run:
-            # TODO (SAT-555): Probably should not send a power on if it's already on.
-            ipmi_waiter = IPMIPowerStateWaiter(non_bis_ncns, 'on', args.ipmi_timeout,
-                                               username, password, send_command=True)
-            with IPMIConsoleLogger(non_bis_ncns):
-                remaining_nodes = ipmi_waiter.wait_for_completion()
+                # TODO (SAT-555): Probably should not send a power on if it's already on.
+                ipmi_waiter = IPMIPowerStateWaiter(ncn_group, 'on', args.ipmi_timeout,
+                                                   username, password, send_command=True)
+                ipmi_waiter.wait_for_completion()
 
-                ssh_waiter = SSHAvailableWaiter(non_bis_ncns - remaining_nodes, args.ssh_timeout)
+                ssh_waiter = SSHAvailableWaiter(ncn_group, args.ssh_timeout)
                 inaccessible_nodes = ssh_waiter.wait_for_completion()
 
                 if inaccessible_nodes:
