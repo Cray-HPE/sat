@@ -64,27 +64,6 @@ def validate_log_level(level):
         )
 
 
-def validate_fail_action(action):
-    """Validates the given action.
-
-    Args:
-        action (str): The action string to validate.
-
-    Returns:
-        None
-
-    Raises:
-        ConfigValidationError: If the given `action` is not valid.
-    """
-    valid_actions = ('abort', 'skip', 'prompt', 'force')
-    if action not in valid_actions:
-        raise ConfigValidationError(
-            "Action '{}' is not one of the valid actions: {}".format(
-                action, ", ".join(valid_actions)
-            )
-        )
-
-
 SAT_CONFIG_SPEC = {
     'api_gateway': {
         'host': OptionSpec(str, 'api-gw-service-nmn.local', None, None),
@@ -97,10 +76,7 @@ SAT_CONFIG_SPEC = {
         'max_pod_states': OptionSpec(int, 10, None, None),
         'cle_bos_template': OptionSpec(str, '', None, 'cle_bos_template'),
         'uan_bos_template': OptionSpec(str, DEFAULT_UAN_BOS_TEMPLATE, None,
-                                       'uan_bos_template'),
-        'state_check_fail_action': OptionSpec(str, 'abort',
-                                              validate_fail_action,
-                                              'state_check_fail_action')
+                                       'uan_bos_template')
     },
     'format': {
         'no_headings': OptionSpec(bool, False, None, 'no_headings'),

@@ -173,15 +173,6 @@ def add_bootsys_subparser(subparsers):
     _add_bootsys_shutdown_subparser(actions_subparsers)
     _add_bootsys_boot_subparser(actions_subparsers)
 
-    # TODO: Remove the state-check-fail-action option
-    bootsys_parser.add_argument(
-        '--state-check-fail-action',
-        choices=['abort', 'skip', 'prompt', 'force'],
-        help='Action to take if a failure occurs when checking whether a BOS '
-             'session template needs an operation applied based on current node '
-             'state in HSM. Defaults to "abort".'
-    )
-
     # TODO: Move into the _add_bootsys_ACTION_subparsers so the options are
     # under the action subparser.
     bootsys_parser.add_argument(

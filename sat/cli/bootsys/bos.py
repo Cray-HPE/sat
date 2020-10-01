@@ -39,7 +39,7 @@ from sat.cli.bootsys.defaults import (
 )
 from sat.config import get_config_value
 from sat.session import SATSession
-from sat.util import get_val_by_path, pester_choices
+from sat.util import get_val_by_path
 
 LOGGER = logging.getLogger(__name__)
 
@@ -530,50 +530,6 @@ def get_template_nodes_by_state(session_template_data):
     return dict(nodes_by_state)
 
 
-def handle_state_check_failure(failed_st, operation, fail_action):
-    """Handle a failure to check state for session templates.
-
-    Args:
-        failed_st (list): A list of session template names for which we failed
-            to query state.
-        operation (str): The operation being attempted on the session templates.
-        fail_action (str): The action to take if there are any session templates
-            for which we failed to query state of the nodes in them.
-
-    Returns:
-        A list of failed templates that should still have the operation
-        performed on them.
-
-    Raises:
-        BOSFailure: if there are failed session templates, and the chosen action
-            is to abort.
-        ValueError: if called with a `fail_action` other than 'abort', 'skip',
-            'prompt', or 'force'.
-    """
-    if not failed_st:
-        return []
-
-    fail_msg = 'Failed to get state of nodes in session {}: {}'.format(
-        INFLECTOR.plural('template', len(failed_st)), ', '.join(failed_st)
-    )
-
-    if fail_action == 'abort':
-        raise BOSFailure('{}. Aborting {} attempt.'.format(fail_msg, operation))
-    elif fail_action == 'skip':
-        LOGGER.warning('%s. Skipping %s.', fail_msg, operation)
-        return []
-    elif fail_action == 'prompt':
-        prompt = '{}. How would you like to proceed? '.format(fail_msg)
-        response = pester_choices(prompt, ('skip', 'abort', 'force')) or 'abort'
-        return handle_state_check_failure(failed_st, operation, response)
-    elif fail_action == 'force':
-        LOGGER.warning('%s. Forcing %s.', fail_msg, operation)
-        return failed_st
-    else:
-        raise ValueError("Unrecognized action '{}' for handling state check "
-                         "failure.".format(fail_action))
-
-
 def get_templates_needing_operation(session_templates, operation):
     """
     Get the session templates that still need the given `operation` performed.
@@ -628,13 +584,7 @@ def get_templates_needing_operation(session_templates, operation):
         if list(nodes_by_state.keys()) != [end_state]:
             needed_st.append(session_template)
 
-    # Let BOSFailure raise
-    needed_st.extend(handle_state_check_failure(
-        failed_st, operation,
-        get_config_value('bootsys.state_check_fail_action')
-    ))
-
-    return needed_st
+    return needed_st + failed_st
 
 
 def find_cle_bos_template():
