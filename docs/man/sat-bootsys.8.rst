@@ -110,6 +110,17 @@ These options apply to both the ``shutdown`` and ``boot`` actions.
         NCNs, which are the only nodes that are powered on/off directly with
         IPMI. The default is 120 seconds.
 
+**--capmc-timeout** *CAPMC_TIMEOUT*
+        A timeout, in seconds, for components to reach desired power state after
+        a CAPMC operation is performed. The default is 120 seconds.
+
+        This applies to waiting for compute nodes and application nodes to reach
+        the powered off state if they had to be forcibly powered off with CAPMC
+        after the shutdown with BOS.
+
+        This also applies to waiting for chassis to reach powered off state
+        after they are powered off with CAPMC.
+
 SHUTDOWN OPTIONS
 ----------------
 These options apply only to the ``shutdown`` action.
@@ -140,15 +151,16 @@ These options apply only to the ``shutdown`` action.
                 prompt: Prompt user whether to abort, skip, or force.
                 force: Do the operation against this session template anyway.
 
-**--capmc-timeout** *CAPMC_TIMEOUT*
-        A timeout, in seconds, for compute nodes and application nodes to reach
-        the powered off state if they had to be forcibly powered off with CAPMC
-        after the shutdown with BOS. The default is 120 seconds.
-
 BOOT OPTIONS
 ------------
 
 These options apply only to the ``boot`` action.
+
+
+**--discovery-timeout** *DISCOVERY_TIMEOUT*
+        A timeout, in seconds, for components to be powered on by the HMS
+        discovery job after that job is resumed during boot. The default is
+        600 seconds.
 
 **--ssh-timeout** *SSH_TIMEOUT*
         The number of seconds after which the ``boot`` action should time out

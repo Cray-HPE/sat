@@ -209,22 +209,37 @@ class APIGatewayClient:
 class HSMClient(APIGatewayClient):
     base_resource_path = 'smd/hsm/v1/'
 
-    def get_component_xnames(self, hsm_type, role):
+    def get_component_xnames(self, params=None, omit_empty=True):
         """Get the xnames of components matching the given criteria.
 
+        If any args are omitted, the results are not limited by that criteria.
+
         Args:
-            hsm_type (str): the type of component in the HSM database. E.g.
-                "Node" or "NodeBMC"
-            role (str): the role of the components in the HSM database. E.g.
-                "compute" or "application".
+            params (dict): the parameters to pass in the GET request to the
+                '/State/Components' URL in HSM. E.g.:
+                    {
+                        'type': 'Node',
+                        'role': 'Compute',
+                        'class': 'Mountain'
+                    }
+            omit_empty (bool): if True, omit the components with "State": "Empty"
 
         Returns:
             list of str: the xnames matching the given filters
+
+        Raises:
+            APIError: if there is a failure querying the HSM API or getting
+                the required information from the response.
         """
-        err_prefix = f'Failed to get components with type={hsm_type}, role={role}'
+        if params:
+            params_string = f' with {", ".join(f"{key}={value}" for key, value in params.items())}'
+        else:
+            params_string = ''
+
+        err_prefix = f'Failed to get components{params_string}.'
+
         try:
-            components = self.get('State', 'Components',
-                                  params={'type': hsm_type, 'role': role}).json()['Components']
+            components = self.get('State', 'Components', params=params).json()['Components']
         except APIError as err:
             raise APIError(f'{err_prefix}: {err}')
         except ValueError as err:
@@ -233,7 +248,11 @@ class HSMClient(APIGatewayClient):
             raise APIError(f'{err_prefix} due to missing {err} key in response.')
 
         try:
-            return [component['ID'] for component in components]
+            if omit_empty:
+                return [component['ID'] for component in components
+                        if component['State'] != 'Empty']
+            else:
+                return [component['ID'] for component in components]
         except KeyError as err:
             raise APIError(f'{err_prefix} due to missing {err} key in list of components.')
 
@@ -405,6 +424,21 @@ class CAPMCError(APIError):
 class CAPMCClient(APIGatewayClient):
     base_resource_path = 'capmc/capmc/v1/'
 
+    def __init__(self, *args, suppress_warnings=False, **kwargs):
+        """Initialize the CAPMCClient.
+
+        Args:
+            *args: args passed through to APIGatewayClient.__init__
+            suppress_warnings (bool): if True, suppress warnings when a query to
+                get_xname_status results in an error and node(s) in undefined
+                state. As an example, this is useful when waiting for a BMC or
+                node controller to be powered on since CAPMC will fail to query
+                the power status until it is powered on.
+            **kwargs: keyword args passed through to APIGatewayClient.__init__
+        """
+        self.suppress_warnings = suppress_warnings
+        super().__init__(*args, **kwargs)
+
     def set_xnames_power_state(self, xnames, power_state, force=False, recursive=False, prereq=False):
         """Set the power state of the given xnames.
 
@@ -468,9 +502,11 @@ class CAPMCClient(APIGatewayClient):
                              f'when getting power state of xname(s): {", ".join(xnames)}') from err
 
         if response.get('e'):
-            LOGGER.warning(f'Failed to get power state of one or more xnames, e={response["e"]}, '
-                           f'err_msg="{response.get("err_msg")}". xnames with undefined power state: '
-                           f'{", ".join(response.get("undefined", []))}')
+            level = logging.DEBUG if self.suppress_warnings else logging.WARNING
+            LOGGER.log(level,
+                       'Failed to get power state of one or more xnames, e=%s, '
+                       'err_msg="%s". xnames with undefined power state: %s',
+                       response['e'], response.get("err_msg"), ", ".join(response.get('undefined', [])))
 
         # Take out the err code and err_msg if everything went well
         return {k: v for k, v in response.items() if k not in {'e', 'err_msg'}}

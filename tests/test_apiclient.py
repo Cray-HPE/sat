@@ -176,14 +176,14 @@ class TestHSMClient(unittest.TestCase):
     """Tests for the APIGatewayClient class: HSM client."""
 
     def setUp(self):
-        self.xnames = ['x1000c0s0b0n0', 'x1000c0s1b0n0']
-        self.post_params = {'xnames': self.xnames}
+        self.xnames = ['x1000c0s0b0n0', 'x1000c0s1b0n0', 'x1000c0s1b1n0', 'x1000c0s1b1n0']
+        self.states = ['On', 'Ready', 'Empty', 'Empty']
 
         self.mock_get = mock.patch('sat.apiclient.APIGatewayClient.get').start()
         self.mock_get.return_value.json.return_value = {
             'Components': [
-                # There will be more fields than this, but we only care about this one
-                {'ID': xname} for xname in self.xnames
+                # There will be more fields than this, but we only care about these
+                {'ID': xname, 'State': state} for xname, state in zip(self.xnames, self.states)
             ]
         }
 
@@ -194,11 +194,18 @@ class TestHSMClient(unittest.TestCase):
 
     def test_get_component_xnames_success(self):
         """Test get_component_xnames in the successful case."""
-        hsm_type = 'node'
-        role = 'compute'
-        result = self.hsm_client.get_component_xnames(hsm_type, role)
+        params = {'type': 'Node', 'role': 'Compute'}
+        result = self.hsm_client.get_component_xnames(params)
         self.mock_get.assert_called_once_with('State', 'Components',
-                                              params={'type': hsm_type, 'role': role})
+                                              params=params)
+        self.assertEqual(self.xnames[0:2], result)
+
+    def test_get_components_xnames_with_empty(self):
+        """Test get_component_xnames with omit_empty=False"""
+        params = {'type': 'Node', 'role': 'Compute'}
+        result = self.hsm_client.get_component_xnames(params, omit_empty=False)
+        self.mock_get.assert_called_once_with('State', 'Components',
+                                              params=params)
         self.assertEqual(self.xnames, result)
 
 
@@ -544,6 +551,25 @@ class TestCAPMCClientGetState(ExtendedTestCase):
         with self.assertLogs(level=logging.WARNING) as cm:
             self.capmc_client.get_xnames_power_state(self.xnames)
         self.assert_in_element(expected_warning, cm.output)
+
+    def test_get_xnames_power_state_capmc_err_suppress(self):
+        """Test get_xnames_power_state with an error reported by CAPMC."""
+        self.mock_post.return_value.json.return_value['e'] = -1
+        err_msg = 'capmc failure'
+        self.mock_post.return_value.json.return_value = {
+            'e': -1,
+            'err_msg': err_msg,
+            'undefined': self.xnames
+        }
+        expected_msg = (f'Failed to get power state of one or more xnames, e=-1, '
+                        f'err_msg="{err_msg}". xnames with undefined power state: '
+                        f'{", ".join(self.xnames)}')
+        capmc_client = sat.apiclient.CAPMCClient(suppress_warnings=True)
+        with self.assertLogs(level=logging.DEBUG) as cm:
+            capmc_client.get_xnames_power_state(self.xnames)
+
+        self.assertEqual(logging.getLevelName(logging.DEBUG), cm.records[0].levelname)
+        self.assertEqual(cm.records[0].message, expected_msg)
 
     def test_get_xname_power_state_success(self):
         """Test get_xname_power_state when there is a single matching state."""
