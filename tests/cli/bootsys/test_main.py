@@ -21,15 +21,10 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-import glob
 import logging
-import os
-from subprocess import CalledProcessError
 import unittest
 from unittest.mock import call, Mock, patch
 
-import sat
-import sat.cli.bootsys.defaults
 from sat.cli.bootsys.bos import BOSFailure
 from sat.cli.bootsys.main import do_boot, do_bootsys, do_shutdown
 from sat.cli.bootsys.state_recorder import StateError
@@ -80,6 +75,7 @@ class TestDoShutdown(ExtendedTestCase):
         self.args.redfish_username = None
         self.args.ignore_pod_failures = False
         self.args.ipmi_timeout = 1
+        self.args.capmc_timeout = 120
 
         # Mock functions called in do_shutdown
         self.mock_service_activity_check = patch(
@@ -88,6 +84,8 @@ class TestDoShutdown(ExtendedTestCase):
         self.mock_print = patch('builtins.print').start()
         self.mock_pod_state_recorder = patch('sat.cli.bootsys.main.PodStateRecorder').start().return_value
         self.mock_bos_operations = patch('sat.cli.bootsys.main.do_bos_operations').start()
+        self.mock_nodes_power_off = patch('sat.cli.bootsys.main.do_nodes_power_off',
+                                          return_value=(set(), set())).start()
         self.mock_pester_choices = patch('sat.util.pester_choices').start()
         self.mock_pester_choices.return_value = 'yes'
         self.mock_do_shutdown_playbook = patch('sat.cli.bootsys.main.do_shutdown_playbook').start()
@@ -120,6 +118,7 @@ class TestDoShutdown(ExtendedTestCase):
             call('Succeeded with shutdown of management NCNs.')
         ])
         self.mock_bos_operations.assert_called_once_with('shutdown')
+        self.mock_nodes_power_off.assert_called_once_with(self.args.capmc_timeout)
         self.mock_do_shutdown_playbook.assert_called_once_with()
         self.mock_do_enable_hosts.assert_called_once_with()
         self.mock_ssh_client.load_system_host_keys.assert_called_once_with()
@@ -143,6 +142,7 @@ class TestDoShutdown(ExtendedTestCase):
         self.mock_pod_state_recorder.dump_state.assert_called_once()
         self.mock_service_activity_check.assert_not_called()
         self.mock_bos_operations.assert_not_called()
+        self.mock_nodes_power_off.assert_not_called()
         self.mock_do_shutdown_playbook.assert_not_called()
         self.mock_do_enable_hosts.assert_not_called()
         self.mock_get_user_pass.assert_not_called()
@@ -163,6 +163,7 @@ class TestDoShutdown(ExtendedTestCase):
         self.mock_pod_state_recorder.dump_state.assert_called_once()
         self.mock_service_activity_check.assert_called_with(self.args)
         self.mock_bos_operations.assert_called_with('shutdown')
+        self.mock_nodes_power_off.assert_called_once_with(self.args.capmc_timeout)
         self.mock_do_shutdown_playbook.assert_called_with()
         self.mock_do_enable_hosts.assert_called_with()
         self.mock_ssh_client.load_system_host_keys.assert_called_with()
@@ -192,10 +193,44 @@ class TestDoShutdown(ExtendedTestCase):
             call('Proceeding with BOS shutdown of computes and UAN.')
         ])
         self.mock_bos_operations.assert_called_once_with('shutdown')
+        self.mock_nodes_power_off.assert_not_called()
         self.mock_do_shutdown_playbook.assert_not_called()
         self.mock_do_enable_hosts.assert_not_called()
         self.mock_get_user_pass.assert_not_called()
         self.mock_mgmt_shutdown.assert_not_called()
+
+    def test_do_shutdown_capmc_failure(self):
+        """Test do_shutdown with a failure and timeout in capmc power off stage."""
+        timed_out_nodes = {'x5000c2s4b0n0'}
+        failed_nodes = {'x5000c7s3b0n0', 'x5000c0s1b0n0'}
+        self.mock_nodes_power_off.return_value = timed_out_nodes, failed_nodes
+
+        do_shutdown(self.args)
+
+        self.mock_service_activity_check.assert_called_once_with(self.args)
+        self.mock_pod_state_recorder.dump_state.assert_called_once()
+        self.mock_print.assert_has_calls([
+            call('Proceeding with BOS shutdown of computes and UAN.'),
+            call(f'The following node(s) timed out waiting to reach power off state: '
+                 f'{", ".join(timed_out_nodes)}'),
+            call(f'The following node(s) failed to power off with CAPMC: '
+                 f'{", ".join(failed_nodes)}'),
+            call('Proceeding with shutdown of management platform services.'),
+            call('Succeeded with shutdown of management platform services.'),
+            call('Enabling required entries in /etc/hosts for NCN mgmt interfaces.'),
+            call('Proceeding with shutdown of management NCNs.'),
+            call('Succeeded with shutdown of management NCNs.')
+        ])
+        self.mock_bos_operations.assert_called_once_with('shutdown')
+        self.mock_nodes_power_off.assert_called_once_with(self.args.capmc_timeout)
+        self.mock_do_shutdown_playbook.assert_called_once_with()
+        self.mock_do_enable_hosts.assert_called_once_with()
+        self.mock_ssh_client.load_system_host_keys.assert_called_once_with()
+        self.mock_get_user_pass.assert_called_once()
+        self.mock_mgmt_shutdown.assert_called_once_with(
+            self.mock_ssh_client, self.mock_username,
+            self.mock_password, self.args.ipmi_timeout, self.args.dry_run
+        )
 
     def test_do_shutdown_do_not_proceed_bos(self):
         """Test do_shutdown with a 'no' answer to the first proceed prompt."""
@@ -207,6 +242,7 @@ class TestDoShutdown(ExtendedTestCase):
         self.mock_service_activity_check.assert_called_once_with(self.args)
         self.mock_pod_state_recorder.dump_state.assert_called_once()
         self.mock_bos_operations.assert_not_called()
+        self.mock_nodes_power_off.assert_not_called()
         self.mock_do_shutdown_playbook.assert_not_called()
         self.mock_do_enable_hosts.assert_not_called()
         self.mock_get_user_pass.assert_not_called()
@@ -222,6 +258,7 @@ class TestDoShutdown(ExtendedTestCase):
         self.mock_service_activity_check.assert_called_once_with(self.args)
         self.mock_pod_state_recorder.dump_state.assert_called_once()
         self.mock_bos_operations.assert_called_once_with('shutdown')
+        self.mock_nodes_power_off.assert_called_once_with(self.args.capmc_timeout)
         self.mock_do_shutdown_playbook.assert_not_called()
         self.mock_do_enable_hosts.assert_not_called()
         self.mock_get_user_pass.assert_not_called()
@@ -237,6 +274,7 @@ class TestDoShutdown(ExtendedTestCase):
         self.mock_service_activity_check.assert_called_once_with(self.args)
         self.mock_pod_state_recorder.dump_state.assert_called_once()
         self.mock_bos_operations.assert_called_once_with('shutdown')
+        self.mock_nodes_power_off.assert_called_once_with(self.args.capmc_timeout)
         self.mock_do_shutdown_playbook.assert_called_once_with()
         self.mock_do_enable_hosts.assert_called_once_with()
         self.mock_get_user_pass.assert_not_called()

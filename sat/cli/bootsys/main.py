@@ -31,6 +31,7 @@ from sat.cli.bootsys.mgmt_boot_power import do_mgmt_boot
 from sat.cli.bootsys.mgmt_hosts import do_enable_hosts_entries
 from sat.cli.bootsys.mgmt_shutdown_ansible import do_shutdown_playbook
 from sat.cli.bootsys.mgmt_shutdown_power import do_mgmt_shutdown_power
+from sat.cli.bootsys.power import do_nodes_power_off
 from sat.cli.bootsys.state_recorder import PodStateRecorder, StateError
 from sat.cli.bootsys.service_activity import do_service_activity_check
 from sat.util import BeginEndLogger, get_username_and_password_interactively, prompt_continue
@@ -91,6 +92,16 @@ def do_shutdown(args):
     except BOSFailure as err:
         LOGGER.error("Failed %s: %s", action_msg, err)
         sys.exit(1)
+
+    action_msg = 'ensuring power off of computes and UAN'
+    with BeginEndLogger(action_msg):
+        timed_out_nodes, failed_nodes = do_nodes_power_off(args.capmc_timeout)
+    if timed_out_nodes:
+        print(f'The following node(s) timed out waiting to reach power off '
+              f'state: {", ".join(timed_out_nodes)}')
+    if failed_nodes:
+        print(f'The following node(s) failed to power off with CAPMC: '
+              f'{", ".join(failed_nodes)}')
 
     action_msg = 'shutdown of management platform services'
     prompt_continue(action_msg)

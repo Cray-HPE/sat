@@ -88,9 +88,31 @@ These options must be specified after the subcommand.
         If supplied, do not perform any destructive operations on the system.
         (e.g. powering off, stopping services, etc.)
 
+SHUTDOWN AND BOOT OPTIONS
+-------------------------
+These options apply to both the ``shutdown`` and ``boot`` actions.
+
+**--cle-bos-template** *CLE_BOS_TEMPLATE*
+        The name of the BOS session template for shutdown and boot of CLE
+        compute nodes. Defaults to a template matching the pattern "cle-X.Y.X"
+        where "X", "Y", and "Z" are integer version numbers. This overrides the
+        option ``bootsys.cle_bos_template`` in the config file.
+
+**--uan-bos-template** *UAN_BOS_TEMPLATE*
+        The name of the BOS session template for shutdown and boot of user
+        access nodes (UANs). Defaults to "uan". If the empty string is
+        specified, no UAN shutdown will be performed. This overrides the option
+        ``bootsys.uan_bos_template`` in the config file.
+
+**--ipmi-timeout** *IPMI_TIMEOUT*
+        A timeout, in seconds, for nodes to reach the desired power state after
+        IPMI power commands are issued. This applies only to the management
+        NCNs, which are the only nodes that are powered on/off directly with
+        IPMI. The default is 120 seconds.
+
 SHUTDOWN OPTIONS
 ----------------
-These options apply to the ``shutdown`` action.
+These options apply only to the ``shutdown`` action.
 
 **-i, --ignore-failures**
         Same as setting --ignore-pod-failures and --ignore-service-failures.
@@ -106,11 +128,7 @@ These options apply to the ``shutdown`` action.
         there are no additional steps implemented, so it doesn't make much
         difference.
 
-**--pod-state-file**
-        Specify a custom file to write pod-state. Default is
-        /var/sat/podstates/pod-state.json.
-
-**--state-check-fail-action**
+**--state-check-fail-action** *FAIL_ACTION*
         Action to take if a failure occurs when checking whether a BOS session
         template needs an operation applied based on current node state in HSM.
         The choices and their meanings are as follows:
@@ -122,18 +140,39 @@ These options apply to the ``shutdown`` action.
                 prompt: Prompt user whether to abort, skip, or force.
                 force: Do the operation against this session template anyway.
 
-**--ipmi-timeout**
-        A timeout, in seconds, after which an uncompleted
-        IPMI command is considered failed. Defaults to 120 seconds.
-
+**--capmc-timeout** *CAPMC_TIMEOUT*
+        A timeout, in seconds, for compute nodes and application nodes to reach
+        the powered off state if they had to be forcibly powered off with CAPMC
+        after the shutdown with BOS. The default is 120 seconds.
 
 BOOT OPTIONS
 ------------
 
-**--ssh-timeout**
-        A timeout, in seconds, after which a node which has powered on
-        but is not accessible via SSH is considered to have failed booting.
-        Defaults to 120 seconds.
+These options apply only to the ``boot`` action.
+
+**--ssh-timeout** *SSH_TIMEOUT*
+        The number of seconds after which the ``boot`` action should time out
+        while waiting for a node to become accessible via SSH after being
+        powered on. Defaults to 600 seconds.
+
+**--k8s-timeout** *K8S_TIMEOUT*
+        The number of seconds after which the ``boot`` action should time out
+        while waiting for kubernetes pods to return to their pre-shutdown state.
+        Defaults to 1800 seconds.
+
+**--ceph-timeout** *CEPH_TIMEOUT*
+        The number of seconds after which the ``boot`` action should time out
+        while waiting for Ceph storage to come up. Defaults to 600 seconds.
+
+**--bgp-timeout** *BGP_TIMEOUT*
+        The number of seconds after which the ``boot`` action should time out
+        while waiting for a the BGP peering sessions to become established.
+        Defaults to 600 seconds.
+
+**--hsn-timeout** *HSN_TIMEOUT*
+        The number of seconds after which the ``boot`` action should time out
+        while waiting for the high-speed network to come up after running the
+        bringup action. Defaults to 600 seconds.
 
 EXAMPLES
 ========
