@@ -44,7 +44,7 @@ class APIGatewayClient:
     # This can be set in subclasses to make a client for a specific API
     base_resource_path = ''
 
-    def __init__(self, session=None, host=None, cert_verify=None):
+    def __init__(self, session=None, host=None, cert_verify=None, timeout=60):
         """Initialize the APIGatewayClient.
 
         Args:
@@ -52,6 +52,8 @@ class APIGatewayClient:
                 or None to make connections without a session.
             host (str): The API gateway host.
             cert_verify (bool): Whether to verify the gateway's certificate.
+            timeout (int): number of seconds to wait for a response before timing
+                out requests made to services behind the API gateway.
         """
 
         # Inherit parameters from session if not passed as arguments
@@ -72,6 +74,7 @@ class APIGatewayClient:
         self.session = session
         self.host = host
         self.cert_verify = cert_verify
+        self.timeout = timeout
 
     def _make_req(self, *args, req_type='GET', req_param=None, json=None):
         """Perform HTTP request with type `req_type` to resource given in `args`.
@@ -102,14 +105,14 @@ class APIGatewayClient:
 
         try:
             if req_type == 'GET':
-                r = requester.get(url, params=req_param, verify=self.cert_verify)
+                r = requester.get(url, params=req_param, verify=self.cert_verify, timeout=self.timeout)
             elif req_type == 'POST':
                 r = requester.post(url, data=req_param, verify=self.cert_verify,
-                                   json=json)
+                                   json=json, timeout=self.timeout)
             elif req_type == 'PUT':
-                r = requester.put(url, data=req_param, verify=self.cert_verify)
+                r = requester.put(url, data=req_param, verify=self.cert_verify, timeout=self.timeout)
             elif req_type == 'DELETE':
-                r = requester.delete(url, verify=self.cert_verify)
+                r = requester.delete(url, verify=self.cert_verify, timeout=self.timeout)
             else:
                 # Internal error not expected to occur.
                 raise ValueError("Request type '{}' is invalid.".format(req_type))

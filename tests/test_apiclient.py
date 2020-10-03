@@ -71,7 +71,7 @@ class TestAPIGatewayClient(unittest.TestCase):
 
         mock_requests_get.assert_called_once_with(
             get_http_url_prefix(api_gw_host) + '/'.join(path_components),
-            params=None, verify=True
+            params=None, verify=True, timeout=60
         )
         self.assertEqual(response, mock_requests_get.return_value)
 
@@ -86,7 +86,7 @@ class TestAPIGatewayClient(unittest.TestCase):
 
         mock_requests_get.assert_called_once_with(
             get_http_url_prefix(api_gw_host) + '/'.join(path_components),
-            params=params, verify=True
+            params=params, verify=True, timeout=60
         )
         self.assertEqual(response, mock_requests_get.return_value)
 
@@ -110,7 +110,7 @@ class TestAPIGatewayClient(unittest.TestCase):
 
         mock_requests_post.assert_called_once_with(
             get_http_url_prefix(api_gw_host) + '/'.join(path_components),
-            data=payload, verify=True, json=None
+            data=payload, verify=True, json=None, timeout=60
         )
         self.assertEqual(response, mock_requests_post.return_value)
 
@@ -135,7 +135,7 @@ class TestAPIGatewayClient(unittest.TestCase):
 
         mock_requests_put.assert_called_once_with(
             get_http_url_prefix(api_gw_host) + '/'.join(path_components),
-            data=payload, verify=True
+            data=payload, verify=True, timeout=60
         )
 
     @mock.patch('requests.put', side_effect=requests.exceptions.RequestException)
@@ -158,7 +158,7 @@ class TestAPIGatewayClient(unittest.TestCase):
 
         mock_requests_delete.assert_called_once_with(
             get_http_url_prefix(api_gw_host) + '/'.join(path_components),
-            verify=True
+            verify=True, timeout=60
         )
         self.assertEqual(response, mock_requests_delete.return_value)
 
