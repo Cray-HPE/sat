@@ -60,18 +60,18 @@ STAGES_BY_ACTION = {
         ('session-checks', ('service_activity', 'do_service_activity_check')),
         ('bos-operations', ('bos', 'do_bos_shutdowns')),
         ('cabinet-power', ('cabinet_power', 'do_cabinets_power_off')),
-        ('bgp-check', ('mgmt_boot_power', 'do_bgp_check')),  # TODO: consider moving this function to new module
-        ('platform-services', ('mgmt_shutdown_ansible', 'do_shutdown_playbook')),
-        ('ncn-power', ('mgmt_shutdown_power', 'do_power_off_ncns'))
+        ('bgp-check', ('bgp', 'do_bgp_check')),
+        ('platform-services', ('mgmt_ansible', 'do_shutdown_playbook')),
+        ('ncn-power', ('mgmt_power', 'do_power_off_ncns'))
     ]),
     'boot': OrderedDict([
-        ('ncn-power', ('mgmt_boot_power', 'do_power_on_ncns')),
-        ('platform-services', ('mgmt_boot_power', 'do_platform_startup_playbook')),
-        ('k8s-check', ('mgmt_boot_power', 'do_k8s_check')),
-        ('ceph-check', ('mgmt_boot_power', 'do_ceph_check')),
-        ('bgp-check', ('mgmt_boot_power', 'do_bgp_check')),
+        ('ncn-power', ('mgmt_power', 'do_power_on_ncns')),
+        ('platform-services', ('mgmt_ansible', 'do_startup_playbook')),
+        ('k8s-check', ('k8s', 'do_k8s_check')),
+        ('ceph-check', ('ceph', 'do_ceph_check')),
+        ('bgp-check', ('bgp', 'do_bgp_check')),
         ('cabinet-power', ('cabinet_power', 'do_cabinets_power_on')),
-        ('hsn-bringup', ('mgmt_boot_power', 'do_hsn_bringup')),
+        ('hsn-bringup', ('hsn', 'do_hsn_bringup')),
         ('bos-operations', ('bos', 'do_bos_boots'))
     ])
 }

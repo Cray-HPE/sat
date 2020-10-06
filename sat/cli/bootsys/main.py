@@ -61,6 +61,7 @@ def do_bootsys(args):
     Returns:
         None
     """
+    # TODO: remove
     if args.ignore_failures:
         args.ignore_service_failures = True
         args.ignore_pod_failures = True

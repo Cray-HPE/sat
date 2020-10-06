@@ -30,8 +30,7 @@ from sat.cli.bootsys.power import (
     CAPMCError,
     CAPMCPowerWaiter,
     do_nodes_power_off,
-    get_nodes_by_role_and_state
-)
+    get_nodes_by_role_and_state)
 from tests.common import ExtendedTestCase
 
 

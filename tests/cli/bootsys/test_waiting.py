@@ -36,7 +36,7 @@ def get_mock_waiter(complete_behavior):
     GroupWaiter.wait_for_completion method.
 
     Args:
-        member_complete_behavior (bool|str -> bool):
+        complete_behavior (bool|str -> bool):
             if boolean, has_completed always return this value.
             if iterable, has_completed will return the members of the iterable
                 in order of calls.

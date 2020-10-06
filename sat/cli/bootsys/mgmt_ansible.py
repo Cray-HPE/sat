@@ -1,5 +1,5 @@
 """
-Run an Ansible playbook to shutdown platform services on the management cluster.
+Run an Ansible playbook to start/stop platform services on the management cluster.
 
 (C) Copyright 2020 Hewlett Packard Enterprise Development LP.
 
@@ -22,9 +22,29 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 from sat.cli.bootsys.util import run_ansible_playbook
+from sat.util import BeginEndLogger
 
+STARTUP_PLAYBOOK = '/opt/cray/crayctl/ansible_framework/main/platform-startup.yml'
 SHUTDOWN_PLAYBOOK = '/opt/cray/crayctl/ansible_framework/main/platform-shutdown.yml'
 
 
 def do_shutdown_playbook(args):
-    run_ansible_playbook(SHUTDOWN_PLAYBOOK, '--skip-tags prompt')
+    """Run ansible playbook to stop platform services
+
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this stage.
+    """
+    with BeginEndLogger('platform-shutdown.yml ansible playbook'):
+        run_ansible_playbook(SHUTDOWN_PLAYBOOK, '--skip-tags prompt')
+
+
+def do_startup_playbook(args):
+    """Run ansible playbook to start platform services
+
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this stage.
+    """
+    with BeginEndLogger('platform-startup.yml ansible playbook'):
+        run_ansible_playbook(STARTUP_PLAYBOOK, '--skip-tags prompt')

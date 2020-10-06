@@ -1,5 +1,5 @@
 """
-Unit tests for the service_activity module.
+Unit tests for the sat.cli.bootsys.bos module.
 
 (C) Copyright 2020 Hewlett Packard Enterprise Development LP.
 

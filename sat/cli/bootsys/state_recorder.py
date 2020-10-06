@@ -292,6 +292,19 @@ class HSNStateRecorder(StateRecorder):
 
 
 def do_state_capture(args):
+    """Capture and record state about k8s pods and the HSN.
+
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to the bootsys subcommand.
+
+    Returns:
+        None.
+
+    Raises:
+        SystemExit: if there is a failure to capture state.
+    """
+    # TODO: HSNStateRecorder.dump_state
     print('Capturing state of k8s pods.')
     with BeginEndLogger('kubernetes pod state capture'):
         try:

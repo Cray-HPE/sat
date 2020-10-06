@@ -771,8 +771,23 @@ def do_bos_operations(operation):
 
 
 def do_bos_shutdowns(args):
+    """Shut down compute nodes and UANs using BOS.
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this stage.
+
+    Returns: None
+    """
     do_bos_operations('shutdown')
 
 
 def do_bos_boots(args):
+    """Boot compute nodes and UANs using BOS.
+
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this stage.
+
+    Returns: None
+    """
     do_bos_operations('boot')
