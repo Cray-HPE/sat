@@ -40,15 +40,17 @@ class TestCAPMCPowerWaiter(ExtendedTestCase):
 
     def setUp(self):
         """Set up some patches and shared objects."""
-        self.mock_capmc_client = patch('sat.cli.bootsys.power.CAPMCClient').start().return_value
+        self.mock_capmc_client_cls = patch('sat.cli.bootsys.power.CAPMCClient').start()
+        self.mock_capmc_client = self.mock_capmc_client_cls.return_value
         self.mock_sat_session = patch('sat.cli.bootsys.power.SATSession').start()
 
         self.members = {'x5000c0s0b0n0', 'x5000c0s1b0n0'}
         self.power_state = 'off'
         self.timeout = 60
         self.poll_interval = 5
+        self.suppress_warnings = True
         self.waiter = CAPMCPowerWaiter(self.members, self.power_state,
-                                       self.timeout, self.poll_interval)
+                                       self.timeout, self.poll_interval, self.suppress_warnings)
 
     def tearDown(self):
         """Stop all patches."""
@@ -60,6 +62,9 @@ class TestCAPMCPowerWaiter(ExtendedTestCase):
         self.assertEqual(self.power_state, self.waiter.power_state)
         self.assertEqual(self.timeout, self.waiter.timeout)
         self.assertEqual(self.poll_interval, self.waiter.poll_interval)
+        self.mock_capmc_client_cls.assert_called_once_with(self.mock_sat_session.return_value,
+                                                           suppress_warnings=self.suppress_warnings)
+        self.assertEqual(self.mock_capmc_client, self.waiter.capmc_client)
 
     def test_condition_name(self):
         """Test the condition_name of the CAPMCPowerWaiter"""
@@ -255,8 +260,8 @@ class TestGetNodesByRoleAndState(unittest.TestCase):
             'off': self.compute_nodes + self.application_nodes[1:]
         }
 
-        def mock_get_xnames(_, role):
-            return self.nodes_by_role.get(role, [])
+        def mock_get_xnames(params):
+            return self.nodes_by_role.get(params.get('role'), [])
 
         self.mock_hsm_client = patch('sat.cli.bootsys.power.HSMClient').start().return_value
         self.mock_hsm_client.get_component_xnames = mock_get_xnames

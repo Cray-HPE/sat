@@ -100,8 +100,14 @@ def add_bootsys_subparser(subparsers):
 
     bootsys_parser.add_argument(
         '--capmc-timeout', default=120, type=int,
-        help='Timeout, in seconds, for compute nodes and application nodes to reach '
-             'the powered off state if they had to be powered off with CAPMC.'
+        help='Timeout, in seconds, for components to reach desired power state '
+             'after a CAPMC operation.'
+    )
+
+    bootsys_parser.add_argument(
+        '--discovery-timeout', default=600, type=int,
+        help='Timeout, in seconds, for node controllers and BMCs to reach the '
+             'powered on state after the HMS discovery job is resumed.'
     )
 
     bootsys_parser.add_argument(
@@ -112,13 +118,13 @@ def add_bootsys_subparser(subparsers):
 
     bootsys_parser.add_argument(
         '--ssh-timeout', default=600, type=int,
-        help='Timeout waiting for SSH availability on nodes'
+        help='Timeout waiting for SSH availability on nodes.'
     )
 
     bootsys_parser.add_argument(
         '--k8s-timeout', default=1800, type=int,
         help='Timeout waiting for Kubernetes pods to return to '
-        'pre-shutdown state'
+             'pre-shutdown state.'
     )
 
     bootsys_parser.add_argument(
@@ -133,5 +139,5 @@ def add_bootsys_subparser(subparsers):
 
     bootsys_parser.add_argument(
         '--hsn-timeout', default=600, type=int,
-        help='Timeout waiting for HSN bringup'
+        help='Timeout waiting for HSN bringup.'
     )

@@ -30,3 +30,5 @@ requests < 3.0
 requests-oauthlib
 toml == 0.10.0
 urllib3 >= 1.0, < 2.0
+croniter >= 0.3, < 1.0
+python-dateutil >= 2.7.3, < 3.0

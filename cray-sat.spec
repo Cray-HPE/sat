@@ -32,7 +32,9 @@ BuildRoot: %{_topdir}
 Vendor: Cray Inc.
 Requires: slingshot-tools
 Requires: python3-argcomplete
+Requires: python3-python-dateutil >= 2.7.3, python3-python-dateutil < 3.0
 Requires: python3-docker
+Requires: python3-croniter >= 0.3, python3-croniter < 1.0
 Requires: python3-inflect < 3.0
 Requires: python3-kubernetes
 Requires: python3-paramiko >= 2.4.2

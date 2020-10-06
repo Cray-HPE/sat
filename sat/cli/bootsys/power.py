@@ -150,7 +150,7 @@ def get_nodes_by_role_and_state(role, power_state):
     hsm_client = HSMClient(SATSession())
     capmc_client = CAPMCClient(SATSession())
 
-    role_nodes = hsm_client.get_component_xnames('Node', role)
+    role_nodes = hsm_client.get_component_xnames({'type': 'Node', 'role': role})
     LOGGER.debug('Found %s node(s) with role %s: %s', len(role_nodes), role, role_nodes)
     if not role_nodes:
         return role_nodes
@@ -170,7 +170,7 @@ def get_nodes_by_role_and_state(role, power_state):
 class CAPMCPowerWaiter(GroupWaiter):
     """Waits for all members to reach the given power state in CAPMC."""
 
-    def __init__(self, members, power_state, timeout, poll_interval=5):
+    def __init__(self, members, power_state, timeout, poll_interval=5, suppress_warnings=False):
         """Create a new CAPMCPowerStateWaiter.
 
         Args:
@@ -179,10 +179,15 @@ class CAPMCPowerWaiter(GroupWaiter):
             timeout (int): how long to wait for nodes to reach given power state
                 before timing out.
             poll_interval (int): how long to wait between checks on power state
+            suppress_warnings (bool): if True, suppress warnings when a query to
+                get_xname_status results in an error and node(s) in undefined
+                state. As an example, this is useful when waiting for a BMC or
+                node controller to be powered on since CAPMC will fail to query
+                the power status until it is powered on.
         """
         super().__init__(members, timeout, poll_interval)
         self.power_state = power_state
-        self.capmc_client = CAPMCClient(SATSession())
+        self.capmc_client = CAPMCClient(SATSession(), suppress_warnings=suppress_warnings)
 
     def condition_name(self):
         return 'CAPMC power ' + self.power_state
@@ -202,7 +207,7 @@ class CAPMCPowerWaiter(GroupWaiter):
         try:
             current_state = self.capmc_client.get_xname_power_state(member)
         except APIError as err:
-            LOGGER.warning("Failed to query power state: %s", err)
+            LOGGER.warning('Failed to query power state: %s', err)
             return False
 
         return current_state == self.power_state
