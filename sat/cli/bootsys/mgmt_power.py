@@ -33,9 +33,9 @@ from paramiko.ssh_exception import BadHostKeyException, AuthenticationException,
 
 from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger
 from sat.cli.bootsys.mgmt_hosts import do_enable_hosts_entries, do_disable_hosts_entries
-from sat.cli.bootsys.power import LOGGER
 from sat.cli.bootsys.util import get_ncns, RunningService
 from sat.cli.bootsys.waiting import GroupWaiter
+from sat.config import get_config_value
 from sat.util import BeginEndLogger, get_username_and_password_interactively, prompt_continue
 
 LOGGER = logging.getLogger(__name__)
@@ -168,10 +168,10 @@ class SSHAvailableWaiter(GroupWaiter):
             return False
         else:
             return True
+
+
 # Failures are logged, but otherwise ignored. They may be considered "stalled shutdowns" and
 # forcibly powered off as allowed for in the process.
-
-
 def start_shutdown(hosts, ssh_client):
     """Start shutdown by sending a shutdown command to each host.
 
@@ -200,7 +200,7 @@ def start_shutdown(hosts, ssh_client):
                 channel.close()
 
 
-def finish_shutdown(hosts, username, password, timeout):
+def finish_shutdown(hosts, username, password, ncn_shutdown_timeout, ipmi_timeout):
     """Ensure each host is powered off.
 
     After start_shutdown is called, this checks that all the hosts
@@ -212,21 +212,23 @@ def finish_shutdown(hosts, username, password, timeout):
         hosts ([str]): a list of hostnames to power off.
         username (str): IPMI username to use.
         password (str): IPMI password to use.
-        timeout (int): timeout, in seconds, after which to hard power off.
+        ncn_shutdown_timeout (int): timeout, in seconds, after which to hard
+            power off.
+        ipmi_timeout (int): timeout, in seconds, for nodes to reach desired
+            power state after IPMI power off.
 
     Raises:
         SystemExit: if any of the `hosts` failed to reach powered off state
     """
     with RunningService('dhcpd', sleep_after_start=5):
-        # TODO: use NCN shutdown timeout
-        ipmi_waiter = IPMIPowerStateWaiter(hosts, 'off', timeout, username, password)
+        ipmi_waiter = IPMIPowerStateWaiter(hosts, 'off', ncn_shutdown_timeout, username, password)
         pending_hosts = ipmi_waiter.wait_for_completion()
 
         if pending_hosts:
             LOGGER.warning('Forcibly powering off nodes: %s', ', '.join(pending_hosts))
 
             # Confirm all nodes have actually turned off.
-            failed_hosts = IPMIPowerStateWaiter(pending_hosts, 'off', timeout, username, password,
+            failed_hosts = IPMIPowerStateWaiter(pending_hosts, 'off', ipmi_timeout, username, password,
                                                 send_command=True).wait_for_completion()
 
             if failed_hosts:
@@ -235,22 +237,25 @@ def finish_shutdown(hosts, username, password, timeout):
                 sys.exit(1)
 
 
-def do_mgmt_shutdown_power(ssh_client, username, password, timeout):
+def do_mgmt_shutdown_power(ssh_client, username, password, ncn_shutdown_timeout, ipmi_timeout):
     """Power off NCNs.
 
     Args:
         ssh_client (SSHClient): a paramiko client object.
         username (str): IPMI username to use.
         password (str): IPMI password to use.
-        timeout (int): timeout, in seconds, after which to hard power off.
-    """
+        ncn_shutdown_timeout (int): timeout, in seconds, after which to hard
+            power off.
+        ipmi_timeout (int): timeout, in seconds, for nodes to reach desired
+            power state after IPMI power off.    """
     LOGGER.info('Sending shutdown command to hosts.')
 
     non_bis_hosts = get_ncns(['managers', 'storage', 'workers'], exclude=['bis'])
     with IPMIConsoleLogger(non_bis_hosts):
         start_shutdown(non_bis_hosts, ssh_client)
 
-        finish_shutdown(non_bis_hosts, username, password, timeout)
+        finish_shutdown(non_bis_hosts, username, password,
+                        ncn_shutdown_timeout, ipmi_timeout)
         LOGGER.info('Shutdown complete.')
 
 
@@ -272,7 +277,9 @@ def do_power_off_ncns(args):
     ssh_client.load_system_host_keys()
 
     with BeginEndLogger(action_msg):
-        do_mgmt_shutdown_power(ssh_client, username, password, args.ipmi_timeout)
+        do_mgmt_shutdown_power(ssh_client, username, password,
+                               get_config_value('bootsys.ncn_shutdown_timeout'),
+                               get_config_value('bootsys.ipmi_timeout'))
     print('Succeeded with {}.'.format(action_msg))
 
 
@@ -298,17 +305,18 @@ def do_power_on_ncns(args):
         worker_nodes = get_ncns(['workers'], exclude=['bis'])
         ncn_groups = [master_nodes, storage_nodes, worker_nodes]
         # flatten lists of ncn groups
-        # TODO: don't think this works
-        non_bis_ncns = sum(ncn_groups)
+        non_bis_ncns = sum(ncn_groups, [])
         with IPMIConsoleLogger(non_bis_ncns):
             for ncn_group in ncn_groups:
 
                 # TODO (SAT-555): Probably should not send a power on if it's already on.
-                ipmi_waiter = IPMIPowerStateWaiter(ncn_group, 'on', args.ipmi_timeout,
+                ipmi_waiter = IPMIPowerStateWaiter(ncn_group, 'on',
+                                                   get_config_value('bootsys.ipmi_timeout'),
                                                    username, password, send_command=True)
                 ipmi_waiter.wait_for_completion()
 
-                ssh_waiter = SSHAvailableWaiter(ncn_group, args.ssh_timeout)
+                ssh_waiter = SSHAvailableWaiter(ncn_group,
+                                                get_config_value('bootsys.ncn_boot_timeout'))
                 inaccessible_nodes = ssh_waiter.wait_for_completion()
 
                 if inaccessible_nodes:

@@ -69,11 +69,11 @@ def do_bootsys(args):
         try:
             for stage in STAGES_BY_ACTION[args.action].keys():
                 print(stage)
-                sys.exit(0)
         # Should not happen the way arguments are parsed
         except KeyError:
             LOGGER.error('Invalid action: %s', args.action)
             sys.exit(1)
+        sys.exit(0)
 
     try:
         submodule, stage_func_name = STAGES_BY_ACTION[args.action][args.stage]

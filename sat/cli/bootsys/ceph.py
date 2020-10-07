@@ -30,6 +30,7 @@ from paramiko import SSHClient, SSHException
 
 from sat.cli.bootsys.util import get_groups
 from sat.cli.bootsys.waiting import Waiter
+from sat.config import get_config_value
 from sat.util import BeginEndLogger
 
 LOGGER = logging.getLogger(__name__)
@@ -138,6 +139,6 @@ def do_ceph_check(args):
         restart_ceph_services()
 
     with BeginEndLogger('wait for ceph health'):
-        ceph_waiter = CephHealthWaiter(args.ceph_timeout)
+        ceph_waiter = CephHealthWaiter(get_config_value('bootsys.ceph_timeout'))
         if not ceph_waiter.wait_for_completion():
             sys.exit(1)

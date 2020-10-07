@@ -21,7 +21,6 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-
 import logging
 import warnings
 
@@ -35,6 +34,7 @@ from sat.cached_property import cached_property
 from sat.cli.bootsys.state_recorder import PodStateRecorder, StateError
 from sat.cli.bootsys.util import k8s_pods_to_status_dict
 from sat.cli.bootsys.waiting import GroupWaiter, Waiter
+from sat.config import get_config_value
 from sat.report import Report
 from sat.util import BeginEndLogger
 
@@ -216,7 +216,7 @@ def do_k8s_check(args):
         k8s_api_waiter.wait_for_completion()
 
     try:
-        k8s_waiter = KubernetesPodStatusWaiter(args.k8s_timeout)
+        k8s_waiter = KubernetesPodStatusWaiter(get_config_value('bootsys.k8s_timeout'))
     except ConfigException as err:
         # Unlikely, given that we loaded the config earlier, but could happen
         LOGGER.error("Failed to load kubernetes config while waiting for pods "

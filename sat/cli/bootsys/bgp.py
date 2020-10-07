@@ -27,6 +27,7 @@ import sys
 
 from sat.cli.bootsys.util import run_ansible_playbook
 from sat.cli.bootsys.waiting import Waiter
+from sat.config import get_config_value
 from sat.util import BeginEndLogger
 
 LOGGER = logging.getLogger(__name__)
@@ -97,6 +98,6 @@ def do_bgp_check(args):
             passed to this stage.
     """
     with BeginEndLogger('Wait for BGP peering sessions established'):
-        bgp_waiter = BGPSpineStatusWaiter(args.bgp_timeout)
+        bgp_waiter = BGPSpineStatusWaiter(get_config_value('bootsys.bgp_timeout'))
         if not bgp_waiter.wait_for_completion():
             sys.exit(1)

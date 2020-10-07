@@ -29,6 +29,7 @@ import os
 import toml
 
 from sat.cli.bootsys.defaults import DEFAULT_UAN_BOS_TEMPLATE
+from sat.cli.bootsys.parser import TIMEOUT_SPECS
 
 DEFAULT_CONFIG_PATH = '/etc/sat.toml'
 LOGGER = logging.getLogger(__name__)
@@ -120,6 +121,19 @@ SAT_CONFIG_SPEC = {
         'password': OptionSpec(str, '', None, None)
     },
 }
+
+
+def _add_bootsys_timeouts(config_spec):
+    bootsys_timeout_opts = {}
+    for ts in TIMEOUT_SPECS:
+        underscore_option = f'{ts.option_prefix.replace("-", "_")}_timeout'
+        bootsys_timeout_opts[underscore_option] = OptionSpec(
+            int, ts.default, None, underscore_option
+        )
+    config_spec['bootsys'].update(bootsys_timeout_opts)
+
+
+_add_bootsys_timeouts(SAT_CONFIG_SPEC)
 
 
 def _option_value(args, curr, spec):

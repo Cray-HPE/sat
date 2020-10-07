@@ -35,8 +35,6 @@ from inflect import engine
 from sat.apiclient import APIError, BOSClient, HSMClient
 from sat.cli.bootsys.defaults import (
     CLE_BOS_TEMPLATE_REGEX,
-    BOS_BOOT_TIMEOUT,
-    BOS_SHUTDOWN_TIMEOUT,
     PARALLEL_CHECK_INTERVAL
 )
 from sat.config import get_config_value
@@ -365,7 +363,7 @@ class BOSSessionThread(Thread):
         self.monitor_status_kubectl()
 
 
-def do_parallel_bos_operations(session_templates, operation):
+def do_parallel_bos_operations(session_templates, operation, timeout):
     """Perform BOS operation against the session templates in parallel.
 
     Args:
@@ -373,6 +371,7 @@ def do_parallel_bos_operations(session_templates, operation):
             to create BOS sessions with the given `operation`.
         operation (str): The operation to perform on the given BOS session
             templates. Can be either 'shutdown' or 'boot'.
+        timeout (int): The timeout for the BOS operation
 
     Returns:
         None
@@ -396,14 +395,13 @@ def do_parallel_bos_operations(session_templates, operation):
 
     print(f'Started {operation} operation on BOS '
           f'{template_plural}: {", ".join(session_templates)}.')
-    bos_timeout = BOS_SHUTDOWN_TIMEOUT if operation == 'shutdown' else BOS_BOOT_TIMEOUT
-    print(f'Waiting up to {bos_timeout} seconds for {session_plural} to complete.')
+    print(f'Waiting up to {timeout} seconds for {session_plural} to complete.')
 
     active_threads = {t.session_template: t for t in bos_session_threads}
     failed_session_templates = []
     just_finished = []
 
-    while active_threads and elapsed_time < bos_timeout:
+    while active_threads and elapsed_time < timeout:
         if just_finished:
             print(f'Still waiting on session(s) for template(s): '
                   f'{", ".join(active_threads.keys())}')
@@ -430,7 +428,7 @@ def do_parallel_bos_operations(session_templates, operation):
 
     if active_threads:
         LOGGER.error('BOS %s timed out after %s seconds for session %s: %s.',
-                     operation, bos_timeout,
+                     operation, timeout,
                      INFLECTOR.plural('template', len(active_threads)),
                      ', '.join(active_threads.keys()))
 
@@ -729,12 +727,13 @@ def get_session_templates():
     return session_templates
 
 
-def do_bos_operations(operation):
+def do_bos_operations(operation, timeout):
     """Perform a BOS operation on the compute node and UAN session templates.
 
     Args:
         operation (str): The operation to perform on the compute node and UAN
             session templates. Valid operations are 'boot' and 'shutdown'.
+        timeout (int): The timeout for the BOS operation.
 
     Returns:
         None
@@ -767,7 +766,7 @@ def do_bos_operations(operation):
 
     if templates_to_use:
         # Let any exceptions raise to caller
-        do_parallel_bos_operations(templates_to_use, operation)
+        do_parallel_bos_operations(templates_to_use, operation, timeout)
 
 
 def do_bos_shutdowns(args):
@@ -778,7 +777,7 @@ def do_bos_shutdowns(args):
 
     Returns: None
     """
-    do_bos_operations('shutdown')
+    do_bos_operations('shutdown', get_config_value('bootsys.bos_shutdown_timeout'))
 
 
 def do_bos_boots(args):
@@ -790,4 +789,4 @@ def do_bos_boots(args):
 
     Returns: None
     """
-    do_bos_operations('boot')
+    do_bos_operations('boot', get_config_value('bootsys.bos_boot_timeout'))
