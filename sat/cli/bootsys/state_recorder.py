@@ -66,16 +66,18 @@ class StateRecorder(ABC):
     The data is stored in JSON and loaded as JSON.
     """
 
-    def __init__(self, dir_path, file_prefix, num_to_keep, file_suffix='.json'):
+    def __init__(self, description, dir_path, file_prefix, num_to_keep, file_suffix='.json'):
         """
         Create a new StateRecorder object to record and load state information.
 
         Args:
+            description (str): A description of the state recorded by this object.
             dir_path (str): The path to the directory containing the files.
             file_prefix (str): The prefix of files to count and remove extras.
             num_to_keep (int): The number of files to keep.
             file_suffix (str): The suffix of the files to remove.
         """
+        self.description = description
         self.dir_path = dir_path
         self.file_prefix = file_prefix
         self.num_to_keep = num_to_keep
@@ -241,7 +243,8 @@ class PodStateRecorder(StateRecorder):
     def __init__(self):
         pod_state_dir = os.path.join(DEFAULT_STATE_DIR, POD_STATE_DIR)
         num_to_keep = get_config_value('bootsys.max_pod_states')
-        super().__init__(pod_state_dir, POD_STATE_FILE_PREFIX, num_to_keep)
+        super().__init__('kubernetes pod state', pod_state_dir,
+                         POD_STATE_FILE_PREFIX, num_to_keep)
 
     def get_state_data(self):
         """Get K8s pod information in a dictionary.
@@ -273,7 +276,8 @@ class HSNStateRecorder(StateRecorder):
     def __init__(self):
         hsn_state_dir = os.path.join(DEFAULT_STATE_DIR, HSN_STATE_DIR)
         num_to_keep = get_config_value('bootsys.max_hsn_states')
-        super().__init__(hsn_state_dir, HSN_STATE_FILE_PREFIX, num_to_keep)
+        super().__init__('high-speed network (HSN) state', hsn_state_dir,
+                         HSN_STATE_FILE_PREFIX, num_to_keep)
 
         self.fabric_client = FabricControllerClient(SATSession())
 
@@ -304,15 +308,20 @@ def do_state_capture(args):
     Raises:
         SystemExit: if there is a failure to capture state.
     """
-    # TODO: HSNStateRecorder.dump_state
-    print('Capturing state of k8s pods.')
-    with BeginEndLogger('kubernetes pod state capture'):
-        try:
-            PodStateRecorder().dump_state()
-        except StateError as err:
-            msg = str(err)
-            if args.ignore_pod_failures:
-                LOGGER.warning(msg)
-            else:
-                LOGGER.error(msg)
-                sys.exit(1)
+    state_recorders = [HSNStateRecorder(), PodStateRecorder()]
+
+    failed = []
+    print('Capturing system state.')
+    with BeginEndLogger('system state capture'):
+        for sr in state_recorders:
+            try:
+                print(f'Capturing {sr.description}')
+                sr.dump_state()
+            except StateError as err:
+                LOGGER.error(f'Failed to capture {sr.description}: {err}')
+                failed.append(sr)
+
+    if failed:
+        sys.exit(1)
+    else:
+        print('Finished capturing system state.')

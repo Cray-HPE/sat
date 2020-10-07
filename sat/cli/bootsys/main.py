@@ -61,10 +61,6 @@ def do_bootsys(args):
     Returns:
         None
     """
-    # TODO: remove
-    if args.ignore_failures:
-        args.ignore_service_failures = True
-        args.ignore_pod_failures = True
     if args.list_stages:
         try:
             for stage in STAGES_BY_ACTION[args.action].keys():

@@ -39,6 +39,9 @@ class SimpleRecorder(StateRecorder):
         'foo': 'bar'
     }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__('simple state', *args, **kwargs)
+
     def get_state_data(self):
         return self.CONST_DATA
 

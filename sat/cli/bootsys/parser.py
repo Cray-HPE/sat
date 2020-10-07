@@ -98,7 +98,6 @@ def _add_stage_options(subparser, action):
     """
     stage_group = subparser.add_mutually_exclusive_group(required=True)
 
-    # TODO: choices are not categorized by boot/shutdown
     stage_group.add_argument(
         '--stage', help=f'Specify the stage of the {action} to run.',
         choices=STAGES_BY_ACTION[action]
@@ -173,24 +172,6 @@ def add_bootsys_subparser(subparsers):
 
     _add_bootsys_shutdown_subparser(actions_subparsers)
     _add_bootsys_boot_subparser(actions_subparsers)
-
-    # TODO: Remove the ignore* options
-    bootsys_parser.add_argument(
-        '-i', '--ignore-failures', action='store_true',
-        help='Proceed with the shutdown regardless of failed steps.'
-    )
-
-    bootsys_parser.add_argument(
-        '--ignore-service-failures', action='store_true',
-        help='If specified, do not fail to shutdown if querying services '
-             'for active sessions fails.',
-    )
-
-    bootsys_parser.add_argument(
-        '--ignore-pod-failures', action='store_true',
-        help='Disregard any failures associated with storing pod state '
-             'while shutting down.',
-    )
 
     # TODO: Remove the state-check-fail-action option
     bootsys_parser.add_argument(
