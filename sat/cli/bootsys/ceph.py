@@ -135,6 +135,7 @@ def do_ceph_check(args):
         args: The argparse.Namespace object containing the parsed arguments
             passed to this stage.
     """
+    print('Restarting ceph services and waiting for ceph to be healthy.')
     with BeginEndLogger('restart ceph services on storage nodes'):
         restart_ceph_services()
 
@@ -142,3 +143,5 @@ def do_ceph_check(args):
         ceph_waiter = CephHealthWaiter(get_config_value('bootsys.ceph_timeout'))
         if not ceph_waiter.wait_for_completion():
             sys.exit(1)
+        else:
+            print('Ceph is healthy.')

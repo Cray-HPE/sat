@@ -206,6 +206,7 @@ def do_k8s_check(args):
         args: The argparse.Namespace object containing the parsed arguments
             passed to this stage.
     """
+    print('Waiting for k8s and pods to reach expected states.')
     try:
         k8s_api_waiter = KubernetesAPIAvailableWaiter(60)
     except ConfigException as err:
@@ -232,3 +233,5 @@ def do_k8s_check(args):
                      f'failed to reach their expected states: '
                      f'{", ".join(pending_pods)}')
         raise SystemExit(1)
+    else:
+        print('All k8s pods reached expected states.')

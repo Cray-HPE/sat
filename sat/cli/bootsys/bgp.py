@@ -97,7 +97,10 @@ def do_bgp_check(args):
         args: The argparse.Namespace object containing the parsed arguments
             passed to this stage.
     """
+    print('Checking for BGP peering sessions established and re-establishing if necessary.')
     with BeginEndLogger('Wait for BGP peering sessions established'):
         bgp_waiter = BGPSpineStatusWaiter(get_config_value('bootsys.bgp_timeout'))
         if not bgp_waiter.wait_for_completion():
             sys.exit(1)
+        else:
+            print('All BGP peering sessions established.')
