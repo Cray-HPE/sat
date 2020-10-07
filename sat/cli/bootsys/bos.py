@@ -27,6 +27,7 @@ import posixpath
 from random import choices, randint
 import shlex
 import subprocess
+import sys
 from threading import Event, Thread
 from time import sleep, monotonic
 
@@ -37,6 +38,7 @@ from sat.cli.bootsys.defaults import (
     CLE_BOS_TEMPLATE_REGEX,
     PARALLEL_CHECK_INTERVAL
 )
+from sat.cli.bootsys.power import do_nodes_power_off
 from sat.config import get_config_value
 from sat.session import SATSession
 from sat.util import get_val_by_path
@@ -711,7 +713,7 @@ def do_bos_operations(operation, timeout):
     # specified on the command-line or in the config file is 'abort'.
     templates_to_use = get_templates_needing_operation(session_templates, operation)
     LOGGER.debug(f"Found {INFLECTOR.no('session template', len(templates_to_use))} "
-                 f"needing '{operation} performed"
+                 f"needing '{operation}' performed"
                  f"{': ' + ', '.join(templates_to_use) if templates_to_use else '.'}")
 
     if templates_to_use:
@@ -727,7 +729,21 @@ def do_bos_shutdowns(args):
 
     Returns: None
     """
-    do_bos_operations('shutdown', get_config_value('bootsys.bos_shutdown_timeout'))
+    try:
+        do_bos_operations('shutdown', get_config_value('bootsys.bos_shutdown_timeout'))
+    except BOSFailure as err:
+        LOGGER.error(err)
+        sys.exit(1)
+
+    timed_out, failed = do_nodes_power_off(get_config_value('bootsys.capmc_timeout'))
+    if timed_out:
+        LOGGER.error(f'Timed out while waiting for the following node(s) to reach '
+                     f'powered off state after CAPMC power off: {", ".join(timed_out)}')
+    if failed:
+        LOGGER.error(f'Failed to power of the following node(s) with CAPMC: '
+                     f'{", ".join(timed_out)}')
+    if timed_out or failed:
+        sys.exit(1)
 
 
 def do_bos_boots(args):
@@ -739,4 +755,8 @@ def do_bos_boots(args):
 
     Returns: None
     """
-    do_bos_operations('boot', get_config_value('bootsys.bos_boot_timeout'))
+    try:
+        do_bos_operations('boot', get_config_value('bootsys.bos_boot_timeout'))
+    except BOSFailure as err:
+        LOGGER.error(err)
+        sys.exit(1)

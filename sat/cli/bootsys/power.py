@@ -113,7 +113,6 @@ class CAPMCPowerWaiter(GroupWaiter):
         return current_state == self.power_state
 
 
-# TODO: Call this during do_bos_shutdowns
 def do_nodes_power_off(timeout):
     """Ensure the compute and application nodes (UANs) are powered off.
 
