@@ -23,7 +23,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 from collections import namedtuple
 
-import sat.parsergroups
 from sat.cli.bootsys.defaults import DEFAULT_UAN_BOS_TEMPLATE
 from sat.cli.bootsys.stages import STAGES_BY_ACTION
 
@@ -55,7 +54,7 @@ TIMEOUT_SPECS = [
     TimeoutSpec('bos-boot', ['boot'], 900,
                 'compute and application nodes have completed their BOS boot.'),
     TimeoutSpec('ncn-shutdown', ['shutdown'], 300,
-                'management NCNs have completed a graceful shutdown and have reached'
+                'management NCNs have completed a graceful shutdown and have reached '
                 'the powered off state according to IMPI.'),
 ]
 
@@ -74,7 +73,7 @@ def _add_timeout_options(subparser, action):
         if action in timeout.applicable_actions:
 
             help_text = (
-                f'Timeout, in seconds, to wait until {timeout.condition}.'
+                f'Timeout, in seconds, to wait until {timeout.condition} '
                 f'Defaults to {timeout.default}. Overrides the option '
                 f'bootsys.{timeout.option_prefix.replace("-", "_")}_timeout '
                 f'in the config file.'
@@ -84,6 +83,32 @@ def _add_timeout_options(subparser, action):
                 f'--{timeout.option_prefix}-timeout', type=int,
                 help=help_text
             )
+
+
+def _add_bos_template_options(subparser, action):
+    """Add the --cle-bos-template and --uan-bos-template options for the action.
+
+    Args:
+        subparser: The argparse.ArgumentParser object for the action
+        action (str): the action to which the template options apply.
+
+    Returns:
+        None
+    """
+    subparser.add_argument(
+        '--cle-bos-template',
+        help=f'The name of the BOS session template for {action} of CLE '
+             f'compute nodes. Defaults to template matching "cle-X.Y.Z".'
+    )
+
+    subparser.add_argument(
+        '--uan-bos-template',
+        help=f'The name of the BOS session template for {action} of User '
+             f'Access Nodes (UANs). Defaults to {DEFAULT_UAN_BOS_TEMPLATE}.'
+        # Note that we don't want to specify the default with the `default`
+        # kwarg here because then the value from the config file could never
+        # take precedence over the command-line default.
+    )
 
 
 def _add_stage_options(subparser, action):
@@ -109,6 +134,26 @@ def _add_stage_options(subparser, action):
     )
 
 
+def _add_bootsys_action_subparser(subparsers, action):
+    """Add the shutdown subparser to the parent bootsys parser.
+
+    Args:
+        subparsers: The argparse.ArgumentParser object returned by the
+            add_subparsers method.
+        action (str): The action to add the parser for.
+
+    Returns:
+        None
+    """
+    action_parser = subparsers.add_parser(
+        action, help=f'Perform a {action} operation',
+        description=f'Performs a portion of the {action} operation on the system.'
+    )
+    _add_stage_options(action_parser, action)
+    _add_bos_template_options(action_parser, action)
+    _add_timeout_options(action_parser, action)
+
+
 def _add_bootsys_shutdown_subparser(subparsers):
     """Add the shutdown subparser to the parent bootsys parser.
 
@@ -119,12 +164,7 @@ def _add_bootsys_shutdown_subparser(subparsers):
     Returns:
         None
     """
-    shutdown_parser = subparsers.add_parser(
-        'shutdown', help='Perform a shutdown operation',
-        description='Performs a portion of the shutdown operation on the system.'
-    )
-    _add_stage_options(shutdown_parser, 'shutdown')
-    _add_timeout_options(shutdown_parser, 'shutdown')
+    _add_bootsys_action_subparser(subparsers, 'shutdown')
 
 
 def _add_bootsys_boot_subparser(subparsers):
@@ -137,12 +177,7 @@ def _add_bootsys_boot_subparser(subparsers):
     Returns:
         None
     """
-    boot_parser = subparsers.add_parser(
-        'boot', help='Perform a boot operation',
-        description='Performs a portion of the boot operation on the system.'
-    )
-    _add_stage_options(boot_parser, 'boot')
-    _add_timeout_options(boot_parser, 'boot')
+    _add_bootsys_action_subparser(subparsers, 'boot')
 
 
 def add_bootsys_subparser(subparsers):
@@ -155,15 +190,11 @@ def add_bootsys_subparser(subparsers):
     Returns:
         None
     """
-
-    redfish_opts = sat.parsergroups.create_redfish_options()
-
     bootsys_parser = subparsers.add_parser(
         'bootsys', help='Boot or shut down the system.',
         description='Boot or shut down the entire system, including the '
                     'compute nodes, user access nodes, and non-compute '
                     'nodes running the management software.',
-        parents=[redfish_opts]
     )
 
     actions_subparsers = bootsys_parser.add_subparsers(
@@ -172,21 +203,3 @@ def add_bootsys_subparser(subparsers):
 
     _add_bootsys_shutdown_subparser(actions_subparsers)
     _add_bootsys_boot_subparser(actions_subparsers)
-
-    # TODO: Move into the _add_bootsys_ACTION_subparsers so the options are
-    # under the action subparser.
-    bootsys_parser.add_argument(
-        '--cle-bos-template',
-        help='The name of the BOS session template for shutdown/boot of CLE '
-             'compute nodes. Defaults to template matching "cle-X.Y.Z".'
-    )
-
-    bootsys_parser.add_argument(
-        '--uan-bos-template',
-        help='The name of the BOS session template for shutdown/boot of User '
-             'Access Nodes (UANs). '
-             'Defaults to "{}"'.format(DEFAULT_UAN_BOS_TEMPLATE)
-        # Note that we don't want to specify the default with the `default`
-        # kwarg here because then the value from the config file could never
-        # take precedence over the command-line default.
-    )
