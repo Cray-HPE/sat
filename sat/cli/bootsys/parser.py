@@ -121,7 +121,10 @@ def _add_stage_options(subparser, action):
     Returns:
         None
     """
-    stage_group = subparser.add_mutually_exclusive_group(required=True)
+    # Preserve backwards compatibility where `sat bootsys shutdown` would just
+    # run service checks.
+    stage_required = action != 'shutdown'
+    stage_group = subparser.add_mutually_exclusive_group(required=stage_required)
 
     stage_group.add_argument(
         '--stage', help=f'Specify the stage of the {action} to run.',

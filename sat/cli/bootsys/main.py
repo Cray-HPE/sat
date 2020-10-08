@@ -61,6 +61,10 @@ def do_bootsys(args):
     Returns:
         None
     """
+    if args.action is None:
+        LOGGER.error('An action is required.')
+        sys.exit(1)
+
     if args.list_stages:
         try:
             for stage in STAGES_BY_ACTION[args.action].keys():
@@ -70,6 +74,11 @@ def do_bootsys(args):
             LOGGER.error('Invalid action: %s', args.action)
             sys.exit(1)
         sys.exit(0)
+
+    # Preserve backwards compatibility by making `sat bootsys shutdown` an alias
+    # for `sat bootsys shutdown --stage session-checks`.
+    if args.action == 'shutdown' and args.stage is None:
+        args.stage = 'session-checks'
 
     try:
         submodule, stage_func_name = STAGES_BY_ACTION[args.action][args.stage]
