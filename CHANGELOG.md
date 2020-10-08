@@ -25,24 +25,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.4.0] - 2020-10-08
 
 ### Added
-- ``sat bootsys shutdown`` now performs the remaining steps required to fully
-  shut down a system, including:
-    - Shutdown of the compute nodes and User Access Nodes (UANs) using BOS.
-    - Shutdown of the platform services by running the Ansible playbook,
-      platform-shutdown.yml.
-    - Enabling of hosts in hosts file after platform services are stopped.
-    - Shutdown and power off of the management NCNs.
-- ``sat bootsys boot`` implements the beginning portion of the system boot,
-  including:
-    - Power on and boot of management NCNs.
-    - Waiting for management NCNs to be accessible via ssh.
-    - Disabling of hosts in hosts file after NCNs are booted.
-    - Execution of Ansible playbook that starts platform services.
-    - Waiting for kubernetes pods to reach expected states.
-    - Boot of the compute nodes and User Access Nodes (UANs) using BOS.
+- ``sat bootsys shutdown`` and ``sat bootsys boot`` have been split into stages
+  which are specified with ``--stage``. Behavior of ``sat bootsys shutdown``
+  without stage specified is to run the ``session-checks`` stage for backwards
+  compatibility with the previous release.
+- Stages added to ``sat bootsys shutdown`` to automate additional stages of the
+  system shutdown procedure. Stages are as follows:
+    - capture-state: captures state of HSN and k8s pods on the system.
+    - session-checks: checks for active sessions in BOS, CFS, CRUS, FAS, and NMD
+      services.
+    - bos-operations: shuts down compute nodes and User Access Nodes (UANs)
+      using BOS.
+    - cabinet-power: shuts down power to the liquid-cooled compute cabinets in
+      the system and suspends hms-discovery cronjob in k8s.
+    - bgp-check: checks BGP peering sessions on spine switches and
+      re-establishes if necessary.
+    - platform-services: stops platform services running on management NCNs.
+    - ncn-power: shuts down and powers off the management NCNs.
+- Stages added to ``sat bootsys boot`` to automate additional stages of the
+  system boot procedure. Stages are as follows:
+    - ncn-power: powers on and boots managment NCNs.
+    - platform-services: starts platform services on management NCNs.
+    - k8s-check: waits for k8s pod health to reach state from before shutdown.
+    - ceph-check: restarts ceph services and waits for them to be healthy.
+    - bgp-check: checks BGP peering sessions on spine switches and
+      re-establishes if necessary.
+    - cabinet-power: resumes hms-discovery cronjob in k8s, waits for it to be
+      scheduled, and then waits for chassis in liquid-cooled cabinets to be
+      powered on.
+    - hsn-bringup: brings up the HSN and waits for it be as healthy as it was
+      before shutdown.
+    - bos-operations: boots compute nodes and User Access Nodes (UANs) using
+      BOS.
 - Debug logging for every stage of `sat bootsys` operations including duration
   of each stage.
 - Developer documentation in markdown format.
@@ -58,7 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Respect configured stderr log level and stop emitting duplicate log messages
   to stderr.
 - Fixed typos on ``sat linkhealth`` and ``sat status`` man pages.
-- Added show_empty and show_missing FORMAT config file options to
+- Added ``show_empty`` and ``show_missing`` FORMAT config file options to
   ``sat`` man page.
 - Added sat-switch subcommand to ``sat`` man page.
 - ``sat firmware`` now logs an error for unknown xnames.
