@@ -308,6 +308,7 @@ def do_power_on_ncns(args):
         non_bis_ncns = sum(ncn_groups, [])
         with IPMIConsoleLogger(non_bis_ncns):
             for ncn_group in ncn_groups:
+                print(f'Powering on NCNs: {", ".join(ncn_group)}')
 
                 # TODO (SAT-555): Probably should not send a power on if it's already on.
                 ipmi_waiter = IPMIPowerStateWaiter(ncn_group, 'on',
@@ -327,6 +328,8 @@ def do_power_on_ncns(args):
                     # Have to exit here because playbook will fail if nodes are
                     # not available for SSH.
                     raise SystemExit(1)
+                else:
+                    print(f'Powered on NCNs: {", ".join(ncn_group)}')
 
     LOGGER.info('Disabling entries in /etc/hosts to prepare for starting DNS.')
     do_disable_hosts_entries()
