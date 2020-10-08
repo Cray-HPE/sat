@@ -21,13 +21,17 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+import sys
 from collections import OrderedDict
+from datetime import timedelta
 from functools import partial
+import getpass
 import logging
 import math
 import os
 import os.path
 import re
+import time
 
 # Logic borrowed from imps to get the most efficient YAML available
 try:
@@ -57,10 +61,11 @@ def pester(message,
     Args:
         message: a string with a prompt to be printed before asking the user.
         valid_answer: a regex string for which if message matches,
-            return some value based on the input.
+            return some value based on the input. If falsy, then the first
+            response is used for the return value.
         human_readable_valid: a human-readable version of valid_answer.
-            This is displayed at the prompt. If it is falsy
-            (e.g., None or empty string), then the regex is displayed instead.
+            This is displayed at the prompt. If either it or valid_answer is
+            falsy (e.g., None or empty string), then no guidance is given.
         parse_answer: a function taking one string argument which returns a
             value which is to be used in some higher-level conditional.
 
@@ -70,14 +75,91 @@ def pester(message,
     """
     try:
         while True:
-            answer = input("{} ({}) ".format(message, human_readable_valid or valid_answer))
-            if re.match(valid_answer, answer):
+            guidance = (" ({}) ".format(human_readable_valid)
+                        if human_readable_valid and valid_answer
+                        else "")
+
+            answer = input(message + guidance + ": ")
+            if not valid_answer or re.match(valid_answer, answer):
                 return parse_answer(answer)
             else:
                 print("Input must match '{}'. ".format(valid_answer), end="")
     except EOFError:
         print("\n", end="")
         return
+
+
+def pester_choices(prompt, choices):
+    """Pester for input one of the given choices is entered on stdin.
+
+    Args:
+        prompt (str): the prompt displayed to the user
+        choices (Iterable): the Iterable that defines the possible valid choices
+            for user input. Must support __contains__.
+
+    Returns:
+        The first valid answer given on stdin or None if interrupted with EOF.
+    """
+    full_prompt = '{} [{}] '.format(prompt, ','.join(choices))
+    try:
+        while True:
+            answer = input(full_prompt)
+            if answer in choices:
+                return answer
+            else:
+                print('Input must be one of the following choices: {}'.format(
+                    ', '.join(choices)))
+    except EOFError:
+        print('\n', end='')
+        return None
+
+
+def prompt_continue(action_msg):
+    """Prompt whether to continue with an action and exit if answer is no.
+
+    Args:
+        action_msg (str): Prompt whether to continue with an action. If the
+            answer is yes, print a message that we are continuing. If the answer
+            is no, then exit.
+
+    Raises:
+        SystemExit: if the user answers no to the prompt.
+    """
+    # TODO: we should add an option to be non-interactive like --disruptive
+    answer = pester_choices('Proceed with {}?'.format(action_msg),
+                            ('yes', 'no'))
+    if answer == 'yes':
+        print('Proceeding with {}.'.format(action_msg))
+    else:
+        print('Will not proceed with {}. Exiting.'.format(action_msg))
+        sys.exit(1)
+
+
+def get_username_and_password_interactively(username=None, username_prompt='Username',
+                                            password=None, password_prompt='Password'):
+    """Interactively query the user for username and password.
+
+    If either username or password are given, then the user will not
+    be queried for those respective fields. If username is not given,
+    the user will be queried for both.
+
+    Args:
+        username (str): a username that is already known.
+        username_prompt (str): a prompt for querying the username.
+        password (str): a password that is already known.
+        password_prompt (str): a prompt for querying the password.
+
+    Returns:
+        (str, str) the username and password.
+
+    """
+    if username and not password:
+        return (username, getpass.getpass(password_prompt + ": "))
+    elif username and password:
+        return (username, password)
+    else:
+        return (input(username_prompt + ": "),
+                getpass.getpass(password_prompt + ": "))
 
 
 def get_pretty_printed_dict(d, min_len=0):
@@ -387,3 +469,41 @@ def get_new_ordered_dict(orig_dict, dotted_paths, default_value=None, strip_path
          get_val_by_path(orig_dict, dotted_path, default_value))
         for dotted_path in dotted_paths
     ])
+
+
+class BeginEndLogger:
+    """A context manager that logs a message when entering and exiting context.
+
+    The message logged at the beginning will be prefixed with 'BEGIN: ', and the
+    message logged at the end will be prefixed with 'END: '
+    """
+
+    def __init__(self, msg, logger=None, level=logging.DEBUG):
+        """Create a new BeginEndLogger context manager.
+
+        Args:
+            msg (str): The message to log
+            logger (logging.Logger): The logger to use to log beginning and end
+                messages. If None, defaults to the sat.util logger defined in
+                this module.
+            level (int): The log level to use for the begin and end log messages.
+                Defaults to logging.DEBUG.
+        """
+        self.msg = msg
+        if logger is None:
+            self.logger = LOGGER
+        else:
+            self.logger = logger
+        self.level = level
+        self.start_time = None
+
+    def __enter__(self):
+        """Log a beginning message and record the start time."""
+        self.start_time = time.monotonic()
+        self.logger.log(self.level, 'BEGIN: %s', self.msg)
+
+    def __exit__(self, type_, value, traceback):
+        """Log an end message including the duration."""
+        duration_seconds = time.monotonic() - self.start_time
+        duration = timedelta(seconds=duration_seconds)
+        self.logger.log(self.level, 'END: %s. Duration: %s', self.msg, duration)

@@ -32,15 +32,19 @@ BuildRoot: %{_topdir}
 Vendor: Cray Inc.
 Requires: slingshot-tools
 Requires: python3-argcomplete
+Requires: python3-python-dateutil >= 2.7.3, python3-python-dateutil < 3.0
 Requires: python3-docker
+Requires: python3-croniter >= 0.3, python3-croniter < 1.0
 Requires: python3-inflect < 3.0
 Requires: python3-kubernetes
+Requires: python3-paramiko >= 2.4.2
 Requires: python3-parsec
 Requires: python3-PrettyTable >= 0.7.2, python3-PrettyTable < 1.0
 Requires: python3-PyYAML
 Requires: python3-requests < 3.0
 Requires: python3-requests-oauthlib
 Requires: python3-toml >= 0.10.0, python3-toml < 1.0
+Requires: python3-urllib3 >= 1.0, python3-urllib3 < 2.0
 BuildRequires: python3-argcomplete
 BuildRequires: python3-docutils
 
@@ -90,8 +94,10 @@ install -m 644 etc/sat.toml %{buildroot}/etc/sat.toml
 # This directory is used to hold the user-created site_info.yml
 install -m 755 -d %{buildroot}/opt/cray/etc
 
+# Holds state dumps gathered during shutdown.
+install -m 755 -d %{buildroot}/var/sat/bootsys
 # Holds pod state dumps gathered during shutdown.
-install -m 755 -d %{buildroot}/var/sat/podstates
+install -m 755 -d %{buildroot}/var/sat/bootsys/pod-states
 
 # Install ansible content for crayctldeploy subpackage
 install -m 755 -d %{buildroot}/%{ansible_framework_dir}/roles
@@ -119,7 +125,8 @@ cat INSTALLED_FILES | grep __pycache__ | xargs dirname | xargs dirname | uniq >>
 %files -f INSTALLED_FILES
 %dir /var/log/cray
 %dir /opt/cray/etc
-%dir /var/sat/podstates
+%dir /var/sat/bootsys
+%dir /var/sat/bootsys/pod-states
 %config(noreplace) /etc/sat.toml
 %{satmandir}/*.8.gz
 /etc/bash_completion.d/sat-completion.bash

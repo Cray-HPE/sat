@@ -938,6 +938,7 @@ class TestReportActiveSessions(ExtendedTestCase):
 
 class TestDoServiceActivityCheck(ExtendedTestCase):
     """Test the do_service_activity_check function."""
+    # TODO: Fix these tests for changes to do_service_activity_check
 
     def setUp(self):
         """Set up some mocks."""
@@ -953,7 +954,6 @@ class TestDoServiceActivityCheck(ExtendedTestCase):
         ).start()
 
         self.mock_args = Mock()
-        self.mock_args.ignore_service_failures = False
 
         self.mock_print = patch('builtins.print').start()
 
@@ -969,8 +969,8 @@ class TestDoServiceActivityCheck(ExtendedTestCase):
 
         self.assertEqual(1, cm.exception.code)
         self.mock_print.assert_called_once_with(
-            'Unable to proceed with shutdown because active sessions exist for '
-            'the following services: CFS, BOS'
+            'Active sessions exist for the following services: CFS, BOS. Allow '
+            'the sessions to complete or cancel them before proceeding.'
         )
 
     def test_do_service_activity_check_inactive(self):
@@ -979,10 +979,13 @@ class TestDoServiceActivityCheck(ExtendedTestCase):
 
         do_service_activity_check(self.mock_args)
 
-        self.mock_print.assert_not_called()
+        self.mock_print.assert_called_once_with(
+            'No active sessions exist. It is safe to proceed with the '
+            'shutdown procedure.'
+        )
 
-    def test_do_service_activity_check_failed(self):
-        """Test do_service_activity_check with failures to check services."""
+    def test_do_service_activity_check_active_and_failed(self):
+        """Test do_service_activity_check with active services and failures."""
         self.mock_report_active_sessions.return_value = ['CRUS', 'NMD'], ['BOS', 'CFS']
 
         with self.assertRaises(SystemExit) as raises_cm, \
@@ -993,27 +996,27 @@ class TestDoServiceActivityCheck(ExtendedTestCase):
         self.assert_in_element('Failed to get active sessions for the '
                                'following services: BOS, CFS',
                                logs_cm.output)
-        self.assert_in_element("If necessary, this failure can be bypassed by "
-                               "specifying the '--ignore-service-failures' option.",
-                               logs_cm.output)
-        self.mock_print.assert_not_called()
+        self.mock_print.assert_called_once_with(
+            'Active sessions exist for the following services: CRUS, NMD. Allow the '
+            'sessions to complete or cancel them before proceeding.'
+        )
 
-    def test_do_service_activity_check_ignore_failures(self):
-        """Test do_service_activity_check ignoring failures to check services."""
-        self.mock_report_active_sessions.return_value = ['CRUS', 'FAS'], ['BOS', 'CFS']
-        self.mock_args.ignore_service_failures = True
+    def test_do_service_activity_check_failed(self):
+        """Test do_service_activity_check with failures."""
+        self.mock_report_active_sessions.return_value = [], ['NMD', 'CFS']
 
         with self.assertRaises(SystemExit) as raises_cm, \
-                self.assertLogs(level=logging.WARNING) as logs_cm:
+                self.assertLogs(level=logging.ERROR) as logs_cm:
             do_service_activity_check(self.mock_args)
 
         self.assertEqual(1, raises_cm.exception.code)
         self.assert_in_element('Failed to get active sessions for the '
-                               'following services: BOS, CFS',
+                               'following services: NMD, CFS',
                                logs_cm.output)
         self.mock_print.assert_called_once_with(
-            'Unable to proceed with shutdown because active sessions exist for '
-            'the following services: CRUS, FAS'
+            'No active sessions found in the services which could be successfully '
+            'queried. Review the errors above before proceeding with the shutdown '
+            'procedure.'
         )
 
 

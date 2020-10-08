@@ -23,12 +23,14 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 from collections import OrderedDict
 from itertools import product
+import logging
 import os
 from textwrap import dedent
 from unittest import mock
 import unittest
 
 from sat import util
+from tests.common import ExtendedTestCase
 
 PT_BORDERS_ON = False
 PT_ALIGN = 'l'
@@ -350,6 +352,103 @@ class TestGetNewOrderedDict(unittest.TestCase):
             ('nope', None)
         ])
         self.assertEqual(expected, new_dict)
+
+
+class TestPesterChoices(unittest.TestCase):
+    """Test the pester_choices function."""
+
+    def setUp(self):
+        """Set up some mocks."""
+        self.mock_print = mock.patch('builtins.print').start()
+        self.mock_input = mock.patch('builtins.input').start()
+
+    def tearDown(self):
+        """Stop all patches."""
+        mock.patch.stopall()
+
+    def test_valid_answer(self):
+        """Test pester_choices with a valid answer."""
+        self.mock_input.return_value = 'yes'
+        response = util.pester_choices('Continue?', ('yes', 'no'))
+        self.mock_input.assert_called_once_with('Continue? [yes,no] ')
+        self.assertEqual('yes', response)
+
+    def test_eventual_valid_answer(self):
+        """Test pester_choices with invalid answers and then a valid answer."""
+        self.mock_input.side_effect = ['yarp', 'nope', 'nah', 'maybe']
+        response = util.pester_choices('Do you agree? ', ('yes', 'no', 'maybe'))
+        correction_msg = 'Input must be one of the following choices: yes, no, maybe'
+        self.mock_print.assert_has_calls([mock.call(correction_msg)] * 3)
+        self.assertEqual('maybe', response)
+
+    def test_eof(self):
+        """Test when interrupted by an EOFError."""
+        self.mock_input.side_effect = ['no', 'maybe', EOFError]
+        response = util.pester_choices('What is your favorite prog rock band?', ('yes',))
+        correction_msg = 'Input must be one of the following choices: yes'
+        self.mock_print.assert_has_calls([mock.call(correction_msg)] * 2)
+        self.assertEqual(response, None)
+
+
+class TestPromptContinue(unittest.TestCase):
+    """Test the prompt_continue function."""
+
+    def setUp(self):
+        """Set up some mocks."""
+        self.mock_print = mock.patch('builtins.print').start()
+        self.mock_pester_choices = mock.patch('sat.util.pester_choices').start()
+
+    def tearDown(self):
+        """Stop all patches."""
+        mock.patch.stopall()
+
+    def test_yes(self):
+        """Test prompt_continue when user answers 'yes'."""
+        self.mock_pester_choices.return_value = 'yes'
+        action_msg = 'action'
+        util.prompt_continue(action_msg)
+        self.mock_print.assert_called_once_with('Proceeding with {}.'.format(action_msg))
+
+    def test_no(self):
+        """Test prompt_continue when user answers 'no'."""
+        self.mock_pester_choices.return_value = 'no'
+        action_msg = 'action'
+        with self.assertRaises(SystemExit):
+            util.prompt_continue(action_msg)
+        self.mock_print.assert_called_once_with('Will not proceed with {}. '
+                                                'Exiting.'.format(action_msg))
+
+
+class TestBeginEndLogger(ExtendedTestCase):
+    """Test the BeginEndLogger context manager class."""
+
+    def setUp(self):
+        """Set up some mocks."""
+        self.mock_monotonic = mock.patch('time.monotonic').start()
+        self.time_vals = [0, 10]
+        self.mock_monotonic.side_effect = self.time_vals
+
+    def tearDown(self):
+        """Stop mock patching."""
+        mock.patch.stopall()
+
+    def test_logged_messages_and_duration(self):
+        """Test the messages and duration logged by BeginEndLogger."""
+        my_stage = 'the test'
+        with self.assertLogs(level=logging.DEBUG) as cm:
+            with util.BeginEndLogger(my_stage):
+                pass  # NOSONAR
+
+        self.assert_in_element(f'BEGIN: {my_stage}', cm.output)
+        self.assert_in_element(f'END: {my_stage}. Duration: 0:00:10', cm.output)
+
+    def test_logged_messages_custom_level(self):
+        """Test the messages and duration logged by BeginEndLogger with custom level."""
+        with self.assertLogs(level=logging.INFO) as cm:
+            with util.BeginEndLogger('test', level=logging.INFO):
+                pass  # NOSONAR
+
+        self.assertEqual(2, len(cm.output))
 
 
 if __name__ == '__main__':

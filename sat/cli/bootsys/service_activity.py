@@ -445,7 +445,7 @@ def do_service_activity_check(args):
     Raises:
         SystemExit: if there are active services preventing a system shutdown
             or there was a failure to query one or more services for active
-            sessions and --ignore-service-failures was not specified.
+            sessions.
     """
     service_activity_checkers = [
         BOSActivityChecker(),
@@ -458,20 +458,21 @@ def do_service_activity_check(args):
     active, failed = _report_active_sessions(service_activity_checkers)
 
     if failed:
-        fail_msg = (
-            'Failed to get active sessions for the following {}: '
-            '{}'.format(INFLECTOR.plural('service', len(failed)),
-                        ', '.join(failed))
-        )
-        if args.ignore_service_failures:
-            LOGGER.warning(fail_msg)
-        else:
-            LOGGER.error(fail_msg)
-            LOGGER.error("If necessary, this failure can be bypassed by specifying "
-                         "the '--ignore-service-failures' option.")
-            sys.exit(1)
+        LOGGER.error(f'Failed to get active sessions for the following '
+                     f'{INFLECTOR.plural("service", len(failed))}: '
+                     f'{", ".join(failed)}')
 
     if active:
-        print("Unable to proceed with shutdown because active sessions exist "
-              "for the following services: {}".format(', '.join(active)))
+        print(f'Active sessions exist for the following '
+              f'{INFLECTOR.plural("service", len(active))}: '
+              f'{", ".join(active)}. Allow the sessions to complete or '
+              f'cancel them before proceeding.')
         sys.exit(1)
+    elif failed:
+        print('No active sessions found in the services which could be '
+              'successfully queried. Review the errors above before '
+              'proceeding with the shutdown procedure.')
+        sys.exit(1)
+    else:
+        print('No active sessions exist. It is safe to proceed with the '
+              'shutdown procedure.')

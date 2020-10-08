@@ -32,8 +32,8 @@ from sat.config import get_config_value
 from sat.constants import BMC_TYPES
 from sat.apiclient import APIError, HSMClient
 from sat.session import SATSession
+from sat.util import get_username_and_password_interactively
 from sat.xname import XName, get_matches
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -67,13 +67,8 @@ def get_username_and_pass(suggestion=''):
     """
     username = suggestion or get_config_value('redfish.username')
     password = '' if suggestion else get_config_value('redfish.password')
-    if not username:
-        username = input("Redfish username: ")
-        password = ''
-    if not password:
-        password = getpass.getpass('Password for {}: '.format(username))
-
-    return username, password
+    return get_username_and_password_interactively(username=username, username_prompt='Redfish username',
+                                                   password=password, password_prompt='Redfish password')
 
 
 def query(xname, addr, username, password):

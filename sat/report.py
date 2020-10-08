@@ -151,7 +151,7 @@ class Report:
                 there were headings in this report that were not present in row.
             TypeError: row was not a list or dict.
         """
-        if isinstance(row, list):
+        if isinstance(row, list) or isinstance(row, tuple):
             if len(row) != len(self.headings):
                 msg = (
                     'row contains an incorrect number of entries. '

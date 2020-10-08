@@ -98,7 +98,90 @@ BOOTSYS
 
 **max_pod_states**
         Maximum number of pod-state files allowed to accumulate in
-        /var/sat/podstates. The default value is 10.
+        /var/sat/bootsys/pod-states. These files record the state of all pods in
+        kubernetes at the time the system is shut down, and the latest one is
+        used to verify when the pods are up after reboot. The default value is
+        10.
+
+**max_hsn_states**
+        Maximum number of hsn-state files allowed to accumulate in
+        /var/sat/bootsys/hsn-states. These files record the state of the
+        high-speed network at the time the system was shut down, and the latest
+        one is used to verify when the HSN is up after reboot. The default value
+        is 10.
+
+**cle_bos_template**
+        The name of the BOS session template to use for shutting down and
+        booting the CLE compute nodes during a shutdown or boot action. If not
+        specified, this defaults to searching for a session template that
+        matches the pattern "cle-X.Y.Z" where X, Y, and Z are integer version
+        numbers. If this option is not specified, and more than one BOS session
+        template matches the pattern, the `bootsys` command will fail with a
+        message indicating that an explicit CLE BOS template must be specified.
+
+        This config file option can by overridden by the command-line option of
+        the same name.
+
+**uan_bos_template**
+        The name of the BOS session template to use for shutting down and
+        booting the User Access Nodes (UANs) during a shutdown or boot action.
+        If not specified, this defaults to "uan".
+
+        This config file option can by overridden by the command-line option of
+        the same name.
+
+**discovery_timeout**
+        Timeout, in seconds, to wait until node controllers
+        (NodeBMCs) reach the powered on state after the HMS
+        Discovery cronjob is resumed. Defaults to 600.
+
+**ipmi_timeout**
+        Timeout, in seconds, to wait until management NCNs
+        reach the desired power state after IPMI power
+        commands are issued. Defaults to 60.
+
+**ncn_boot_timeout**
+        Timeout, in seconds, to wait until management nodes
+        are reachable via SSH after boot. Defaults to 300.
+
+**k8s_timeout**
+        Timeout, in seconds, to wait until Kubernetes pods
+        have returned to their pre-shutdown state. Defaults to
+        600.
+
+**ceph_timeout**
+        Timeout, in seconds, to wait until ceph has returned
+        to a healthy state. Defaults to 600.
+
+**bgp_timeout**
+        Timeout, in seconds, to wait until BGP routes report
+        that they are established on management switches.
+        Defaults to 600.
+
+**hsn_timeout**
+        Timeout, in seconds, to wait until the high-speed
+        network (HSN) has returned to its pre-shutdown state.
+        Defaults to 300.
+
+**bos_boot_timeout**
+        Timeout, in seconds, to wait until compute and
+        application nodes have completed their BOS boot.
+        Defaults to 900.
+
+**capmc_timeout**
+        Timeout, in seconds, to wait until components reach
+        powered off state after they are shutdown with CAPMC.
+        Defaults to 120.
+
+**bos_shutdown_timeout**
+        Timeout, in seconds, to wait until compute and
+        application nodes have completed their BOS shutdown.
+        Defaults to 600.
+
+**ncn_shutdown_timeout**
+        Timeout, in seconds, to wait until management NCNs
+        have completed a graceful shutdown and have reached the
+        powered off state according to IMPI. Defaults to 300.
 
 FORMAT
 ------
@@ -108,6 +191,12 @@ FORMAT
 
 **no_borders**
         If "true", then omit borders from tabular output. Defaults to "false".
+
+**show_empty**
+        If "true", then show values for columns even if every value is EMPTY. Defaults to "false".
+
+**show_missing**
+        If "true", then show values for columns even if every value is MISSING. Defaults to "false".
 
 GENERAL
 -------
@@ -161,6 +250,8 @@ sat-linkhealth(8),
 sat-sensors(8),
 sat-setrev(8),
 sat-showrev(8),
-sat-status(8)
+sat-status(8),
+sat-swap(8)
+sat-switch(8)
 
 .. include:: _notice.rst

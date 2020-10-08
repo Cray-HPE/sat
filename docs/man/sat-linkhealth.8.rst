@@ -26,7 +26,7 @@ be Router BMCs or components that contain Router BMCs. The xname of a Router BMC
 has the form x#c#r#b# (cabinet #, chassis # router #, BMC #). If a cabinet is
 specified, then all router BMCs in that cabinet are targeted. If a chassis is
 specified, then all router BMCs in that chassis are targeted. If a router is
-specified, then all BMSs for the router are targeted. If no xname is specified,
+specified, then all BMCs for the router are targeted. If no xname is specified,
 all router BMCs are targeted.
 
 Note that if a cable is unplugged, no information on speed or status will be available.
