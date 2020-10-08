@@ -84,131 +84,164 @@ These options must be specified after the subcommand.
 **-h, --help**
         Print the help message for 'sat bootsys'.
 
-**--dry-run**
-        If supplied, do not perform any destructive operations on the system.
-        (e.g. powering off, stopping services, etc.)
-
 SHUTDOWN AND BOOT OPTIONS
 -------------------------
 These options apply to both the ``shutdown`` and ``boot`` actions.
 
+**--stage** *STAGE*
+        The stage of the boot or shutdown to execute. See ``--list-stages``
+        to see the list of stages available for each action.
+
+**--list-stages**
+        List the stages that can be run for the given action.
+
 **--cle-bos-template** *CLE_BOS_TEMPLATE*
-        The name of the BOS session template for shutdown and boot of CLE
-        compute nodes. Defaults to a template matching the pattern "cle-X.Y.X"
-        where "X", "Y", and "Z" are integer version numbers. This overrides the
-        option ``bootsys.cle_bos_template`` in the config file.
+        The name of the BOS session template for shutdown or boot of CLE compute
+        nodes. Defaults to a template matching the pattern "cle-X.Y.X" where
+        "X", "Y", and "Z" are integer version numbers. This overrides the option
+        ``bootsys.cle_bos_template`` in the config file.
 
 **--uan-bos-template** *UAN_BOS_TEMPLATE*
-        The name of the BOS session template for shutdown and boot of user
+        The name of the BOS session template for shutdown or boot of user
         access nodes (UANs). Defaults to "uan". If the empty string is
         specified, no UAN shutdown will be performed. This overrides the option
         ``bootsys.uan_bos_template`` in the config file.
 
-**--ipmi-timeout** *IPMI_TIMEOUT*
-        A timeout, in seconds, for nodes to reach the desired power state after
-        IPMI power commands are issued. This applies only to the management
-        NCNs, which are the only nodes that are powered on/off directly with
-        IPMI. The default is 120 seconds.
+SHUTDOWN TIMEOUT OPTIONS
+------------------------
+
+These options set the timeouts of various parts of the stages of the
+``shutdown`` action.
 
 **--capmc-timeout** *CAPMC_TIMEOUT*
-        A timeout, in seconds, for components to reach desired power state after
-        a CAPMC operation is performed. The default is 120 seconds.
+        Timeout, in seconds, to wait until components reach
+        powered off state after they are shutdown with CAPMC.
+        Defaults to 120. Overrides the option
+        bootsys.capmc_timeout in the config file.
 
-        This applies to waiting for compute nodes and application nodes to reach
-        the powered off state if they had to be forcibly powered off with CAPMC
-        after the shutdown with BOS.
-
-        This also applies to waiting for chassis to reach powered off state
-        after they are powered off with CAPMC.
-
-SHUTDOWN OPTIONS
-----------------
-These options apply only to the ``shutdown`` action.
-
-**-i, --ignore-failures**
-        Same as setting --ignore-pod-failures and --ignore-service-failures.
-
-**--ignore-pod-failures**
-        Disregard any failures associated with storing pod state while
-        shutting down.
-
-**--ignore-service-failures**
-        If specified, do not fail to shut down if failures are encountered while
-        querying services for active sessions. This will still log warnings
-        about these failures, but it will continue with the shutdown. Currently,
-        there are no additional steps implemented, so it doesn't make much
-        difference.
-
-**--state-check-fail-action** *FAIL_ACTION*
-        Action to take if a failure occurs when checking whether a BOS session
-        template needs an operation applied based on current node state in HSM.
-        The choices and their meanings are as follows:
-
-        ::
-
-                abort: Abort the entire shutdown operation. This is the default.
-                skip: Skip performing an operation against the session template(s).
-                prompt: Prompt user whether to abort, skip, or force.
-                force: Do the operation against this session template anyway.
-
-BOOT OPTIONS
-------------
-
-These options apply only to the ``boot`` action.
-
-
-**--discovery-timeout** *DISCOVERY_TIMEOUT*
-        A timeout, in seconds, for components to be powered on by the HMS
-        discovery job after that job is resumed during boot. The default is
-        600 seconds.
-
-**--ssh-timeout** *SSH_TIMEOUT*
-        The number of seconds after which the ``boot`` action should time out
-        while waiting for a node to become accessible via SSH after being
-        powered on. Defaults to 600 seconds.
-
-**--k8s-timeout** *K8S_TIMEOUT*
-        The number of seconds after which the ``boot`` action should time out
-        while waiting for kubernetes pods to return to their pre-shutdown state.
-        Defaults to 1800 seconds.
-
-**--ceph-timeout** *CEPH_TIMEOUT*
-        The number of seconds after which the ``boot`` action should time out
-        while waiting for Ceph storage to come up. Defaults to 600 seconds.
+**--ipmi-timeout** *IPMI_TIMEOUT*
+        Timeout, in seconds, to wait until management NCNs
+        reach the desired power state after IPMI power
+        commands are issued. Defaults to 60. Overrides the
+        option bootsys.ipmi_timeout in the config file.
 
 **--bgp-timeout** *BGP_TIMEOUT*
-        The number of seconds after which the ``boot`` action should time out
-        while waiting for a the BGP peering sessions to become established.
-        Defaults to 600 seconds.
+        Timeout, in seconds, to wait until BGP routes report
+        that they are established on management switches.
+        Defaults to 600. Overrides the option
+        bootsys.bgp_timeout in the config file.
 
+**--bos-shutdown-timeout** *BOS_SHUTDOWN_TIMEOUT*
+        Timeout, in seconds, to wait until compute and
+        application nodes have completed their BOS shutdown.
+        Defaults to 600. Overrides the option
+        bootsys.bos_shutdown_timeout in the config file.
+
+**--ncn-shutdown-timeout** *NCN_SHUTDOWN_TIMEOUT*
+        Timeout, in seconds, to wait until management NCNs
+        have completed a graceful shutdown and have reached the
+        powered off state according to IMPI. Defaults to 300.
+        Overrides the option bootsys.ncn_shutdown_timeout in
+        the config file.
+
+BOOT TIMEOUT OPTIONS
+--------------------
+
+These options set the timeouts of various parts of the stages of the
+``boot`` action.
+
+**--discovery-timeout** *DISCOVERY_TIMEOUT*
+        Timeout, in seconds, to wait until node controllers
+        (NodeBMCs) reach the powered on state after the HMS
+        Discovery cronjob is resumed. Defaults to 600.
+        Overrides the option bootsys.discovery_timeout in the
+        config file.
+**--ipmi-timeout** *IPMI_TIMEOUT*
+        Timeout, in seconds, to wait until management NCNs
+        reach the desired power state after IPMI power
+        commands are issued. Defaults to 60. Overrides the
+        option bootsys.ipmi_timeout in the config file.
+**--ncn-boot-timeout** *NCN_BOOT_TIMEOUT*
+        Timeout, in seconds, to wait until management nodes
+        are reachable via SSH after boot. Defaults to 300.
+        Overrides the option bootsys.ncn_boot_timeout in the
+        config file.
+**--k8s-timeout** *K8S_TIMEOUT*
+        Timeout, in seconds, to wait until Kubernetes pods
+        have returned to their pre-shutdown state. Defaults to
+        600. Overrides the option bootsys.k8s_timeout in the
+        config file.
+**--ceph-timeout** *CEPH_TIMEOUT*
+        Timeout, in seconds, to wait until ceph has returned
+        to a healthy state. Defaults to 600. Overrides the
+        option bootsys.ceph_timeout in the config file.
+**--bgp-timeout** *BGP_TIMEOUT*
+        Timeout, in seconds, to wait until BGP routes report
+        that they are established on management switches.
+        Defaults to 600. Overrides the option
+        bootsys.bgp_timeout in the config file.
 **--hsn-timeout** *HSN_TIMEOUT*
-        The number of seconds after which the ``boot`` action should time out
-        while waiting for the high-speed network to come up after running the
-        bringup action. Defaults to 600 seconds.
+        Timeout, in seconds, to wait until the high-speed
+        network (HSN) has returned to its pre-shutdown state.
+        Defaults to 300. Overrides the option
+        bootsys.hsn_timeout in the config file.
+**--bos-boot-timeout** *BOS_BOOT_TIMEOUT*
+        Timeout, in seconds, to wait until compute and
+        application nodes have completed their BOS boot.
+        Defaults to 900. Overrides the option
+        bootsys.bos_boot_timeout in the config file.
+
 
 EXAMPLES
 ========
 
-Shut down the entire system:
+List the stages available under the shutdown action:
 
 ::
 
-        # sat bootsys shutdown
+        # sat bootsys shutdown --list-stages
 
-Shut down the entire system, ignoring any failures encountered while querying
-services for active sessions:
-
-::
-
-        # sat bootsys shutdown --ignore-service-failures
-
-Shut down the entire system, and force a shutdown operation to be performed
-against the session template(s) even if we fail to query the current state of
-the nodes included in the boot sets of the session template(s):
+List the stages available under the boot action:
 
 ::
 
-        # sat bootsys shutdown --state-check-fail-action force
+        # sat bootsys boot --list-stages
+
+Capture the state of the system prior to beginning the shutdown as part of the
+system shutdown procedure:
+
+::
+
+        # sat bootsys shutdown --stage capture-state
+
+Run the service activity checks during the beginning of the system shutdown
+procedure:
+
+::
+
+        # sat bootsys shutdown --stage session-checks
+
+Shut down the computes and UANs as part of the system shutdown procedure, using
+a non-default timeout of 5 minutes for the BOS shutdown to complete:
+
+::
+
+        # sat bootsys shutdown --stage bos-operations --bos-shutdown-timeout 300
+
+Shut down and power off the management NCNs (other than ncn-w001), using
+non-default timeouts of 10 minutes for the NCN graceful shutdown and 2 minutes
+for the IPMI power off of those NCNs:
+
+::
+
+        # sat bootsys shutdown --stage ncn-power --ncn-shutdown-timeout 600 --ipmi-timeout 120
+
+Boot the computes and UANs as part of the system boot procedure:
+
+::
+
+        # sat bootsys boot --stage bos-operations
+
 
 SEE ALSO
 ========

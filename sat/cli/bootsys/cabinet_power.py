@@ -26,6 +26,7 @@ import logging
 from sat.apiclient import APIError, CAPMCClient, HSMClient
 from sat.cli.bootsys.discovery import HMSDiscoveryCronJob, HMSDiscoveryError, HMSDiscoveryScheduledWaiter
 from sat.cli.bootsys.power import CAPMCPowerWaiter
+from sat.config import get_config_value
 from sat.session import SATSession
 
 
@@ -65,7 +66,8 @@ def do_cabinets_power_off(args):
 
     print(f'Waiting for {len(chassis_xnames)} liquid-cooled chassis to reach '
           f'powered off state.')
-    capmc_waiter = CAPMCPowerWaiter(chassis_xnames, 'off', args.capmc_timeout)
+    capmc_waiter = CAPMCPowerWaiter(chassis_xnames, 'off',
+                                    get_config_value('bootsys.capmc_timeout'))
     timed_out_xnames = capmc_waiter.wait_for_completion()
 
     if timed_out_xnames:
@@ -115,7 +117,8 @@ def do_cabinets_power_on(args):
     hsm_client = HSMClient(SATSession())
     try:
         mtn_node_bmcs = hsm_client.get_component_xnames({'Type': 'NodeBMC',
-                                                         'Class': 'Mountain'})
+                                                         'Class': 'Mountain'},
+                                                        omit_empty=False)
     except APIError as err:
         LOGGER.error(f'Failed to get list of NodeBMCs to wait on: {err}')
         raise SystemExit(1)
@@ -123,7 +126,8 @@ def do_cabinets_power_on(args):
     # Once NodeBMCs are powered on, it is possible to boot nodes with BOS.
     # Suppress warnings about CAPMC state query errors because we expect the
     # BMCs/node controllers to be unreachable until they are powered on.
-    bmc_waiter = CAPMCPowerWaiter(mtn_node_bmcs, 'on', args.discovery_timeout,
+    bmc_waiter = CAPMCPowerWaiter(mtn_node_bmcs, 'on',
+                                  get_config_value('bootsys.discovery_timeout'),
                                   suppress_warnings=True)
     bmcs_timed_out = bmc_waiter.wait_for_completion()
 

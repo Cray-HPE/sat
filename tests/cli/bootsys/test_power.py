@@ -30,8 +30,7 @@ from sat.cli.bootsys.power import (
     CAPMCError,
     CAPMCPowerWaiter,
     do_nodes_power_off,
-    get_nodes_by_role_and_state
-)
+    get_nodes_by_role_and_state)
 from tests.common import ExtendedTestCase
 
 
@@ -92,7 +91,7 @@ class TestCAPMCPowerWaiter(ExtendedTestCase):
         member = 'x5000c0s0b0n0'
         api_err_msg = 'CAPMC failure'
         self.mock_capmc_client.get_xname_power_state.side_effect = APIError(api_err_msg)
-        with self.assertLogs(level=logging.WARNING) as cm:
+        with self.assertLogs(level=logging.DEBUG) as cm:
             self.assertFalse(self.waiter.member_has_completed(member))
         self.assert_in_element(f'Failed to query power state: {api_err_msg}', cm.output)
 

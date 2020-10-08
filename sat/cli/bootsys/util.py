@@ -33,7 +33,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 class RunningService:
-    def __init__(self, service, dry_run=True, sleep_after_start=0):
+    def __init__(self, service, sleep_after_start=0):
         """
         Create a new context manager that starts a service in a context and
         stops it when leaving the context.
@@ -44,12 +44,10 @@ class RunningService:
 
         Args:
             service (str): name of the service to start/stop
-            dry_run (bool): if True, do not really start and stop the service.
             sleep_after_start (int): number of seconds to sleep after starting
                 the service when entering the context.
         """
         self._service = service
-        self._dry_run = dry_run
         self._sleep_after_start = sleep_after_start
 
     def _systemctl_start_stop(self, state):
@@ -64,8 +62,7 @@ class RunningService:
         cmd = 'systemctl {} {}'.format('start' if state else 'stop',
                                        self._service)
         LOGGER.info('Running `%s`', cmd)
-        if not self._dry_run:
-            subprocess.check_call(shlex.split(cmd))
+        subprocess.check_call(shlex.split(cmd))
 
     def __enter__(self):
         self._systemctl_start_stop(True)

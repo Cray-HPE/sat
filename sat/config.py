@@ -29,6 +29,7 @@ import os
 import toml
 
 from sat.cli.bootsys.defaults import DEFAULT_UAN_BOS_TEMPLATE
+from sat.cli.bootsys.parser import TIMEOUT_SPECS
 
 DEFAULT_CONFIG_PATH = '/etc/sat.toml'
 LOGGER = logging.getLogger(__name__)
@@ -63,27 +64,6 @@ def validate_log_level(level):
         )
 
 
-def validate_fail_action(action):
-    """Validates the given action.
-
-    Args:
-        action (str): The action string to validate.
-
-    Returns:
-        None
-
-    Raises:
-        ConfigValidationError: If the given `action` is not valid.
-    """
-    valid_actions = ('abort', 'skip', 'prompt', 'force')
-    if action not in valid_actions:
-        raise ConfigValidationError(
-            "Action '{}' is not one of the valid actions: {}".format(
-                action, ", ".join(valid_actions)
-            )
-        )
-
-
 SAT_CONFIG_SPEC = {
     'api_gateway': {
         'host': OptionSpec(str, 'api-gw-service-nmn.local', None, None),
@@ -96,10 +76,7 @@ SAT_CONFIG_SPEC = {
         'max_pod_states': OptionSpec(int, 10, None, None),
         'cle_bos_template': OptionSpec(str, '', None, 'cle_bos_template'),
         'uan_bos_template': OptionSpec(str, DEFAULT_UAN_BOS_TEMPLATE, None,
-                                       'uan_bos_template'),
-        'state_check_fail_action': OptionSpec(str, 'abort',
-                                              validate_fail_action,
-                                              'state_check_fail_action')
+                                       'uan_bos_template')
     },
     'format': {
         'no_headings': OptionSpec(bool, False, None, 'no_headings'),
@@ -120,6 +97,19 @@ SAT_CONFIG_SPEC = {
         'password': OptionSpec(str, '', None, None)
     },
 }
+
+
+def _add_bootsys_timeouts(config_spec):
+    bootsys_timeout_opts = {}
+    for ts in TIMEOUT_SPECS:
+        underscore_option = f'{ts.option_prefix.replace("-", "_")}_timeout'
+        bootsys_timeout_opts[underscore_option] = OptionSpec(
+            int, ts.default, None, underscore_option
+        )
+    config_spec['bootsys'].update(bootsys_timeout_opts)
+
+
+_add_bootsys_timeouts(SAT_CONFIG_SPEC)
 
 
 def _option_value(args, curr, spec):

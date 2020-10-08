@@ -27,7 +27,7 @@ from unittest import mock
 
 import sat
 from sat.config import ConfigValidationError, DEFAULT_CONFIG_PATH, get_config_value, load_config,\
-    SATConfig, SAT_CONFIG_SPEC, validate_log_level, _option_value, OptionSpec, validate_fail_action
+    SATConfig, SAT_CONFIG_SPEC, validate_log_level, _option_value, OptionSpec
 from tests.common import ExtendedTestCase
 
 CONFIGS_DIR = os.path.join(os.path.dirname(__file__), 'resources/configs')
@@ -50,22 +50,6 @@ class TestValidateLogLevel(unittest.TestCase):
         expected_msg = "Level '{}' is not one of the valid log levels".format(invalid_level)
         with self.assertRaisesRegex(ConfigValidationError, expected_msg):
             validate_log_level(invalid_level)
-
-
-class TestValidateFailAction(unittest.TestCase):
-    """Tests for validate_fail_action validation function"""
-
-    def test_validate_fail_action_valid(self):
-        """Test validate_fail_action with valid actions"""
-        for action in ['abort', 'skip', 'prompt', 'force']:
-            validate_fail_action(action)
-
-    def test_validate_fail_action_invalid(self):
-        """Test validate_fail_action with invalid action"""
-        invalid_action = 'foo'
-        expected_msg = "Action '{}' is not one of the valid actions".format(invalid_action)
-        with self.assertRaisesRegex(ConfigValidationError, expected_msg):
-            validate_fail_action(invalid_action)
 
 
 class TestOptionValue(unittest.TestCase):

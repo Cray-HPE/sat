@@ -41,9 +41,5 @@ HSN_STATE_FILE_PREFIX = 'hsn-state'
 CLE_BOS_TEMPLATE_REGEX = re.compile(r'^cle-\d+.\d+.\d+$')
 # The name of the standard UAN session template
 DEFAULT_UAN_BOS_TEMPLATE = 'uan'
-# The number of seconds to wait before timing out on the BOS shutdowns
-BOS_SHUTDOWN_TIMEOUT = 600
-# The number of seconds to wait before timing out on the BOS boots
-BOS_BOOT_TIMEOUT = 900
 # The number of seconds to wait between checks on parallel BOS operations
 PARALLEL_CHECK_INTERVAL = 10

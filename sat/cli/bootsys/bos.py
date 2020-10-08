@@ -27,6 +27,7 @@ import posixpath
 from random import choices, randint
 import shlex
 import subprocess
+import sys
 from threading import Event, Thread
 from time import sleep, monotonic
 
@@ -35,13 +36,12 @@ from inflect import engine
 from sat.apiclient import APIError, BOSClient, HSMClient
 from sat.cli.bootsys.defaults import (
     CLE_BOS_TEMPLATE_REGEX,
-    BOS_BOOT_TIMEOUT,
-    BOS_SHUTDOWN_TIMEOUT,
     PARALLEL_CHECK_INTERVAL
 )
+from sat.cli.bootsys.power import do_nodes_power_off
 from sat.config import get_config_value
 from sat.session import SATSession
-from sat.util import get_val_by_path, pester_choices
+from sat.util import get_val_by_path
 
 LOGGER = logging.getLogger(__name__)
 
@@ -365,7 +365,7 @@ class BOSSessionThread(Thread):
         self.monitor_status_kubectl()
 
 
-def do_parallel_bos_operations(session_templates, operation):
+def do_parallel_bos_operations(session_templates, operation, timeout):
     """Perform BOS operation against the session templates in parallel.
 
     Args:
@@ -373,6 +373,7 @@ def do_parallel_bos_operations(session_templates, operation):
             to create BOS sessions with the given `operation`.
         operation (str): The operation to perform on the given BOS session
             templates. Can be either 'shutdown' or 'boot'.
+        timeout (int): The timeout for the BOS operation
 
     Returns:
         None
@@ -396,14 +397,13 @@ def do_parallel_bos_operations(session_templates, operation):
 
     print(f'Started {operation} operation on BOS '
           f'{template_plural}: {", ".join(session_templates)}.')
-    bos_timeout = BOS_SHUTDOWN_TIMEOUT if operation == 'shutdown' else BOS_BOOT_TIMEOUT
-    print(f'Waiting up to {bos_timeout} seconds for {session_plural} to complete.')
+    print(f'Waiting up to {timeout} seconds for {session_plural} to complete.')
 
     active_threads = {t.session_template: t for t in bos_session_threads}
     failed_session_templates = []
     just_finished = []
 
-    while active_threads and elapsed_time < bos_timeout:
+    while active_threads and elapsed_time < timeout:
         if just_finished:
             print(f'Still waiting on session(s) for template(s): '
                   f'{", ".join(active_threads.keys())}')
@@ -430,7 +430,7 @@ def do_parallel_bos_operations(session_templates, operation):
 
     if active_threads:
         LOGGER.error('BOS %s timed out after %s seconds for session %s: %s.',
-                     operation, bos_timeout,
+                     operation, timeout,
                      INFLECTOR.plural('template', len(active_threads)),
                      ', '.join(active_threads.keys()))
 
@@ -532,50 +532,6 @@ def get_template_nodes_by_state(session_template_data):
     return dict(nodes_by_state)
 
 
-def handle_state_check_failure(failed_st, operation, fail_action):
-    """Handle a failure to check state for session templates.
-
-    Args:
-        failed_st (list): A list of session template names for which we failed
-            to query state.
-        operation (str): The operation being attempted on the session templates.
-        fail_action (str): The action to take if there are any session templates
-            for which we failed to query state of the nodes in them.
-
-    Returns:
-        A list of failed templates that should still have the operation
-        performed on them.
-
-    Raises:
-        BOSFailure: if there are failed session templates, and the chosen action
-            is to abort.
-        ValueError: if called with a `fail_action` other than 'abort', 'skip',
-            'prompt', or 'force'.
-    """
-    if not failed_st:
-        return []
-
-    fail_msg = 'Failed to get state of nodes in session {}: {}'.format(
-        INFLECTOR.plural('template', len(failed_st)), ', '.join(failed_st)
-    )
-
-    if fail_action == 'abort':
-        raise BOSFailure('{}. Aborting {} attempt.'.format(fail_msg, operation))
-    elif fail_action == 'skip':
-        LOGGER.warning('%s. Skipping %s.', fail_msg, operation)
-        return []
-    elif fail_action == 'prompt':
-        prompt = '{}. How would you like to proceed? '.format(fail_msg)
-        response = pester_choices(prompt, ('skip', 'abort', 'force')) or 'abort'
-        return handle_state_check_failure(failed_st, operation, response)
-    elif fail_action == 'force':
-        LOGGER.warning('%s. Forcing %s.', fail_msg, operation)
-        return failed_st
-    else:
-        raise ValueError("Unrecognized action '{}' for handling state check "
-                         "failure.".format(fail_action))
-
-
 def get_templates_needing_operation(session_templates, operation):
     """
     Get the session templates that still need the given `operation` performed.
@@ -630,13 +586,7 @@ def get_templates_needing_operation(session_templates, operation):
         if list(nodes_by_state.keys()) != [end_state]:
             needed_st.append(session_template)
 
-    # Let BOSFailure raise
-    needed_st.extend(handle_state_check_failure(
-        failed_st, operation,
-        get_config_value('bootsys.state_check_fail_action')
-    ))
-
-    return needed_st
+    return needed_st + failed_st
 
 
 def find_cle_bos_template():
@@ -729,12 +679,13 @@ def get_session_templates():
     return session_templates
 
 
-def do_bos_operations(operation):
+def do_bos_operations(operation, timeout):
     """Perform a BOS operation on the compute node and UAN session templates.
 
     Args:
         operation (str): The operation to perform on the compute node and UAN
             session templates. Valid operations are 'boot' and 'shutdown'.
+        timeout (int): The timeout for the BOS operation.
 
     Returns:
         None
@@ -762,9 +713,50 @@ def do_bos_operations(operation):
     # specified on the command-line or in the config file is 'abort'.
     templates_to_use = get_templates_needing_operation(session_templates, operation)
     LOGGER.debug(f"Found {INFLECTOR.no('session template', len(templates_to_use))} "
-                 f"needing '{operation} performed"
+                 f"needing '{operation}' performed"
                  f"{': ' + ', '.join(templates_to_use) if templates_to_use else '.'}")
 
     if templates_to_use:
         # Let any exceptions raise to caller
-        do_parallel_bos_operations(templates_to_use, operation)
+        do_parallel_bos_operations(templates_to_use, operation, timeout)
+
+
+def do_bos_shutdowns(args):
+    """Shut down compute nodes and UANs using BOS.
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this stage.
+
+    Returns: None
+    """
+    try:
+        do_bos_operations('shutdown', get_config_value('bootsys.bos_shutdown_timeout'))
+    except BOSFailure as err:
+        LOGGER.error(err)
+        sys.exit(1)
+
+    timed_out, failed = do_nodes_power_off(get_config_value('bootsys.capmc_timeout'))
+    if timed_out:
+        LOGGER.error(f'Timed out while waiting for the following node(s) to reach '
+                     f'powered off state after CAPMC power off: {", ".join(timed_out)}')
+    if failed:
+        LOGGER.error(f'Failed to power of the following node(s) with CAPMC: '
+                     f'{", ".join(timed_out)}')
+    if timed_out or failed:
+        sys.exit(1)
+
+
+def do_bos_boots(args):
+    """Boot compute nodes and UANs using BOS.
+
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this stage.
+
+    Returns: None
+    """
+    try:
+        do_bos_operations('boot', get_config_value('bootsys.bos_boot_timeout'))
+    except BOSFailure as err:
+        LOGGER.error(err)
+        sys.exit(1)

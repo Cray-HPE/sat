@@ -52,22 +52,14 @@ class TestRunningService(unittest.TestCase):
     @patch('sat.cli.bootsys.util.subprocess.check_call')
     def test_systemctl_start(self, mock_check_call):
         """Test starting systemd services."""
-        dry_svc = RunningService(self.svc_name, dry_run=True)
-        dry_svc._systemctl_start_stop(True)
-        mock_check_call.assert_not_called()
-
-        svc = RunningService(self.svc_name, dry_run=False)
+        svc = RunningService(self.svc_name)
         svc._systemctl_start_stop(True)
         mock_check_call.assert_called_once_with(['systemctl', 'start', self.svc_name])
 
     @patch('sat.cli.bootsys.util.subprocess.check_call')
     def test_systemctl_stop(self, mock_check_call):
         """Test stopping systemd services."""
-        dry_svc = RunningService(self.svc_name, dry_run=True)
-        dry_svc._systemctl_start_stop(False)
-        mock_check_call.assert_not_called()
-
-        svc = RunningService(self.svc_name, dry_run=False)
+        svc = RunningService(self.svc_name)
         svc._systemctl_start_stop(False)
         mock_check_call.assert_called_once_with(['systemctl', 'stop', self.svc_name])
 

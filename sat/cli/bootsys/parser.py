@@ -21,9 +21,166 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+from collections import namedtuple
 
-import sat.parsergroups
 from sat.cli.bootsys.defaults import DEFAULT_UAN_BOS_TEMPLATE
+from sat.cli.bootsys.stages import STAGES_BY_ACTION
+
+
+TimeoutSpec = namedtuple('TimeoutSpec', ['option_prefix', 'applicable_actions',
+                                         'default', 'condition'])
+
+TIMEOUT_SPECS = [
+    TimeoutSpec('capmc', ['shutdown'], 120,
+                'components reach powered off state after they are shutdown with CAPMC.'),
+    TimeoutSpec('discovery', ['boot'], 600,
+                'node controllers (NodeBMCs) reach the powered on state '
+                'after the HMS Discovery cronjob is resumed.'),
+    TimeoutSpec('ipmi', ['boot', 'shutdown'], 60,
+                'management NCNs reach the desired power state after IPMI '
+                'power commands are issued.'),
+    TimeoutSpec('ncn-boot', ['boot'], 300,
+                'management nodes are reachable via SSH after boot.'),
+    TimeoutSpec('k8s', ['boot'], 600,
+                'Kubernetes pods have returned to their pre-shutdown state.'),
+    TimeoutSpec('ceph', ['boot'], 600,
+                'ceph has returned to a healthy state.'),
+    TimeoutSpec('bgp', ['boot', 'shutdown'], 600,
+                'BGP routes report that they are established on management switches.'),
+    TimeoutSpec('hsn', ['boot'], 300,
+                'the high-speed network (HSN) has returned to its pre-shutdown state.'),
+    TimeoutSpec('bos-shutdown', ['shutdown'], 600,
+                'compute and application nodes have completed their BOS shutdown.'),
+    TimeoutSpec('bos-boot', ['boot'], 900,
+                'compute and application nodes have completed their BOS boot.'),
+    TimeoutSpec('ncn-shutdown', ['shutdown'], 300,
+                'management NCNs have completed a graceful shutdown and have reached '
+                'the powered off state according to IMPI.'),
+]
+
+
+def _add_timeout_options(subparser, action):
+    """Add the timeouts that apply to an action to the subparser for the action.
+
+    Args:
+        subparser: The argparse.ArgumentParser object for the action
+        action: The name of the action.
+
+    Returns:
+        None.
+    """
+    for timeout in TIMEOUT_SPECS:
+        if action in timeout.applicable_actions:
+
+            help_text = (
+                f'Timeout, in seconds, to wait until {timeout.condition} '
+                f'Defaults to {timeout.default}. Overrides the option '
+                f'bootsys.{timeout.option_prefix.replace("-", "_")}_timeout '
+                f'in the config file.'
+            )
+
+            subparser.add_argument(
+                f'--{timeout.option_prefix}-timeout', type=int,
+                help=help_text
+            )
+
+
+def _add_bos_template_options(subparser, action):
+    """Add the --cle-bos-template and --uan-bos-template options for the action.
+
+    Args:
+        subparser: The argparse.ArgumentParser object for the action
+        action (str): the action to which the template options apply.
+
+    Returns:
+        None
+    """
+    subparser.add_argument(
+        '--cle-bos-template',
+        help=f'The name of the BOS session template for {action} of CLE '
+             f'compute nodes. Defaults to template matching "cle-X.Y.Z".'
+    )
+
+    subparser.add_argument(
+        '--uan-bos-template',
+        help=f'The name of the BOS session template for {action} of User '
+             f'Access Nodes (UANs). Defaults to {DEFAULT_UAN_BOS_TEMPLATE}.'
+        # Note that we don't want to specify the default with the `default`
+        # kwarg here because then the value from the config file could never
+        # take precedence over the command-line default.
+    )
+
+
+def _add_stage_options(subparser, action):
+    """Add the --stage and --list-stages options appropriate to action.
+
+    Args:
+        subparser: The argparse.ArgumentParser object for the action
+        action (str): the action to which the stages apply.
+
+    Returns:
+        None
+    """
+    # Preserve backwards compatibility where `sat bootsys shutdown` would just
+    # run service checks.
+    stage_required = action != 'shutdown'
+    stage_group = subparser.add_mutually_exclusive_group(required=stage_required)
+
+    stage_group.add_argument(
+        '--stage', help=f'Specify the stage of the {action} to run.',
+        choices=STAGES_BY_ACTION[action]
+    )
+
+    stage_group.add_argument(
+        '--list-stages', action='store_true',
+        help='List the stages of bootsys that can be run for the given action.'
+    )
+
+
+def _add_bootsys_action_subparser(subparsers, action):
+    """Add the shutdown subparser to the parent bootsys parser.
+
+    Args:
+        subparsers: The argparse.ArgumentParser object returned by the
+            add_subparsers method.
+        action (str): The action to add the parser for.
+
+    Returns:
+        None
+    """
+    action_parser = subparsers.add_parser(
+        action, help=f'Perform a {action} operation',
+        description=f'Performs a portion of the {action} operation on the system.'
+    )
+    _add_stage_options(action_parser, action)
+    _add_bos_template_options(action_parser, action)
+    _add_timeout_options(action_parser, action)
+
+
+def _add_bootsys_shutdown_subparser(subparsers):
+    """Add the shutdown subparser to the parent bootsys parser.
+
+    Args:
+        subparsers: The argparse.ArgumentParser object returned by the
+            add_subparsers method.
+
+    Returns:
+        None
+    """
+    _add_bootsys_action_subparser(subparsers, 'shutdown')
+
+
+def _add_bootsys_boot_subparser(subparsers):
+    """Add the boot subparser to the parent bootsys parser.
+
+    Args:
+        subparsers: The argparse.ArgumentParser object returned by the
+            add_subparsers method.
+
+    Returns:
+        None
+    """
+    _add_bootsys_action_subparser(subparsers, 'boot')
 
 
 def add_bootsys_subparser(subparsers):
@@ -36,108 +193,16 @@ def add_bootsys_subparser(subparsers):
     Returns:
         None
     """
-
-    redfish_opts = sat.parsergroups.create_redfish_options()
-
     bootsys_parser = subparsers.add_parser(
         'bootsys', help='Boot or shut down the system.',
         description='Boot or shut down the entire system, including the '
                     'compute nodes, user access nodes, and non-compute '
                     'nodes running the management software.',
-        parents=[redfish_opts]
     )
 
-    bootsys_parser.add_argument(
-        'action', help='Specify whether to boot or shut down.',
-        choices=['boot', 'shutdown']
+    actions_subparsers = bootsys_parser.add_subparsers(
+        metavar='action', dest='action', help='The action to perform.'
     )
 
-    bootsys_parser.add_argument(
-        '--dry-run', action='store_true',
-        help='Do not run any commands, only print what would run.'
-    )
-
-    bootsys_parser.add_argument(
-        '-i', '--ignore-failures', action='store_true',
-        help='Proceed with the shutdown regardless of failed steps.'
-    )
-
-    bootsys_parser.add_argument(
-        '--ignore-service-failures', action='store_true',
-        help='If specified, do not fail to shutdown if querying services '
-             'for active sessions fails.',
-    )
-
-    bootsys_parser.add_argument(
-        '--ignore-pod-failures', action='store_true',
-        help='Disregard any failures associated with storing pod state '
-             'while shutting down.',
-    )
-
-    bootsys_parser.add_argument(
-        '--state-check-fail-action',
-        choices=['abort', 'skip', 'prompt', 'force'],
-        help='Action to take if a failure occurs when checking whether a BOS '
-             'session template needs an operation applied based on current node '
-             'state in HSM. Defaults to "abort".'
-    )
-
-    bootsys_parser.add_argument(
-        '--cle-bos-template',
-        help='The name of the BOS session template for shutdown/boot of CLE '
-             'compute nodes. Defaults to template matching "cle-X.Y.Z".'
-    )
-
-    bootsys_parser.add_argument(
-        '--uan-bos-template',
-        help='The name of the BOS session template for shutdown/boot of User '
-             'Access Nodes (UANs). '
-             'Defaults to "{}"'.format(DEFAULT_UAN_BOS_TEMPLATE)
-        # Note that we don't want to specify the default with the `default`
-        # kwarg here because then the value from the config file could never
-        # take precedence over the command-line default.
-    )
-
-    bootsys_parser.add_argument(
-        '--capmc-timeout', default=120, type=int,
-        help='Timeout, in seconds, for components to reach desired power state '
-             'after a CAPMC operation.'
-    )
-
-    bootsys_parser.add_argument(
-        '--discovery-timeout', default=600, type=int,
-        help='Timeout, in seconds, for node controllers and BMCs to reach the '
-             'powered on state after the HMS discovery job is resumed.'
-    )
-
-    bootsys_parser.add_argument(
-        '--ipmi-timeout', default=120, type=int,
-        help='Timeout, in seconds, for nodes to reach desired power state after '
-             'IPMI power commands are issued.'
-    )
-
-    bootsys_parser.add_argument(
-        '--ssh-timeout', default=600, type=int,
-        help='Timeout waiting for SSH availability on nodes.'
-    )
-
-    bootsys_parser.add_argument(
-        '--k8s-timeout', default=1800, type=int,
-        help='Timeout waiting for Kubernetes pods to return to '
-             'pre-shutdown state.'
-    )
-
-    bootsys_parser.add_argument(
-        '--ceph-timeout', default=600, type=int,
-        help='Timeout waiting for Ceph to come up.'
-    )
-
-    bootsys_parser.add_argument(
-        '--bgp-timeout', default=600, type=int,
-        help='Timeout waiting for BGP routes to become established.'
-    )
-
-    bootsys_parser.add_argument(
-        '--hsn-timeout', default=600, type=int,
-        help='Timeout waiting for HSN bringup.'
-    )
+    _add_bootsys_shutdown_subparser(actions_subparsers)
+    _add_bootsys_boot_subparser(actions_subparsers)
