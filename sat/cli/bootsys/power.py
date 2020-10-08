@@ -107,7 +107,9 @@ class CAPMCPowerWaiter(GroupWaiter):
         try:
             current_state = self.capmc_client.get_xname_power_state(member)
         except APIError as err:
-            LOGGER.warning('Failed to query power state: %s', err)
+            # When cabinets are powered off, the query will respond with 400 bad request
+            # until components are reachable.
+            LOGGER.debug('Failed to query power state: %s', err)
             return False
 
         return current_state == self.power_state

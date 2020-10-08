@@ -117,7 +117,8 @@ def do_cabinets_power_on(args):
     hsm_client = HSMClient(SATSession())
     try:
         mtn_node_bmcs = hsm_client.get_component_xnames({'Type': 'NodeBMC',
-                                                         'Class': 'Mountain'})
+                                                         'Class': 'Mountain'},
+                                                        omit_empty=False)
     except APIError as err:
         LOGGER.error(f'Failed to get list of NodeBMCs to wait on: {err}')
         raise SystemExit(1)
