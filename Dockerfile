@@ -1,0 +1,28 @@
+# Copyright 2020 Hewlett Packard Enterprise Development LP
+#
+# Dockerfile for translating Redfish events to a Monasca format on a Kafka topic.
+
+FROM dtr.dev.cray.com/baseos/alpine:3.12.0 as base
+
+WORKDIR /sat
+COPY CHANGELOG.md README.md /sat/
+COPY setup.cfg setup.py /sat/
+COPY requirements.docker.txt /sat/requirements.txt
+COPY config-docker-sat.sh /sat/
+COPY sat /sat/sat
+COPY docs/man /sat/docs/man
+COPY tools /sat/tools
+
+RUN apk update && \
+    apk add --no-cache python3-dev py3-pip bash openssl-dev libffi-dev \
+        musl-dev git make gcc mandoc ansible ipmitool && \
+    PIP_INDEX_URL=http://dst.us.cray.com/dstpiprepo/simple \
+    PIP_TRUSTED_HOST=dst.us.cray.com \
+    pip3 install --no-cache-dir -U pip && \
+    pip3 install --no-cache-dir .
+
+RUN /sat/config-docker-sat.sh
+
+# All files have been installed so remove from WORKDIR
+RUN rm -rf /sat/*
+CMD ["/bin/bash", "-l"]
