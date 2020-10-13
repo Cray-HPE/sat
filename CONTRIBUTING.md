@@ -35,6 +35,9 @@ Contributors must follow the guidelines below:
    release version based on [Semantic Versioning](https://semver.org/), and a
    new ``[Unreleased]`` section will be created to track changes for the next
    release.
+6. When a new release is issued, the container version should be updated to match
+   the vesion in ``CHANGELOG.md``.  The container is versioned based on the contents
+   of the .version file in the root of the repository.
 
 # Developer Documentation
 
