@@ -1,5 +1,7 @@
 #!/bin/bash -x
 
+LOGDIR=/var/log/cray
+
 SATMANDIR=/usr/share/man/man8
 SLINGSHOT_TOOLS_REPO=https://stash.us.cray.com/scm/SSHOT/slingshot_tools.git
 SLINGSHOT_TOOLS_DIR=slingshot_tools
@@ -10,8 +12,15 @@ CRAYCTL_DIR=crayctl
 CRAYCTL_BRANCH=master
 BMC_ROOT_PASSWORD=${BMC_ROOT_PASSWORD:-"**password**"}
 
+# create logging directory
+if [ ! -d "$LOGDIR" ]; then
+    mkdir -p $LOGDIR
+    chmod 755 $LOGDIR
+fi
+
 # generate sat.toml
-python3 /sat/tools/generate_default_config.py -o /etc/sat.toml sat/config.py
+cd /sat
+python3 tools/generate_default_config.py -o /etc/sat.toml sat/config.py
 
 # make man pages
 cd /sat/docs/man
