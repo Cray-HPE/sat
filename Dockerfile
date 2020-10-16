@@ -1,6 +1,6 @@
 # Copyright 2020 Hewlett Packard Enterprise Development LP
 #
-# Dockerfile for translating Redfish events to a Monasca format on a Kafka topic.
+# Dockerfile for SAT
 
 FROM dtr.dev.cray.com/baseos/alpine:3.12.0 as base
 
@@ -15,7 +15,7 @@ COPY tools /sat/tools
 
 RUN apk update && \
     apk add --no-cache python3-dev py3-pip bash openssl-dev libffi-dev \
-        musl-dev git make gcc mandoc ansible ipmitool && \
+        musl-dev git make gcc mandoc ipmitool && \
     PIP_INDEX_URL=http://dst.us.cray.com/dstpiprepo/simple \
     PIP_TRUSTED_HOST=dst.us.cray.com \
     pip3 install --no-cache-dir -U pip && \
