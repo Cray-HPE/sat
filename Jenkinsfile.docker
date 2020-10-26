@@ -22,7 +22,7 @@
 
 dockerBuildPipeline {
   repository = "cray"
-  imagePrefix = "sat"
+  imagePrefix = "cray"
   app = "sat"
   name = "cray-sat"
   description = "Shasta System Admin Toolkit"
