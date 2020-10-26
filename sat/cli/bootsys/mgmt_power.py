@@ -305,7 +305,7 @@ def do_power_on_ncns(args):
         worker_nodes = get_ncns(['workers'], exclude=['bis'])
         ncn_groups = [master_nodes, storage_nodes, worker_nodes]
         # flatten lists of ncn groups
-        non_bis_ncns = sum(ncn_groups, [])
+        non_bis_ncns = set(ncn for sublist in ncn_groups for ncn in sublist)
         with IPMIConsoleLogger(non_bis_ncns):
             for ncn_group in ncn_groups:
                 print(f'Powering on NCNs: {", ".join(ncn_group)}')
