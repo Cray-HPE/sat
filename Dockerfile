@@ -15,7 +15,7 @@ COPY tools /sat/tools
 
 RUN apk update && \
     apk add --no-cache python3-dev py3-pip bash openssl-dev libffi-dev \
-        musl-dev git make gcc mandoc ipmitool && \
+        curl musl-dev git make gcc mandoc ipmitool && \
     PIP_INDEX_URL=http://dst.us.cray.com/dstpiprepo/simple \
     PIP_TRUSTED_HOST=dst.us.cray.com \
     pip3 install --no-cache-dir -U pip && \
@@ -24,5 +24,5 @@ RUN apk update && \
 RUN /sat/config-docker-sat.sh
 
 # All files have been installed so remove from WORKDIR
-RUN rm -rf /sat/*
+# RUN rm -rf /sat/*
 CMD ["/bin/bash", "-l"]
