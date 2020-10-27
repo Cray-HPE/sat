@@ -12,6 +12,7 @@ COPY config-docker-sat.sh /sat/
 COPY sat /sat/sat
 COPY docs/man /sat/docs/man
 COPY tools /sat/tools
+COPY ./docker_entrypoint.sh /docker_entrypoint.sh
 
 RUN apk update && \
     apk add --no-cache python3-dev py3-pip bash openssl-dev libffi-dev \
@@ -28,5 +29,6 @@ RUN rm -rf /sat/*
 
 # certs should be mounted from host
 # --mount type=bind,src=/usr/share/pki/trust/anchors,target=/usr/local/share/ca-certificates,ro=true
-ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
-CMD ["sh", "-c", "update-ca-certificates 2&>/dev/null && /bin/bash -l"]]
+RUN chmod +x /docker_entrypoint.sh
+ENTRYPOINT ["/docker_entrypoint.sh"]
+CMD ["/bin/bash", "-l"]
