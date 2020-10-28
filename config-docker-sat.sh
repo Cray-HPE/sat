@@ -12,6 +12,10 @@ CRAYCTL_DIR=crayctl
 CRAYCTL_BRANCH=master
 BMC_ROOT_PASSWORD=${BMC_ROOT_PASSWORD:-"**password**"}
 
+NODE_IMAGE_KUBERNETES_REPO=https://stash.us.cray.com/scm/CLOUD/node-image-kubernetes.git
+NODE_IMAGE_KUBERNETES_DIR=node-image-kubernetes
+NODE_IMAGE_KUBERNETES_BRANCH=master
+
 # create logging directory
 if [ ! -d "$LOGDIR" ]; then
     mkdir -p $LOGDIR
@@ -64,3 +68,18 @@ ansible localhost -m ansible.builtin.copy \
 ansible localhost -m ansible.builtin.template \
     -a "src=/sat/crayctl/ansible_framework/main/templates/ipmi_console_start.sh.j2 dest=/root/bin/ipmi_console_start.sh mode=0755" \
     --extra-vars "bmc_root_password=$BMC_ROOT_PASSWORD"
+
+# install kubectl using same version used in ncn image
+cd /sat
+git clone $NODE_IMAGE_KUBERNETES_REPO $NODE_IMAGE_KUBERNETES_DIR
+cd  $NODE_IMAGE_KUBERNETES_DIR
+git checkout $NODE_IMAGE_KUBERNETES_BRANCH
+
+KUBECTL_VERSION=$(grep "^kubernetes_pull_version=" provisioners/common/install.sh | head -n1 | sed "s/^kubernetes_pull_version=\"//" | sed "s/\"//")
+if [ -z "$KUBECTL_VERSION" ]; then
+    KUBECTL_VERSION=$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)
+fi
+
+curl -LO https://storage.googleapis.com/kubernetes-release/release/$KUBECTL_VERSION/bin/linux/amd64/kubectl
+chmod +x ./kubectl
+mv ./kubectl /usr/bin
