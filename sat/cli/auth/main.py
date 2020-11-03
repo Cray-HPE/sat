@@ -58,6 +58,6 @@ def do_auth(args):
         print('Succeeded!')
         session.save()
     else:
-        print('Authenication failed!')
+        print('Authentication failed!')
         LOGGER.error('Authentication Failed.')
         raise SystemExit(1)
