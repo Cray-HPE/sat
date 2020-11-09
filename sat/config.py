@@ -307,6 +307,6 @@ def get_config_value(query_string):
         section, option = parts
         if not section or not option:
             raise ValueError("Improperly formatted query string supplied to get_config_value(). "
-                             "(Got '%s'.)".format(query_string))
+                             "(Got '{}'.)".format(query_string))
         else:
             return CONFIG.get(section, option)
