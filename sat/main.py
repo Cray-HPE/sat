@@ -53,7 +53,7 @@ def main():
 
         # Dynamically importing here affords the following
         # advantages:
-        # 1. If Ctrl-C is pressed while imports are occuring, we
+        # 1. If Ctrl-C is pressed while imports are occurring, we
         #    can handle it gracefully.
         # 2. We can import only the subcommand code relevant to the
         #    desired subcommand, which gives a small performance benefit,
