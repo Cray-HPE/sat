@@ -22,10 +22,6 @@ if [ ! -d "$LOGDIR" ]; then
     chmod 755 $LOGDIR
 fi
 
-# generate sat.toml
-cd /sat
-python3 tools/generate_default_config.py -o /etc/sat.toml sat/config.py
-
 # make man pages
 cd /sat/docs/man
 make

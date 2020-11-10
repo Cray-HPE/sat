@@ -70,14 +70,13 @@ Admin Toolkit (SAT).
 %build
 
 # make man pages
-mkdir -p etc/
-python3 ./tools/generate_default_config.py -o etc/sat.toml sat/config.py
 python3 setup.py build
 cd docs/man
 make
 cd -
 
 # generate auto-completion script
+mkdir -p etc/
 register-python-argcomplete sat > etc/sat-completion.bash
 
 %install
@@ -87,7 +86,6 @@ python3 setup.py install -O1 --root="$RPM_BUILD_ROOT" --record=INSTALLED_FILES \
 # Install logging directory and config file
 install -m 755 -d %{buildroot}/var/log/cray
 install -m 755 -d %{buildroot}/etc
-install -m 644 etc/sat.toml %{buildroot}/etc/sat.toml
 
 # This directory is used to hold the user-created site_info.yml
 install -m 755 -d %{buildroot}/opt/cray/etc
@@ -125,7 +123,6 @@ cat INSTALLED_FILES | grep __pycache__ | xargs dirname | xargs dirname | uniq >>
 %dir /opt/cray/etc
 %dir /var/sat/bootsys
 %dir /var/sat/bootsys/pod-states
-%config(noreplace) /etc/sat.toml
 %{satmandir}/*.8.gz
 /etc/bash_completion.d/sat-completion.bash
 

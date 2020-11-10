@@ -33,7 +33,7 @@ FILES
 This subcommand requires extra files for its operation, and this section
 details the purpose and default location of those files.
 
-config - /etc/sat.toml
+config - $HOME/.config/sat/sat.toml
         This subcommand can read its default username from the global sat
         configuration file.
 
