@@ -45,7 +45,7 @@ OPTIONS
 These options must be specified after the subcommand.
 
 **-h, --help**
-        Print the help message for 'sat switch'.
+        Print the help message for 'sat swap'.
 
 **-a, --action** {enable, disable}
         Perform action to enable or disable the ports on a switch
