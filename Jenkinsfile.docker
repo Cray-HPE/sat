@@ -27,5 +27,5 @@ dockerBuildPipeline {
   name = "cray-sat"
   description = "Shasta System Admin Toolkit"
   dockerfile = "Dockerfile"
-  product = "shasta-standard,shasta-premium"
+  product = "sat"
 }
