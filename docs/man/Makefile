@@ -6,6 +6,7 @@ all: \
 	sat-firmware.8 \
 	sat-hwinv.8 \
 	sat-hwmatch.8 \
+	sat-init.8 \
 	sat-k8s.8 \
 	sat-linkhealth.8 \
 	sat-sensors.8 \

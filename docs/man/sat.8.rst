@@ -55,8 +55,9 @@ CONFIGURATION
 =============
 
 SAT can be configured by editing its configuration file. This configuration
-file is in TOML format, and is installed at /etc/sat.toml. A custom location
-may be specified in the SAT_CONFIG_FILE environment variable.
+file is in TOML format, and is generated at $HOME/.config/sat/sat.toml upon first
+running SAT. A custom location may be specified in the SAT_CONFIG_FILE
+environment variable.
 
 The configuration file is installed with commented out values. These indicate
 the internal values SAT will use if these values are not provided by the
@@ -245,6 +246,7 @@ sat-diag(8),
 sat-firmware(8),
 sat-hwinv(8),
 sat-hwmatch(8),
+sat-init(8),
 sat-k8s(8),
 sat-linkhealth(8),
 sat-sensors(8),

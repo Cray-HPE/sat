@@ -46,10 +46,6 @@ FILES
 This subcommand requires extra files for its operation, and this section
 details the purpose and default location of those files.
 
-config: /etc/sat.toml
-        Global config file for SAT. setrev uses the site_info variable to
-        determine where to write its information.
-
 site_info: /opt/cray/etc/site_info.yml
         This is the file that will contain the information set by this command.
         This file is written in YAML format, and its location is configurable
