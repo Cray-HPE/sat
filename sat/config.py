@@ -89,7 +89,7 @@ SAT_CONFIG_SPEC = {
         'site_info': OptionSpec(str, '/opt/cray/etc/site_info.yml', None, None),
     },
     'logging': {
-        'file_name': OptionSpec(str, '/var/log/cray/sat.log', None, 'logfile'),
+        'file_name': OptionSpec(str, '/var/log/cray/sat/sat.log', None, 'logfile'),
         'file_level': OptionSpec(str, 'INFO', validate_log_level, 'loglevel'),
         'stderr_level': OptionSpec(str, 'WARNING', validate_log_level, 'loglevel'),
     },
