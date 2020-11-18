@@ -25,6 +25,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2020-11-18
+
+### Added
+- New ``sat init`` subcommand that generates a config file for the user at
+  ``$HOME/.config/sat/sat.toml`` and populates it with defaults.
+- ``Dockerfile`` to build a Docker image containing sat and its
+  dependencies, including ipmitool, kubectl, and slingshot-tools.
+- ``requirements.docker.txt`` that explicitly specifies the ``sat`` python
+  package's dependencies and their versions that are installed in the Docker
+  image.
+- ``Jenkinsfile.docker`` that builds the Docker image in a DST pipeline.
+
+### Changed
+- Changed default location of configuration file from ``/etc/sat.toml`` to
+  ``$HOME/.config/sat/sat.toml`` to more easily allow each user to have their
+  own configuration file.
+- Modified all ``sat`` commands to generate a config file at the new default
+  location, ``$HOME/.config/sat/sat.toml``, if one does not exist yet.
+- Renamed ``Jenkinsfile`` to ``Jenkinsfile.rpm`` to differentiate from the newly
+  added ``Jenkinsfile.docker`` that builds the Docker image.
+- Moved sat from the shasta-standard and shasta-premium product streams to the
+  sat product stream. 
+
+### Fixed
+- Updated Vendor tag in RPM spec file to HPE.
+- Fixed RPM build failure in DST pipeline by removing `BuildRequires` tags that
+  result in conflicting requirements installed in container used to build RPM.
+
+### Security
+- Incremented required version of python cryptography package from 3.1 to 3.2.
+
 ## [2.4.0] - 2020-10-08
 
 ### Added
@@ -79,6 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ``sat`` man page.
 - Added sat-switch subcommand to ``sat`` man page.
 - ``sat firmware`` now logs an error for unknown xnames.
+- Fixed bug in flattening of list of NCN hostnames in the ``ncn-power`` stage of
+  ``sat bootsys boot``.
 
 ## [2.3.0] - 2020-07-01
 
