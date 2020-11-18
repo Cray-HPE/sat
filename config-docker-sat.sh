@@ -1,6 +1,6 @@
 #!/bin/bash -x
 
-LOGDIR=/var/log/cray
+LOGDIR=/var/log/cray/sat
 
 SATMANDIR=/usr/share/man/man8
 SLINGSHOT_TOOLS_REPO=https://stash.us.cray.com/scm/SSHOT/slingshot_tools.git
