@@ -25,13 +25,14 @@ from collections import namedtuple
 import getpass
 import logging
 import os
+from textwrap import dedent, indent
 
 import toml
 
 from sat.cli.bootsys.defaults import DEFAULT_UAN_BOS_TEMPLATE
 from sat.cli.bootsys.parser import TIMEOUT_SPECS
 
-DEFAULT_CONFIG_PATH = '/etc/sat.toml'
+DEFAULT_CONFIG_PATH = f'{os.getenv("HOME", "/root")}/.config/sat/sat.toml'
 LOGGER = logging.getLogger(__name__)
 CONFIG = None
 
@@ -307,6 +308,104 @@ def get_config_value(query_string):
         section, option = parts
         if not section or not option:
             raise ValueError("Improperly formatted query string supplied to get_config_value(). "
-                             "(Got '%s'.)".format(query_string))
+                             "(Got '{}'.)".format(query_string))
         else:
             return CONFIG.get(section, option)
+
+
+def process_toml_output(toml_str):
+    """Comments out non-header lines, and adds a HPE copyright statement to a string.
+
+    Non-default username settings are not commented out.
+
+    Args:
+        toml_str (str): some arbitrary TOML content.
+
+    Returns:
+        a string containing the same TOML content, with options commented
+        out and a copyright statement prepended.
+
+    """
+    copyright_stmt = """\
+        Default configuration file for SAT.
+        (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+
+        Permission is hereby granted, free of charge, to any person obtaining a
+        copy of this software and associated documentation files (the "Software"),
+        to deal in the Software without restriction, including without limitation
+        the rights to use, copy, modify, merge, publish, distribute, sublicense,
+        and/or sell copies of the Software, and to permit persons to whom the
+        Software is furnished to do so, subject to the following conditions:
+
+        The above copyright notice and this permission notice shall be included
+        in all copies or substantial portions of the Software.
+
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+        THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+        OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+        ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+        OTHER DEALINGS IN THE SOFTWARE.
+
+    """
+    return indent(dedent(copyright_stmt) + toml_str, "# ",
+                  predicate=lambda line: all([line != '\n',
+                                              not line.startswith('['),
+                                              not (line.startswith('username') and not line.endswith('""\n'))]))
+
+
+def generate_default_config(path=None, username=None, force=False, log_when_file_exists=False):
+    """Generates a default SAT configuration file.
+
+    This function generates a default SAT configuration file if one does not
+    already exist.  It generates the configuration file in the default
+    location or the location specified by $SAT_CONFIG_FILE.
+
+    Args:
+        path(str): write the configuration file to the given path.
+        username(str): generate the configuration file with
+            api_gateway.username set to the given username.
+        force(bool): if True, overwrite existing configuration files.
+        log_when_file_exists(bool): if True, log that the log file exists
+            at ERROR level, else log at DEBUG level.
+
+    Returns:
+        None
+    """
+    # Allow the user to specify an alternate config file in an env variable
+    config_file_path = path or os.getenv('SAT_CONFIG_FILE', DEFAULT_CONFIG_PATH)
+    if os.path.isfile(config_file_path) and not force:
+        log_fn = LOGGER.error if log_when_file_exists else LOGGER.debug
+        log_fn(f'Configuration file "{config_file_path}" already exists.  Not generating configuration file.')
+        return
+    config_file_dir = os.path.dirname(config_file_path)
+    if not os.path.isdir(config_file_dir):
+        try:
+            os.makedirs(config_file_dir, exist_ok=True)
+        except OSError as e:
+            LOGGER.error(f'Unable to create directory {config_file_dir}: {e}')
+            raise SystemExit(1)
+    LOGGER.info(f'Creating default configuration file at {config_file_path}')
+
+    # Convert SAT_CONFIG_SPEC to a dict
+    config_spec = {
+        section: {
+            option: '' if callable(spec.default) else spec.default
+            for option, spec in options.items()
+        }
+        for section, options in SAT_CONFIG_SPEC.items()
+    }
+
+    if username:
+        config_spec['api_gateway']['username'] = username
+
+    try:
+        output_stream = open(config_file_path, 'w')
+        with output_stream:
+            toml_str = toml.dumps(config_spec)
+            output_stream.write(process_toml_output(toml_str))
+
+    except IOError as ioerr:
+        print("ERROR: {}".format(ioerr))
+        raise SystemExit(1)

@@ -1,5 +1,5 @@
 // vi: sts=4 et ai
-// (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+// (C) Copyright 2020 Hewlett Packard Enterprise Development LP.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -18,12 +18,14 @@
 // OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 // ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 // OTHER DEALINGS IN THE SOFTWARE.
-@Library("dst-shared") _
+@Library('dst-shared@master') _
 
-rpmBuild( 
-    product: "shasta-standard,shasta-premium",
-    target_node: "ncn",
-    specfile: "cray-sat.spec",
-    channel: "sat-ci"
-)
-
+dockerBuildPipeline {
+  repository = "cray"
+  imagePrefix = "cray"
+  app = "sat"
+  name = "cray-sat"
+  description = "Shasta System Admin Toolkit"
+  dockerfile = "Dockerfile"
+  product = "sat"
+}

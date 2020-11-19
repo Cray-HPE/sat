@@ -21,13 +21,16 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+
+from collections import OrderedDict
 import os
+from textwrap import dedent
 import unittest
 from unittest import mock
 
 import sat
-from sat.config import ConfigValidationError, DEFAULT_CONFIG_PATH, get_config_value, load_config,\
-    SATConfig, SAT_CONFIG_SPEC, validate_log_level, _option_value, OptionSpec
+from sat.config import ConfigValidationError, DEFAULT_CONFIG_PATH, get_config_value, generate_default_config,\
+    load_config, SATConfig, SAT_CONFIG_SPEC, validate_log_level, _option_value, OptionSpec
 from tests.common import ExtendedTestCase
 
 CONFIGS_DIR = os.path.join(os.path.dirname(__file__), 'resources/configs')
@@ -108,6 +111,108 @@ class TestOptionValue(unittest.TestCase):
         different_option_spec = OptionSpec(str, self.default, None, None)
         self.assertEqual(_option_value(self.mock_args, None, different_option_spec),
                          self.default)
+
+
+class TestGenerateDefaultConfig(unittest.TestCase):
+    """Tests for the generate_default_config function"""
+
+    def setUp(self):
+        """Sets up mocks for testing generate_default_config."""
+        # Use an OrderedDict to enforce ordering of settings
+        self.fake_config_spec = {
+            'api_gateway': OrderedDict([
+                ('username', OptionSpec(str, lambda x: 'sat_user', None, None)),
+                ('favorite_color', OptionSpec(str, 'red', None, None))
+            ])
+        }
+        mock.patch('sat.config.SAT_CONFIG_SPEC', self.fake_config_spec).start()
+        self.mock_open = mock.patch('builtins.open').start()
+        self.mock_output_stream = self.mock_open.return_value
+        self.mock_getenv = mock.patch('sat.config.os.getenv', return_value=DEFAULT_CONFIG_PATH).start()
+        self.mock_isdir = mock.patch('sat.config.os.path.isdir', return_value=True).start()
+        self.mock_isfile = mock.patch('sat.config.os.path.isfile', return_value=False).start()
+        self.mock_makedirs = mock.patch('sat.config.os.makedirs').start()
+
+        self.expected_config = dedent("""\
+        # Default configuration file for SAT.
+        # (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+
+        # Permission is hereby granted, free of charge, to any person obtaining a
+        # copy of this software and associated documentation files (the "Software"),
+        # to deal in the Software without restriction, including without limitation
+        # the rights to use, copy, modify, merge, publish, distribute, sublicense,
+        # and/or sell copies of the Software, and to permit persons to whom the
+        # Software is furnished to do so, subject to the following conditions:
+
+        # The above copyright notice and this permission notice shall be included
+        # in all copies or substantial portions of the Software.
+
+        # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+        # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+        # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+        # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+        # OTHER DEALINGS IN THE SOFTWARE.
+
+        [api_gateway]
+        # username = ""
+        # favorite_color = "red"
+        """)
+
+    def tearDown(self):
+        """Stop all patches."""
+        mock.patch.stopall()
+
+    def test_basic_config_generation(self):
+        """Test basic default config generation"""
+        generate_default_config()
+        self.mock_open.assert_called_with(DEFAULT_CONFIG_PATH, 'w')
+        self.mock_output_stream.write.assert_called_once_with(self.expected_config)
+        self.mock_makedirs.assert_not_called()
+
+    def test_generate_alternate_location(self):
+        """Test generate_default_config() can write to the file specified by SAT_CONFIG_FILE"""
+        self.mock_getenv.return_value = '/tmp/sat.toml'
+        generate_default_config()
+        self.mock_getenv.assert_called_with('SAT_CONFIG_FILE', DEFAULT_CONFIG_PATH)
+        self.mock_open.assert_called_once_with('/tmp/sat.toml', 'w')
+        self.mock_output_stream.write.assert_called_once_with(self.expected_config)
+        self.mock_makedirs.assert_not_called()
+
+    def test_generate_create_directory(self):
+        """Test generate_default_config() will create a config directory if needed"""
+        self.mock_getenv.return_value = '/etc/opt/cray/sat.toml'
+        self.mock_isdir.return_value = False
+        generate_default_config()
+        self.mock_getenv.assert_called_with('SAT_CONFIG_FILE', DEFAULT_CONFIG_PATH)
+        self.mock_open.assert_called_once_with('/etc/opt/cray/sat.toml', 'w')
+        self.mock_output_stream.write.assert_called_once_with(self.expected_config)
+        self.mock_makedirs.assert_called_once_with('/etc/opt/cray', exist_ok=True)
+
+    def test_generate_with_username(self):
+        """Test generating config with a username will write a config file with a username"""
+        self.expected_config = self.expected_config.replace('# username = ""', 'username = "sat_user"')
+        generate_default_config(username='sat_user')
+        self.mock_open.assert_called_with(DEFAULT_CONFIG_PATH, 'w')
+        self.mock_output_stream.write.assert_called_once_with(self.expected_config)
+        self.mock_makedirs.assert_not_called()
+
+    def test_generate_file_exists(self):
+        """Test generating a config file when the file exists will not overwrite"""
+        self.mock_isfile.return_value = True
+        generate_default_config()
+        self.mock_open.assert_not_called()
+        self.mock_output_stream.write.assert_not_called()
+        self.mock_makedirs.assert_not_called()
+
+    def test_generate_file_exists_force(self):
+        """Test generating a config file when the file exists will overwrite if forcing"""
+        self.mock_isfile.return_value = True
+        generate_default_config(force=True)
+        self.mock_open.assert_called_with(DEFAULT_CONFIG_PATH, 'w')
+        self.mock_output_stream.write.assert_called_once_with(self.expected_config)
+        self.mock_makedirs.assert_not_called()
 
 
 class TestLoadConfig(unittest.TestCase):

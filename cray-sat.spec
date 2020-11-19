@@ -29,7 +29,7 @@ Source: %{name}-%{version}.tar.gz
 Summary: System Admin Toolkit (SAT)
 Group: System/Management
 BuildRoot: %{_topdir}
-Vendor: Cray Inc.
+Vendor: Hewlett Packard Enterprise Company
 Requires: slingshot-tools
 Requires: python3-argcomplete
 Requires: python3-python-dateutil >= 2.7.3, python3-python-dateutil < 3.0
@@ -45,8 +45,6 @@ Requires: python3-requests < 3.0
 Requires: python3-requests-oauthlib
 Requires: python3-toml >= 0.10.0, python3-toml < 1.0
 Requires: python3-urllib3 >= 1.0, python3-urllib3 < 2.0
-BuildRequires: python3-argcomplete
-BuildRequires: python3-docutils
 
 %description
 The System Admin Toolkit (SAT) is a command-line utility to perform various
@@ -72,14 +70,13 @@ Admin Toolkit (SAT).
 %build
 
 # make man pages
-mkdir -p etc/
-python3 ./tools/generate_default_config.py -o etc/sat.toml sat/config.py
 python3 setup.py build
 cd docs/man
 make
 cd -
 
 # generate auto-completion script
+mkdir -p etc/
 register-python-argcomplete sat > etc/sat-completion.bash
 
 %install
@@ -89,7 +86,6 @@ python3 setup.py install -O1 --root="$RPM_BUILD_ROOT" --record=INSTALLED_FILES \
 # Install logging directory and config file
 install -m 755 -d %{buildroot}/var/log/cray
 install -m 755 -d %{buildroot}/etc
-install -m 644 etc/sat.toml %{buildroot}/etc/sat.toml
 
 # This directory is used to hold the user-created site_info.yml
 install -m 755 -d %{buildroot}/opt/cray/etc
@@ -127,7 +123,6 @@ cat INSTALLED_FILES | grep __pycache__ | xargs dirname | xargs dirname | uniq >>
 %dir /opt/cray/etc
 %dir /var/sat/bootsys
 %dir /var/sat/bootsys/pod-states
-%config(noreplace) /etc/sat.toml
 %{satmandir}/*.8.gz
 /etc/bash_completion.d/sat-completion.bash
 

@@ -28,7 +28,7 @@ import sys
 
 import argcomplete
 
-from sat.config import load_config
+from sat.config import generate_default_config, load_config
 from sat.logging import bootstrap_logging, configure_logging
 from sat.parser import create_parent_parser
 
@@ -48,12 +48,18 @@ def main():
 
         bootstrap_logging()
 
-        load_config(args)
-        configure_logging()
+        # Automatically create config file if it does not exist, except
+        # in `sat init` where the subcommand will create it.  With
+        # `sat init`, don't bother loading configuration or configuring
+        # logging either.
+        if args.command != 'init':
+            generate_default_config(username=args.username)
+            load_config(args)
+            configure_logging()
 
         # Dynamically importing here affords the following
         # advantages:
-        # 1. If Ctrl-C is pressed while imports are occuring, we
+        # 1. If Ctrl-C is pressed while imports are occurring, we
         #    can handle it gracefully.
         # 2. We can import only the subcommand code relevant to the
         #    desired subcommand, which gives a small performance benefit,
