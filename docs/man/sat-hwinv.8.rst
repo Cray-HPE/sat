@@ -145,6 +145,9 @@ These options list components of certain types in the system.
 **--list-procs**
         List all the processors in the system.
 
+**--list-node-accels**
+        List all the node accelerators in the system.
+
 **--list-mems**
         List all the memory modules in the system.
 
@@ -187,6 +190,9 @@ These options list components of certain types in the system.
 
 **--proc-fields** *PROC_FIELDS*
         Same as **--node-fields** but for processors.
+
+**--node-accel-fields** *NODE_ACCEL_FIELDS*
+        Same as **--node-fields** but for node accelerators.
 
 **--mem-fields** *MEM_FIELDS*
         Same as **--node-fields** but for memory modules.
