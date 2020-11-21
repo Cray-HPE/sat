@@ -97,6 +97,12 @@ SAT_CONFIG_SPEC = {
         'username': OptionSpec(str, '', None, None),
         'password': OptionSpec(str, '', None, None)
     },
+    's3': {
+        'endpoint': OptionSpec(str, 'https://rgw-vip', None, None),
+        'bucket': OptionSpec(str, 'sat', None, None),
+        'access_key_file': OptionSpec(str, '~/.config/sat/s3_access_key', None, None),
+        'secret_key_file': OptionSpec(str, '~/.config/sat/s3_secret_key', None, None)
+    }
 }
 
 
@@ -311,6 +317,23 @@ def get_config_value(query_string):
                              "(Got '{}'.)".format(query_string))
         else:
             return CONFIG.get(section, option)
+
+
+def read_config_value_file(query_string):
+    """Loads a configuration value from a filename in the configuration.
+
+    Args:
+        query_string (str): A dot-delimited reference to a section and option from
+            the configuration. query_string should be in the form '<section>.<option>'.
+
+    Returns:
+        The contents of the file specified by query_string.
+
+    Raises:
+        OSError if opening the file fails.
+    """
+    with open(os.path.expanduser(get_config_value(query_string))) as config_value_file:
+        return config_value_file.read().strip()
 
 
 def process_toml_output(toml_str):

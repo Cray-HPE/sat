@@ -25,14 +25,14 @@ import re
 
 # The default directory where pre-shutdown state is captured (currently k8s pod
 # states, HSN status). This can be overridden on the command-line.
-DEFAULT_STATE_DIR = '/var/sat/bootsys/'
+DEFAULT_LOCAL_STATE_DIR = '/var/sat/bootsys/'
 
-# The directory within DEFAULT_STATE_DIR where pod state is stored and read from
+# The directory within DEFAULT_LOCAL_STATE_DIR where pod state is stored and read from
 POD_STATE_DIR = 'pod-states/'
 # The prefix used for files that record pod states.
 POD_STATE_FILE_PREFIX = 'pod-states'
 
-# The directory within DEFAULT_STATE_DIR where high-speed network (HSN) state is stored and read from
+# The directory within DEFAULT_LOCAL_STATE_DIR where high-speed network (HSN) state is stored and read from
 HSN_STATE_DIR = 'hsn-states/'
 # The prefix used for files that record HSN state
 HSN_STATE_FILE_PREFIX = 'hsn-state'

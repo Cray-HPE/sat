@@ -29,6 +29,8 @@ import sys
 import warnings
 from datetime import datetime
 
+from boto3.exceptions import Boto3Error
+from botocore.exceptions import BotoCoreError, ClientError
 from kubernetes.client import CoreV1Api
 from kubernetes.config import load_kube_config, ConfigException
 from yaml import YAMLLoadWarning
@@ -36,13 +38,13 @@ from yaml import YAMLLoadWarning
 from sat.apiclient import FabricControllerClient
 from sat.session import SATSession
 from sat.cli.bootsys.defaults import (
-    DEFAULT_STATE_DIR,
+    DEFAULT_LOCAL_STATE_DIR,
     POD_STATE_DIR, POD_STATE_FILE_PREFIX,
     HSN_STATE_DIR, HSN_STATE_FILE_PREFIX
 )
 from sat.cli.bootsys.util import k8s_pods_to_status_dict
 from sat.config import get_config_value
-from sat.util import BeginEndLogger
+from sat.util import BeginEndLogger, get_s3_resource
 
 
 LOGGER = logging.getLogger(__name__)
@@ -60,13 +62,13 @@ class PodStateError(StateError):
 
 class StateRecorder(ABC):
     """
-    Records some state information to a time-stamped file and maintains a
-    symbolic link to the most recent version of that state.
+    Records some state information to a time-stamped file and stores it in the
+    configured S3 bucket.
 
     The data is stored in JSON and loaded as JSON.
     """
 
-    def __init__(self, description, dir_path, file_prefix, num_to_keep, file_suffix='.json'):
+    def __init__(self, description, dir_path, file_prefix, num_to_keep, s3, bucket_name, file_suffix='.json'):
         """
         Create a new StateRecorder object to record and load state information.
 
@@ -75,6 +77,8 @@ class StateRecorder(ABC):
             dir_path (str): The path to the directory containing the files.
             file_prefix (str): The prefix of files to count and remove extras.
             num_to_keep (int): The number of files to keep.
+            s3 (ServiceResource): A boto3.resources.factory.s3.ServiceResource object.
+            bucket_name (str): The name of the S3 bucket to use.
             file_suffix (str): The suffix of the files to remove.
         """
         self.description = description
@@ -82,37 +86,43 @@ class StateRecorder(ABC):
         self.file_prefix = file_prefix
         self.num_to_keep = num_to_keep
         self.file_suffix = file_suffix
+        self.s3 = s3
+        self.bucket_name = bucket_name
 
-    @property
-    def symlink_file_name(self):
-        """str: The name of the symlink file, not including the directory."""
-        return f'{self.file_prefix}{self.file_suffix}'
+    def _get_s3_state_files(self):
+        """Get a list of state files the configured S3 bucket.
 
-    @property
-    def symlink_file_path(self):
-        """str: The full path to the symbolic link that points to the latest state file."""
-        return os.path.join(self.dir_path, self.symlink_file_name)
+        File names will be sorted by last-modified time, from oldest to most recent.
+        """
+        try:
+            s3_bucket = self.s3.Bucket(self.bucket_name)
+            state_files = [
+                f.key for f in
+                sorted(s3_bucket.objects.filter(Prefix=self.dir_path), key=lambda x: x.last_modified)
+                if os.path.basename(f.key).startswith(self.file_prefix) and f.key.endswith(self.file_suffix)
+            ]
+            return state_files
+        except (BotoCoreError, ClientError, Boto3Error) as err:
+            raise StateError(f'Unable to list files in S3 Bucket {self.bucket_name}: {err}')
 
     def _remove_old_files(self):
-        """Remove old files within the given directory that match the given prefix.
+        """Remove old files within the given S3 bucket that match the given prefix.
 
-        File names will be sorted alphabetically, the file with the name consisting
-        of only the prefix followed by the suffix will be disregarded, and then all
-        but the last `self.num_to_keep` files will be removed.
+        File names will be sorted by last-modified time and all but the last `self.num_to_keep` files will be removed.
         """
-        # Get the list of all files with the given prefix and suffix but omit the
-        # symlink which will have a file name that is just prefix and suffix.
-        files = [x for x in sorted(os.listdir(self.dir_path))
-                 if x.startswith(self.file_prefix) and x.endswith(self.file_suffix)
-                 and x != self.symlink_file_name]
+        candidates_for_removal = self._get_s3_state_files()
+        LOGGER.debug('Current state files: %s', candidates_for_removal)
 
-        num_to_remove = len(files) - self.num_to_keep
+        num_to_remove = len(candidates_for_removal) - self.num_to_keep
         if num_to_remove > 0:
-            for file_to_remove in files[:num_to_remove]:
+            for file_to_remove in candidates_for_removal[:num_to_remove]:
+                LOGGER.debug('Removing %s from S3', file_to_remove)
                 try:
-                    os.remove(os.path.join(self.dir_path, file_to_remove))
-                except (PermissionError, FileNotFoundError) as err:
-                    LOGGER.warning(f'Failed to remove old file {file_to_remove}: {err}')
+                    self.s3.Object(self.bucket_name, file_to_remove).delete()
+                except (BotoCoreError, ClientError, Boto3Error) as err:
+                    LOGGER.warning(f'Failed to remove old file {file_to_remove} from S3: {err}')
+
+        LOGGER.debug('Files left in bucket: %s', self._get_s3_state_files())
 
     def _create_new_file(self):
         """Create a new file in the given directory.
@@ -128,41 +138,28 @@ class StateRecorder(ABC):
         timestamp_str = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
         new_file = os.path.join(self.dir_path,
                                 f'{self.file_prefix}.{timestamp_str}{self.file_suffix}')
+        local_new_file_path = os.path.join(DEFAULT_LOCAL_STATE_DIR, new_file)
 
         try:
-            with open(new_file, 'w') as f:
+            with open(local_new_file_path, 'w') as f:
                 f.write('')
         except OSError as err:
-            raise StateError(f'Failed to create new file {new_file}: {err}') from err
+            raise StateError(f'Failed to create new file {local_new_file_path}: {err}') from err
 
         return new_file
 
-    def _update_symlink(self, target_file):
-        """Update the symbolic link for the default file.
-
-        An old symbolic link at `self.dir_path`/`self.file_prefix``self.file_suffix`
-        will be removed and replaced with a symbolic link that points at `target_file`.
-
-        An error is not raised if the symlink cannot be altered, but a warning is logged.
-
-        Args:
-            target_file (str): The target file path for the symlink.
-        """
-        symlink_file = self.symlink_file_path
-
+    def _ensure_local_dir_path_exists(self):
+        """Ensure that DEFAULT_LOCAL_STATE_DIR/self.dir_path exists"""
+        local_dir_path = os.path.join(DEFAULT_LOCAL_STATE_DIR, self.dir_path)
         try:
-            os.remove(symlink_file)
-        except FileNotFoundError:
-            LOGGER.info(f'No existing file found to remove at {symlink_file}.')
+            os.makedirs(local_dir_path, exist_ok=True)
+        except (FileExistsError, NotADirectoryError) as err:
+            raise StateError(
+                f'Cannot create state file because one of the leading components '
+                f'of the path {local_dir_path} is not a directory.'
+            ) from err
         except OSError as err:
-            LOGGER.warning(f'Failed to remove symlink at {symlink_file}: {err}')
-            return
-
-        try:
-            os.symlink(target_file, symlink_file)
-        except OSError as err:
-            LOGGER.warning(f'Failed to create symlink at {symlink_file} pointing '
-                           f'to {target_file}: {err}')
+            raise StateError(f'Failed to ensure state directory {local_dir_path} exists: {err}')
 
     @abstractmethod
     def get_state_data(self):
@@ -182,9 +179,8 @@ class StateRecorder(ABC):
         """Dump state information to a file in `self.dir_path`.
 
         Ensures that the `self.dir_path` exists and then creates a new file for
-        the current state info, removes the existing symlink and re-creates it
-        to point to the newly created file, and then dumps state info to that
-        file. Then removes existing files if necessary to maintain the maximum
+        the current state info, dumps state info to that file.  Then removes
+        existing files from the S3 bucket if necessary to maintain the maximum
         number of state files to keep based on `self.num_to_keep`.
 
         Raises:
@@ -193,24 +189,24 @@ class StateRecorder(ABC):
         """
         # This can raise a StateError
         state_data = self.get_state_data()
-        try:
-            os.makedirs(self.dir_path, exist_ok=True)
-        except (FileExistsError, NotADirectoryError) as err:
-            raise StateError(
-                f'Cannot create state file because one of the leading components '
-                f'of the path {self.dir_path} is not a directory.'
-            ) from err
-        except OSError as err:
-            raise StateError(f'Failed to ensure state directory {self.dir_path} exists: {err}')
 
+        self._ensure_local_dir_path_exists()
         new_file_name = self._create_new_file()
+        local_new_file_name = os.path.join(DEFAULT_LOCAL_STATE_DIR, new_file_name)
 
         try:
-            with open(new_file_name, 'w') as f:
+            with open(local_new_file_name, 'w') as f:
                 json.dump(state_data, f)
         except OSError as err:
-            raise PodStateError(f'Failed to write pod state to file {new_file_name}: {err}') from err
-        self._update_symlink(new_file_name)
+            raise StateError(f'Failed to write state to file {local_new_file_name}: {err}') from err
+        try:
+            LOGGER.debug('Uploading %s to S3', new_file_name)
+            self.s3.Object(self.bucket_name, new_file_name).upload_file(local_new_file_name)
+        except (ClientError, BotoCoreError, Boto3Error) as err:
+            raise PodStateError(f'Failed to dump state to S3: {err}')
+        finally:
+            os.remove(local_new_file_name)
+
         self._remove_old_files()
 
     def get_stored_state(self):
@@ -227,24 +223,43 @@ class StateRecorder(ABC):
             StateError: if the file containing the latest state cannot be
                 opened or parsed with JSON.
         """
-        symlink_file = self.symlink_file_path
+        files_in_bucket = self._get_s3_state_files()
+        LOGGER.debug('Files in bucket: %s', files_in_bucket)
+        if not files_in_bucket:
+            raise StateError('No stored state found')
+        latest_state_file = os.path.join(files_in_bucket[-1])
+        latest_state_file_local_path = os.path.join(DEFAULT_LOCAL_STATE_DIR, latest_state_file)
+        LOGGER.debug('Latest state file: %s', latest_state_file)
+        self._ensure_local_dir_path_exists()
         try:
-            with open(symlink_file) as f:
-                return json.load(f)
+            self.s3.Object(self.bucket_name, latest_state_file).download_file(latest_state_file_local_path)
+            LOGGER.debug('Downloaded %s to %s', latest_state_file, latest_state_file_local_path)
+        except (BotoCoreError, ClientError, Boto3Error) as err:
+            raise StateError(f'Unable to download {latest_state_file} from s3: {err}')
+
+        try:
+            with open(latest_state_file_local_path) as f:
+                state_data = json.load(f)
+            return state_data
         except OSError as err:
-            raise StateError(f'Failed to open file {symlink_file} to read latest state: {err}')
+            raise StateError(
+                f'Failed to open downloaded file {latest_state_file_local_path} to read latest state: {err}'
+            )
         except ValueError as err:
-            raise StateError(f'Failed to parse JSON from file {symlink_file}: {err}')
+            raise StateError(f'Failed to parse JSON from downloaded file {latest_state_file_local_path}: {err}')
+        finally:
+            os.remove(latest_state_file_local_path)
 
 
 class PodStateRecorder(StateRecorder):
     """Records the state of k8s pods based on the k8s API."""
 
     def __init__(self):
-        pod_state_dir = os.path.join(DEFAULT_STATE_DIR, POD_STATE_DIR)
         num_to_keep = get_config_value('bootsys.max_pod_states')
-        super().__init__('kubernetes pod state', pod_state_dir,
-                         POD_STATE_FILE_PREFIX, num_to_keep)
+        s3 = get_s3_resource()
+        bucket_name = get_config_value('s3.bucket')
+        super().__init__('kubernetes pod state', POD_STATE_DIR,
+                         POD_STATE_FILE_PREFIX, num_to_keep, s3, bucket_name)
 
     def get_state_data(self):
         """Get K8s pod information in a dictionary.
@@ -274,10 +289,11 @@ class HSNStateRecorder(StateRecorder):
     """Records the state of the High-speed Network (HSN) according to the fabric controller API."""
 
     def __init__(self):
-        hsn_state_dir = os.path.join(DEFAULT_STATE_DIR, HSN_STATE_DIR)
         num_to_keep = get_config_value('bootsys.max_hsn_states')
-        super().__init__('high-speed network (HSN) state', hsn_state_dir,
-                         HSN_STATE_FILE_PREFIX, num_to_keep)
+        s3 = get_s3_resource()
+        bucket_name = get_config_value('s3.bucket')
+        super().__init__('high-speed network (HSN) state', HSN_STATE_DIR,
+                         HSN_STATE_FILE_PREFIX, num_to_keep, s3, bucket_name)
 
         self.fabric_client = FabricControllerClient(SATSession())
 

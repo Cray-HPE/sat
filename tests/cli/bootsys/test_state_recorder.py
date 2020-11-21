@@ -21,15 +21,18 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+from boto3.exceptions import Boto3Error
 from kubernetes.config import ConfigException
-import logging
+import datetime
+import os
 import unittest
 from unittest.mock import call, patch, Mock
 
+from sat.cli.bootsys.defaults import DEFAULT_LOCAL_STATE_DIR
 from sat.cli.bootsys.state_recorder import (
     HSNStateRecorder,
     PodStateError, PodStateRecorder,
-    StateError, StateRecorder
+    StateError, StateRecorder,
 )
 
 
@@ -52,26 +55,39 @@ class TestStateRecorder(unittest.TestCase):
 
     def setUp(self):
         """Create an object and set up mocks."""
-        self.dir_path = '/tmp'
+        self.dir_path = 'states'
         self.file_prefix = 'simple'
         self.num_to_keep = 5
         self.file_suffix = '.json'
-        self.simple_recorder = SimpleRecorder(self.dir_path, self.file_prefix, self.num_to_keep)
-        self.symlink_file_name = f'{self.file_prefix}{self.file_suffix}'
-        self.symlink_file_path = f'{self.dir_path}/{self.file_prefix}{self.file_suffix}'
-        self.base_file_list = [self.symlink_file_name]
+        self.mock_s3 = Mock()
+        self.bucket_name = 'sat'
 
-        self.mock_listdir = patch('os.listdir').start()
-        self.mock_remove = patch('os.remove').start()
+        self.simple_recorder = SimpleRecorder(
+            self.dir_path, self.file_prefix, self.num_to_keep, self.mock_s3, self.bucket_name
+        )
+
+        self.mock_s3_bucket = self.mock_s3.Bucket.return_value
+        self.bucket_files = [
+            Mock(key='states/simple.2020-09-07T18:05:14.json',
+                 last_modified=datetime.datetime(2020, 9, 7, 18, 5, 14, 266170))
+        ]
+        self.mock_s3_bucket.objects.filter.return_value = self.bucket_files
 
         self.mock_open = patch('builtins.open').start()
         self.mock_date_str = '2020-09-07T18:05:14'
+        self.expected_new_file_name = os.path.join(
+            self.dir_path, f'{self.file_prefix}.{self.mock_date_str}{self.file_suffix}'
+        )
+        self.expected_local_new_file_name = os.path.join(
+            DEFAULT_LOCAL_STATE_DIR, self.expected_new_file_name
+        )
         self.mock_datetime = patch('sat.cli.bootsys.state_recorder.datetime').start()
         self.mock_utcnow = Mock()
         self.mock_datetime.utcnow = self.mock_utcnow
         self.mock_utcnow.return_value.strftime.return_value = self.mock_date_str
 
-        self.mock_symlink = patch('os.symlink').start()
+        self.local_dir_path = os.path.join(DEFAULT_LOCAL_STATE_DIR, self.dir_path)
+        self.mock_remove = patch('os.remove').start()
         self.mock_makedirs = patch('os.makedirs').start()
         self.mock_json_dump = patch('json.dump').start()
         self.mock_json_load = patch('json.load').start()
@@ -80,81 +96,102 @@ class TestStateRecorder(unittest.TestCase):
         """Stop all mock patches."""
         patch.stopall()
 
-    def set_up_state_recorder_method_mocks(self):
+    def set_up_mock_create_new_file(self):
         """Mock some of the StateRecorder methods to help test higher-level methods."""
-        self.method_order_tracker = Mock()
-        self.mock_create_new_file = patch('sat.cli.bootsys.state_recorder.StateRecorder._create_new_file',
-                                          self.method_order_tracker._create_new_file).start()
-        self.mock_update_symlink = patch('sat.cli.bootsys.state_recorder.StateRecorder._update_symlink',
-                                         self.method_order_tracker._update_symlink).start()
-        self.mock_remove_old_files = patch('sat.cli.bootsys.state_recorder.StateRecorder._remove_old_files',
-                                           self.method_order_tracker._remove_old_files).start()
+        self.mock_create_new_file = patch('sat.cli.bootsys.state_recorder.StateRecorder._create_new_file').start()
+        self.mock_create_new_file.return_value = self.expected_new_file_name
 
-    def test_init(self):
-        """Test instantiation of a simple subclass of StateRecorder."""
+    def assert_instance_variables(self):
+        """Check that self.simple_recorder has the expected instance variables"""
         self.assertEqual(self.dir_path, self.simple_recorder.dir_path)
         self.assertEqual(self.file_prefix, self.simple_recorder.file_prefix)
         self.assertEqual(self.num_to_keep, self.simple_recorder.num_to_keep)
         self.assertEqual(self.file_suffix, self.simple_recorder.file_suffix)
+        self.assertEqual(self.mock_s3, self.simple_recorder.s3)
+        self.assertEqual(self.bucket_name, self.simple_recorder.bucket_name)
 
-    def test_init_non_default_suffix(self):
-        """Test instantiation of a simple subclass of StateRecorder with non-default suffix."""
-        dir_path = '/tmp'
-        file_prefix = 'simple'
-        num_to_keep = 10
-        file_suffix = '.yaml'
-        recorder = SimpleRecorder(dir_path, file_prefix, num_to_keep, file_suffix)
-        self.assertEqual(dir_path, recorder.dir_path)
-        self.assertEqual(file_prefix, recorder.file_prefix)
-        self.assertEqual(num_to_keep, recorder.num_to_keep)
-        self.assertEqual(file_suffix, recorder.file_suffix)
+    def test_init(self):
+        """Test instantiation of a simple subclass of StateRecorder."""
+        self.assert_instance_variables()
 
-    def test_symlink_file_name(self):
-        """Test symlink_file_name property of StateRecorder."""
-        self.assertEqual(self.symlink_file_name, self.simple_recorder.symlink_file_name)
-
-    def test_symlink_file_path(self):
-        """Test symlink_file_path property of StateRecorder."""
-        self.assertEqual('/tmp/simple.json', self.simple_recorder.symlink_file_path)
+    def test_init_non_default_values(self):
+        """Test instantiation of a simple subclass of StateRecorder with non-default num_to_keep and suffix"""
+        self.num_to_keep = 10
+        self.file_suffix = '.yaml'
+        self.simple_recorder = SimpleRecorder(
+            self.dir_path, self.file_prefix, self.num_to_keep, self.mock_s3, self.bucket_name, self.file_suffix
+        )
+        self.assert_instance_variables()
 
     def test_remove_old_files_none(self):
-        """Test _remove_old_files with no files except the symlink matching prefix and suffix."""
-        self.mock_listdir.return_value = self.base_file_list
+        """Test _remove_old_files with no files removes no files."""
+        self.mock_s3_bucket.objects.filter.return_value = []
         self.simple_recorder._remove_old_files()
-        self.mock_remove.assert_not_called()
+        self.mock_s3.Bucket.assert_called_with(self.bucket_name)
+        self.mock_s3.Bucket.return_value.objects.filter.assert_called_with(Prefix=self.dir_path)
+        self.mock_s3.Object.return_value.delete.assert_not_called()
 
     def test_remove_old_files_below_limit(self):
-        """Test _remove_old_files with the number of files below the limit."""
-        self.mock_listdir.return_value = [self.symlink_file_name,
-                                          f'{self.file_prefix}.1{self.file_suffix}']
+        """Test _remove_old_files with the number of files below the limit removes no files."""
         self.simple_recorder._remove_old_files()
-        self.mock_remove.assert_not_called()
+        self.mock_s3.Bucket.assert_called_with(self.bucket_name)
+        self.mock_s3.Bucket.return_value.objects.filter.assert_called_with(Prefix=self.dir_path)
+        self.mock_s3.Object.return_value.delete.assert_not_called()
 
     def test_remove_old_files_at_limit(self):
-        """Test _remove_old_files with the number of files at the limit."""
-        self.mock_listdir.return_value = (
-            self.base_file_list +
-            [f'{self.file_prefix}.{i}{self.file_suffix}' for i in range(self.num_to_keep)]
-        )
+        """Test _remove_old_files with the number of files at the limit removes no files."""
+        bucket_files = [
+            Mock(key=f'states/simple.2020-09-07T18:0{i}:14.json',
+                 last_modified=datetime.datetime(2020, 9, 7, 18, i, 14, 266170))
+            for i in range(self.num_to_keep)
+        ]
+        self.mock_s3_bucket.objects.filter.return_value = bucket_files
         self.simple_recorder._remove_old_files()
-        self.mock_remove.assert_not_called()
+        self.mock_s3.Bucket.assert_called_with(self.bucket_name)
+        self.mock_s3.Bucket.return_value.objects.filter.assert_called_with(Prefix=self.dir_path)
+        self.mock_s3.Object.return_value.delete.assert_not_called()
 
     def test_remove_old_files_over_limit(self):
         """Test _remove_old_files with the number of files over the limit."""
-        numbered_files = [f'{self.file_prefix}.{i}{self.file_suffix}'
-                          for i in range(self.num_to_keep * 2)]
-        self.mock_listdir.return_value = self.base_file_list + numbered_files
+        bucket_files = [
+            Mock(key=f'states/simple.2020-09-07T18:0{i}:14.json',
+                 last_modified=datetime.datetime(2020, 9, 7, 18, i, 14, 266170))
+            for i in range(self.num_to_keep + 1)
+        ]
+        self.mock_s3.Bucket.return_value.objects.filter.return_value = bucket_files
         self.simple_recorder._remove_old_files()
-        self.mock_remove.assert_has_calls([
-            call(f'{self.dir_path}/{file_name}') for file_name in numbered_files[:self.num_to_keep]
-        ])
+        self.mock_s3.Bucket.assert_called_with(self.bucket_name)
+        self.mock_s3.Bucket.return_value.objects.filter.assert_called_with(Prefix=self.dir_path)
+        self.mock_s3.Object.return_value.delete.called_once_with(bucket_files[0])
+
+    def test_remove_old_files_s3_list_error(self):
+        """Test _remove_old_files when S3 can't list files raises a StateError."""
+        self.mock_s3.Bucket.return_value.objects.filter.side_effect = Boto3Error
+        with self.assertRaisesRegex(StateError, 'Unable to list files in S3 Bucket'):
+            self.simple_recorder._remove_old_files()
+        self.mock_s3.Bucket.assert_called_with(self.bucket_name)
+        self.mock_s3.Bucket.return_value.objects.filter.assert_called_with(Prefix=self.dir_path)
+        self.mock_s3.Object.return_value.delete.assert_not_called()
+
+    def test_remove_old_files_irrelevant_file(self):
+        """Test _remove_old_files under the limit but with an extra file that should be ignored"""
+        bucket_files = [
+            Mock(key=f'states/simple.2020-09-07T18:0{i}:14.json',
+                 last_modified=datetime.datetime(2020, 9, 7, 18, i, 14, 266170))
+            for i in range(self.num_to_keep)] + [
+            Mock(key='some-other-file',
+                 last_modified=datetime.datetime(2018, 9, 7, 19, 0, 14, 266170))
+            ]
+        self.mock_s3_bucket.objects.filter.return_value = bucket_files
+        self.simple_recorder._remove_old_files()
+        self.mock_s3.Bucket.assert_called_with(self.bucket_name)
+        self.mock_s3.Bucket.return_value.objects.filter.assert_called_with(Prefix=self.dir_path)
+        self.mock_s3.Object.return_value.delete.assert_not_called()
 
     def test_create_new_file_success(self):
         """Test _create_new_file in the successful case."""
         self.simple_recorder._create_new_file()
-        self.mock_open.assert_called_once_with(
-            f'{self.dir_path}/{self.file_prefix}.{self.mock_date_str}{self.file_suffix}', 'w'
-        )
+        self.mock_open.assert_called_once_with(self.expected_local_new_file_name, 'w')
         self.mock_open.return_value.__enter__.return_value.write.assert_called_once_with('')
 
     def test_create_new_file_open_failure(self):
@@ -162,9 +199,7 @@ class TestStateRecorder(unittest.TestCase):
         self.mock_open.side_effect = OSError
         with self.assertRaises(StateError):
             self.simple_recorder._create_new_file()
-        self.mock_open.assert_called_once_with(
-            f'{self.dir_path}/{self.file_prefix}.{self.mock_date_str}{self.file_suffix}', 'w'
-        )
+        self.mock_open.assert_called_once_with(self.expected_local_new_file_name, 'w')
         self.mock_open.return_value.__enter__.assert_not_called()
 
     def test_create_new_file_write_failure(self):
@@ -173,124 +208,170 @@ class TestStateRecorder(unittest.TestCase):
         with self.assertRaises(StateError):
             self.simple_recorder._create_new_file()
         self.mock_open.assert_called_once_with(
-            f'{self.dir_path}/{self.file_prefix}.{self.mock_date_str}{self.file_suffix}', 'w'
+            self.expected_local_new_file_name, 'w'
         )
         self.mock_open.return_value.__enter__.return_value.write.assert_called_once_with('')
 
-    def test_update_symlink(self):
-        """Test _update_symlink in the successful case."""
-        target = '/tmp/bullseye.json'
-        self.simple_recorder._update_symlink(target)
-        self.mock_remove.assert_called_once_with(self.symlink_file_path)
-        self.mock_symlink.assert_called_once_with(target, self.symlink_file_path)
-
-    def test_update_symlink_remove_error(self):
-        """Test _update_symlink when removal of the old symlink fails."""
-        self.mock_remove.side_effect = OSError
-        target = '/tmp/irreplaceable.json'
-        with self.assertLogs(level=logging.WARNING):
-            self.simple_recorder._update_symlink(target)
-        self.mock_remove.assert_called_once_with(self.symlink_file_path)
-        self.mock_symlink.assert_not_called()
-
-    def test_update_symlink_remove_not_present(self):
-        """Test _update_symlink when old symlink does not exist."""
-        self.mock_remove.side_effect = FileNotFoundError
-        target = '/tmp/not_present.json'
-        with self.assertLogs(level=logging.INFO):
-            self.simple_recorder._update_symlink(target)
-        self.mock_remove.assert_called_once_with(self.symlink_file_path)
-        self.mock_symlink.assert_called_once_with(target, self.symlink_file_path)
-
-    def test_update_symlink_failure(self):
-        """Test _update_symlink when symlink fails."""
-        self.mock_symlink.side_effect = OSError
-        target = '/tmp/fail_link.json'
-        with self.assertLogs(level=logging.WARNING):
-            self.simple_recorder._update_symlink(target)
-        self.mock_remove.assert_called_once_with(self.symlink_file_path)
-        self.mock_symlink.assert_called_once_with(target, self.symlink_file_path)
-
     def test_dump_state(self):
         """Test dump_state method in the successful case."""
-        self.set_up_state_recorder_method_mocks()
+        self.set_up_mock_create_new_file()
         self.simple_recorder.dump_state()
-        self.mock_makedirs.assert_called_once_with(self.simple_recorder.dir_path, exist_ok=True)
-        self.method_order_tracker.assert_has_calls([
-            call._create_new_file(),
-            call._update_symlink(self.mock_create_new_file.return_value),
-            call._remove_old_files()
-        ])
-        self.mock_open.assert_called_once_with(self.mock_create_new_file.return_value, 'w')
+        self.mock_makedirs.assert_called_once_with(self.local_dir_path, exist_ok=True)
+        self.mock_create_new_file.assert_called_once_with()
+        self.mock_open.assert_called_once_with(self.expected_local_new_file_name, 'w')
+        self.mock_s3.Object.assert_called_once_with(self.bucket_name, self.expected_new_file_name)
+        self.mock_s3.Object.return_value.upload_file.assert_called_once_with(self.expected_local_new_file_name)
+        self.mock_remove.assert_called_once_with(self.expected_local_new_file_name)
         self.mock_json_dump.assert_called_once_with(SimpleRecorder.CONST_DATA,
                                                     self.mock_open.return_value.__enter__.return_value)
 
     def test_dump_state_makedirs_file_exists(self):
         """Test dump_state method when the dir or a leading part of the path is a file."""
-        self.set_up_state_recorder_method_mocks()
+        self.set_up_mock_create_new_file()
         for err in [FileExistsError, NotADirectoryError]:
             self.mock_makedirs.side_effect = err
             with self.assertRaisesRegex(StateError, 'is not a directory'):
                 self.simple_recorder.dump_state()
 
-        self.mock_makedirs.assert_called_with(self.simple_recorder.dir_path, exist_ok=True)
-        self.assertEqual([], self.method_order_tracker.mock_calls)
+        self.mock_makedirs.assert_called_with(self.local_dir_path, exist_ok=True)
+        self.mock_create_new_file.assert_not_called()
         self.mock_open.assert_not_called()
         self.mock_json_dump.assert_not_called()
+        self.mock_s3.Object.assert_not_called()
 
     def test_dump_state_makedirs_failure(self):
         """Test dump_state method when it fails to create the dir."""
-        self.set_up_state_recorder_method_mocks()
+        self.set_up_mock_create_new_file()
         self.mock_makedirs.side_effect = OSError
-        with self.assertRaisesRegex(StateError, f'Failed to ensure state directory {self.dir_path} exists'):
+        with self.assertRaisesRegex(StateError, f'Failed to ensure state directory {self.local_dir_path} exists'):
             self.simple_recorder.dump_state()
-
-        self.mock_makedirs.assert_called_once_with(self.simple_recorder.dir_path, exist_ok=True)
-        self.assertEqual([], self.method_order_tracker.mock_calls)
+        self.mock_makedirs.assert_called_once_with(self.local_dir_path, exist_ok=True)
+        self.mock_create_new_file.assert_not_called()
         self.mock_open.assert_not_called()
         self.mock_json_dump.assert_not_called()
+        self.mock_s3.Object.assert_not_called()
 
     def test_dump_state_file_open_failure(self):
         """Test dump_state when it fails to open the file to write to."""
-        self.set_up_state_recorder_method_mocks()
+        self.set_up_mock_create_new_file()
         self.mock_open.side_effect = OSError
 
-        with self.assertRaisesRegex(StateError, 'Failed to write pod state to file'):
+        with self.assertRaisesRegex(StateError, 'Failed to write state to file'):
             self.simple_recorder.dump_state()
 
+        self.mock_makedirs.assert_called_once_with(self.local_dir_path, exist_ok=True)
         self.mock_create_new_file.assert_called_once_with()
-        self.mock_update_symlink.assert_not_called()
-        self.mock_remove_old_files.assert_not_called()
-        self.mock_open.assert_called_once_with(self.mock_create_new_file.return_value, 'w')
         self.mock_json_dump.assert_not_called()
+        self.mock_s3.Object.assert_not_called()
+        self.mock_open.assert_called_once_with(self.expected_local_new_file_name, 'w')
+        self.mock_json_dump.assert_not_called()
+
+    def test_dump_state_s3_dump_error(self):
+        """Test dump_state when uploading to S3 fails raises a StateError"""
+        self.set_up_mock_create_new_file()
+        self.mock_s3.Object.return_value.upload_file.side_effect = Boto3Error
+        with self.assertRaisesRegex(StateError, 'Failed to dump state to S3'):
+            self.simple_recorder.dump_state()
+        self.mock_makedirs.assert_called_once_with(self.local_dir_path, exist_ok=True)
+        self.mock_create_new_file.assert_called_once_with()
+        self.mock_open.assert_called_once_with(self.expected_local_new_file_name, 'w')
+        self.mock_s3.Object.assert_called_once_with(self.bucket_name, self.expected_new_file_name)
+        self.mock_json_dump.assert_called_once_with(SimpleRecorder.CONST_DATA,
+                                                    self.mock_open.return_value.__enter__.return_value)
+        self.mock_remove.assert_called_once_with(self.expected_local_new_file_name)
 
     def test_get_stored_state(self):
         """Test get_stored_state method in the successful case."""
+        bucket_files = [
+            Mock(key=f'states/simple.2020-09-07T18:0{i}:14.json',
+                 last_modified=datetime.datetime(2020, 9, 7, 18, i, 14, 266170))
+            for i in range(5)
+        ]
+        self.mock_s3_bucket.objects.filter.return_value = bucket_files
+        expected_latest_file = bucket_files[-1].key
+        expected_local_path = os.path.join(DEFAULT_LOCAL_STATE_DIR, expected_latest_file)
+
         stored_state = self.simple_recorder.get_stored_state()
 
+        # Assert file was downloaded from S3
+        self.mock_s3_bucket.objects.filter.assert_called_once_with(Prefix=self.dir_path)
+        self.mock_s3.Object.assert_called_once_with(self.bucket_name, expected_latest_file)
+        self.mock_s3.Object.return_value.download_file.assert_called_once_with(expected_local_path)
+
+        # Assert file was saved locally and opened
+        self.mock_makedirs.assert_called_once_with(self.local_dir_path, exist_ok=True)
         self.assertEqual(self.mock_json_load.return_value, stored_state)
-        self.mock_open.assert_called_once_with(self.simple_recorder.symlink_file_path)
+        self.mock_open.assert_called_once_with(expected_local_path)
         self.mock_json_load.assert_called_once_with(self.mock_open.return_value.__enter__.return_value)
+        self.mock_remove.assert_called_once_with(expected_local_path)
+
+    def test_get_stored_state_no_state(self):
+        """Test get_stored_state when no files are returned from S3."""
+        self.mock_s3_bucket.objects.filter.return_value = []
+        with self.assertRaisesRegex(StateError, 'No stored state found'):
+            self.simple_recorder.get_stored_state()
+        self.mock_s3_bucket.objects.filter.assert_called_once_with(Prefix=self.dir_path)
+        self.mock_open.assert_not_called()
+        self.mock_json_load.assert_not_called()
+        self.mock_remove.assert_not_called()
+
+    def test_get_stored_state_irrelevant_file(self):
+        """Test get_stored state when a file exists but should be ignored."""
+        bucket_files = [
+            Mock(key=f'states/some-random-file.json',
+                 last_modified=datetime.datetime(2020, 9, 7, 18, 0, 14, 266170))
+        ]
+        self.mock_s3_bucket.objects.filter.return_value = bucket_files
+        with self.assertRaisesRegex(StateError, 'No stored state found'):
+            self.simple_recorder.get_stored_state()
+        self.mock_s3_bucket.objects.filter.assert_called_once_with(Prefix=self.dir_path)
+        self.mock_open.assert_not_called()
+        self.mock_json_load.assert_not_called()
+        self.mock_remove.assert_not_called()
 
     def test_get_stored_state_os_error(self):
         """Test get_stored_state method when fails to open file."""
         self.mock_open.side_effect = OSError
+        expected_local_file = os.path.join(
+            DEFAULT_LOCAL_STATE_DIR, self.bucket_files[0].key
+        )
 
-        with self.assertRaisesRegex(StateError, 'Failed to open file'):
+        with self.assertRaisesRegex(StateError, 'Failed to open downloaded file'):
             self.simple_recorder.get_stored_state()
 
-        self.mock_open.assert_called_once_with(self.simple_recorder.symlink_file_path)
+        self.mock_open.assert_called_once_with(expected_local_file)
         self.mock_json_load.assert_not_called()
+        self.mock_remove.assert_called_once_with(expected_local_file)
 
     def test_get_stored_state_json_error(self):
         """Test get_stored_state method when fails to parse JSON from file data."""
         self.mock_json_load.side_effect = ValueError
+        expected_local_file = os.path.join(
+            DEFAULT_LOCAL_STATE_DIR, self.bucket_files[0].key
+        )
 
-        with self.assertRaisesRegex(StateError, 'Failed to parse JSON'):
+        with self.assertRaisesRegex(StateError, 'Failed to parse JSON from downloaded file'):
             self.simple_recorder.get_stored_state()
 
-        self.mock_open.assert_called_once_with(self.simple_recorder.symlink_file_path)
+        self.mock_open.assert_called_once_with(expected_local_file)
         self.mock_json_load.assert_called_once_with(self.mock_open.return_value.__enter__.return_value)
+        self.mock_remove.assert_called_once_with(expected_local_file)
+
+    def test_get_stored_state_s3_list_error(self):
+        """Test get_stored_state when S3 can't list files raises a StateError."""
+        self.mock_s3_bucket.objects.filter.side_effect = Boto3Error
+
+        with self.assertRaisesRegex(StateError, 'Unable to list files in S3 Bucket'):
+            self.simple_recorder.get_stored_state()
+        self.mock_remove.assert_not_called()
+
+    def test_get_stored_state_s3_download_error(self):
+        """Test get_stored_state when S3 can't download a file raises a StateError."""
+        self.mock_s3.Object.return_value.download_file.side_effect = Boto3Error
+
+        with self.assertRaisesRegex(StateError, 'Unable to download'):
+            self.simple_recorder.get_stored_state()
+        self.mock_remove.assert_not_called()
 
 
 def get_fake_pod_list(pods):
@@ -317,9 +398,17 @@ class TestPodStateRecorder(unittest.TestCase):
 
     def setUp(self):
         """Set up mocks."""
-        self.max_pod_states = 10
-        self.mock_get_config_value = patch('sat.cli.bootsys.state_recorder.get_config_value').start()
-        self.mock_get_config_value.return_value = self.max_pod_states
+        self.fake_config = {
+            'bootsys': {
+                'max_pod_states': 10,
+            },
+            's3': {
+                'bucket': 'sat'
+            }
+        }
+        self.mock_get_config_value = patch('sat.cli.bootsys.state_recorder.get_config_value',
+                                           side_effect=self.fake_get_config_value).start()
+        self.mock_s3 = patch('sat.cli.bootsys.state_recorder.get_s3_resource').start().return_value
 
         self.mock_load_kube_config = patch('sat.cli.bootsys.state_recorder.load_kube_config').start()
         self.mock_pods = get_fake_pod_list([
@@ -336,14 +425,24 @@ class TestPodStateRecorder(unittest.TestCase):
         """Stop all patches."""
         patch.stopall()
 
+    def fake_get_config_value(self, query_string):
+        """Mock the behavior of get_config_value"""
+        section, value = query_string.split('.')
+        return self.fake_config[section][value]
+
     def test_init(self):
         """Test creation of a new PodStateRecorder."""
         psr = PodStateRecorder()
-        self.mock_get_config_value.assert_called_once_with('bootsys.max_pod_states')
-        self.assertEqual(psr.dir_path, '/var/sat/bootsys/pod-states/')
+        self.assertEqual(
+            [call('bootsys.max_pod_states'), call('s3.bucket')],
+            self.mock_get_config_value.mock_calls
+        )
+        self.assertEqual(psr.dir_path, 'pod-states/')
         self.assertEqual(psr.file_prefix, 'pod-states')
         self.assertEqual(psr.file_suffix, '.json')
-        self.assertEqual(psr.num_to_keep, self.max_pod_states)
+        self.assertEqual(psr.num_to_keep, self.fake_config['bootsys']['max_pod_states'])
+        self.assertEqual(psr.bucket_name, self.fake_config['s3']['bucket'])
+        self.assertEqual(psr.s3, self.mock_s3)
 
     def test_get_state_data(self):
         """Test the successful case for get_state_data."""
@@ -383,9 +482,17 @@ class TestHSNStateRecorder(unittest.TestCase):
 
     def setUp(self):
         """Set up mocks."""
-        self.max_hsn_states = 10
-        self.mock_get_config_value = patch('sat.cli.bootsys.state_recorder.get_config_value').start()
-        self.mock_get_config_value.return_value = self.max_hsn_states
+        self.fake_config = {
+            'bootsys': {
+                'max_hsn_states': 10,
+            },
+            's3': {
+                'bucket': 'sat'
+            }
+        }
+        self.mock_get_config_value = patch('sat.cli.bootsys.state_recorder.get_config_value',
+                                           side_effect=self.fake_get_config_value).start()
+        self.mock_s3 = patch('sat.cli.bootsys.state_recorder.get_s3_resource').start().return_value
 
         patch('sat.cli.bootsys.state_recorder.SATSession').start()
         mock_fc_class = patch('sat.cli.bootsys.state_recorder.FabricControllerClient').start()
@@ -395,14 +502,24 @@ class TestHSNStateRecorder(unittest.TestCase):
         """Stop all patches."""
         patch.stopall()
 
+    def fake_get_config_value(self, query_string):
+        """Mock the behavior of get_config_value"""
+        section, value = query_string.split('.')
+        return self.fake_config[section][value]
+
     def test_init(self):
         """Test creation of a new HSNStateRecorder."""
         hsr = HSNStateRecorder()
-        self.mock_get_config_value.assert_called_once_with('bootsys.max_hsn_states')
-        self.assertEqual(hsr.dir_path, '/var/sat/bootsys/hsn-states/')
+        self.assertEqual(
+            [call('bootsys.max_hsn_states'), call('s3.bucket')],
+            self.mock_get_config_value.mock_calls
+        )
+        self.assertEqual(hsr.dir_path, 'hsn-states/')
         self.assertEqual(hsr.file_prefix, 'hsn-state')
         self.assertEqual(hsr.file_suffix, '.json')
-        self.assertEqual(hsr.num_to_keep, self.max_hsn_states)
+        self.assertEqual(hsr.num_to_keep, self.fake_config['bootsys']['max_hsn_states'])
+        self.assertEqual(hsr.bucket_name, self.fake_config['s3']['bucket'])
+        self.assertEqual(hsr.s3, self.mock_s3)
 
     def test_get_state_data(self):
         """Test the successful case for get_state_data."""
