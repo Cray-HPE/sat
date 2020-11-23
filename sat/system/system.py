@@ -34,6 +34,7 @@ from sat.system.hsn_board import HSNBoard
 from sat.system.memory_module import MemoryModule
 from sat.system.node import Node
 from sat.system.node_enclosure import NodeEnclosure
+from sat.system.node_enclosure_power_supply import NodeEnclosurePowerSupply
 from sat.system.processor import Processor
 from sat.system.router_module import RouterModule
 from sat.xname import XName
@@ -63,6 +64,7 @@ class System:
             MemoryModule: {},
             Node: {},
             NodeEnclosure: {},
+            NodeEnclosurePowerSupply: {},
             Processor: {},
             RouterModule: {}
         }
