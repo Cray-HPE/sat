@@ -25,9 +25,16 @@ version information about installed docker images and rpm packages.
 The default behavior of this command is to print general revision information
 about the system and the installed products. This is a mixture of information
 read from individual product release files in ``/opt/cray/etc/release``,
-site-specific information read from ``/opt/cray/etc/site_info.yml``, and various
-api calls to other Cray services. The following list details the meaning and
-source of information for each field.
+site-specific information read from the site information file, and various
+API calls to other Cray services.
+
+**sat showrev** downloads the site information from the configured S3 bucket if
+available, otherwise a local copy of the site information file is used, if it
+exists.  The default local path for the site information file is
+``/opt/cray/etc/site_info.yml``.
+
+The following list details the meaning and source of information for each
+field.
 
 Interconnect
     Unique list of interconnect names obtained from the Hardware State
@@ -49,27 +56,27 @@ SLES version
     Version of SLES read from ``/etc/os-release`` on the local host.
 
 Serial number
-    Manually populated by ``sat setrev`` and read back from
-    ``/opt/cray/etc/site_info.yml``.
+    Manually populated by ``sat setrev`` and read back from the configured S3
+    bucket, or ``/opt/cray/etc/site_info.yml``.
 
 Site name
-    Manually populated by ``sat setrev`` and read back from
-    ``/opt/cray/etc/site_info.yml``.
+    Manually populated by ``sat setrev`` and read back from the configured S3
+    bucket, or ``/opt/cray/etc/site_info.yml``.
 
 Slurm version
     Version of Slurm as indicated by slurmctld.
 
 System install date
-    Manually populated by ``sat setrev`` and read back from
-    ``/opt/cray/etc/site_info.yml``.
+    Manually populated by ``sat setrev`` and read back from the configured S3
+    bucket, or ``/opt/cray/etc/site_info.yml``.
 
 System name
-    Manually populated by ``sat setrev`` and read back from
-    ``/opt/cray/etc/site_info.yml``.
+    Manually populated by ``sat setrev`` and read back from the configured S3
+    bucket, or ``/opt/cray/etc/site_info.yml``.
 
 System type
-    Manually populated by ``sat setrev`` and read back from
-    ``/opt/cray/etc/site_info.yml``.
+    Manually populated by ``sat setrev`` and read back from the configured S3
+    bucket, or ``/opt/cray/etc/site_info.yml``.
 
 The **--docker** option displays information about all installed docker
 images in a table. This table is sorted on the docker image name. This
@@ -122,7 +129,9 @@ operation. Their default locations are also listed.
 
 site_info: /opt/cray/etc/site_info.yml
         Showrev uses this file to display the Serial number, Site name,
-        System install date, System name, and System type fields.
+        System install date, System name, and System type fields. This file
+        is downloaded from the configured S3 bucket on every invocation of
+        **sat showrev** if it is available, otherwise a local copy is used.
 
 release: /opt/cray/etc/release
         Showrev parses the files in this directory to collect information for

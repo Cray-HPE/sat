@@ -28,9 +28,12 @@ import os
 import sys
 from collections import namedtuple
 
+from boto3.exceptions import Boto3Error
+from botocore.exceptions import BotoCoreError, ClientError
 import yaml
 
 from sat.config import get_config_value
+from sat.util import get_s3_resource, yaml_dump
 
 
 LOGGER = logging.getLogger(__name__)
@@ -58,7 +61,7 @@ def is_valid_date(date_text):
 
 
 def get_site_data(sitefile):
-    """Load data from existing sitefile.
+    """Load data from existing sitefile, downloading from S3 if possible.
 
     Args:
         sitefile: path to site info file.
@@ -68,44 +71,38 @@ def get_site_data(sitefile):
         Returns empty dict if file did not exist or could not be parsed.
 
     Raises:
-        PermissionError: If the sitefile exists but could not be read.
+        PermissionError: If the sitefile exists locally but could not be read.
     """
+    s3 = get_s3_resource()
+    s3_bucket = get_config_value('s3.bucket')
 
-    s = ''
-    data = {}
+    try:
+        LOGGER.debug('Downloading %s from S3 (bucket: %s)', sitefile, s3_bucket)
+        s3.Object(s3_bucket, sitefile).download_file(sitefile)
+    except (BotoCoreError, ClientError, Boto3Error) as err:
+        # It is not an error if this file doesn't already exist
+        LOGGER.debug('Unable to download site info file %s from S3: %s', sitefile, err)
 
     try:
         with open(sitefile, 'r') as f:
-            s = f.read()
+            data = yaml.safe_load(f.read())
     except FileNotFoundError:
-        # it is not an error if this file doesn't already exist.
+        # It is not an error if this file doesn't already exist.
         return {}
     except PermissionError:
         # but we should not attempt to write to it if we can't read it.
-        LOGGER.error('Site file {} has insufficient permissions.'.format(sitefile))
+        LOGGER.error('Site file %s has insufficient permissions.', sitefile)
         raise
-
-    try:
-        data = yaml.safe_load(s)
     except yaml.error.YAMLError:
-        LOGGER.warning('Site file {} is not in yaml format. '
-                       'It will be replaced if you continue.'.format(sitefile))
+        LOGGER.warning('Site file %s is not in yaml format. '
+                       'It will be replaced if you continue.', sitefile)
         return {}
 
     # ensure we parsed the file correctly.
     if type(data) is not dict:
-        LOGGER.warning('Site file {} did not contain key value pairs. '
-                       'It will be replaced if you continue.'.format(sitefile))
+        LOGGER.warning('Site file %s did not contain key-value pairs. '
+                       'It will be replaced if you continue.', sitefile)
         return {}
-
-    # yaml.safe_load will attempt 'helpful' conversions to different types,
-    # and we only want strings.
-    for key, value in data.items():
-        data[key] = str(value)
-
-    if 'Site name' not in data:
-        LOGGER.warning('Site file {} does not contain "Site name". '
-                       'It will be replaced if you continue.'.format(sitefile))
 
     return data
 
@@ -116,7 +113,7 @@ def input_site_data(data):
     User will be re-prompted on invalid input.
 
     Args:
-        data (io): dict-ref containing values to input. Will be modified.
+        data (dict): Currently-set values that will be modified by user input.
 
     Returns:
         None
@@ -178,20 +175,19 @@ def write_site_data(sitefile, data):
         Exception of unknown type if the write to the sitefile failed.
     """
 
-    # write entries to file as yaml - avoid using PyYAML
-    with open(sitefile, 'w') as of:
-        try:
-            of.write('---\n')
-        except Exception:
-            LOGGER.critical('Writing to {}. Check its integrity!'.format(sitefile))
-            raise
+    s3 = get_s3_resource()
+    s3_bucket = get_config_value('s3.bucket')
 
-        for key, value in data.items():
-            try:
-                of.write('{}: {}\n'.format(key, value))
-            except Exception:
-                LOGGER.critical('Writing {}. Check the integrity of {} !'.format(key, sitefile))
-                raise
+    # Write entries to file as yaml
+    try:
+        with open(sitefile, 'w') as of:
+            of.write(yaml_dump(data))
+        LOGGER.debug('Uploading %s to S3 (bucket: %s)', sitefile, s3_bucket)
+        s3.Object(s3_bucket, sitefile).upload_file(sitefile)
+    except OSError as err:
+        LOGGER.error('Unable to write %s. Error: %s', sitefile, err)
+    except (BotoCoreError, ClientError, Boto3Error) as err:
+        LOGGER.error('Unable to upload site info file %s to S3. Error: %s', sitefile, err)
 
 
 def do_setrev(args):

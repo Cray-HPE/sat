@@ -23,12 +23,15 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 
 
+from argparse import Namespace
 from datetime import datetime
+import logging
 import os
 import os.path
 import unittest
 from unittest import mock
-from argparse import Namespace
+
+from boto3.exceptions import Boto3Error
 
 import sat.cli.setrev.main
 
@@ -83,6 +86,22 @@ empty_input = InputDict({})
 
 class TestSetrev(unittest.TestCase):
 
+    def setUp(self):
+        """Sets up patches."""
+        self.mock_s3 = mock.patch('sat.cli.setrev.main.get_s3_resource').start().return_value
+        self.s3_bucket = 'sat'
+        self.mock_get_config_value = mock.patch('sat.cli.setrev.main.get_config_value',
+                                                return_value=self.s3_bucket).start()
+
+    def tearDown(self):
+        """Stops all patches."""
+        mock.patch.stopall()
+
+    def set_up_mock_yaml_load(self):
+        """Patch the yaml.safe_load method"""
+        self.mock_yaml_load = mock.patch('sat.cli.setrev.main.yaml.safe_load',
+                                         return_value=full).start()
+
     def test_is_valid_date_empty_string(self):
         """is_valid_date should return True on empty string.
         """
@@ -119,13 +138,6 @@ class TestSetrev(unittest.TestCase):
 
         for key, value in d.items():
             self.assertEqual(type(value), str)
-
-    def test_get_site_data_file_not_found(self):
-        """get_site_data should return empty dict if file doesn't exist.
-        """
-        path = 'idontexist.yml'
-        d = sat.cli.setrev.main.get_site_data(path)
-        self.assertEqual(d, {})
 
     def test_get_site_data_file_not_found(self):
         """get_site_data should return empty dict if file doesn't exist.
@@ -231,8 +243,7 @@ class TestSetrev(unittest.TestCase):
         """
         try:
             sitefile = '{}/sitefile1.yml'.format(samples)
-            d1 = full
-            d2 = {}
+            d1 = dict(full)
 
             if os.path.exists(sitefile):
                 os.remove(sitefile)
@@ -252,7 +263,7 @@ class TestSetrev(unittest.TestCase):
 
         try:
             sitefile = '{}/sitefile1.yml'.format(samples)
-            d1 = full
+            d1 = dict(full)
             sat.cli.setrev.main.write_site_data(sitefile, d1)
             sat.cli.setrev.main.write_site_data(sitefile, {})
 
@@ -263,6 +274,61 @@ class TestSetrev(unittest.TestCase):
         finally:
             if os.path.exists(sitefile):
                 os.remove(sitefile)
+
+    def test_get_site_data_s3(self):
+        """When reading site data, download from S3."""
+        self.set_up_mock_yaml_load()
+        sitefile = '/opt/cray/etc/site_info.yml'
+        with mock.patch('builtins.open') as mock_open:
+            sat.cli.setrev.main.get_site_data(sitefile)
+
+        self.mock_s3.Object.assert_called_once_with(self.s3_bucket, sitefile)
+        self.mock_s3.Object.return_value.download_file.assert_called_once_with(sitefile)
+        self.mock_yaml_load.assert_called_once_with(
+            mock_open.return_value.__enter__.return_value.read.return_value
+        )
+
+    def test_get_site_data_no_s3(self):
+        """When reading site data, if S3 is not available fall back on a local file."""
+        self.set_up_mock_yaml_load()
+        self.mock_s3.Object.return_value.upload_file.side_effect = Boto3Error
+        sitefile = '/opt/cray/etc/site_info.yml'
+        with mock.patch('builtins.open') as mock_open:
+            sat.cli.setrev.main.get_site_data(sitefile)
+
+        self.mock_s3.Object.assert_called_once_with(self.s3_bucket, sitefile)
+        self.mock_s3.Object.return_value.download_file.assert_called_once_with(sitefile)
+        self.mock_yaml_load.assert_called_once_with(
+            mock_open.return_value.__enter__.return_value.read.return_value
+        )
+
+    def test_write_site_data_s3(self):
+        """write_site_data should upload to S3"""
+        self.set_up_mock_yaml_load()
+        sitefile = '/opt/cray/etc/site_info.yml'
+        with mock.patch('builtins.open') as mock_open:
+            sat.cli.setrev.main.write_site_data(sitefile, dict(full))
+
+        mock_open.assert_called_once_with(sitefile, 'w')
+        # Just assert file was written; assume the other tests test the writing behavior
+        mock_open.return_value.__enter__.return_value.write.assert_called()
+        self.mock_s3.Object.assert_called_once_with(self.s3_bucket, sitefile)
+        self.mock_s3.Object.return_value.upload_file.assert_called_once_with(sitefile)
+
+    def test_write_site_data_no_s3(self):
+        """When S3 is not working, a local file should be written and an error logged."""
+        self.set_up_mock_yaml_load()
+        sitefile = '/opt/cray/etc/site_info.yml'
+        self.mock_s3.Object.return_value.upload_file.side_effect = Boto3Error
+        with mock.patch('builtins.open') as mock_open:
+            with self.assertLogs(level=logging.ERROR):
+                sat.cli.setrev.main.write_site_data(sitefile, dict(full))
+
+        mock_open.assert_called_once_with(sitefile, 'w')
+        # Just assert file was written; assume the other tests test the writing behavior
+        mock_open.return_value.__enter__.return_value.write.assert_called()
+        self.mock_s3.Object.assert_called_once_with(self.s3_bucket, sitefile)
+        self.mock_s3.Object.return_value.upload_file.assert_called_once_with(sitefile)
 
 
 def set_options(namespace):
