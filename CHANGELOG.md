@@ -38,9 +38,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Changed ``sat bootsys`` state capture and hsn/k8s checks to use an S3
   bucket instead of local files.
+- ``sat setrev`` now writes the site information file to S3, and
+  ``sat showrev`` now downloads the site information file from S3.
 
 ### Removed
 - Removed parsing of ``/etc/cray-release`` from ``sat showrev``.
+
+### Fixed
+- Fixed dumping of serial number in ``sat setrev`` so that it is always
+  a string.
 
 ## [3.0.0] - 2020-11-18
 
