@@ -139,6 +139,9 @@ These options list components of certain types in the system.
         nodes in air-cooled cabinets. For nodes in liquid-cooled cabinets, these represent
         the node card associated with two of the nodes in a slot.
 
+**--list-node-enclosure-power-supplies**
+        List all the node enclosure power supplies in the system.
+
 **--list-procs**
         List all the processors in the system.
 
@@ -178,6 +181,9 @@ These options list components of certain types in the system.
 
 **--node-enclosure-fields** *NODE_ENCLOSURE_FIELDS*
         Same as **--node-fields** but for node enclosures.
+
+**--node-enclosure-power-supply-fields** *NODE_ENCLOSURE_POWER_SUPPLY_FIELDS*
+        Same as **--node-fields** but for node enclosure power supplies.
 
 **--proc-fields** *PROC_FIELDS*
         Same as **--node-fields** but for processors.
