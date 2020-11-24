@@ -32,6 +32,7 @@ from sat.system.processor import Processor
 from tests.system.component_data import get_component_raw_data, CHASSIS_XNAME, NODE_XNAME
 
 DEFAULT_PROCESSOR_COUNT = 2
+DEFAULT_NODE_ACCEL_COUNT = 1
 DEFAULT_BIOS_VERSION = '2019.11.b'
 
 
@@ -90,6 +91,17 @@ class TestNode(unittest.TestCase):
         self.node.processors = {'{}p{}'.format(NODE_XNAME, index): proc
                                 for index, proc in enumerate(self.fake_processors)}
 
+    def add_fake_node_accels(self):
+        """Add some fake node accelerators to `self.node`."""
+        self.fake_node_accels = []
+        for _ in range(DEFAULT_NODE_ACCEL_COUNT):
+            fake_node_accel = mock.Mock()
+            self.fake_node_accels.append(fake_node_accel)
+        # Set the node accelerators in the node with some xnames beneath the node, not
+        # that it should matter.
+        self.node.node_accels = {'{}a{}'.format(NODE_XNAME, index): node_accel
+                                for index, node_accel in enumerate(self.fake_node_accels)}
+
     def add_fake_drives(self):
         """Add some fake drives to `self.node`."""
         self.fake_drives = []
@@ -139,6 +151,11 @@ class TestNode(unittest.TestCase):
         """Test the processor_count property."""
         self.add_fake_processors()
         self.assertEqual(DEFAULT_PROCESSOR_COUNT, self.node.processor_count)
+
+    def test_accelerator_count(self):
+        """Test the accelerator_count property."""
+        self.add_fake_node_accels()
+        self.assertEqual(DEFAULT_NODE_ACCEL_COUNT, self.node.accelerator_count)
 
     def test_memory_type(self):
         """Test the memory_type property."""
