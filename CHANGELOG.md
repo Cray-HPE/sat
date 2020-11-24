@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ``--list-node_enclosure_power_supplies``.
 - Ability to list node accelerators (e.g. GPUs) in ``sat hwinv`` with
   ``--list-node_accels``.
+- New field for accelerator counts when listing and summarizing nodes
+  in ``sat hwinv``.
 
 ## [3.0.0] - 2020-11-18
 
