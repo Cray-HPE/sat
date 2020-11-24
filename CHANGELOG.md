@@ -28,7 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Ability to list node enclosure power supplies in ``sat hwinv`` with ``--list-node_enclosure_power_supplies``.
+- Ability to list node enclosure power supplies in ``sat hwinv`` with
+  ``--list-node_enclosure_power_supplies``.
 
 ## [3.0.0] - 2020-11-18
 

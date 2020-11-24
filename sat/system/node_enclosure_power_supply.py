@@ -30,7 +30,7 @@ class NodeEnclosurePowerSupply(BaseComponent):
 
     hsm_type = NODE_ENCLOSURE_POWER_SUPPLY_TYPE
     arg_name = 'node_enclosure_power_supply'
-    pretty_name = 'node_enclosure_power_supply'
+    pretty_name = 'node enclosure power supply'
 
     fields = BaseComponent.fields + []
 
@@ -42,5 +42,3 @@ class NodeEnclosurePowerSupply(BaseComponent):
                 that contains the raw data for the node enclosure.
         """
         super().__init__(raw_data)
-
-        # TODO: Add anything that is needed for NodeEnclosurePowerSupply-type objects
