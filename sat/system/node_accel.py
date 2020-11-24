@@ -21,8 +21,7 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-from sat.cached_property import cached_property
-from sat.system.component import NodeComponent, ComponentDataDict
+from sat.system.component import NodeComponent
 from sat.system.constants import NODE_ACCEL_TYPE
 
 
@@ -31,18 +30,7 @@ class NodeAccel(NodeComponent):
 
     hsm_type = NODE_ACCEL_TYPE
     arg_name = 'node_accel'
-    pretty_name = 'node_accel'
+    pretty_name = 'node accelerator'
 
     # Any fields needed specifically on a nodeAccel can be added here.
     fields = NodeComponent.fields + []
-
-    @cached_property
-    def fru_info(self):
-        """ComponentDataDict: The FRU info stored in the raw data.
-        """
-
-        #workaround for CASMHMS-4240
-        #TODO - when CASMHMS-4240 is fixed, use fru_info() from BaseComponent
-        #fru_info_key = '{}FRUInfo'.format(self.type)
-        fru_info_key = 'ProcessorFRUInfo'
-        return ComponentDataDict(self.raw_data['PopulatedFRU'][fru_info_key])
