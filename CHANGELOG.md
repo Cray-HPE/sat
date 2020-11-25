@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ``--list-node_accels``.
 - New field for accelerator counts when listing and summarizing nodes
   in ``sat hwinv``.
+- Ability to list node accelerator risers (e.g. Redstone Modules)
+  in ``sat hwinv`` with ``--list-node_accel_risers``.
+- New field for accelerator riser counts when listing and summarizing nodes
+  in ``sat hwinv``.
 
 ## [3.0.0] - 2020-11-18
 

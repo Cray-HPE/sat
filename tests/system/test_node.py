@@ -33,6 +33,7 @@ from tests.system.component_data import get_component_raw_data, CHASSIS_XNAME, N
 
 DEFAULT_PROCESSOR_COUNT = 2
 DEFAULT_NODE_ACCEL_COUNT = 1
+DEFAULT_NODE_ACCEL_RISER_COUNT = 1
 DEFAULT_BIOS_VERSION = '2019.11.b'
 
 
@@ -102,6 +103,17 @@ class TestNode(unittest.TestCase):
         self.node.node_accels = {'{}a{}'.format(NODE_XNAME, index): node_accel
                                 for index, node_accel in enumerate(self.fake_node_accels)}
 
+    def add_fake_node_accel_risers(self):
+        """Add some fake node accelerator risers to `self.node`."""
+        self.fake_node_accel_risers = []
+        for _ in range(DEFAULT_NODE_ACCEL_RISER_COUNT):
+            fake_node_accel_riser = mock.Mock()
+            self.fake_node_accel_risers.append(fake_node_accel_riser)
+        # Set the node accelerator risers in the node with some xnames beneath the node, not
+        # that it should matter.
+        self.node.node_accel_risers = {'{}r{}'.format(NODE_XNAME, index): node_accel_riser
+                                for index, node_accel_riser in enumerate(self.fake_node_accel_risers)}
+
     def add_fake_drives(self):
         """Add some fake drives to `self.node`."""
         self.fake_drives = []
@@ -156,6 +168,11 @@ class TestNode(unittest.TestCase):
         """Test the accelerator_count property."""
         self.add_fake_node_accels()
         self.assertEqual(DEFAULT_NODE_ACCEL_COUNT, self.node.accelerator_count)
+
+    def test_accelerator_riser_count(self):
+        """Test the accelerator_riser_count property."""
+        self.add_fake_node_accel_risers()
+        self.assertEqual(DEFAULT_NODE_ACCEL_RISER_COUNT, self.node.accelerator_riser_count)
 
     def test_memory_type(self):
         """Test the memory_type property."""
