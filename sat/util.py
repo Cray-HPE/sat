@@ -40,9 +40,11 @@ except ImportError:
     from yaml import SafeDumper
 from yaml.resolver import BaseResolver
 from yaml import dump
+import boto3
 from prettytable import PrettyTable
 
 from sat.xname import XName
+from sat.config import get_config_value, read_config_value_file
 
 LOGGER = logging.getLogger(__name__)
 
@@ -469,6 +471,29 @@ def get_new_ordered_dict(orig_dict, dotted_paths, default_value=None, strip_path
          get_val_by_path(orig_dict, dotted_path, default_value))
         for dotted_path in dotted_paths
     ])
+
+
+def get_s3_resource():
+    """Helper function to load the S3 API from configuration variables.
+
+    Raises:
+        SystemExit: if unable to load the configuration values
+    """
+    try:
+        access_key = read_config_value_file('s3.access_key_file')
+        secret_key = read_config_value_file('s3.secret_key_file')
+    except OSError as err:
+        LOGGER.error(f'Unable to load configuration: {err}')
+        raise SystemExit(1)
+
+    return boto3.resource(
+        's3',
+        endpoint_url=get_config_value('s3.endpoint'),
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        region_name='',
+        verify=False
+    )
 
 
 class BeginEndLogger:

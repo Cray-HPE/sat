@@ -19,6 +19,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 argcomplete
+boto3
 docker
 inflect >= 0.2.5, < 3.0
 kubernetes

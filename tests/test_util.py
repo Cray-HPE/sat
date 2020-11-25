@@ -419,6 +419,52 @@ class TestPromptContinue(unittest.TestCase):
                                                 'Exiting.'.format(action_msg))
 
 
+class TestGetS3Resource(unittest.TestCase):
+    """Test the get_s3_resource function"""
+    def setUp(self):
+        self.mock_boto3 = mock.patch('sat.util.boto3.resource').start()
+        self.mock_read_config_value_file = mock.patch(
+            'sat.util.read_config_value_file',
+            side_effect=self.fake_read_config_value_file
+        ).start()
+        self.mock_get_config_value = mock.patch('sat.util.get_config_value').start()
+        self.access_key = mock.Mock()
+        self.secret_key = mock.Mock()
+        self.fake_config = {
+            's3': {
+                'access_key_file': self.access_key,
+                'secret_key_file': self.secret_key
+            }
+        }
+
+    def fake_read_config_value_file(self, query_string):
+        """Fake the behavior of read_config_value_file."""
+        section, value = query_string.split('.')
+        return self.fake_config[section][value]
+
+    def test_get_s3_resource(self):
+        """Test get_s3_resource in the successful case."""
+        result = util.get_s3_resource()
+        self.assertEqual([mock.call('s3.access_key_file'), mock.call('s3.secret_key_file')],
+                         self.mock_read_config_value_file.mock_calls)
+        self.mock_get_config_value.assert_called_once_with('s3.endpoint')
+        self.mock_boto3.assert_called_once_with(
+            's3',
+            endpoint_url=self.mock_get_config_value.return_value,
+            aws_access_key_id=self.access_key,
+            aws_secret_access_key=self.secret_key,
+            region_name='',
+            verify=False
+        )
+        self.assertEqual(result, self.mock_boto3.return_value)
+
+    def test_get_s3_resource_error(self):
+        """Test get_s3_resource when opening a file fails"""
+        self.mock_read_config_value_file.side_effect = OSError
+        with self.assertRaises(SystemExit):
+            util.get_s3_resource()
+
+
 class TestBeginEndLogger(ExtendedTestCase):
     """Test the BeginEndLogger context manager class."""
 

@@ -222,31 +222,6 @@ def get_interconnects():
     return networks
 
 
-def get_release_version():
-    """Gets release version as found in /etc/cray-release
-
-    Returns:
-        A string containing the version, or "ERROR" if it could not be read.
-    """
-    rel_path = '/etc/cray-release'
-    s = ''
-    try:
-        with open(rel_path, 'r') as f:
-            s = '[default]' + f.read()
-    except (FileNotFoundError, AttributeError, PermissionError):
-        LOGGER.error('Could not open {} for reading.'.format(rel_path))
-        return 'ERROR'
-
-    cp = configparser.ConfigParser()
-    cp.read_string(s)
-
-    try:
-        return cp['default']['VERSION']
-    except KeyError:
-        LOGGER.error('No "VERSION" field in {}.'.format(rel_path))
-        return 'ERROR'
-
-
 def get_sles_version():
     """Gets SLES version info found in /etc/os-release.
 
@@ -351,7 +326,6 @@ def get_system_version(sitefile, substr=''):
         ('Kernel', get_kernel_version),
         ('Lustre', lambda: zypper_versions['cray-lustre-client']),
         ('PBS version', lambda: zypper_versions['pbs-crayctldeploy']),
-        ('Release version', get_release_version),
         ('SLES version', get_sles_version),
         ('Serial number', lambda: sitedata['Serial number']),
         ('Site name', lambda: sitedata['Site name']),

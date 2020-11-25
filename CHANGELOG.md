@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New field for accelerator counts when listing and summarizing nodes
   in ``sat hwinv``.
 
+### Changed
+- Changed ``sat bootsys`` state capture and hsn/k8s checks to use an S3
+  bucket instead of local files.
+
+### Removed
+- Removed parsing of ``/etc/cray-release`` from ``sat showrev``.
+
 ## [3.0.0] - 2020-11-18
 
 ### Added

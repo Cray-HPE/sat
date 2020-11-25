@@ -29,8 +29,9 @@ import unittest
 from unittest import mock
 
 import sat
-from sat.config import ConfigValidationError, DEFAULT_CONFIG_PATH, get_config_value, generate_default_config,\
-    load_config, SATConfig, SAT_CONFIG_SPEC, validate_log_level, _option_value, OptionSpec
+from sat.config import ConfigValidationError, DEFAULT_CONFIG_PATH, get_config_value, read_config_value_file, \
+    generate_default_config, load_config, SATConfig, SAT_CONFIG_SPEC, validate_log_level, _option_value, \
+    OptionSpec
 from tests.common import ExtendedTestCase
 
 CONFIGS_DIR = os.path.join(os.path.dirname(__file__), 'resources/configs')
@@ -269,6 +270,7 @@ class TestGetConfigValue(unittest.TestCase):
     @mock.patch('sat.config.CONFIG')
     @mock.patch('sat.config.load_config')
     def test_get_config_value(self, mock_load_config, mock_config):
+        """Test a basic call of get_config_value"""
         option_name = 'foo.bar'
         expected_value = 'expected'
         mock_config.get.return_value = expected_value
@@ -276,6 +278,36 @@ class TestGetConfigValue(unittest.TestCase):
         mock_load_config.assert_called_once_with()
         mock_config.get.assert_called_once_with('foo', 'bar')
         self.assertEqual(expected_value, option_value)
+
+
+class TestGetConfigValueFromFile(unittest.TestCase):
+
+    def setUp(self):
+        """Sets up for test methods.
+
+        Patches open, os.path.expanduser, and config.get_config_value.
+        """
+        self.mock_expanduser = mock.patch('sat.config.os.path.expanduser').start()
+        self.mock_open = mock.patch('builtins.open').start()
+        self.mock_get_config_value = mock.patch('sat.config.get_config_value').start()
+
+    def tearDown(self):
+        """Cleans up after test methods.
+
+        Stop patch of open, os.path.expanduser, and config.get_config_value.
+        """
+        mock.patch.stopall()
+
+    def test_get_config_value_from_file(self):
+        """Test a basic call of get_config_value_from_file"""
+        option_name = 'foo.bar'
+        expected_value = 'expected'
+        self.mock_open.return_value.__enter__.return_value.read.return_value = f'{expected_value}\n'
+        actual_value = read_config_value_file(option_name)
+        self.mock_get_config_value.assert_called_once_with(option_name)
+        self.mock_expanduser.assert_called_once_with(self.mock_get_config_value.return_value)
+        self.mock_open.assert_called_once_with(self.mock_expanduser.return_value)
+        self.assertEqual(expected_value, actual_value)
 
 
 class TestSATConfig(ExtendedTestCase):
