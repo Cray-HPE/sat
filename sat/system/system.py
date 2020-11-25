@@ -37,6 +37,7 @@ from sat.system.node_enclosure import NodeEnclosure
 from sat.system.node_enclosure_power_supply import NodeEnclosurePowerSupply
 from sat.system.processor import Processor
 from sat.system.node_accel import NodeAccel
+from sat.system.node_accel_riser import NodeAccelRiser
 from sat.system.router_module import RouterModule
 from sat.xname import XName
 
@@ -68,6 +69,7 @@ class System:
             NodeEnclosurePowerSupply: {},
             Processor: {},
             NodeAccel: {},
+            NodeAccelRiser: {},
             RouterModule: {}
         }
 

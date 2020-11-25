@@ -148,6 +148,9 @@ These options list components of certain types in the system.
 **--list-node-accels**
         List all the node accelerators in the system.
 
+**--list-node-accel-risers**
+        List all the node accelerator risers in the system.
+
 **--list-mems**
         List all the memory modules in the system.
 
@@ -193,6 +196,9 @@ These options list components of certain types in the system.
 
 **--node-accel-fields** *NODE_ACCEL_FIELDS*
         Same as **--node-fields** but for node accelerators.
+
+**--node-accel-riser-fields** *NODE_ACCEL_RISER_FIELDS*
+        Same as **--node-fields** but for node accelerator risers.
 
 **--mem-fields** *MEM_FIELDS*
         Same as **--node-fields** but for memory modules.
