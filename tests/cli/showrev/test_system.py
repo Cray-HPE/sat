@@ -271,6 +271,22 @@ class TestSystem(unittest.TestCase):
         slurm_version = sat.cli.showrev.system.get_slurm_version()
         self.assertEqual('ERROR', slurm_version)
 
+    def test_get_site_data_from_s3(self):
+        """Test get_site_data downloads from S3."""
+        sitefile = '/opt/cray/etc/site_info.yml'
+        mock_s3 = mock.patch('sat.cli.showrev.system.get_s3_resource').start().return_value
+        mock.patch('sat.cli.showrev.system.get_config_value', return_value='sat').start()
+        mock_open = mock.patch('builtins.open').start()
+        mock_yaml_load = mock.patch('sat.cli.showrev.system.yaml.safe_load').start()
+        sat.cli.showrev.system.get_site_data(sitefile)
+        mock_s3.Object.assert_called_once_with('sat', sitefile)
+        mock_s3.Object.return_value.download_file.assert_called_once_with(sitefile)
+        mock_open.assert_called_once_with(sitefile, 'r')
+        mock_open.return_value.__enter__.return_value.read.assert_called_once_with()
+        mock_yaml_load.assert_called_once_with(
+            mock_open.return_value.__enter__.return_value.read.return_value
+        )
+
 
 if __name__ == '__main__':
     unittest.main()

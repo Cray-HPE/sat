@@ -34,7 +34,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 def do_showrev(args):
-    """Run the showrev comand with the given arguments.
+    """Run the showrev command with the given arguments.
 
     Args:
         args: The argparse.Namespace object containing the parsed arguments
