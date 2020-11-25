@@ -101,7 +101,7 @@ class TestNode(unittest.TestCase):
         # Set the node accelerators in the node with some xnames beneath the node, not
         # that it should matter.
         self.node.node_accels = {'{}a{}'.format(NODE_XNAME, index): node_accel
-                                for index, node_accel in enumerate(self.fake_node_accels)}
+                                 for index, node_accel in enumerate(self.fake_node_accels)}
 
     def add_fake_node_accel_risers(self):
         """Add some fake node accelerator risers to `self.node`."""
@@ -112,7 +112,7 @@ class TestNode(unittest.TestCase):
         # Set the node accelerator risers in the node with some xnames beneath the node, not
         # that it should matter.
         self.node.node_accel_risers = {'{}r{}'.format(NODE_XNAME, index): node_accel_riser
-                                for index, node_accel_riser in enumerate(self.fake_node_accel_risers)}
+                                       for index, node_accel_riser in enumerate(self.fake_node_accel_risers)}
 
     def add_fake_drives(self):
         """Add some fake drives to `self.node`."""
