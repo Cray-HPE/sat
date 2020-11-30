@@ -31,6 +31,7 @@ from sat.system.field import ComponentField
 from sat.system.memory_module import MemoryModule
 from sat.system.node_accel import NodeAccel
 from sat.system.node_accel_riser import NodeAccelRiser
+from sat.system.node_hsn_nic import NodeHsnNic
 from sat.system.processor import Processor
 from sat.util import bytes_to_gib
 
@@ -58,6 +59,7 @@ class Node(BaseComponent):
         ComponentField('Processor Model', summarizable=True),
         ComponentField('Accelerator Count', summarizable=True),
         ComponentField('Accelerator Riser Count', summarizable=True),
+        ComponentField('HSN NIC Count', summarizable=True),
         ComponentField('Drive Count', summarizable=True),
         ComponentField('Total Drive Capacity (GiB)', summarizable=True),
         ComponentField('BIOS Version'),
@@ -81,6 +83,7 @@ class Node(BaseComponent):
         self.processors = {}
         self.node_accels = {}
         self.node_accel_risers = {}
+        self.node_hsn_nics = {}
         self.drives = {}
 
         self.children_by_type = {
@@ -88,6 +91,7 @@ class Node(BaseComponent):
             Processor: self.processors,
             NodeAccel: self.node_accels,
             NodeAccelRiser: self.node_accel_risers,
+            NodeHsnNic: self.node_hsn_nics,
             Drive: self.drives
         }
 
@@ -157,6 +161,11 @@ class Node(BaseComponent):
     def accelerator_riser_count(self):
         """int: The number of node_accel_risers this node has."""
         return len(self.node_accel_risers)
+
+    @cached_property
+    def hsn_nic_count(self):
+        """int: The number of node_hsn_nics this node has."""
+        return len(self.node_hsn_nics)
 
     @cached_property
     def drive_count(self):

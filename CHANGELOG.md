@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in ``sat hwinv`` with ``--list-node_accel_risers``.
 - New field for accelerator riser counts when listing and summarizing nodes
   in ``sat hwinv``.
+- Ability to list node HSN NICs in ``sat hwinv`` with ``--list-node_hsn_nics``.
+- New field for HSN NIC counts when listing and summarizing nodes
+  in ``sat hwinv``.
 
 ### Changed
 - Changed ``sat bootsys`` state capture and hsn/k8s checks to use an S3
