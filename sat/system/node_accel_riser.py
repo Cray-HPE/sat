@@ -22,7 +22,8 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 from sat.cached_property import cached_property
-from sat.system.component import NodeComponent
+from sat.constants import MISSING_VALUE
+from sat.system.component import ComponentDataDict, NodeComponent
 from sat.system.constants import NODE_ACCEL_RISER_TYPE
 from sat.system.field import ComponentField
 
@@ -44,6 +45,8 @@ class NodeAccelRiser(NodeComponent):
     @cached_property
     def pcb_serial_number(self):
         """str: the PCB serial number of the riser card."""
+        if not isinstance(self.fru_info['Oem'], ComponentDataDict):
+            return MISSING_VALUE
         return self.fru_info['Oem']['PCBSerialNumber']
 
     @cached_property
