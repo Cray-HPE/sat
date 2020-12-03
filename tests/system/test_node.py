@@ -34,6 +34,7 @@ from tests.system.component_data import get_component_raw_data, CHASSIS_XNAME, N
 DEFAULT_PROCESSOR_COUNT = 2
 DEFAULT_NODE_ACCEL_COUNT = 1
 DEFAULT_NODE_ACCEL_RISER_COUNT = 1
+DEFAULT_NODE_HSN_NIC_COUNT = 2
 DEFAULT_BIOS_VERSION = '2019.11.b'
 
 
@@ -114,6 +115,17 @@ class TestNode(unittest.TestCase):
         self.node.node_accel_risers = {'{}r{}'.format(NODE_XNAME, index): node_accel_riser
                                        for index, node_accel_riser in enumerate(self.fake_node_accel_risers)}
 
+    def add_fake_node_hsn_nics(self):
+        """Add some fake node HSN NICs to `self.node`."""
+        self.fake_node_hsn_nics = []
+        for _ in range(DEFAULT_NODE_HSN_NIC_COUNT):
+            fake_node_hsn_nic = mock.Mock()
+            self.fake_node_hsn_nics.append(fake_node_hsn_nic)
+        # Set the node HSN NICs in the node with some xnames beneath the node, not
+        # that it should matter.
+        self.node.node_hsn_nics = {'{}h{}'.format(NODE_XNAME, index): node_hsn_nic
+                                   for index, node_hsn_nic in enumerate(self.fake_node_hsn_nics)}
+
     def add_fake_drives(self):
         """Add some fake drives to `self.node`."""
         self.fake_drives = []
@@ -173,6 +185,11 @@ class TestNode(unittest.TestCase):
         """Test the accelerator_riser_count property."""
         self.add_fake_node_accel_risers()
         self.assertEqual(DEFAULT_NODE_ACCEL_RISER_COUNT, self.node.accelerator_riser_count)
+
+    def test_hsn_nic_count(self):
+        """Test the hsn_nic_count property."""
+        self.add_fake_node_hsn_nics()
+        self.assertEqual(DEFAULT_NODE_HSN_NIC_COUNT, self.node.hsn_nic_count)
 
     def test_memory_type(self):
         """Test the memory_type property."""
