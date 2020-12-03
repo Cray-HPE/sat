@@ -21,26 +21,16 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-from sat.cached_property import cached_property
-from sat.system.component import ComponentDataDict, NodeComponent
+from sat.system.component import NodeComponent
 from sat.system.constants import NODE_HSN_NIC_TYPE
 
 
 class NodeHsnNic(NodeComponent):
-    """A node HSN NIC in the system."""
+    """A nodeHsnNic in the system."""
 
     hsm_type = NODE_HSN_NIC_TYPE
     arg_name = 'node_hsn_nic'
     pretty_name = 'node HSN NIC'
 
-    # Any fields needed specifically on a nodeHSNNIC can be added here.
+    # Any fields needed specifically on a nodeHsnNic can be added here.
     fields = NodeComponent.fields + []
-
-    # Type is NodeHsnNic and fru_info_key is HSNNICFRUInfo
-    # If they were the same, we could remove this code and use fru_info in BaseComponent
-    @cached_property
-    def fru_info(self):
-        """ComponentDataDict: The FRU info stored in the raw data.
-        """
-        fru_info_key = 'HSNNICFRUInfo'
-        return ComponentDataDict(self.raw_data['PopulatedFRU'][fru_info_key])
