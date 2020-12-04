@@ -22,9 +22,11 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
-
+import logging
 import unittest
 from unittest import mock
+
+from docker.errors import DockerException
 
 import sat.cli.showrev
 
@@ -103,6 +105,12 @@ class TestContainers(unittest.TestCase):
         result = sat.cli.showrev.containers.get_dockers()
         self.assertEqual(result, sorted(result))
         self.assertGreater(len(result), 0)
+
+    def test_get_dockers_error(self):
+        """Test an error is logged when docker.from_env() returns an error."""
+        with mock.patch('sat.cli.showrev.containers.docker.from_env', side_effect=DockerException):
+            with self.assertLogs(level=logging.ERROR):
+                self.assertEqual(sat.cli.showrev.containers.get_dockers(), [])
 
 
 if __name__ == '__main__':
