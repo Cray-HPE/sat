@@ -26,9 +26,10 @@ SHUTDOWN ACTION
 The shutdown action consists of the following phases, some of which are not yet
 implemented.
 
-In the first phase, it saves the state of all kubernetes pods to a file. This
-file will be used when the system is booted to verify all pods are in the states
-they were in before the shutdown.
+In the first phase, it saves the state of all kubernetes pods to a file in an
+S3 bucket. This file will be used when the system is booted to verify all pods
+are in the states they were in before the shutdown. The S3 bucket must be
+configured in the ``s3`` section of the SAT configuration file.
 
 In the second phase, it checks for any active sessions across multiple different
 services in the system, including the Boot Orchestration Service (BOS), the

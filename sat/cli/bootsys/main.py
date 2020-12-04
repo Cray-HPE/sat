@@ -82,8 +82,8 @@ def do_bootsys(args):
 
     try:
         submodule, stage_func_name = STAGES_BY_ACTION[args.action][args.stage]
-        stage = load_stage(submodule, stage_func_name)
-        stage(args)
     except KeyError:
         LOGGER.error('Invalid stage received for %s action: %s', args.action, args.stage)
         sys.exit(1)
+    stage = load_stage(submodule, stage_func_name)
+    stage(args)

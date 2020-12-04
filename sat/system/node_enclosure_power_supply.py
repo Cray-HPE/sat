@@ -1,5 +1,5 @@
 """
-Some constant default values used in the bootsys code.
+Class to represent a NodeEnclosurePowerSupply object obtained from Hardware State Manager (HSM).
 
 (C) Copyright 2020 Hewlett Packard Enterprise Development LP.
 
@@ -21,25 +21,24 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-import re
+from sat.system.component import BaseComponent
+from sat.system.constants import NODE_ENCLOSURE_POWER_SUPPLY_TYPE
 
-# The default directory where pre-shutdown state is captured (currently k8s pod
-# states, HSN status). This can be overridden on the command-line.
-DEFAULT_LOCAL_STATE_DIR = '/var/sat/bootsys/'
 
-# The directory within DEFAULT_LOCAL_STATE_DIR where pod state is stored and read from
-POD_STATE_DIR = 'pod-states/'
-# The prefix used for files that record pod states.
-POD_STATE_FILE_PREFIX = 'pod-states'
+class NodeEnclosurePowerSupply(BaseComponent):
+    """A NodeEnclosurePowerSupply in the system."""
 
-# The directory within DEFAULT_LOCAL_STATE_DIR where high-speed network (HSN) state is stored and read from
-HSN_STATE_DIR = 'hsn-states/'
-# The prefix used for files that record HSN state
-HSN_STATE_FILE_PREFIX = 'hsn-state'
+    hsm_type = NODE_ENCLOSURE_POWER_SUPPLY_TYPE
+    arg_name = 'node_enclosure_power_supply'
+    pretty_name = 'node enclosure power supply'
 
-# The regex matching standard CLE session templates, e.g. cle-1.3.0
-CLE_BOS_TEMPLATE_REGEX = re.compile(r'^cle-\d+.\d+.\d+$')
-# The name of the standard UAN session template
-DEFAULT_UAN_BOS_TEMPLATE = 'uan'
-# The number of seconds to wait between checks on parallel BOS operations
-PARALLEL_CHECK_INTERVAL = 10
+    fields = BaseComponent.fields + []
+
+    def __init__(self, raw_data):
+        """Creates a NodeEnclosurePowerSupply with the raw JSON returned by the HSM API.
+
+        Args:
+            raw_data (dict): The dictionary returned as JSON by the HSM API
+                that contains the raw data for the node enclosure.
+        """
+        super().__init__(raw_data)

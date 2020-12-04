@@ -121,35 +121,6 @@ class TestSystem(unittest.TestCase):
         result = sat.cli.showrev.system.get_interconnects()
         self.assertEqual(['ERROR'], result)
 
-    def test_get_release_version_correct_format(self):
-        """Positive test case for get_release_version.
-        """
-        file_ = '{}/cray-release'.format(samples)
-        with open(file_) as f:
-            data = f.read()
-
-        mock_open = mock.mock_open(read_data=data)
-
-        with mock.patch('sat.cli.showrev.system.open', mock_open):
-            short = '{}/cray-release'.format(samples)
-            result = sat.cli.showrev.system.get_release_version()
-            self.assertTrue(os.path.exists(short))
-            self.assertEqual(result, '1.2')
-
-    def test_get_release_version_file_not_found(self):
-        """get_release_version should return a certain error string on file-not-found.
-
-        The underlying path to os-release is hardcoded in this function, so its
-        error string won't match the path in our lambda. That's expected.
-        """
-        mock_open = mock.mock_open()
-        mock_open.side_effect = FileNotFoundError
-
-        with mock.patch('sat.cli.showrev.system.open', mock_open):
-            result = sat.cli.showrev.system.get_release_version()
-            self.assertEqual(result, 'ERROR')
-            self.assertFalse(os.path.exists('idontexist'))
-
     def test_get_sles_version_correct_format(self):
         """Positive test case for get_sles_version.
         """
@@ -299,6 +270,22 @@ class TestSystem(unittest.TestCase):
 
         slurm_version = sat.cli.showrev.system.get_slurm_version()
         self.assertEqual('ERROR', slurm_version)
+
+    def test_get_site_data_from_s3(self):
+        """Test get_site_data downloads from S3."""
+        sitefile = '/opt/cray/etc/site_info.yml'
+        mock_s3 = mock.patch('sat.cli.showrev.system.get_s3_resource').start().return_value
+        mock.patch('sat.cli.showrev.system.get_config_value', return_value='sat').start()
+        mock_open = mock.patch('builtins.open').start()
+        mock_yaml_load = mock.patch('sat.cli.showrev.system.yaml.safe_load').start()
+        sat.cli.showrev.system.get_site_data(sitefile)
+        mock_s3.Object.assert_called_once_with('sat', sitefile)
+        mock_s3.Object.return_value.download_file.assert_called_once_with(sitefile)
+        mock_open.assert_called_once_with(sitefile, 'r')
+        mock_open.return_value.__enter__.return_value.read.assert_called_once_with()
+        mock_yaml_load.assert_called_once_with(
+            mock_open.return_value.__enter__.return_value.read.return_value
+        )
 
 
 if __name__ == '__main__':

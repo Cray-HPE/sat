@@ -1,5 +1,5 @@
 """
-Some constant default values used in the bootsys code.
+Unit tests for sat.system.node_hsn_nic.
 
 (C) Copyright 2020 Hewlett Packard Enterprise Development LP.
 
@@ -21,25 +21,21 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-import re
+import unittest
 
-# The default directory where pre-shutdown state is captured (currently k8s pod
-# states, HSN status). This can be overridden on the command-line.
-DEFAULT_LOCAL_STATE_DIR = '/var/sat/bootsys/'
+from sat.system.node_hsn_nic import NodeHsnNic
+from tests.system.component_data import NODE_HSN_NIC_XNAME, get_component_raw_data
 
-# The directory within DEFAULT_LOCAL_STATE_DIR where pod state is stored and read from
-POD_STATE_DIR = 'pod-states/'
-# The prefix used for files that record pod states.
-POD_STATE_FILE_PREFIX = 'pod-states'
 
-# The directory within DEFAULT_LOCAL_STATE_DIR where high-speed network (HSN) state is stored and read from
-HSN_STATE_DIR = 'hsn-states/'
-# The prefix used for files that record HSN state
-HSN_STATE_FILE_PREFIX = 'hsn-state'
+class TestNodeHsnNic(unittest.TestCase):
+    """Test the NodeHsnNic class."""
 
-# The regex matching standard CLE session templates, e.g. cle-1.3.0
-CLE_BOS_TEMPLATE_REGEX = re.compile(r'^cle-\d+.\d+.\d+$')
-# The name of the standard UAN session template
-DEFAULT_UAN_BOS_TEMPLATE = 'uan'
-# The number of seconds to wait between checks on parallel BOS operations
-PARALLEL_CHECK_INTERVAL = 10
+    def test_init(self):
+        raw_data = get_component_raw_data(hsm_type='NodeHsnNic', xname=NODE_HSN_NIC_XNAME)
+        node_hsn_nic = NodeHsnNic(raw_data)
+        self.assertEqual(raw_data, node_hsn_nic.raw_data)
+        self.assertEqual(node_hsn_nic.children_by_type, {})
+
+
+if __name__ == '__main__':
+    unittest.main()

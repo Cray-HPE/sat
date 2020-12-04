@@ -25,6 +25,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2020-12-04
+
+### Added
+- Ability to list node enclosure power supplies in ``sat hwinv`` with
+  ``--list-node-enclosure-power-supplies``.
+- Ability to list node accelerators (e.g. GPUs) in ``sat hwinv`` with
+  ``--list-node-accels``.
+- New field for accelerator counts when listing and summarizing nodes
+  in ``sat hwinv``.
+- Ability to list node accelerator risers (e.g. Redstone Modules)
+  in ``sat hwinv`` with ``--list-node-accel-risers``.
+- New field for accelerator riser counts when listing and summarizing nodes
+  in ``sat hwinv``.
+- Ability to list node HSN NICs in ``sat hwinv`` with ``--list-node-hsn-nics``.
+- New field for HSN NIC counts when listing and summarizing nodes
+  in ``sat hwinv``.
+
+### Changed
+- Changed ``sat bootsys`` state capture and hsn/k8s checks to use an S3
+  bucket instead of local files.
+- ``sat setrev`` now writes the site information file to S3, and
+  ``sat showrev`` now downloads the site information file from S3.
+- Changed default logging directory to ``/var/log/cray/sat/sat.log``.
+
+### Removed
+- Removed parsing of ``/etc/cray-release`` from ``sat showrev``.
+
+### Fixed
+- Fixed dumping of serial number in ``sat setrev`` so that it is always
+  a string.
+
 ## [3.0.0] - 2020-11-18
 
 ### Added

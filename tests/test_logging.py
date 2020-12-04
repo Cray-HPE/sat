@@ -44,7 +44,7 @@ class TestLogging(unittest.TestCase):
         ).start()
 
         config_values = self.config_values = {
-            'logging.file_name': '/var/log/cray/sat.log',
+            'logging.file_name': '/var/log/cray/sat/sat.log',
             'logging.file_level': 'debug',
             'logging.stderr_level': 'warning'
         }

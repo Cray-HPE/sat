@@ -1,5 +1,5 @@
 """
-Some constant default values used in the bootsys code.
+Class to represent a NodeHsnNic object obtained from Hardware State Manager (HSM).
 
 (C) Copyright 2020 Hewlett Packard Enterprise Development LP.
 
@@ -21,25 +21,16 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-import re
+from sat.system.component import NodeComponent
+from sat.system.constants import NODE_HSN_NIC_TYPE
 
-# The default directory where pre-shutdown state is captured (currently k8s pod
-# states, HSN status). This can be overridden on the command-line.
-DEFAULT_LOCAL_STATE_DIR = '/var/sat/bootsys/'
 
-# The directory within DEFAULT_LOCAL_STATE_DIR where pod state is stored and read from
-POD_STATE_DIR = 'pod-states/'
-# The prefix used for files that record pod states.
-POD_STATE_FILE_PREFIX = 'pod-states'
+class NodeHsnNic(NodeComponent):
+    """A nodeHsnNic in the system."""
 
-# The directory within DEFAULT_LOCAL_STATE_DIR where high-speed network (HSN) state is stored and read from
-HSN_STATE_DIR = 'hsn-states/'
-# The prefix used for files that record HSN state
-HSN_STATE_FILE_PREFIX = 'hsn-state'
+    hsm_type = NODE_HSN_NIC_TYPE
+    arg_name = 'node_hsn_nic'
+    pretty_name = 'node HSN NIC'
 
-# The regex matching standard CLE session templates, e.g. cle-1.3.0
-CLE_BOS_TEMPLATE_REGEX = re.compile(r'^cle-\d+.\d+.\d+$')
-# The name of the standard UAN session template
-DEFAULT_UAN_BOS_TEMPLATE = 'uan'
-# The number of seconds to wait between checks on parallel BOS operations
-PARALLEL_CHECK_INTERVAL = 10
+    # Any fields needed specifically on a nodeHsnNic can be added here.
+    fields = NodeComponent.fields + []

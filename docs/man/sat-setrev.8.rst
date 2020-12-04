@@ -19,7 +19,7 @@ DESCRIPTION
 ===========
 
 The setrev subcommand prompts the user for input from stdin in order to populate
-the site-information file. This file is used by **sat showrev --system** to
+the site information file. This file is used by **sat showrev --system** to
 print the following fields:
 
     - Serial number
@@ -30,6 +30,9 @@ print the following fields:
 
 This subcommand is required to be run if **sat showrev** is to display this
 information - as this information must be manually populated on the system.
+
+The site information file is uploaded to the configured S3 bucket if available,
+otherwise the site information file is just saved locally.
 
 OPTIONS
 =======

@@ -33,6 +33,8 @@ import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from collections import defaultdict
 
+from boto3.exceptions import Boto3Error
+from botocore.exceptions import BotoCoreError, ClientError
 import kubernetes
 import yaml
 from kubernetes.client.rest import ApiException
@@ -40,13 +42,14 @@ from kubernetes.client.rest import ApiException
 from sat.apiclient import APIError, HSMClient
 from sat.config import get_config_value
 from sat.session import SATSession
+from sat.util import get_s3_resource
 
 
 LOGGER = logging.getLogger(__name__)
 
 
 def get_site_data(sitefile):
-    """Get site-specific information from the sitefile.
+    """Get site-specific information from the sitefile, using S3 if possible.
 
     Args:
         sitefile: Specify custom sitefile to load. It must be in yaml format.
@@ -59,7 +62,8 @@ def get_site_data(sitefile):
         will be logged and this dict will default its entries to 'ERROR'.
     """
 
-    s = ''
+    s3 = get_s3_resource()
+    s3_bucket = get_config_value('s3.bucket')
     data = defaultdict(lambda: None)
     default = defaultdict(lambda: 'ERROR')
 
@@ -67,17 +71,24 @@ def get_site_data(sitefile):
         sitefile = get_config_value('general.site_info')
 
     try:
-        with open(sitefile, 'r') as f:
-            s = f.read()
-    except FileNotFoundError:
-        LOGGER.error('Sitefile {} not found. '
-                     'Run "sat setrev" to generate this file.'.format(sitefile))
-        return default
+        LOGGER.debug('Downloading %s from S3 (bucket: %s)', sitefile, s3_bucket)
+        s3.Object(s3_bucket, sitefile).download_file(sitefile)
+    except (BotoCoreError, ClientError, Boto3Error) as err:
+        LOGGER.error('Unable to download site info file %s from S3. Attempting to read from cached copy.'
+                     'Error: %s', sitefile, err)
 
     try:
-        data.update(yaml.safe_load(s))
+        with open(sitefile, 'r') as f:
+            data.update(yaml.safe_load(f.read()))
+    except FileNotFoundError:
+        LOGGER.error('Site information file %s not found. '
+                     'Run "sat setrev" to generate this file.', sitefile)
+        return default
+    except OSError as err:
+        LOGGER.error('Unable to open site information file %s: %s', sitefile, err)
+        return default
     except yaml.parser.ParserError:
-        LOGGER.error('Site file {} is not in yaml format.'.format(sitefile))
+        LOGGER.error('Site file %s is not in yaml format.', sitefile)
         return default
 
     # use hostname if site name isn't specified
@@ -85,7 +96,7 @@ def get_site_data(sitefile):
         try:
             data['System name'] = socket.gethostname()
         except Exception:  # TODO: find specific exception
-            LOGGER.error('Site-file {} has no "System name", and gethostname query failed.'.format(sitefile))
+            LOGGER.error('Site-file %s has no "System name", and gethostname query failed.', sitefile)
             data['System name'] = 'ERROR'
 
     return data
@@ -222,31 +233,6 @@ def get_interconnects():
     return networks
 
 
-def get_release_version():
-    """Gets release version as found in /etc/cray-release
-
-    Returns:
-        A string containing the version, or "ERROR" if it could not be read.
-    """
-    rel_path = '/etc/cray-release'
-    s = ''
-    try:
-        with open(rel_path, 'r') as f:
-            s = '[default]' + f.read()
-    except (FileNotFoundError, AttributeError, PermissionError):
-        LOGGER.error('Could not open {} for reading.'.format(rel_path))
-        return 'ERROR'
-
-    cp = configparser.ConfigParser()
-    cp.read_string(s)
-
-    try:
-        return cp['default']['VERSION']
-    except KeyError:
-        LOGGER.error('No "VERSION" field in {}.'.format(rel_path))
-        return 'ERROR'
-
-
 def get_sles_version():
     """Gets SLES version info found in /etc/os-release.
 
@@ -351,7 +337,6 @@ def get_system_version(sitefile, substr=''):
         ('Kernel', get_kernel_version),
         ('Lustre', lambda: zypper_versions['cray-lustre-client']),
         ('PBS version', lambda: zypper_versions['pbs-crayctldeploy']),
-        ('Release version', get_release_version),
         ('SLES version', get_sles_version),
         ('Serial number', lambda: sitedata['Serial number']),
         ('Site name', lambda: sitedata['Site name']),

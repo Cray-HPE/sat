@@ -139,8 +139,20 @@ These options list components of certain types in the system.
         nodes in air-cooled cabinets. For nodes in liquid-cooled cabinets, these represent
         the node card associated with two of the nodes in a slot.
 
+**--list-node-enclosure-power-supplies**
+        List all the node enclosure power supplies in the system.
+
 **--list-procs**
         List all the processors in the system.
+
+**--list-node-accels**
+        List all the node accelerators in the system.
+
+**--list-node-accel-risers**
+        List all the node accelerator risers in the system.
+
+**--list-node-hsn-nics**
+        List all the node HSN NICs in the system.
 
 **--list-mems**
         List all the memory modules in the system.
@@ -179,8 +191,20 @@ These options list components of certain types in the system.
 **--node-enclosure-fields** *NODE_ENCLOSURE_FIELDS*
         Same as **--node-fields** but for node enclosures.
 
+**--node-enclosure-power-supply-fields** *NODE_ENCLOSURE_POWER_SUPPLY_FIELDS*
+        Same as **--node-fields** but for node enclosure power supplies.
+
 **--proc-fields** *PROC_FIELDS*
         Same as **--node-fields** but for processors.
+
+**--node-accel-fields** *NODE_ACCEL_FIELDS*
+        Same as **--node-fields** but for node accelerators.
+
+**--node-accel-riser-fields** *NODE_ACCEL_RISER_FIELDS*
+        Same as **--node-fields** but for node accelerator risers.
+
+**--node-hsn-nic-fields** *NODE_HSN_NIC_FIELDS*
+        Same as **--node-fields** but for node HSN NICs.
 
 **--mem-fields** *MEM_FIELDS*
         Same as **--node-fields** but for memory modules.

@@ -84,7 +84,7 @@ python3 setup.py install -O1 --root="$RPM_BUILD_ROOT" --record=INSTALLED_FILES \
                              --install-scripts=/usr/bin
 
 # Install logging directory and config file
-install -m 755 -d %{buildroot}/var/log/cray
+install -m 755 -d %{buildroot}/var/log/cray/sat
 install -m 755 -d %{buildroot}/etc
 
 # This directory is used to hold the user-created site_info.yml
@@ -119,7 +119,7 @@ cat INSTALLED_FILES | grep __pycache__ | xargs dirname | xargs dirname | uniq >>
 # need to manually install it here.
 
 %files -f INSTALLED_FILES
-%dir /var/log/cray
+%dir /var/log/cray/sat
 %dir /opt/cray/etc
 %dir /var/sat/bootsys
 %dir /var/sat/bootsys/pod-states
