@@ -27,10 +27,33 @@ import sys
 
 from sat.config import get_config_value
 from sat.report import Report
-from sat.cli.showrev import containers, products, rpm, system
+from sat.cli.showrev import containers, local, products, rpm, system
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def assign_default_args(args):
+    """Set default options in 'args'
+
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this subcommand.
+
+    Returns:
+        None. Modifies args in place.
+    """
+    if args.all:
+        args.system = True
+        args.products = True
+        args.docker = True
+        args.local = True
+        args.packages = True
+        args.release_files = True
+    elif not any((args.system, args.products, args.local, args.docker, args.packages, args.release_files)):
+        args.local = True
+        args.system = True
+        args.products = True
 
 
 def do_showrev(args):
@@ -51,79 +74,72 @@ def do_showrev(args):
     no_headings = get_config_value('format.no_headings')
     no_borders = get_config_value('format.no_borders')
 
-    if args.all:
-        args.system = True
-        args.products = True
-        args.docker = True
-        args.packages = True
-        args.release_files = True
-    elif not any((args.system, args.products, args.docker, args.packages, args.release_files)):
-        args.system = True
-        args.products = True
+    def append_report(title, headings, data):
+        """Create a new Report and add it to the list of reports.
+
+        Args:
+            title: The title of the new Report to create.
+            headings: A list of strings describing the heading elements
+                of the Report
+            data: A list of tuples where each element is a row to add to
+                the new Report
+
+        Returns:
+            None.  Modifies reports in place.
+        """
+        if not data:
+            LOGGER.warning('Could not retrieve "%s"', title)
+        else:
+            reports.append(Report(
+                headings, title, sort_by, reverse, no_headings, no_borders,
+                filter_strs=args.filter_strs))
+            reports[-1].add_rows(data)
+
+    assign_default_args(args)
 
     if args.system:
-        data = system.get_system_version(args.sitefile)
-        if not data:
-            LOGGER.warning('Could not retrieve system version information.')
-
-        else:
-            title = 'System Revision Information'
-            headings = ['component', 'data']
-            reports.append(Report(
-                headings, title, sort_by, reverse, no_headings, no_borders,
-                filter_strs=args.filter_strs))
-            reports[-1].add_rows(data)
+        append_report(
+            'System Revision Information',
+            ['component', 'data'],
+            system.get_system_version(args.sitefile)
+        )
 
     if args.release_files:
-        headings, data = products.get_release_file_versions()
-        if not data:
-            LOGGER.warning('Could not retrieve release file versions.')
-
-        else:
-            title = 'Local Release Files'
-            reports.append(Report(
-                headings, title, sort_by, reverse, no_headings, no_borders,
-                filter_strs=args.filter_strs))
-            reports[-1].add_rows(data)
+        release_headings, release_data = products.get_release_file_versions()
+        append_report(
+            'Local Release Files',
+            release_headings,
+            release_data
+        )
 
     if args.products:
-        headings, data = products.get_product_versions()
-        if not data:
-            LOGGER.warning('Could not retrieve product versions.')
+        product_headings, product_data = products.get_product_versions()
+        append_report(
+            'Product Revision Information',
+            product_headings,
+            product_data
+        )
 
-        else:
-            title = 'Product Revision Information'
-            reports.append(Report(
-                headings, title, sort_by, reverse, no_headings, no_borders,
-                filter_strs=args.filter_strs))
-            reports[-1].add_rows(data)
+    if args.local:
+        append_report(
+            'Local Host Operating System',
+            ['component', 'version'],
+            local.get_local_os_information()
+        )
 
     if args.docker:
-        data = containers.get_dockers()
-        if not data:
-            LOGGER.warning(
-                'Could not retrieve list of installed docker containers.')
-
-        else:
-            title = 'Installed Container Versions'
-            headings = ['name', 'short-id', 'versions']
-            reports.append(Report(
-                headings, title, sort_by, reverse, no_headings, no_borders,
-                filter_strs=args.filter_strs))
-            reports[-1].add_rows(data)
+        append_report(
+            'Installed Container Versions',
+            ['name', 'short-id', 'versions'],
+            containers.get_dockers()
+        )
 
     if args.packages:
-        data = rpm.get_rpms()
-        if not data:
-            LOGGER.warning('Could not retrieve list of installed rpms.')
-
-        else:
-            title = 'Installed Package Versions'
-            headings = ['name', 'version']
-            reports.append(Report(
-                headings, title, sort_by, reverse, no_headings, no_borders,
-                filter_strs=args.filter_strs))
-            reports[-1].add_rows(data)
+        append_report(
+            'Installed Package Versions',
+            ['name', 'version'],
+            rpm.get_rpms()
+        )
 
     if not reports:
         LOGGER.error('No data collected')

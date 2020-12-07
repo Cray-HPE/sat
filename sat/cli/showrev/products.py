@@ -71,13 +71,13 @@ def get_product_versions():
         lists where each element is a list representing one row of data.
 
         The headings will be the product name, version, image name, and image
-        recipe name.  The rows will be the values of each of these fields for
+        recipe name. The rows will be the values of each of these fields for
         each product.
 
         If multiple versions of one product exist, then there will be one row
-        for each product-version.  If multiple images and/or recipes exist for
+        for each product-version. If multiple images and/or recipes exist for
         one product-version, then each image or recipe will be printed as a
-        newline-separated list within the same row.  If no images and/or recipes
+        newline-separated list within the same row. If no images and/or recipes
         exist for a product-version, then their values will be 'MISSING'.
     """
     product_key = 'product_name'
