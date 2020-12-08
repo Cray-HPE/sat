@@ -38,11 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and from ``/etc/os-release`` if that does not exist for the SLES
   version.
 
-### Fixed
-- Improved error handling in ``sat showrev --docker``.
-
 ### Removed
 - Removed Lustre and PBS versions from ``sat showrev``.
+- Removed ``--packages`` and ``--docker`` options from ``sat showrev``.
+- Removed package and docker image listing from output of
+  ``sat showrev --all``.
 
 ## [3.1.0] - 2020-12-04
 

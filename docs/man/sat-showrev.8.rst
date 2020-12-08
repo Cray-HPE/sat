@@ -91,16 +91,6 @@ SLES version
     system. If ``/opt/cray/sat/etc/os-release`` exists, it is assumed to refer
     to the host operating system.
 
-The **--docker** option displays information about all installed docker
-images in a table. This table is sorted on the docker image name. This
-table has 3 columns; one for the image's name, its unique short-id, and
-its version.
-
-The **--packages** option displays information about installed RPM packages.
-This output is a 2-column table with the first column containing the
-package-name and the second containing its version. This table is sorted by
-package-name.
-
 OPTIONS
 =======
 
@@ -123,16 +113,9 @@ These options must be specified after the subcommand.
         directory. This option is not enabled by default and is included for
         compatibility with previous releases.
 
-**--docker**
-        Display information about the containers installed on this node.
-
-**--packages**
-        Display information about the installed packages on this node.
-
 **--all**
         Display everything. Equivalent to specifying **--system**,
-        **--products**, **--docker**, **--local**, **--packages**, and
-        **--release-files**.
+        **--products**, **--local**, and **--release-files**.
 
 **--sitefile** *file*
         Specify custom site information file printed by --system. This file

@@ -27,7 +27,7 @@ import sys
 
 from sat.config import get_config_value
 from sat.report import Report
-from sat.cli.showrev import containers, local, products, rpm, system
+from sat.cli.showrev import local, products, system
 
 
 LOGGER = logging.getLogger(__name__)
@@ -46,11 +46,9 @@ def assign_default_args(args):
     if args.all:
         args.system = True
         args.products = True
-        args.docker = True
         args.local = True
-        args.packages = True
         args.release_files = True
-    elif not any((args.system, args.products, args.local, args.docker, args.packages, args.release_files)):
+    elif not any((args.system, args.products, args.local, args.release_files)):
         args.local = True
         args.system = True
         args.products = True
@@ -125,20 +123,6 @@ def do_showrev(args):
             'Local Host Operating System',
             ['component', 'version'],
             local.get_local_os_information()
-        )
-
-    if args.docker:
-        append_report(
-            'Installed Container Versions',
-            ['name', 'short-id', 'versions'],
-            containers.get_dockers()
-        )
-
-    if args.packages:
-        append_report(
-            'Installed Package Versions',
-            ['name', 'version'],
-            rpm.get_rpms()
         )
 
     if not reports:
