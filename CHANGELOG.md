@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed ``--packages`` and ``--docker`` options from ``sat showrev``.
 - Removed package and docker image listing from output of
   ``sat showrev --all``.
+- Removed ``sat cablecheck``.
+
+### Fixed
+- Improved error handling in ``sat showrev --docker``.
 
 ## [3.1.0] - 2020-12-04
 
