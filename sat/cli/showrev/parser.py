@@ -46,7 +46,7 @@ def add_showrev_subparser(subparsers):
     showrev_parser.add_argument(
         '--all',
         help='Display everything. Equivalent to specifying --system, --products, '
-             '--docker, and --packages.',
+             '--docker, --packages, and --release-files.',
         action='store_true')
     showrev_parser.add_argument(
         '--system',
@@ -57,6 +57,10 @@ def add_showrev_subparser(subparsers):
         '--products',
         help='Display version information about the installed products. '
              'This is enabled when no other options are specified.',
+        action='store_true')
+    showrev_parser.add_argument(
+        '--release-files',
+        help='Display version information about locally installed release files.',
         action='store_true')
     showrev_parser.add_argument(
         '--docker',

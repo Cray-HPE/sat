@@ -22,7 +22,12 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
+import logging
+
 import docker
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 def get_dockers():
@@ -33,8 +38,11 @@ def get_dockers():
         the docker image id. The second contains the image's base-name. The
         third on to the end contain the image's versions.
     """
-
-    client = docker.from_env()
+    try:
+        client = docker.from_env()
+    except docker.errors.DockerException as err:
+        LOGGER.error('Unable to connect to Docker: %s', err)
+        return []
 
     ret = []
     for image in client.images.list():

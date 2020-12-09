@@ -25,6 +25,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Changed ``sat showrev`` to display product information from kuberetes
+  configuration map. Previous product information is now accessible with
+  the ``--release-files`` option.
+
+### Fixed
+- Improved error handling in ``sat showrev --docker``.
+
 ## [3.1.0] - 2020-12-04
 
 ### Added

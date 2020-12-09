@@ -56,7 +56,8 @@ def do_showrev(args):
         args.products = True
         args.docker = True
         args.packages = True
-    elif not any((args.system, args.products, args.docker, args.packages)):
+        args.release_files = True
+    elif not any((args.system, args.products, args.docker, args.packages, args.release_files)):
         args.system = True
         args.products = True
 
@@ -68,6 +69,18 @@ def do_showrev(args):
         else:
             title = 'System Revision Information'
             headings = ['component', 'data']
+            reports.append(Report(
+                headings, title, sort_by, reverse, no_headings, no_borders,
+                filter_strs=args.filter_strs))
+            reports[-1].add_rows(data)
+
+    if args.release_files:
+        headings, data = products.get_release_file_versions()
+        if not data:
+            LOGGER.warning('Could not retrieve release file versions.')
+
+        else:
+            title = 'Local Release Files'
             reports.append(Report(
                 headings, title, sort_by, reverse, no_headings, no_borders,
                 filter_strs=args.filter_strs))
