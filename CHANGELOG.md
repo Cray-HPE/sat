@@ -31,9 +31,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed ``sat showrev`` to display product information from kuberetes
   configuration map. Previous product information is now accessible with
   the ``--release-files`` option.
+- Changed ``sat showrev`` to display separate tables for system-wide
+  information and host-local information. Added the ``--local`` option to
+  ``sat showrev``.
+- ``sat showrev`` will first read from ``/opt/cray/sat/etc/os-release``
+  and from ``/etc/os-release`` if that does not exist for the SLES
+  version.
 
-### Fixed
-- Improved error handling in ``sat showrev --docker``.
+### Removed
+- Removed Lustre and PBS versions from ``sat showrev``.
+- Removed ``--packages`` and ``--docker`` options from ``sat showrev``.
+- Removed package and docker image listing from output of
+  ``sat showrev --all``.
 
 ## [3.1.0] - 2020-12-04
 

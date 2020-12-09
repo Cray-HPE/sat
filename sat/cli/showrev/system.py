@@ -22,14 +22,11 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
-import configparser
 import logging
 import warnings
-import os
 import shlex
 import socket
 import subprocess
-import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from collections import defaultdict
 
@@ -102,79 +99,6 @@ def get_site_data(sitefile):
     return data
 
 
-def get_zypper_versions(packages):
-    """Get version information about package as reported by zypper.
-
-    The first found occurrence of the respective package name is what is
-    entered for each package.
-
-    Args:
-        packages: List of package names. Should be whole package names.
-
-    Returns:
-        Dictionary where package-name => version. The entry for a package
-        will be None if zypper indicated the package could not be found.
-        The entry will be 'ERROR' if the zypper program isn't present, if
-        zypper encountered an internal error, or if the query succeeded,
-        but the output could not be parsed.
-
-    Raises:
-        subprocesses.CalledProcessErorr if the call to zypper encountered some
-            sort of internal error.
-    """
-
-    versions = defaultdict(lambda: None)
-
-    cmd = 'zypper --quiet --xmlout search -t package -xs'
-    toks = shlex.split(cmd) + packages
-    lines = ''
-    root = None
-
-    try:
-        lines = subprocess.check_output(toks).decode('utf-8')
-
-        try:
-            root = ET.fromstring(lines)
-        except ET.ParseError:
-            LOGGER.error('Zypper output could not be parsed for package list {} .'.format(packages))
-            return defaultdict(lambda: 'ERROR')
-    except subprocess.CalledProcessError as cpe:
-
-        if cpe.returncode == 6:
-            # no repositories are defined
-            LOGGER.warning('Zypper has no repositories configured.')
-            return versions
-        elif cpe.returncode == 104:
-            # no matches
-            LOGGER.warning('Zypper found no matches for any package in {}.'.format(packages))
-            return versions
-        else:
-            # zypper had an internal error and we have a serious problem
-            raise
-    except FileNotFoundError:
-        LOGGER.error('The zypper program is not present on this system.')
-        return defaultdict(lambda: 'ERROR')
-
-    try:
-        for entry in root[0][0]:
-            name = entry.attrib['name']
-            try:
-                if name not in versions:
-                    versions[name] = entry.attrib['edition']
-            except KeyError:
-                LOGGER.error('Zypper did not report an "edition" for package {}.'.format(name))
-                versions[name] = 'ERROR'
-    except IndexError:
-        LOGGER.error('Zypper did not report an xml-tree in expected format. No entries at depth 2')
-        return defaultdict(lambda: 'ERROR')
-
-    return versions
-
-
-def get_kernel_version():
-    return os.uname().release
-
-
 def _get_hsm_components():
     """Helper used by get_interconnects.
 
@@ -233,40 +157,6 @@ def get_interconnects():
     return networks
 
 
-def get_sles_version():
-    """Gets SLES version info found in /etc/os-release.
-
-    Returns:
-        A string containing the NAME and VERSION field as found in the file
-        /etc/os-release.
-    """
-    osrel_path = '/etc/os-release'
-
-    try:
-        with open(osrel_path, 'r') as f:
-            config_string = '[default]\n' + f.read()
-    except (FileNotFoundError, AttributeError, PermissionError):
-        LOGGER.error('ERROR: Could not open {}.'.format(osrel_path))
-        return 'ERROR'
-
-    cp = configparser.ConfigParser(interpolation=None)
-    cp.read_string(config_string)
-
-    try:
-        slesname = cp.get('default', 'NAME').replace('"', '')
-        slesvers = cp.get('default', 'VERSION').replace('"', '')
-        if slesname == '' or slesvers == '':
-            LOGGER.error('ERROR: Empty SLES NAME or VERSION field in {}.'.format(osrel_path))
-            return 'ERROR'
-        else:
-            return '{} {}'.format(slesname, slesvers)
-    except configparser.NoOptionError:
-        LOGGER.error('SLES NAME and VERSION fields not found in {}'.format(osrel_path))
-        return 'ERROR'
-
-    return 'ERROR'
-
-
 def get_slurm_version():
     """Get version of slurm.
 
@@ -315,7 +205,7 @@ def get_slurm_version():
     return version
 
 
-def get_system_version(sitefile, substr=''):
+def get_system_version(sitefile):
     """Collects generic information about the system.
 
     This is the function that 'decides' what components (and their versions)
@@ -326,18 +216,11 @@ def get_system_version(sitefile, substr=''):
         various system components.
     """
 
-    zypper_versions = get_zypper_versions(
-        ['cray-lustre-client', 'pbs-crayctldeploy']
-    )
     sitedata = get_site_data(sitefile)
 
     # keep this list in ascii-value sorted order on the keys.
     field_getters_by_name = OrderedDict([
         ('Interconnect', lambda: ' '.join(get_interconnects())),
-        ('Kernel', get_kernel_version),
-        ('Lustre', lambda: zypper_versions['cray-lustre-client']),
-        ('PBS version', lambda: zypper_versions['pbs-crayctldeploy']),
-        ('SLES version', get_sles_version),
         ('Serial number', lambda: sitedata['Serial number']),
         ('Site name', lambda: sitedata['Site name']),
         ('Slurm version', get_slurm_version),
