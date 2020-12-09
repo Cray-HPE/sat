@@ -3,9 +3,6 @@
 LOGDIR=/var/log/cray/sat
 
 SATMANDIR=/usr/share/man/man8
-SLINGSHOT_TOOLS_REPO=https://stash.us.cray.com/scm/SSHOT/slingshot_tools.git
-SLINGSHOT_TOOLS_DIR=slingshot_tools
-SLINGSHOT_TOOLS_BRANCH=master
 
 CRAYCTL_REPO=https://stash.us.cray.com/scm/MTL/crayctl.git
 CRAYCTL_DIR=crayctl
@@ -42,13 +39,6 @@ if [ ! -d "/etc/bash_completion.d" ]; then
 fi
 register-python-argcomplete sat > /etc/bash_completion.d/sat-completion.bash
 echo "source /etc/bash_completion.d/sat-completion.bash" >> /root/.bash_login
-
-# install slingshot-tools
-cd /sat
-git clone $SLINGSHOT_TOOLS_REPO $SLINGSHOT_TOOLS_DIR
-cd  $SLINGSHOT_TOOLS_DIR
-git checkout $SLINGSHOT_TOOLS_BRANCH
-python3 setup.py install --root=/
 
 # install ipmitools scripts
 cd /sat
