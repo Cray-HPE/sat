@@ -37,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ``sat showrev`` will first read from ``/opt/cray/sat/etc/os-release``
   and from ``/etc/os-release`` if that does not exist for the SLES
   version.
+- Modified output and logging of ``sat bootsys boot|shutdown --stage bos-operations``
+  to include more information about the BOS session, BOA jobs and BOA pods.
 
 ### Removed
 - Removed Lustre and PBS versions from ``sat showrev``.

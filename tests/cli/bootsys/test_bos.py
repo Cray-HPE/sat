@@ -22,8 +22,10 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
+import logging
 import shlex
 import subprocess
+from textwrap import indent
 import unittest
 from unittest.mock import Mock, call, patch
 
@@ -32,16 +34,17 @@ from sat.cli.bootsys.bos import (
     BOSSessionThread,
     boa_job_successful
 )
+from tests.common import ExtendedTestCase
 
 
-class TestBOAJobSuccessful(unittest.TestCase):
+class TestBOAJobSuccessful(ExtendedTestCase):
     """Tests for whether the BOA job is successful."""
     def setUp(self):
         """Create some mocks."""
         self.boa_job_id = 'boa-1234567890abcdef'
         self.boa_pods = ['{}-{}'.format(self.boa_job_id, i) for i in range(4)]
         self.boa_pod_logs = [
-            'Starting a BOA job.'
+            'Starting a BOA job.',
             'Finishing a BOA job.'
         ]
         self.fatal_boa_message = (
@@ -81,6 +84,16 @@ class TestBOAJobSuccessful(unittest.TestCase):
         """Stop all patches."""
         patch.stopall()
 
+    def assert_boa_logs(self, logs):
+        """Helper to assert boa pod lines are logged."""
+        max_lines_to_log = 50
+        expected_log_message = (f'BOA job {self.boa_job_id} was not successful. '
+                                f'Last 50 log lines from pod {self.boa_pods[-1]}:\n')
+        expected_log_message += indent('\n'.join(self.boa_pod_logs[-max_lines_to_log:]), prefix='  ')
+        expected_full_log_help = f'To see full logs, run: \'kubectl -n services logs -c boa {self.boa_pods[-1]}\''
+        self.assert_in_element(expected_log_message, logs.output)
+        self.assert_in_element(expected_full_log_help, logs.output)
+
     def test_successful_boa_job(self):
         """Test boa_job_successful on a successful BOA job."""
         self.assertTrue(boa_job_successful(self.boa_job_id))
@@ -113,12 +126,24 @@ class TestBOAJobSuccessful(unittest.TestCase):
     def test_failed_boa_job(self):
         """Test boa_job_successful on a failed BOA job."""
         self.boa_pod_logs.append(self.fatal_boa_message)
-        self.assertFalse(boa_job_successful(self.boa_job_id))
+        with self.assertLogs(level=logging.ERROR) as logs:
+            self.assertFalse(boa_job_successful(self.boa_job_id))
+            self.assert_boa_logs(logs)
 
     def test_failed_boa_job_middle_log(self):
         """Test boa_job_successful on a failed BOA job with log in middle."""
         self.boa_pod_logs.insert(1, self.fatal_boa_message)
-        self.assertFalse(boa_job_successful(self.boa_job_id))
+        with self.assertLogs(level=logging.ERROR) as logs:
+            self.assertFalse(boa_job_successful(self.boa_job_id))
+            self.assert_boa_logs(logs)
+
+    def test_failed_boa_job_many_log_lines(self):
+        """Test boa_job_successful on a failed BOA job only logs num_lines_to_log lines"""
+        self.boa_pod_logs = ['Reindexing BOA session templates'] * 100
+        self.boa_pod_logs.append(self.fatal_boa_message)
+        with self.assertLogs(level=logging.ERROR) as logs:
+            self.assertFalse(boa_job_successful(self.boa_job_id))
+            self.assert_boa_logs(logs)
 
     def test_kubectl_get_failure(self):
         """Test boa_job_successful with 'kubectl get pod' failure."""

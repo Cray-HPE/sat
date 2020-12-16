@@ -28,6 +28,7 @@ from random import choices, randint
 import shlex
 import subprocess
 import sys
+from textwrap import dedent, indent
 from threading import Event, Thread
 from time import sleep, monotonic
 
@@ -94,6 +95,7 @@ def boa_job_successful(boa_job_id):
         raise BOSFailure('{}; no pods with job-name={}'.format(msg_prefix,
                                                                boa_job_id))
 
+    LOGGER.info('Determining success of BOA job with ID %s by checking logs from pod %s', boa_job_id, last_pod)
     logs_cmd = shlex.split('kubectl -n services logs -c boa '
                            '{}'.format(last_pod))
 
@@ -109,8 +111,19 @@ def boa_job_successful(boa_job_id):
         raise BOSFailure('{}; failed to get logs of pod {}: {}'.format(
             msg_prefix, last_pod, err))
 
-    return not any(fatal_err_msg in line
-                   for line in logs_proc.stdout.splitlines())
+    success = not any(fatal_err_msg in line
+                      for line in logs_proc.stdout.splitlines())
+
+    if not success:
+        num_lines_to_log = 50
+        lines_to_log = indent('\n'.join(logs_proc.stdout.splitlines()[-num_lines_to_log:]), prefix='  ')
+        LOGGER.error(
+            'BOA job %s was not successful. Last %s log lines from pod %s:\n%s',
+            boa_job_id, num_lines_to_log, last_pod, lines_to_log
+        )
+        LOGGER.error('To see full logs, run: \'kubectl -n services logs -c boa %s\'', last_pod)
+
+    return success
 
 
 class BOSSessionThread(Thread):
@@ -234,11 +247,17 @@ class BOSSessionThread(Thread):
             '--timeout=0 job/{}'.format(self.boa_job_id)
         )
 
+        print(dedent(f'''
+            Waiting for BOA k8s job with id {self.boa_job_id} to complete. Session template: {self.session_template}.
+            To monitor the progress of this job, run the following command in a separate window:
+                'kubectl -n services logs -c boa -f --selector job-name={self.boa_job_id}'\
+            '''))
+
         while not self.complete and not self.stopped():
             sleep(self.check_interval)
 
-            LOGGER.debug("Waiting for BOA k8s job with job ID %s to complete.",
-                         self.boa_job_id)
+            LOGGER.info("Waiting for BOA k8s job with job ID %s to complete. Session template: %s",
+                        self.boa_job_id, self.session_template)
             try:
                 wait_proc = subprocess.run(wait_cmd, stdout=subprocess.PIPE,
                                            stderr=subprocess.PIPE, encoding='utf-8')
