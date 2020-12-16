@@ -42,11 +42,15 @@ def main():
         None. Calls sys.exit().
     """
     try:
+        bootstrap_logging()
+
+        # cablecheck has been removed in shasta 1.4 - see SAT-745
+        if 'cablecheck' in sys.argv:
+            LOGGER.warning('sat cablecheck has been replaced by \'slingshot-topology-tool --cmd "show cables"\'\n')
+
         parser = create_parent_parser()
         argcomplete.autocomplete(parser)
         args = parser.parse_args()
-
-        bootstrap_logging()
 
         # Automatically create config file if it does not exist, except
         # in `sat init` where the subcommand will create it.  With
