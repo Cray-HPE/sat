@@ -107,7 +107,7 @@ class TestGetProducts(unittest.TestCase):
              'cray-shasta-compute-sles15sp1.x86_64-1.4.23'],
             ['uan', '2.0.0', 'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0',
              'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0'],
-            ['pbs', '0.1.0', MISSING_VALUE, MISSING_VALUE]
+            ['pbs', '0.1.0', '-', '-']
         ]
         actual_headers, actual_fields = get_product_versions()
         self.mock_get_config.assert_called_once_with()
@@ -166,7 +166,7 @@ class TestGetProducts(unittest.TestCase):
              'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0'],
             ['uan', '2.0.1', 'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.1',
              'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.1'],
-            ['pbs', '0.1.0', MISSING_VALUE, MISSING_VALUE]
+            ['pbs', '0.1.0', '-', '-']
         ]
         actual_headers, actual_fields = get_product_versions()
         self.mock_get_config.assert_called_once_with()
@@ -211,7 +211,7 @@ class TestGetProducts(unittest.TestCase):
              'cray-shasta-compute-sles15sp1.x86_64-1.4.23'],
             ['uan', '2.0.0', 'cray-shasta-uan-cos-sles15sp1.aarch64-2.0.0\ncray-shasta-uan-cos-sles15sp1.x86_64-2.0.0',
              'cray-shasta-uan-cos-sles15sp1.aarch64-2.0.0\ncray-shasta-uan-cos-sles15sp1.x86_64-2.0.0'],
-            ['pbs', '0.1.0', MISSING_VALUE, MISSING_VALUE]
+            ['pbs', '0.1.0', '-', '-']
         ]
         actual_headers, actual_fields = get_product_versions()
         self.mock_get_config.assert_called_once_with()

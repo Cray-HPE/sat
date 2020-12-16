@@ -78,7 +78,7 @@ def get_product_versions():
         for each product-version. If multiple images and/or recipes exist for
         one product-version, then each image or recipe will be printed as a
         newline-separated list within the same row. If no images and/or recipes
-        exist for a product-version, then their values will be 'MISSING'.
+        exist for a product-version, then their values will be '-'.
     """
     product_key = 'product_name'
     version_key = 'product_version'
@@ -103,8 +103,8 @@ def get_product_versions():
         # product_data is a multiline string in YAML format
         product_data = safe_load(product_data)
         for version in product_data:
-            images = '\n'.join(sorted(product_data[version].get('images', {}).keys())) or MISSING_VALUE
-            recipes = '\n'.join(sorted(product_data[version].get('recipes', {}).keys())) or MISSING_VALUE
+            images = '\n'.join(sorted(product_data[version].get('images', {}).keys())) or '-'
+            recipes = '\n'.join(sorted(product_data[version].get('recipes', {}).keys())) or '-'
             products.append([product_name, version, images, recipes])
 
     return headers, products

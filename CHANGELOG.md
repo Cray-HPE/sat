@@ -44,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed package and docker image listing from output of
   ``sat showrev --all``.
 
+### Fixed
+- Added a space between sentences in S3 error logging in ``sat showrev``.
+
 ## [3.1.0] - 2020-12-04
 
 ### Added
