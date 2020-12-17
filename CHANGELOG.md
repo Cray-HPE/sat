@@ -25,7 +25,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.2.0] - 2020-12-17
 
 ### Changed
 - Changed ``sat showrev`` to display product information from kuberetes
@@ -48,12 +48,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed package and docker image listing from output of
   ``sat showrev --all``.
 - Removed ``sat cablecheck``.
+- Removed ``slingshot-tools`` from the Docker image.
 
 ### Fixed
 - Improved error handling in ``sat showrev --docker``.
 - Fixed a missing comma in the ``sat`` man page.
-
-### Fixed
 - Added a space between sentences in S3 error logging in ``sat showrev``.
 
 ## [3.1.0] - 2020-12-04
