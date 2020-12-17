@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Improved error handling in ``sat showrev --docker``.
+- Fixed a missing comma in the ``sat`` man page.
 
 ### Fixed
 - Added a space between sentences in S3 error logging in ``sat showrev``.
