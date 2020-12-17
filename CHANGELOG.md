@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   version.
 - Modified output and logging of ``sat bootsys boot|shutdown --stage bos-operations``
   to include more information about the BOS session, BOA jobs and BOA pods.
+- Changed ``sat swap`` to print an error message since the Fabric Controller API
+  that is used is no longer available.
 
 ### Removed
 - Removed Lustre and PBS versions from ``sat showrev``.
