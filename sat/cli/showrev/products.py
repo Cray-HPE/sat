@@ -24,6 +24,11 @@ OTHER DEALINGS IN THE SOFTWARE.
 from collections import OrderedDict
 import logging
 import os
+import warnings
+from yaml import safe_load, YAMLLoadWarning
+
+from kubernetes.client import CoreV1Api
+from kubernetes.config import load_kube_config, ConfigException
 
 from sat.constants import MISSING_VALUE
 
@@ -57,7 +62,55 @@ def _get_unique_keys(ordered_dicts):
     return unique_keys
 
 
-def get_product_versions(release_dir_path='/opt/cray/etc/release'):
+def get_product_versions():
+    """Gets the product versions from the 'cray-product-catalog' config map.
+
+    Returns:
+        A tuple of (headings, data_rows) where headings is a list of strings
+        representing the headings for the data, and data_rows is a list of
+        lists where each element is a list representing one row of data.
+
+        The headings will be the product name, version, image name, and image
+        recipe name. The rows will be the values of each of these fields for
+        each product.
+
+        If multiple versions of one product exist, then there will be one row
+        for each product-version. If multiple images and/or recipes exist for
+        one product-version, then each image or recipe will be printed as a
+        newline-separated list within the same row. If no images and/or recipes
+        exist for a product-version, then their values will be '-'.
+    """
+    product_key = 'product_name'
+    version_key = 'product_version'
+    image_key = 'images'
+    recipe_key = 'image_recipes'
+    headers = [product_key, version_key, image_key, recipe_key]
+    # Load k8s configuration before trying to use API
+    try:
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=YAMLLoadWarning)
+            load_kube_config()
+    # Earlier versions: FileNotFoundError; later versions: ConfigException
+    except (FileNotFoundError, ConfigException) as err:
+        LOGGER.error('Unable to load kubernetes configuration: %s', err)
+        return [], []
+    config_map = CoreV1Api().read_namespaced_config_map(
+        name='cray-product-catalog',
+        namespace='services'
+    )
+    products = []
+    for product_name, product_data in config_map.data.items():
+        # product_data is a multiline string in YAML format
+        product_data = safe_load(product_data)
+        for version in product_data:
+            images = '\n'.join(sorted(product_data[version].get('images', {}).keys())) or '-'
+            recipes = '\n'.join(sorted(product_data[version].get('recipes', {}).keys())) or '-'
+            products.append([product_name, version, images, recipes])
+
+    return headers, products
+
+
+def get_release_file_versions(release_dir_path='/opt/cray/etc/release'):
     """Gets the product versions from files in `release_dir_path`.
 
     Args:

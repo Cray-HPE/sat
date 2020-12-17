@@ -25,6 +25,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2020-12-17
+
+### Changed
+- Changed ``sat showrev`` to display product information from kuberetes
+  configuration map. Previous product information is now accessible with
+  the ``--release-files`` option.
+- Changed ``sat showrev`` to display separate tables for system-wide
+  information and host-local information. Added the ``--local`` option to
+  ``sat showrev``.
+- ``sat showrev`` will first read from ``/opt/cray/sat/etc/os-release``
+  and from ``/etc/os-release`` if that does not exist for the SLES
+  version.
+- Modified output and logging of ``sat bootsys boot|shutdown --stage bos-operations``
+  to include more information about the BOS session, BOA jobs and BOA pods.
+- Changed ``sat swap`` to print an error message since the Fabric Controller API
+  that is used is no longer available.
+
+### Removed
+- Removed Lustre and PBS versions from ``sat showrev``.
+- Removed ``--packages`` and ``--docker`` options from ``sat showrev``.
+- Removed package and docker image listing from output of
+  ``sat showrev --all``.
+- Removed ``sat cablecheck``.
+- Removed ``slingshot-tools`` from the Docker image.
+
+### Fixed
+- Improved error handling in ``sat showrev --docker``.
+- Fixed a missing comma in the ``sat`` man page.
+- Added a space between sentences in S3 error logging in ``sat showrev``.
+
 ## [3.1.0] - 2020-12-04
 
 ### Added

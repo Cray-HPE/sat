@@ -1,7 +1,6 @@
 all: \
 	sat-auth.8 \
 	sat-bootsys.8 \
-	sat-cablecheck.8 \
 	sat-diag.8 \
 	sat-firmware.8 \
 	sat-hwinv.8 \
