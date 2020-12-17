@@ -33,6 +33,7 @@ def set_options(namespace):
     namespace.target = 'cable'
 
 
+@unittest.skip('SAT-713: Temporarily remove sat swap')
 class TestSwapMain(unittest.TestCase):
 
     def setUp(self):
