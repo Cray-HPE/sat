@@ -28,7 +28,7 @@ RUN /sat/config-docker-sat.sh
 RUN rm -rf /sat/*
 
 # certs should be mounted from host
-# --mount type=bind,src=/usr/share/pki/trust/anchors,target=/usr/local/share/ca-certificates,ro=true
+# --mount type=bind,src=/etc/pki/trust/anchors,target=/usr/local/share/ca-certificates,ro=true
 RUN chmod +x /docker_entrypoint.sh
 ENTRYPOINT ["/docker_entrypoint.sh"]
 CMD ["/bin/bash", "-l"]
