@@ -158,10 +158,10 @@ def get_interconnects():
 
 
 def get_slurm_version():
-    """Get version of slurm.
+    """Get version of Slurm.
 
     Returns:
-        String representing version of slurm. Returns 'ERROR' if something
+        String representing version of Slurm. Returns None if something
         went wrong.
     """
 
@@ -173,10 +173,10 @@ def get_slurm_version():
             kubernetes.config.load_kube_config()
     except ApiException as err:
         LOGGER.error('Reading kubernetes config: {}'.format(err))
-        return 'ERROR'
+        return None
     except FileNotFoundError as err:
         LOGGER.error('Kubernetes config not found: {}'.format(err))
-        return 'ERROR'
+        return None
 
     ns = 'user'
     try:
@@ -184,10 +184,10 @@ def get_slurm_version():
         pod = dump.items[0].metadata.name
     except ApiException as err:
         LOGGER.error('Could not retrieve list of pods: {}'.format(err))
-        return 'ERROR'
+        return None
     except IndexError:
-        LOGGER.error('No pods with label app=slurmctld could be found.')
-        return 'ERROR'
+        LOGGER.info('No pods with label app=slurmctld could be found.')
+        return None
 
     cmd = 'kubectl exec -n {} -c slurmctld {} -- sinfo --version'.format(ns, pod)
     toks = shlex.split(cmd)
@@ -197,10 +197,10 @@ def get_slurm_version():
         version = output.decode('utf-8').splitlines()[0]
     except IndexError:
         LOGGER.error('Command to print slurm version returned no stdout.')
-        return 'ERROR'
+        return None
     except subprocess.CalledProcessError as e:
         LOGGER.error('Exception when querying slurm version: {}'.format(e))
-        return 'ERROR'
+        return None
 
     return version
 
@@ -229,5 +229,8 @@ def get_system_version(sitefile):
         ('System type', lambda: sitedata['System type']),
     ])
 
-    return [[field_name, field_getter()]
-            for field_name, field_getter in field_getters_by_name.items()]
+    version_rows = [[field_name, field_getter()]
+                    for field_name, field_getter in field_getters_by_name.items()]
+
+    # filter out null values
+    return [row for row in version_rows if row[1] is not None]
