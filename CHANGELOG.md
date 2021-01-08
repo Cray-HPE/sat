@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Removed error message and 'ERROR' value for Slurm version in system
   table in ``sat showrev`` when Slurm is not present.
+- Add missing space in help text for ``sat showrev`` ``--all`` option.
 
 ## [3.2.0] - 2020-12-17
 
