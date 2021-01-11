@@ -71,7 +71,6 @@ STAGES_BY_ACTION = {
         ('ceph-check', ('ceph', 'do_ceph_check')),
         ('bgp-check', ('bgp', 'do_bgp_check')),
         ('cabinet-power', ('cabinet_power', 'do_cabinets_power_on')),
-        ('hsn-bringup', ('hsn', 'do_hsn_bringup')),
         ('bos-operations', ('bos', 'do_bos_boots'))
     ])
 }
