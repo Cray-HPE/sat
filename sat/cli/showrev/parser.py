@@ -45,7 +45,7 @@ def add_showrev_subparser(subparsers):
 
     showrev_parser.add_argument(
         '--all',
-        help='Display everything. Equivalent to specifying --system, --products,'
+        help='Display everything. Equivalent to specifying --system, --products, '
              '--local and --release-files',
         action='store_true')
     showrev_parser.add_argument(
