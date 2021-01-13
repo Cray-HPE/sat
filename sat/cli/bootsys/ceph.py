@@ -28,7 +28,7 @@ import sys
 
 from paramiko import SSHClient, SSHException
 
-from sat.cli.bootsys.util import get_groups
+from sat.cli.bootsys.util import get_mgmt_ncn_hostnames
 from sat.cli.bootsys.waiting import Waiter
 from sat.config import get_config_value
 from sat.util import BeginEndLogger
@@ -101,7 +101,7 @@ def restart_ceph_services():
         SystemExit: if connecting to one of the hosts failed, or if restarting
             one of the services failed
     """
-    storage_nodes = get_groups(['storage'])
+    storage_nodes = get_mgmt_ncn_hostnames(['storage'])
     ceph_services = ['ceph-mon.target', 'ceph-mgr.target', 'ceph-mds.target']
     ssh_client = SSHClient()
     ssh_client.load_system_host_keys()

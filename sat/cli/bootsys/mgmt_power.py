@@ -33,7 +33,7 @@ from paramiko.ssh_exception import BadHostKeyException, AuthenticationException,
 
 from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger
 from sat.cli.bootsys.mgmt_hosts import do_enable_hosts_entries, do_disable_hosts_entries
-from sat.cli.bootsys.util import get_ncns, RunningService
+from sat.cli.bootsys.util import get_mgmt_ncn_hostnames, RunningService
 from sat.cli.bootsys.waiting import GroupWaiter
 from sat.config import get_config_value
 from sat.util import BeginEndLogger, get_username_and_password_interactively, prompt_continue
@@ -250,11 +250,14 @@ def do_mgmt_shutdown_power(ssh_client, username, password, ncn_shutdown_timeout,
             power state after IPMI power off.    """
     LOGGER.info('Sending shutdown command to hosts.')
 
-    non_bis_hosts = get_ncns(['managers', 'storage', 'workers'], exclude=['bis'])
-    with IPMIConsoleLogger(non_bis_hosts):
-        start_shutdown(non_bis_hosts, ssh_client)
+    # Ensure we do not shut down the first master node yet, as it is the node
+    # where "sat bootsys" commands are being run.
+    # TODO: Is there a better way to get the hostname of the first master node?
+    other_ncns = get_mgmt_ncn_hostnames(['managers', 'storage', 'workers']) - {'ncn-m001'}
+    with IPMIConsoleLogger(other_ncns):
+        start_shutdown(other_ncns, ssh_client)
 
-        finish_shutdown(non_bis_hosts, username, password,
+        finish_shutdown(other_ncns, username, password,
                         ncn_shutdown_timeout, ipmi_timeout)
         LOGGER.info('Shutdown complete.')
 
@@ -300,9 +303,11 @@ def do_power_on_ncns(args):
     do_enable_hosts_entries()
 
     with RunningService('dhcpd', sleep_after_start=5):
-        master_nodes = get_ncns(['managers'])
-        storage_nodes = get_ncns(['storage'])
-        worker_nodes = get_ncns(['workers'], exclude=['bis'])
+        # First master node is already on as it is where "sat bootsys" runs.
+        # TODO: Is there a better way to get the hostname of the first master node?
+        master_nodes = get_mgmt_ncn_hostnames(['managers']) - {'ncn-m001'}
+        storage_nodes = get_mgmt_ncn_hostnames(['storage'])
+        worker_nodes = get_mgmt_ncn_hostnames(['workers'])
         ncn_groups = [master_nodes, storage_nodes, worker_nodes]
         # flatten lists of ncn groups
         non_bis_ncns = set(ncn for sublist in ncn_groups for ncn in sublist)

@@ -48,9 +48,9 @@ class TestRestartCephServices(ExtendedTestCase):
         self.mock_stderr.channel.recv_exit_status.return_value = 0
         self.mock_exec_command.return_value = (self.mock_stdin, self.mock_stdout, self.mock_stderr)
 
-        self.mock_get_groups = patch('sat.cli.bootsys.ceph.get_groups').start()
+        self.mock_get_ncns = patch('sat.cli.bootsys.ceph.get_mgmt_ncn_hostnames').start()
         self.hosts = ['ncn-s001', 'ncn-s002', 'ncn-s003']
-        self.mock_get_groups.return_value = self.hosts
+        self.mock_get_ncns.return_value = self.hosts
 
         self.services_to_restart = ['ceph-mon.target', 'ceph-mgr.target', 'ceph-mds.target']
 
@@ -59,7 +59,7 @@ class TestRestartCephServices(ExtendedTestCase):
 
     def assert_client(self):
         """Helper for test cases to assert that the SSH client was initialized correctly"""
-        self.mock_get_groups.assert_called_once_with(['storage'])
+        self.mock_get_ncns.assert_called_once_with(['storage'])
         self.mock_ssh_client_cls.assert_called_once()
         self.mock_load_system_host_keys.assert_called_once()
 
