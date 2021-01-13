@@ -117,6 +117,14 @@ class HSNBringupWaiter(GroupWaiter):
 def do_hsn_bringup(args):
     """Bring up HSN and wait for it to be healthy.
 
+    NOTE: This stage is not currently supported because both the procedure to
+    bring up the HSN and the fabric controller API have changed completely. As
+    such, it is not included in STAGES_BY_ACTION in sat.cli.bootsys.stages, so
+    it is not possible to execute this stage through the `sat` CLI.
+
+    TODO (SAT-591): Update stage to bring up HSN using next-gen fabric controller
+    TODO (SAT-780): Update stage to capture HSN state using next-gen fabric controller
+
     Args:
         args: The argparse.Namespace object containing the parsed arguments
             passed to this stage.
