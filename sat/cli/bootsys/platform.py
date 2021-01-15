@@ -1,7 +1,7 @@
 """
 Start and stop platform services to boot and shut down a Shasta system.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -44,7 +44,7 @@ CONTAINER_STOP_SCRIPT = (
 
 class RemoteServiceWaiter(Waiter):
     """A class to stop a service over SSH and wait for it to be inactive."""
-    def __init__(self, host, service_name, target_state, timeout, poll_interval=5):
+    def __init__(self, host, service_name, target_state, timeout, poll_interval=5, enable_service=False):
         """Construct a new RemoteServiceWaiter.
 
         Args:
@@ -55,11 +55,15 @@ class RemoteServiceWaiter(Waiter):
             timeout (int): the timeout, in seconds, for the wait operation.
             poll_interval (int): the interval, in seconds, between polls for
                 completion.
+            enable_service (bool): if target_state is 'active', then check
+                and optionally enable the service. Ignored if target_state is
+                not 'active'.
         """
         super().__init__(timeout, poll_interval=poll_interval)
         self.host = host
         self.service_name = service_name
         self.target_state = target_state
+        self.enable_service = enable_service
         self.ssh_client = SSHClient()
 
     def _run_remote_command(self, command, nonzero_error=True):
@@ -118,6 +122,10 @@ class RemoteServiceWaiter(Waiter):
         else:
             self._run_remote_command(f'systemctl {systemctl_action} {self.service_name}')
 
+        # If desired, enable the service
+        if self.target_state == 'active' and self.enable_service and self._get_enabled() != 'enabled':
+            self._run_remote_command(f'systemctl enable {self.service_name}')
+
     def _get_active(self):
         """Check whether the service is active or not according to systemctl.
 
@@ -130,6 +138,21 @@ class RemoteServiceWaiter(Waiter):
         """
         # systemctl is-active always exits with a non-zero code if the service is not active
         stdout, stderr = self._run_remote_command(f'systemctl is-active {self.service_name}',
+                                                  nonzero_error=False)
+        return stdout.read().decode().strip()
+
+    def _get_enabled(self):
+        """Check whether the service is enabled or not according to systemctl.
+
+        Returns:
+            The string representation of the service's enabled status; e.g.
+                'enabled', 'disabled', or 'unknown'.
+
+        Raises:
+            RuntimeError, SSHException: from _run_remote_command.
+        """
+        # systemctl is-enabled always exits with a non-zero code if the service is not active
+        stdout, stderr = self._run_remote_command(f'systemctl is-enabled {self.service_name}',
                                                   nonzero_error=False)
         return stdout.read().decode().strip()
 
@@ -185,11 +208,15 @@ def do_platform_stop(args):
     Returns:
         None
     """
-    print('Stopping containers running under containerd on all Kubernetes NCNs using crictl')
     k8s_ncns = get_mgmt_ncn_hostnames(subroles=['managers', 'workers'])
     if not k8s_ncns:
         LOGGER.error('No Kubernetes NCN hostnames found. Please check the contents of /etc/hosts.')
         raise SystemExit(1)
+    container_stop_info_message = (
+        f'Stopping containers running under containerd on all Kubernetes NCNs using crictl. Hosts: {k8s_ncns}'
+    )
+    LOGGER.info(container_stop_info_message)
+    print(container_stop_info_message)
     # This currently stops all containers in parallel before stopping containerd
     # on each ncn in parallel.  It probably could be faster if it was all in parallel.
     container_stop_threads = [Thread(target=stop_containers, args=(ncn,)) for ncn in k8s_ncns]
@@ -198,7 +225,11 @@ def do_platform_stop(args):
     for thread in container_stop_threads:
         thread.join()
 
-    print('Stopping containerd on all Kubernetes NCNs using systemctl')
+    containerd_stop_info_message = (
+        f'Stopping containerd on all Kubernetes NCNs using systemctl. Hosts: {k8s_ncns}'
+    )
+    LOGGER.info(containerd_stop_info_message)
+    print(containerd_stop_info_message)
     containerd_stop_timeout = 30
     containerd_stop_waiters = [RemoteServiceWaiter(ncn, 'containerd', target_state='inactive',
                                                    timeout=containerd_stop_timeout)
@@ -216,4 +247,21 @@ def do_platform_start(args):
         args: The argparse.Namespace object containing the parsed arguments
             passed to this stage.
     """
-    raise NotImplementedError('Starting platform services is not implemented yet')
+    k8s_ncns = get_mgmt_ncn_hostnames(subroles=['managers', 'workers'])
+    if not k8s_ncns:
+        LOGGER.error('No Kubernetes NCN hostnames found. Please check the contents of /etc/hosts.')
+        raise SystemExit(1)
+    containerd_start_info_message = (
+        f'Starting containerd on all Kubernetes NCNs using systemctl. Hosts: {k8s_ncns}'
+    )
+    print(containerd_start_info_message)
+    LOGGER.info(containerd_start_info_message)
+    # Start containerd on each NCN
+    containerd_start_timeout = 30
+    containerd_start_waiters = [RemoteServiceWaiter(ncn, 'containerd', target_state='active',
+                                                    timeout=containerd_start_timeout, enable_service=True)
+                                for ncn in k8s_ncns]
+    for waiter in containerd_start_waiters:
+        waiter.wait_for_completion_async()
+    for waiter in containerd_start_waiters:
+        waiter.wait_for_completion_await()

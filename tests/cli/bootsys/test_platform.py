@@ -1,7 +1,7 @@
 """
 Unit tests for the sat.cli.bootsys.platform module.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -86,6 +86,7 @@ class TestRemoteServiceWaiter(unittest.TestCase):
         self.service_name = 'exampled'
         self.timeout = 60
         self.service_status = b'active\n'
+        self.enabled_status = b'enabled\n'
         # set self.systemctl_works to False to mimic cases when running the command does not
         # change the service's status
         self.systemctl_works = True
@@ -101,10 +102,15 @@ class TestRemoteServiceWaiter(unittest.TestCase):
         """Fake the behavior of SSHClient.exec_command."""
         if cmd.startswith('systemctl is-active'):
             self.ssh_return_values[1].read.return_value = self.service_status
-        elif cmd.startswith('systemctl stop') and self.systemctl_works:
-            self.service_status = b'inactive\n'
-        elif cmd.startswith('systemctl start') and self.systemctl_works:
-            self.service_status = b'active\n'
+        elif cmd.startswith('systemctl is-enabled'):
+            self.ssh_return_values[1].read.return_value = self.enabled_status
+        if self.systemctl_works:
+            if cmd.startswith('systemctl stop'):
+                self.service_status = b'inactive\n'
+            elif cmd.startswith('systemctl start'):
+                self.service_status = b'active\n'
+            elif cmd.startswith('systemctl enable'):
+                self.enabled_status = b'enabled\n'
 
         return self.ssh_return_values
 
@@ -137,6 +143,32 @@ class TestRemoteServiceWaiter(unittest.TestCase):
         self.assert_ssh_connected()
         self.ssh_client.exec_command.assert_has_calls([mock.call(f'systemctl is-active {self.service_name}'),
                                                        mock.call(f'systemctl start {self.service_name}'),
+                                                       mock.call(f'systemctl is-active {self.service_name}')])
+
+    def test_wait_for_start_with_enable(self):
+        """When enable_service = True, a disabled service should be enabled."""
+        self.waiter.enable_service = True
+        self.waiter.target_state = 'active'
+        self.service_status = b'inactive\n'
+        self.enabled_status = b'disabled\n'
+        self.assertTrue(self.waiter.wait_for_completion())
+        self.assert_ssh_connected()
+        self.ssh_client.exec_command.assert_has_calls([mock.call(f'systemctl is-active {self.service_name}'),
+                                                       mock.call(f'systemctl start {self.service_name}'),
+                                                       mock.call(f'systemctl is-enabled {self.service_name}'),
+                                                       mock.call(f'systemctl enable {self.service_name}'),
+                                                       mock.call(f'systemctl is-active {self.service_name}')])
+
+    def test_wait_for_start_with_enable_already_enabled(self):
+        """When enable_service = True, an already-enabled service should be left alone."""
+        self.waiter.enable_service = True
+        self.waiter.target_state = 'active'
+        self.service_status = b'inactive\n'
+        self.assertTrue(self.waiter.wait_for_completion())
+        self.assert_ssh_connected()
+        self.ssh_client.exec_command.assert_has_calls([mock.call(f'systemctl is-active {self.service_name}'),
+                                                       mock.call(f'systemctl start {self.service_name}'),
+                                                       mock.call(f'systemctl is-enabled {self.service_name}'),
                                                        mock.call(f'systemctl is-active {self.service_name}')])
 
     def test_timeout(self):
