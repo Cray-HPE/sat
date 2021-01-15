@@ -92,6 +92,10 @@ class Waiter(metaclass=abc.ABCMeta):
         """
         self.pre_wait_action()
 
+        # Allow pre_wait_action() to set self.completed to prevent needless waiting.
+        if self.completed:
+            return True
+
         start_time = time.monotonic()
 
         while time.monotonic() - start_time < self.timeout:

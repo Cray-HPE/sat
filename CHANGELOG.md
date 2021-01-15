@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Changed method of getting hostnames of management non-compute nodes (NCNs) in
   ``sat bootsys`` from using Ansible groups to using the ``/etc/hosts`` file.
+- Changed the platform services stage of ``sat bootsys shutdown`` to
+  shut down containerd containers using crictl, and to stop the containerd
+  service using ``systemctl``.
 
 ### Removed
 - Removed the ``hsn-bringup`` stage of ``sat bootsys boot`` due to removal of

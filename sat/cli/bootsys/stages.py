@@ -61,12 +61,12 @@ STAGES_BY_ACTION = {
         ('bos-operations', ('bos', 'do_bos_shutdowns')),
         ('cabinet-power', ('cabinet_power', 'do_cabinets_power_off')),
         ('bgp-check', ('bgp', 'do_bgp_check')),
-        ('platform-services', ('mgmt_ansible', 'do_shutdown_playbook')),
+        ('platform-services', ('platform', 'do_platform_stop')),
         ('ncn-power', ('mgmt_power', 'do_power_off_ncns'))
     ]),
     'boot': OrderedDict([
         ('ncn-power', ('mgmt_power', 'do_power_on_ncns')),
-        ('platform-services', ('mgmt_ansible', 'do_startup_playbook')),
+        ('platform-services', ('platform', 'do_platform_start')),
         ('k8s-check', ('k8s', 'do_k8s_check')),
         ('ceph-check', ('ceph', 'do_ceph_check')),
         ('bgp-check', ('bgp', 'do_bgp_check')),
