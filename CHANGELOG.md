@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+- Changed method of getting hostnames of management non-compute nodes (NCNs) in
+  ``sat bootsys`` from using Ansible groups to using the ``/etc/hosts`` file.
+
 ### Removed
 - Removed the ``hsn-bringup`` stage of ``sat bootsys boot`` due to removal of
   underlying Ansible playbook and old fabric controller service.

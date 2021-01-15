@@ -76,47 +76,60 @@ class RunningService:
         self._systemctl_start_stop(False)
 
 
-def get_groups(groups):
-    """Get a set of hosts in a given group.
+# Maps from management NCN subroles to prefixes for those hostnames
+MGMT_NCN_HOSTNAME_PREFIXES = {
+    'managers': 'ncn-m',
+    'workers': 'ncn-w',
+    'storage': 'ncn-s'
+}
+
+
+def get_mgmt_ncn_hostnames(subroles):
+    """Get a set of management non-compute node (NCN) hostnames.
+
+    The hostnames of the NCNs are parsed from the hosts file on the local host
+    where this is executed.
 
     Args:
-        groups ([str]): a list of groups to retrieve hosts from.
-
-    Returns: a set of all hosts in the given groups.
-    """
-    if not groups:
-        return set()
-
-    host_regex = re.compile(r'\s+\"([\w-]+)\",?$')
-
-    spec = '+'.join(['groups["{}"]'.format(g) for g in groups])
-    cmd = 'ansible localhost -m debug -a \'var={}\''.format(spec)
-    pc = subprocess.run(shlex.split(cmd), stdout=subprocess.PIPE, encoding='utf-8')
-
-    group = set()
-
-    for line in pc.stdout.splitlines():
-        m = host_regex.match(line)
-        if m:
-            group.add(m.group(1))
-
-    return group
-
-
-def get_ncns(groups, exclude=None):
-    """Get a set of nodes from the specified groups.
-
-    Args:
-        groups ([str]): groups to get nodes from.
-        exclude ([str]): groups which should be excluded.
+        subroles (list of str): subroles for which to get hostnames, possible
+            values are keys of `MGMT_NCN_HOSTNAME_PREFIXES`.
 
     Returns:
-        iterator containing all nodes from groups minus the
-        ones from exclude in alphabetical order.
+        Set of hostnames for the management NCNs which have the given subroles.
+
+    Raises:
+        ValueError: if given any invalid subroles values
     """
-    all_groups = get_groups(groups)
-    excluded = get_groups(exclude or [])
-    return all_groups - excluded
+    ncn_hostnames = set()
+
+    invalid_subroles = [subrole for subrole in subroles
+                        if subrole not in MGMT_NCN_HOSTNAME_PREFIXES]
+    if invalid_subroles:
+        raise ValueError(f'Invalid subroles given: {", ".join(invalid_subroles)}')
+
+    # The NCN hostname should have whitespace before it and after it unless
+    # it is the end of the line.
+    hostname_regexes = [
+        re.compile(fr'{MGMT_NCN_HOSTNAME_PREFIXES[subrole]}\d{{3}}')
+        for subrole in subroles
+    ]
+
+    try:
+        with open('/etc/hosts', 'r') as f:
+            for line in f.readlines():
+                # Strip comments
+                stripped_line = line.split('#', 1)[0]
+                for word in stripped_line.split():
+                    for hostname_regex in hostname_regexes:
+                        match = hostname_regex.fullmatch(word)
+                        if match:
+                            ncn_hostnames.add(word)
+
+    except OSError as err:
+        LOGGER.error('Unable to read /etc/hosts to obtain management NCN '
+                     'hostnames: %s', err)
+
+    return ncn_hostnames
 
 
 def k8s_pods_to_status_dict(v1_pod_list):

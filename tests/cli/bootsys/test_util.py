@@ -21,27 +21,109 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+import logging
 import subprocess
+from textwrap import dedent
 import unittest
-from unittest.mock import patch, call
+from unittest.mock import call, mock_open, patch
 
-from sat.cli.bootsys.util import get_ncns, RunningService, run_ansible_playbook
+from sat.cli.bootsys.util import get_mgmt_ncn_hostnames, RunningService, run_ansible_playbook
 
 
 class TestGetNcns(unittest.TestCase):
-    def test_get_groups_with_no_exclude(self):
-        """Test getting NCNs without excludes"""
-        all_ncns = {'foo', 'bar', 'baz'}
-        with patch('sat.cli.bootsys.util.get_groups', side_effect=[all_ncns, set()]):
-            self.assertEqual(all_ncns, get_ncns([]))
 
-    def test_get_groups_with_exclude(self):
-        """Test getting NCNs with exclusions"""
-        all_ncns = {'foo', 'bar', 'baz'}
-        exclusions = {'foo'}
-        with patch('sat.cli.bootsys.util.get_groups', side_effect=[all_ncns, exclusions]):
-            result = get_ncns([])
-            self.assertEqual(result, {'bar', 'baz'})
+    def setUp(self):
+        """Set up a mock open function for the hosts file."""
+        self.hosts_file_contents = dedent("""\
+            10.252.2.14     ncn-s003 ncn-s003.local ncn-s003.nmn
+            10.252.2.13     ncn-s002 ncn-s002.local ncn-s002.nmn
+            10.252.2.12     ncn-s001 ncn-s001.local ncn-s001.nmn
+            10.252.2.18     ncn-w003 ncn-w003.local ncn-w003.nmn
+            10.252.2.9      ncn-w002 ncn-w002.local ncn-w002.nmn
+            10.252.2.8      ncn-w001 ncn-w001.local ncn-w001.nmn
+            10.252.2.15     ncn-m003 ncn-m003.local ncn-m003.nmn
+            10.252.2.16     ncn-m002 ncn-m002.local ncn-m002.nmn
+            #10.252.2.19     ncn-m001 ncn-m001.local ncn-m001.nmn
+            10.252.2.20     uan01 uan01.nmn  # Repurposed ncn-w004
+            10.252.2.100    rgw-vip rgw-vip.local rgw rgw.local
+        """)
+        patch('builtins.open', mock_open(read_data=self.hosts_file_contents)).start()
+
+    def tearDown(self):
+        """Stop the patches."""
+        patch.stopall()
+
+    def test_get_managers(self):
+        """Test getting hostnames of all managers."""
+        # Note that ncn-m001 is commented out
+        expected = {'ncn-m002', 'ncn-m003'}
+        actual = get_mgmt_ncn_hostnames(['managers'])
+        self.assertEqual(expected, actual)
+
+    def test_get_workers(self):
+        """Test getting hostnames of all workers."""
+        expected = {'ncn-w001', 'ncn-w002', 'ncn-w003'}
+        actual = get_mgmt_ncn_hostnames(['workers'])
+        self.assertEqual(expected, actual)
+
+    def test_get_storage(self):
+        """Test getting hostnames of all storage nodes."""
+        expected = {'ncn-s001', 'ncn-s002', 'ncn-s003'}
+        actual = get_mgmt_ncn_hostnames(['storage'])
+        self.assertEqual(expected, actual)
+
+    def test_get_all_ncns(self):
+        """Test getting hostnames of all managers, workers, and storage nodes."""
+        # Note that ncn-m001 is commented out
+        expected = {'ncn-m002', 'ncn-m003',
+                    'ncn-w001', 'ncn-w002', 'ncn-w003',
+                    'ncn-s001', 'ncn-s002', 'ncn-s003'}
+        actual = get_mgmt_ncn_hostnames(['managers', 'workers', 'storage'])
+        self.assertEqual(expected, actual)
+
+    def test_get_invalid_subrole(self):
+        """Test getting hostnames with an invalid subrole included."""
+        subroles = ['managers', 'impostors', 'workers']
+        with self.assertRaisesRegex(ValueError, r'Invalid subroles given: impostors'):
+            get_mgmt_ncn_hostnames(subroles)
+
+    def test_get_invalid_subroles(self):
+        """Test getting hostnames with multiple invalid subroles included."""
+        subroles = ['managers', 'impostors', 'workers', 'crewmates']
+        with self.assertRaisesRegex(ValueError, r'Invalid subroles given: impostors, crewmates'):
+            get_mgmt_ncn_hostnames(subroles)
+
+    def test_get_workers_substring(self):
+        """Test getting worker NCN hostnames with tricky hostnames in the hosts file."""
+        hosts_file_contents = dedent("""\
+            10.252.2.7      not-ncn-w002 not-ncn-w002.local not-ncn-w002.nmn
+            10.252.2.8      ncn-w001 ncn-w001.local ncn-w001.nmn
+            10.252.3.8      ncn-w002.someothernet
+        """)
+        expected = {'ncn-w001'}
+        with patch('builtins.open', mock_open(read_data=hosts_file_contents)):
+            actual = get_mgmt_ncn_hostnames(['workers'])
+        self.assertEqual(expected, actual)
+
+    def test_get_workers_no_newline(self):
+        """Test getting worker NCN hostname from last line without trailing whitespace."""
+        hosts_file_contents = dedent("""\
+            10.252.2.7      ncn-w001
+            10.252.2.8      ncn-w002
+            10.252.2.9      ncn-w003""")
+        expected = {'ncn-w001', 'ncn-w002', 'ncn-w003'}
+        with patch('builtins.open', mock_open(read_data=hosts_file_contents)):
+            actual = get_mgmt_ncn_hostnames(['workers'])
+        self.assertEqual(expected, actual)
+
+    @patch('builtins.open', side_effect=FileNotFoundError('dne'))
+    def test_get_ncns_hosts_file_error(self, _):
+        """Test getting NCNs when hosts file cannot be opened."""
+        with self.assertLogs(level=logging.ERROR) as cm:
+            actual = get_mgmt_ncn_hostnames(['managers'])
+        self.assertEqual(cm.records[0].message, 'Unable to read /etc/hosts to obtain '
+                                                'management NCN hostnames: dne')
+        self.assertEqual(set(), actual)
 
 
 class TestRunningService(unittest.TestCase):
