@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the platform services stage of ``sat bootsys shutdown`` to
   shut down containerd containers using crictl, and to stop the containerd
   service using ``systemctl``.
+- Changed the platform services stage of ``sat bootsys shutdown`` to check
+  health of the Ceph cluster and freeze the Ceph cluster before shutting down.
 - Changed the platform services stage of ``sat bootsys boot`` to start
   containerd on the management NCNs and ensure it's enabled.
 

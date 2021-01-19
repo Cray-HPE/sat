@@ -236,6 +236,9 @@ class TestDoPlatformStop(unittest.TestCase):
         self.hosts = ['ncn-w001', 'ncn-w002', 'ncn-w003', 'ncn-m001', 'ncn-m002']
         self.get_mgmt_ncn_hostnames.return_value = self.hosts
         self.stop_containers = mock.patch('sat.cli.bootsys.platform.stop_containers').start()
+        self.ceph_healthy = mock.patch('sat.cli.bootsys.platform.ceph_healthy').start()
+        self.ceph_healthy.return_value = True
+        self.freeze_ceph = mock.patch('sat.cli.bootsys.platform.freeze_ceph').start()
         self.remote_service_stopped_waiter = mock.patch('sat.cli.bootsys.platform.RemoteServiceWaiter').start()
 
     def tearDown(self):
@@ -255,16 +258,18 @@ class TestDoPlatformStop(unittest.TestCase):
         self.remote_service_stopped_waiter.return_value.wait_for_completion_await.assert_has_calls(
             [mock.call() for host in self.hosts]
         )
+        self.ceph_healthy.assert_called_once_with()
+        self.freeze_ceph.assert_called_once_with()
 
     def test_do_platform_stop_error(self):
-        """Test a call of do_platform_stop when there is a SystemExit in one of the threads."""
+        """Test a call of do_platform_stop when there is a SystemExit in one of the container threads."""
         self.stop_containers.side_effect = SystemExit
         do_platform_stop(self.args)
         self.get_mgmt_ncn_hostnames.assert_called_once_with(subroles=self.expected_subroles)
         self.stop_containers.assert_has_calls([mock.call(host) for host in self.hosts], any_order=True)
 
     def test_do_platform_stop_waiter_error(self):
-        """Test a call of do_platform_stop when there is a RuntimeError in one of the waiters."""
+        """Test a call of do_platform_stop when there is a RuntimeError in one of the containerd waiters."""
         self.remote_service_stopped_waiter.return_value.has_completed.side_effect = RuntimeError
         do_platform_stop(self.args)
         self.get_mgmt_ncn_hostnames.assert_called_once_with(subroles=self.expected_subroles)
@@ -279,3 +284,11 @@ class TestDoPlatformStop(unittest.TestCase):
         with self.assertLogs(level=logging.ERROR):
             with self.assertRaises(SystemExit):
                 do_platform_stop(self.args)
+
+    def test_do_platform_stop_ceph_unhealthy(self):
+        """When Ceph is not healthy, do not freeze Ceph."""
+        self.ceph_healthy.return_value = False
+        with self.assertLogs(level=logging.ERROR):
+            with self.assertRaises(SystemExit):
+                do_platform_stop(self.args)
+        self.freeze_ceph.assert_not_called()

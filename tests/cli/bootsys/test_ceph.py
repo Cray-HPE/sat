@@ -1,7 +1,7 @@
 """
 Unit tests for the sat.cli.bootsys.ceph module.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -28,8 +28,10 @@ import unittest
 from unittest.mock import patch, Mock, call
 
 from paramiko import SSHException
+import subprocess
+from subprocess import CalledProcessError
 
-from sat.cli.bootsys.ceph import restart_ceph_services, CephHealthWaiter
+from sat.cli.bootsys.ceph import ceph_healthy, freeze_ceph, restart_ceph_services, CephHealthWaiter
 from tests.common import ExtendedTestCase
 
 
@@ -164,3 +166,126 @@ class TestCephWaiter(unittest.TestCase):
         """Test that Ceph health is not complete if the JSON schema is incorrect."""
         self.mock_ssh_client.return_value.exec_command.return_value = (None, StringIO('{"foo": {"bar": "baz"}'), None)
         self.assertFalse(self.waiter.has_completed())
+
+
+class TestFreezeCeph(ExtendedTestCase):
+    """Tests for the freeze_ceph function."""
+    def setUp(self):
+        """Set up patches."""
+        self.ceph_osd_command = patch('sat.cli.bootsys.ceph.subprocess.check_output').start()
+        self.ceph_osd_command.side_effect = TestFreezeCeph.fake_ceph_freeze
+        self.expected_params = ['noout', 'norecover', 'nobackfill']
+        self.expected_calls = [call(['ceph', 'osd', 'set', param], stderr=subprocess.STDOUT)
+                               for param in self.expected_params]
+
+    def tearDown(self):
+        """Stop patches."""
+        patch.stopall()
+
+    @staticmethod
+    def fake_ceph_freeze(cmd, stderr):
+        """Mimic the output of the 'ceph osd set <param>' command"""
+        param = cmd[-1]
+        return f'{param} is set'.encode()
+
+    def test_freeze_ceph_success(self):
+        """Test freeze_ceph in the successful case."""
+        with self.assertLogs(level=logging.INFO) as logs:
+            freeze_ceph()
+        self.assert_in_element('Freezing Ceph', logs.output)
+        for expected_param in self.expected_params:
+            self.assert_in_element(f'Running command: ceph osd set {expected_param}', logs.output)
+            self.assert_in_element(f'Command output: {expected_param} is set', logs.output)
+        self.ceph_osd_command.assert_has_calls(self.expected_calls)
+
+    def test_freeze_ceph_failure(self):
+        """Test an error is logged and we exit when a ceph freezing command fails."""
+        self.ceph_osd_command.side_effect = CalledProcessError(returncode=1, cmd='ceph osd set noout')
+        with self.assertLogs(level=logging.ERROR) as error_logs:
+            with self.assertRaises(SystemExit):
+                freeze_ceph()
+        self.assert_in_element('Failed to freeze Ceph', error_logs.output)
+
+
+class TestCephHealthy(ExtendedTestCase):
+    """Tests for the ceph_healthy function."""
+    def setUp(self):
+        """Set up patches."""
+        self.ceph_health_command = patch('sat.cli.bootsys.ceph.subprocess.check_output').start()
+        self.HEALTH_OK = json.dumps({'health': {'status': 'HEALTH_OK'}})
+        self.HEALTH_ERR = json.dumps({'health': {'status': 'HEALTH_ERR'}})
+        self.HEALTH_WARN_OK = json.dumps({
+            'health': {
+                'status': 'HEALTH_WARN',
+                'checks': {
+                    'LARGE_OMAP_OBJECTS': {},
+                    'TOO_FEW_PGS': {}
+                }
+            }
+        })
+        self.HEALTH_WARN_NOT_OK = json.dumps({
+            'health': {
+                'status': 'HEALTH_WARN',
+                'checks': {
+                    'POOL_TARGET_SIZE_BYTES_OVERCOMMITTED': {},
+                    'TOO_FEW_PGS': {}
+                }
+            }
+        })
+
+    def tearDown(self):
+        """Stop patches."""
+        patch.stopall()
+
+    def test_ceph_healthy(self):
+        """Test ceph_healthy returns True when ceph is healthy."""
+        self.ceph_health_command.return_value = self.HEALTH_OK
+        self.assertTrue(ceph_healthy())
+        self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
+
+    def test_ceph_unhealthy(self):
+        """Test ceph_healthy returns False when ceph is unhealthy with HEALTH_ERR."""
+        self.ceph_health_command.return_value = self.HEALTH_ERR
+        self.assertFalse(ceph_healthy())
+        self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
+
+    def test_ceph_warn_healthy(self):
+        """Test ceph_healthy returns True when ceph is in an 'acceptable' warning state."""
+        self.ceph_health_command.return_value = self.HEALTH_WARN_OK
+        with self.assertLogs(level=logging.WARNING) as logs:
+            self.assertTrue(ceph_healthy())
+        self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
+        self.assert_in_element('Ceph health check failed: LARGE_OMAP_OBJECTS', logs.output)
+        self.assert_in_element('Ceph health check failed: TOO_FEW_PGS', logs.output)
+        self.assert_in_element('Ceph is healthy with warnings', logs.output)
+
+    def test_ceph_warn_unhealthy(self):
+        """Test ceph_healthy returns False when ceph is in an 'unacceptable' warning state."""
+        self.ceph_health_command.return_value = self.HEALTH_WARN_NOT_OK
+        with self.assertLogs(level=logging.WARNING) as logs:
+            self.assertFalse(ceph_healthy())
+        self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
+        self.assert_in_element('Ceph health check failed: TOO_FEW_PGS', logs.output)
+        self.assert_in_element('Ceph health check failed: POOL_TARGET_SIZE_BYTES_OVERCOMMITTED', logs.output)
+        self.assert_not_in_element('Ceph is healthy with warnings', logs.output)
+
+    def test_ceph_healthy_command_failed(self):
+        """Test ceph_healthy when the ceph health command fails."""
+        self.ceph_health_command.side_effect = CalledProcessError(returncode=1, cmd='ceph -s --format=json')
+        with self.assertLogs(level=logging.ERROR):
+            self.assertFalse(ceph_healthy())
+        self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
+
+    def test_ceph_healthy_malformed_json(self):
+        """Test ceph_healthy when the ceph health command returns non-json."""
+        self.ceph_health_command.return_value = '{'
+        with self.assertLogs(level=logging.ERROR):
+            self.assertFalse(ceph_healthy())
+        self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
+
+    def test_ceph_healthy_missing_key(self):
+        """Test ceph_healthy when the ceph health command returns incomplete data."""
+        self.ceph_health_command.return_value = json.dumps({'health': {}})
+        with self.assertLogs(level=logging.ERROR):
+            self.assertFalse(ceph_healthy())
+        self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
