@@ -1,7 +1,7 @@
 """
 Contains the code to swap a switch.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -38,5 +38,4 @@ def swap_switch(args):
                                    args.xname,
                                    args.disruptive,
                                    args.dry_run,
-                                   args.overwrite,
-                                   args.save_portset)
+                                   args.save_ports)

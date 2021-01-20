@@ -35,8 +35,7 @@ def set_options(namespace):
     namespace.disruptive = True
     namespace.dry_run = True
     namespace.force = False
-    namespace.overwrite = False
-    namespace.save_portset = False
+    namespace.save_ports = False
 
 
 class TestSwapCable(unittest.TestCase):
@@ -62,8 +61,7 @@ class TestSwapCable(unittest.TestCase):
                                                          self.fake_args.xnames,
                                                          self.fake_args.disruptive,
                                                          self.fake_args.dry_run,
-                                                         self.fake_args.overwrite,
-                                                         self.fake_args.save_portset,
+                                                         self.fake_args.save_ports,
                                                          self.fake_args.force)
 
 
