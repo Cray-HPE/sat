@@ -1,7 +1,7 @@
 """
 Contains functions for modifying port configuration via fabric API.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -30,7 +30,6 @@ import inflect
 
 from sat.apiclient import APIError, FabricControllerClient
 from sat.session import SATSession
-from sat.xname import XName
 
 LOGGER = logging.getLogger(__name__)
 
@@ -45,114 +44,135 @@ class PortManager:
     def __init__(self):
         self.fabric_client = FabricControllerClient(SATSession())
 
-    @staticmethod
-    def _get_endpoints_for_jack(jack, port_info):
-        """Get a list of ports for a single jack
-
-        Args:
-            jack (str): jack xname
-            port_info (dict): the data of a port-links query under the 'ports' key
+    def get_ports(self):
+        """Get a list of port document links
 
         Returns:
-            A 2-tuple of lists of edge port and fabric port xnames
+            A dictionary that contains a documentLinks key which is a list of port paths or None
         """
 
-        jack_xname = XName(jack)
+        # Get ports information using fabric manager API.
+        try:
+            response = self.fabric_client.get('fabric/ports')
+        except APIError as err:
+            LOGGER.error(f'Failed to get ports from fabric manager: {err}')
+            return None
 
-        # Get all ports matching the supplied jack
-        edge_endpoints = [
-            port for port in port_info['edge'] if jack_xname.contains_component(XName(port))
-        ]
+        # Get result as JSON.
+        try:
+            ports = response.json()
+        except ValueError as err:
+            LOGGER.error(f'Failed to parse JSON from fabric manager response: {err}')
+            return None
 
-        fabric_endpoints = [
-            port for port in port_info['fabric'] if jack_xname.contains_component(XName(port))
-        ]
+        return ports
 
-        return edge_endpoints, fabric_endpoints
-
-    @staticmethod
-    def _get_linked_endpoints(ports, link_info):
-        """Get linked ports from a list of ports
-
-        Args:
-            ports (list): port xnames
-            link_info (dict): the data of a port-links query under the 'links' key
+    def get_port(self, port_link):
+        """Get port data using document link
 
         Returns:
-            A list of port xnames which may contain duplicates
+            A dictionary of port data or None if there is an error
         """
 
-        linked_endpoints = []
+        # Get port information from fabric manager via gateway API.
+        try:
+            response = self.fabric_client.get(port_link)
+        except APIError as err:
+            LOGGER.error('Failed to get port information from fabric manager: {}'.format(err))
+            return None
 
-        for port in ports:
-            for endpoint_pair in link_info:
-                endpoint1 = endpoint_pair['endpoint1']
-                endpoint2 = endpoint_pair['endpoint2']
-                if port in [endpoint1, endpoint2]:
-                    linked_endpoints.extend([endpoint1, endpoint2])
-                    break
+        # Get result as JSON.
+        try:
+            port = response.json()
+        except ValueError as err:
+            LOGGER.error('Failed to parse JSON from fabric manager response: {}'.format(err))
+            return None
 
-        return linked_endpoints
+        return port
 
-    @staticmethod
-    def _get_linked_jacks(ports, link_info):
-        """Get linked jacks from a list of ports
-
-        Args:
-            ports (list): port xnames
-            link_info (dict): the data of a port-links query under the 'links' key
+    def get_switches(self):
+        """Get all switches
 
         Returns:
-            A set of jack xnames
+            A dictionary that contains a documentLinks key which is a list of switch paths or None
         """
 
-        return set(
-            XName(p).get_direct_parent().xname_str for p in PortManager._get_linked_endpoints(ports, link_info)
-        )
+        # Get switches information using fabric manager API.
+        try:
+            response = self.fabric_client.get('fabric/switches')
+        except APIError as err:
+            LOGGER.error('Failed to get switches from fabric manager: {}'.format(err))
+            return None
 
-    @staticmethod
-    def _get_jack_endpoints(jack_xnames, portinfo, force):
-        """Get all linked endpoints for the given jack xnames, optionally skipping checks
+        # Get result as JSON.
+        try:
+            switches = response.json()
+        except ValueError as err:
+            LOGGER.error('Failed to parse JSON from fabric manager response: {}'.format(err))
+            return None
 
-        Args:
-            jack_xnames (list): list of jack xnames
-            portinfo(dict): the response data from a fabric port-links query
+        return switches
+
+    def get_switch(self, switch_link):
+        """Get switch data using document link
 
         Returns:
-            A list of sets, where each set is the set of ports connected to the
-                corresponding jack in jack_xnames.
-
+            A dictionary of switch data or None if there is an error
         """
-        jack_endpoints = []
-        for jack in jack_xnames:
-            linked_endpoints = []
 
-            # Get all ports local to the jack
-            edge_endpoints, fabric_endpoints = PortManager._get_endpoints_for_jack(jack, portinfo['ports'])
+        # Get switch information from fabric manager via gateway API.
+        try:
+            response = self.fabric_client.get(switch_link)
+        except APIError as err:
+            LOGGER.error('Failed to get switch information from fabric manager: {}'.format(err))
+            return None
 
-            # Get all jacks that are linked to the jack
-            linked_jacks = PortManager._get_linked_jacks(fabric_endpoints, portinfo['links'])
-            # For each port of each linked jack, get all linked endpoints
-            for linked_jack in linked_jacks:
-                linked_jack_endpoints = PortManager._get_endpoints_for_jack(linked_jack, portinfo['ports'])[1]
-                linked_endpoints.extend(PortManager._get_linked_endpoints(linked_jack_endpoints, portinfo['links']))
+        # Get result as JSON.
+        try:
+            switch = response.json()
+        except ValueError as err:
+            LOGGER.error('Failed to parse JSON switch data from fabric manager response: {}'.format(err))
+            return None
 
-            # For fabric endpoints, check that we were able to get links
-            if fabric_endpoints and not linked_endpoints:
-                no_port_links = f'Unable to get port links for {jack}'
-                if force:
-                    LOGGER.warning(no_port_links)
-                else:
-                    LOGGER.error(no_port_links)
-                    return None
+        return switch
 
-            # Remove duplicates because linked endpoints may overlap with fabric endpoints
-            jack_endpoints.append(set(edge_endpoints + fabric_endpoints + linked_endpoints))
+    def get_port_data_list(self, port_links):
+        """Get a list of dictionaries for ports using document links for each port
 
-        return jack_endpoints
+        Args:
+            port_links (list): a list of port document links
+            Example: [/fabric/ports/x3000c0r15j14p0]
 
-    def get_jack_ports(self, jack_xnames, force=False):
-        """Get a list of ports for one or more jacks
+        Returns:
+            A list of dictionaries for ports or None if there is an error
+            Example: {"xname": "x3000c0r21j14p0",
+                      "port_link": "/fabric/ports/x3000c0r21j14p0",
+                      "policy_link: "/fabric/port-policies/fabric-policy"}
+        """
+
+        port_data_list = []
+        for port_link in port_links:
+            port = self.get_port(port_link)
+
+            if port is None:
+                LOGGER.error('Failed to get port.')
+                return None
+
+            port_data = {}
+            try:
+                port_data['xname'] = port['conn_port']
+                port_data['port_link'] = port_link
+                port_data['policy_link'] = port['portPolicyLinks'][0]
+            except KeyError:
+                LOGGER.error('Key for port data missing from fabric manager switch information.')
+                return None
+
+            port_data_list.append(port_data)
+
+        return port_data_list
+
+    def get_jack_port_data_list(self, jack_xnames, force=False):
+        """Get a list of dictionaries for ports for one or more jacks
 
         Args:
             jack_xnames (list): a list of jack xnames
@@ -161,238 +181,162 @@ class PortManager:
                 cases.
 
         Returns:
-            List of port xnames or None
+            A ist of dictionaries for ports or None if there is an error
         """
 
-        try:
-            response = self.fabric_client.get('port-links')
-            portinfo = response.json()
-        except APIError as err:
-            LOGGER.error(f'Failed to get port links from fabric controller: {err}')
-            return None
-        except ValueError as err:
-            LOGGER.error(f'Failed to parse JSON from fabric controller response: {err}')
-            return None
-
-        # Check that ports and links sub-dictionaries exist
-        missing_keys = [k for k in ['ports', 'links'] if k not in portinfo]
-        if missing_keys:
-            LOGGER.error(
-                f'{INF.plural("Key", len(missing_keys))} missing from fabric controller port links: {missing_keys}'
-            )
-            return None
-
-        # Under ports, check that both 'fabric' and 'edge' ports are listed
-        missing_ports_keys = [k for k in ['fabric', 'edge'] if k not in portinfo['ports']]
-        if missing_ports_keys:
-            LOGGER.error(f'{INF.plural("Key", len(missing_keys))} missing from '
-                         f'fabric controller port links port data: {missing_keys}')
-            return None
-
-        # If a non-jack was given, return an empty list
+        # If a non-jack was given, return None
         non_matching_xnames = [xname for xname in jack_xnames if not re.match(JACK_XNAME_REGEX, xname)]
         if non_matching_xnames:
             num_non_matching = len(non_matching_xnames)
             LOGGER.error(f'{INF.plural("xname", num_non_matching)} {",".join(non_matching_xnames)} '
                          f'{INF.plural_verb("does", num_non_matching)} not match the format of a jack xname.')
-            return []
-
-        # Build a list of lists of all ports for the given jack(s)
-        jack_endpoints = PortManager._get_jack_endpoints(jack_xnames, portinfo, force)
-        if jack_endpoints is None:
             return None
 
-        # For each jack, check that the endpoints match
-        if not all(endpoint_list == jack_endpoints[0] for endpoint_list in jack_endpoints):
-            not_connected = f'Jacks {",".join(jack_xnames)} are not connected by a single cable'
-            if force:
-                LOGGER.warning(not_connected)
-            else:
-                LOGGER.error(not_connected)
-                return None
+        ports = self.get_ports()
+        if ports is None:
+            LOGGER.error('Failed to get ports.')
+            return None
 
-        # Flatten list of lists and remove duplicates
-        jack_ports = list(set(jack for sublist in jack_endpoints for jack in sublist))
+        port_links = []
+        for jack_xname in jack_xnames:
+            for doc_link in ports['documentLinks']:
+                port = doc_link.split('/')[-1]
+                if port.startswith(f'{jack_xname}p'):
+                    port_links.append(doc_link)
 
-        # It may be helpful to the user to see which ports are affected
-        if jack_ports:
-            print(f'Ports: {" ".join(sorted(jack_ports))}')
+        # TODO Get all endpoints that are linked to the jack and add to list of port_links
+        if force:
+            LOGGER.debug('Ignore errors getting endpoints')
+        else:
+            LOGGER.debug('Exit if errors getting endpoints')
 
-        return jack_ports
+        port_data_list = self.get_port_data_list(port_links)
+        return port_data_list
 
-    def get_switch_ports(self, switch_xname):
-        """Get a list of ports for a switch.
+    def get_switch_port_data_list(self, switch_xname):
+        """Get a list of dictionaries for ports for a switch.
 
         Args:
             switch_xname: component name of switch
 
         Returns:
-            List of port names (switch xname augmented by port)
-            Or None if there is an error with the fabric controller API
+            A ist of dictionaries for ports or None if there is an error
         """
 
-        # Get port information from fabric controller via gateway API.
+        switches = self.get_switches()
+        if switches is None:
+            LOGGER.error('Failed to get switches.')
+            return None
+
+        # Get the document link for the switch_xname input
+        # Should only be one so break after find it
+        switch_link = None
         try:
-            response = self.fabric_client.get('port-links')
-        except APIError as err:
-            LOGGER.error('Failed to get port links from fabric controller: {}'.format(err))
+            for doc_link in switches['documentLinks']:
+                switch = doc_link.split('/')[-1]
+                if switch in (switch_xname, f'{switch_xname}b0'):
+                    switch_link = doc_link
+                    break
+        except KeyError:
+            LOGGER.error('Key "documentLinks" missing from fabric manager switches information.')
             return None
 
-        # Get result as JSON.
+        if switch_link is None:
+            LOGGER.error(f'Switch {switch_xname} missing from fabric manager switches.')
+            return None
+
+        switch = self.get_switch(switch_link)
+        if switch is None:
+            LOGGER.error('Failed to get switch data.')
+            return None
+
+        port_data_list = []
         try:
-            portinfo = response.json()
-        except ValueError as err:
-            LOGGER.error('Failed to parse JSON from fabric controller response: {}'.format(err))
+            port_data_list = self.get_port_data_list(switch['edgePortLinks'])
+        except KeyError:
+            LOGGER.error('Key "edgePortLinks" missing from fabric manager switch information.')
             return None
 
-        # Check result for sanity.
-        if 'ports' not in portinfo:
-            LOGGER.error('Key "ports" missing from fabric controller port links.')
+        try:
+            fabric_list = self.get_port_data_list(switch['fabricPortLinks'])
+            if port_data_list is not None:
+                port_data_list.extend(fabric_list)
+            else:
+                port_data_list = fabric_list
+        except KeyError:
+            LOGGER.error('Key "fabricPortLinks" missing from fabric manager switch information.')
             return None
 
-        # Create list of ports.
-        ports = []
-        for key in portinfo['ports']:
-            for port in portinfo['ports'][key]:
-                if XName(switch_xname).contains_component(XName(port)):
-                    ports.append(port)
+        return port_data_list
 
-        return ports
-
-    def create_port_set(self, portset):
-        """Create a port set for a list of ports.
+    def update_port_policy_link(self, port_link, policy_link):
+        """Update a port to use a new policy
 
         Args:
-            portset: JSON with name and ports as required by fabric controller.
-
-        Returns:
-            True if creation is successful
-            False if there is an error with the fabric controller API
-        """
-        portset_json = json.dumps(portset)
-
-        # Create port set through fabric controller gateway API.
-        try:
-            self.fabric_client.post('port-sets', payload=portset_json)
-        except APIError as err:
-            LOGGER.error('Failed to create port set through fabric controller: {}'.format(err))
-            return False
-
-        return True
-
-    def get_port_set_config(self, portset_name):
-        """Get a port set configuration (per port).
-
-        Args:
-            portset_name: name of port set
-
-        Returns:
-            configuration of ports in set
-            Or None if there is an error with the fabric controller API
-        """
-        # Get port set configuration from fabric controller via gateway API.
-        try:
-            response = self.fabric_client.get('port-sets', portset_name, 'config')
-        except APIError as err:
-            LOGGER.error('Failed to get port set config from fabric controller: {}'.format(err))
-            return None
-
-        # Get result as JSON.
-        try:
-            portset_config = response.json()
-            LOGGER.debug("Portset config for {}:\n{}".format(portset_name, portset_config))
-        except ValueError as err:
-            LOGGER.error('Failed to parse JSON from fabric controller response: {}'.format(err))
-            return None
-
-        # Check result for sanity.
-        if 'ports' not in portset_config:
-            LOGGER.error('Key "ports" missing from fabric controller port set config.')
-            return None
-        if portset_config['ports'][0] and 'config' not in portset_config['ports'][0]:
-            LOGGER.error('Key "config" missing from port in fabric port set config.')
-            return None
-
-        return portset_config
-
-    def update_port_set(self, portset_name, port_config, enable):
-        """Update a port set to enable/disable.
-
-        Args:
-            portset_name: name of port set
-            port_config: port configuration
-            enable: True to enable or False to disable
+            port_link: The full path of the port document link
+            policy_link: The full path of the new port policy
 
         Returns:
             True if update is successful
-            False if there is an error with the fabric controller API
+            False if there is an error with the fabric manager API
         """
-        # Example: {"autoneg": true, "enable": false,
-        #           "flowControl": {"rx": true, "tx": true}, "speed": "100"}
-        # Boolean values are not capitalized and speed value is a string.
-        port_config['enable'] = enable
+
+        # Example: {"portPolicyLinks":["/fabric/port-policies/edge-policy"]}
+        port_config = {}
+        port_config['portPolicyLinks'] = [policy_link]
         config_json = json.dumps(port_config)
+        LOGGER.debug(f'Updating port: {port_link}')
+        LOGGER.debug(f'config_json: {config_json}')
 
-        # Update port set through fabric controller gateway API.
+        # Update port to use policy through fabric manager API.
         try:
-            self.fabric_client.put('port-sets', portset_name, 'config', payload=config_json)
+            self.fabric_client.patch(port_link, payload=config_json)
         except APIError as err:
-            LOGGER.error('Failed to update port set {} '
-                         'through fabric controller: {}'.format(portset_name, err))
+            LOGGER.error('Failed to update portPolicyLinks {} '
+                         'through fabric manager: {}'.format(port_link, err))
             return False
 
         return True
 
-    def delete_port_set(self, portset_name):
-        """Delete a port set.
+    def create_offline_port_policy(self, existing_policy_link, new_policy_prefix):
+        """Create a port policy to be used to OFFLINE ports if it doesn't already exist
 
         Args:
-            portset_name: name of port set
+            existing_policy_link (str): The full path of the current port policy used
+            new_policy_prefix (str): Prefix to be added to the current policy used
 
         Returns:
-            True if deletion is successful
-            False if there is an error with the fabric controller API
+            True if creation is successful
+            False if there is an error with the fabric manager API
         """
-        # Delete port set through fabric controller gateway API.
+
+        # Check if the offline port policy already exists
+        path_parts = existing_policy_link.split('/')
+        offline_policy = '/'.join(path_parts[:-1]) + '/' + new_policy_prefix + path_parts[-1]
+
+        offline_policy_exists = True
         try:
-            self.fabric_client.delete('port-sets', portset_name)
+            self.fabric_client.get(offline_policy)
         except APIError as err:
-            LOGGER.error('Failed to delete port set through fabric controller: {}'.format(err))
-            return False
+            offline_policy_exists = False
+            LOGGER.debug('Failed to get existing offline policy from fabric manager: {}'.format(err))
+
+        if offline_policy_exists:
+            LOGGER.info(f'Using existing offline policy: {offline_policy}')
+        else:
+            new_policy_config = {}
+            new_policy_config['state'] = 'OFFLINE'
+            new_policy_config['documentSelfLink'] = offline_policy
+            config_json = json.dumps(new_policy_config)
+            LOGGER.debug(f'Creating offline policy: {offline_policy}')
+            LOGGER.debug(f'config_json: {config_json}')
+
+            # Create port policy through fabric manager API.
+            try:
+                self.fabric_client.post('/'.join(path_parts[:-1]), payload=config_json)
+            except APIError as err:
+                LOGGER.error('Failed to create port policy {} '
+                             'through fabric manager: {}'.format(offline_policy, err))
+                return False
 
         return True
-
-    def delete_port_set_list(self, portset_names):
-        """Delete a list of port sets.
-
-        Args:
-            portset_names: a list of port set names
-
-        Returns:
-            None
-        """
-        for ps_name in portset_names:
-            LOGGER.debug("Deleting port set {}".format(ps_name))
-            self.delete_port_set(ps_name)
-
-    def get_port_sets(self):
-        """Get port sets.
-
-        Returns:
-            Port sets.
-        """
-        # Get port sets from fabric controller via gateway API.
-        try:
-            response = self.fabric_client.get('port-sets')
-        except APIError as err:
-            LOGGER.error('Failed to get port sets from fabric controller: {}'.format(err))
-            return None
-
-        # Get result as JSON.
-        try:
-            portsets = response.json()
-        except ValueError as err:
-            LOGGER.error('Failed to parse JSON from fabric controller response: {}'.format(err))
-            return None
-
-        return portsets

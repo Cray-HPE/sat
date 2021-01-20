@@ -1,7 +1,7 @@
 """
 Contains the code for swapping components.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -36,17 +36,13 @@ LOGGER = logging.getLogger(__name__)
 
 INF = inflect.engine()
 
-# Prefix for port set names created.
-PS_PRE = 'SAT-'
+# Prefix for offline port policy created.
+POL_PRE = 'SAT-OFFLINE-'
 
 ERR_INVALID_OPTIONS = 1
-ERR_GET_PORTS_FAIL = 2
-ERR_NO_PORTS_FOUND = 3
-ERR_PORTSET_EXISTS = 4
-ERR_PORTSET_CREATE_FAIL = 5
-ERR_PORTSET_DELETE_FAIL = 6
-ERR_PORTSET_GET_CONFIG = 7
-ERR_PORTSET_TOGGLE_FAIL = 8
+ERR_NO_PORTS_FOUND = 2
+ERR_PORT_POLICY_CREATE_FAIL = 3
+ERR_PORT_POLICY_TOGGLE_FAIL = 4
 
 
 class Swapper(metaclass=abc.ABCMeta):
@@ -56,12 +52,9 @@ class Swapper(metaclass=abc.ABCMeta):
         self.port_manager = PortManager()
         self.component_type = ''
 
-        # Keep track of port sets this swap has created
-        self.created_port_sets = []
-
     @abc.abstractmethod
-    def get_ports(self, component_id, force):
-        """Get a list of ports to enable/disable for this swap.
+    def get_port_data(self, component_id, force):
+        """Get a list of dictionaries for ports to enable/disable for this swap.
 
         Args:
             component_id (str, list): The xname or list of xnames
@@ -69,14 +62,9 @@ class Swapper(metaclass=abc.ABCMeta):
                 connected by a single cable.  (Not used for switch swapping)
 
         Returns:
-            A list of port xnames.
+            A list of dictionaries with port data.
         """
-        raise NotImplementedError(f'{self.__class__.__name__}.get_ports')
-
-    @cached_property
-    def existing_port_sets(self):
-        """A list of port set names that existed prior to this swap"""
-        return self._get_existing_port_set_names()
+        raise NotImplementedError(f'{self.__class__.__name__}.get_port_data')
 
     def component_name(self, component_id):
         """Get a string name of a component id.
@@ -91,22 +79,6 @@ class Swapper(metaclass=abc.ABCMeta):
             The xname
         """
         return component_id
-
-    def _apply_configuration(self, port_set_config, action):
-        """Apply configuration to ports
-
-        Args:
-            port_set_config (dict): A dictionary mapping from port xnames to
-                port set configuration
-            action (str): 'enable' or 'disable'
-
-        Returns:
-            True if all configuration was successfully applied, else False.
-        """
-        return all(
-            self.port_manager.update_port_set(f'{PS_PRE}{port_xname}', port_config, action == 'enable')
-            for port_xname, port_config in port_set_config.items()
-        )
 
     def _check_arguments(self, action, dry_run, disruptive):
         """Check that given options are valid for a swap.
@@ -132,124 +104,8 @@ class Swapper(metaclass=abc.ABCMeta):
                 pester(f'Enable/disable of {self.component_type} can impact system. Continue?')):
             raise SystemExit(ERR_INVALID_OPTIONS)
 
-    def _check_port_set_does_not_exist(self, port_set_name, overwrite):
-        """Check if port set exists and delete it if self.overwrite is True
-
-        Args:
-            port_set_name (str): The string name of the port set
-            overwrite (bool): if True, overwrite existing port sets.
-
-        Raises:
-            SystemExit(4): if overwrite is False and port set exists
-            SystemExit(5): if deleting an existing port set failed.
-        """
-        if port_set_name in self.existing_port_sets:
-            if overwrite:
-                LOGGER.warning(f'Port set {port_set_name} already exists, deleting it.')
-                if not self.port_manager.delete_port_set(port_set_name):
-                    self._clean_up_and_exit(ERR_PORTSET_DELETE_FAIL)
-            else:
-                LOGGER.error(f'Port set {port_set_name} already exists, exiting.')
-                self._clean_up_and_exit(ERR_PORTSET_EXISTS)
-
-    def _check_port_set_config(self, ports, port_set_config):
-        """Check that the port set configuration dictionary contains all the given ports
-
-        Args:
-             ports (list): A list of port xnames
-             port_set_config (dict): A dictionary mapping port xnames to configuration
-
-        Raises:
-            SystemExit(7): if any of the specified ports don't exist in port_set_config
-        """
-        missing_ports = set(ports) - set(port_set_config.keys())
-        if missing_ports:
-            LOGGER.error(
-                f'Unable to find configuration for {INF.plural("port", len(missing_ports))} '
-                f'{",".join(missing_ports)}.'
-            )
-            self._clean_up_and_exit(ERR_PORTSET_GET_CONFIG)
-
-    def _clean_up_and_exit(self, error_code):
-        """Exit and clean up any existing port sets
-
-        Args:
-            error_code (int): The return code with which to exit
-
-        Raises:
-            SystemExit(error_code): exits with the given error code
-        """
-        self._clean_up_port_sets()
-        raise SystemExit(error_code)
-
-    def _create_port_set(self, port_set_name, ports, save_port_set=False):
-        """Create a port set.
-
-        Args:
-            port_set_name (str): The name of the port set to create
-            ports (list): The list of ports for this port set
-            save_port_set (bool): if True, save the port set to a file
-                in the current working directory.
-
-        Raises:
-            SystemExit(5): if creating a new port set fails
-        """
-        port_set_data = {
-            'name': port_set_name,
-            'ports': ports
-        }
-
-        if save_port_set:
-            port_set_filename = f'{port_set_name.replace(PS_PRE,"",1)}-ports.json'
-            output_json(port_set_data, port_set_filename)
-
-        LOGGER.debug(f'Creating port set {port_set_name}')
-        if not self.port_manager.create_port_set(port_set_data):
-            self._clean_up_and_exit(ERR_PORTSET_CREATE_FAIL)
-
-        self.created_port_sets.append(port_set_name)
-
-    def _get_existing_port_set_names(self):
-        """Get the names of all currently-defined port sets.
-
-        Returns:
-            A list of port set names
-
-        Raises:
-            SystemExit(2): if a valid response was not returned
-        """
-        port_sets = self.port_manager.get_port_sets()
-        if not (port_sets and port_sets.get('names')):
-            self._clean_up_and_exit(ERR_GET_PORTS_FAIL)
-
-        return port_sets['names']
-
-    def _clean_up_port_sets(self):
-        """Clean up existing port sets"""
-        if self.created_port_sets:
-            self.port_manager.delete_port_set_list(self.created_port_sets)
-
-    def _get_port_set_config(self, port_set_name):
-        """Get port set configuration and return it as a map of xnames to config data.
-
-        Args:
-            port_set_name (str): the name of a port set
-
-        Returns:
-            A dictionary of port xnames to configuration data
-
-        Raises:
-            SystemExit(7): if failed to get config
-        """
-        port_set_config = self.port_manager.get_port_set_config(port_set_name)
-        if not port_set_config:
-            self._clean_up_and_exit(ERR_PORTSET_GET_CONFIG)
-        return {
-            config.get('xname'): config.get('config') for config in port_set_config['ports'] if config.get('config')
-        }
-
     def get_and_check_ports(self, component_id, force):
-        """Get ports for this swap and check result.
+        """Get list of dictionaries for ports for this swap and check result.
 
         Args:
             component_id (str, list): The xname or list of xnames
@@ -257,32 +113,89 @@ class Swapper(metaclass=abc.ABCMeta):
                 connected by a single cable.  (Not used for switch swapping)
 
         Returns:
-            A list of port xnames
+            A list of dictionaries for ports
 
         Raises:
             SystemExit(2): if getting ports failed
             SystemExit(3): if no ports were found
         """
-        ports = self.get_ports(component_id, force)
+        ports = self.get_port_data(component_id, force)
         if ports is None:
-            raise SystemExit(ERR_GET_PORTS_FAIL)
-        if not ports:
             LOGGER.error(f'No ports found for {self.component_type} {component_id}')
             raise SystemExit(ERR_NO_PORTS_FOUND)
 
         return ports
 
-    def swap_component(self, action, component_id, disruptive, dry_run, overwrite, save_port_set, force=False):
+    def create_offline_port_policies(self, port_data_list):
+        """Create port policies to be used to OFFLINE ports
+        Args:
+            port_data_list (list): list of dictionaries with current port data
+
+        Raises:
+            SystemExit(4): if creating a new port policy fails
+        """
+
+        # Create new policies to OFFLINE ports
+        # Name the new policies with SAT-OFFLINE- followed by the current policy name
+        # unless the current policy name is already a SAT-OFFLINE- policy
+        #
+        # Create a unique list of policies and create a new policy for each one
+        policy_list = list(set(p['policy_link'] for p in port_data_list))
+        LOGGER.debug(f'policy_list: {policy_list}')
+        for policy in (p for p in policy_list if not p.startswith(POL_PRE)):
+            new_policy_name = POL_PRE + policy.split('/')[-1]
+            LOGGER.debug(f'Creating policy {new_policy_name} for {policy}')
+            if not self.port_manager.create_offline_port_policy(policy, POL_PRE):
+                LOGGER.error(f'Error creating policy {new_policy_name} for {policy}')
+                raise SystemExit(ERR_PORT_POLICY_CREATE_FAIL)
+
+    def update_ports_state(self, port_data_list, action):
+        """Update the state for ports based on action
+
+        Args:
+            port_data_list (list): list of dictionaries with current port data
+            force (bool): if True, skip checking that supplied ports are
+                connected by a single cable.  (Not used for switch swapping)
+
+        Returns:
+            True if all ports were successfully updated, else False.
+        """
+
+        # Use success to return overall success
+        # Returns True if there were no errors
+        # Returns False if any port could not be updated
+        # Keeps updating the remaining ports if an error occurs for any single port
+        success = True
+        for port_data in port_data_list:
+            # Determine which policy to use depending on action and current policy
+            path_parts = port_data['policy_link'].split('/')
+            policy_name = path_parts[-1]
+            if (action == "enable") and (policy_name.startswith(POL_PRE)):
+                # Remove prefix and use original policy
+                policy_name = policy_name[len(POL_PRE):]
+            elif (action == "disable") and (not policy_name.startswith(POL_PRE)):
+                # Add prefix to policy
+                policy_name = POL_PRE + policy_name
+
+            port_link = port_data['port_link']
+            new_policy = '/'.join(path_parts[:-1]) + '/' + policy_name
+            LOGGER.debug(f'Updating {port_link} with policy: {new_policy}')
+            if not self.port_manager.update_port_policy_link(port_link, new_policy):
+                LOGGER.error(f'Error updating {port_link} with policy: {new_policy}')
+                success = False
+
+        return success
+
+    def swap_component(self, action, component_id, disruptive, dry_run, save_ports, force=False):
         """Enable or disable ports specified by self.component_id
 
         Args:
             action (str): the action to perform, ('enable' or 'disable')
             component_id (str, list): The xname or list of xnames
             disruptive (bool): if True, do not confirm disable/enable
-            dry_run (bool): if True, skip applying configuration to ports,
-                but still create port sets.
-            overwrite (bool): if True, overwrite existing port sets.
-            save_port_set (bool): if True, save a port set (for all ports)
+            dry_run (bool): if True, skip applying action to ports,
+                but still create the port set affected.
+            save_ports (bool): if True, save ports  (for all ports affected)
                 to a file in the local working directory.
             force (bool): if True, skip checking that supplied ports are
                 connected by a single cable.  (Not used for switch swapping)
@@ -290,13 +203,9 @@ class Swapper(metaclass=abc.ABCMeta):
         Raises:
             SystemExit: if a failure occurred.  Exit codes are as follows:
                 1 if invalid options were given.
-                2 for an error getting ports.
-                3 if no ports were found for the component.
-                4 if port set already exists.
-                5 if creation of port set fails.
-                6 if deletion of port set fails.
-                7 if problem occurs getting port configuration.
-                8 if disable/enable of port set fails.
+                2 if no ports were found for the component.
+                3 if creation of port policy used to disable port fails.
+                4 if disable/enable of any port fails.
         """
 
         # For a switch, this is the switch xname, and for a cable it is a comma-separated string of xnames
@@ -304,45 +213,32 @@ class Swapper(metaclass=abc.ABCMeta):
 
         self._check_arguments(action, dry_run, disruptive)
 
-        # Get the ports to enable/disable for this swap
-        ports = self.get_and_check_ports(component_id, force)
+        # Get the port data (xname, port_link, policy_link) to enable/disable for this swap
+        port_data_list = self.get_and_check_ports(component_id, force)
 
-        all_ports_port_set_name = f'{PS_PRE}{component_name}'
+        # Print the affected port xnames
+        print(f'Ports: {" ".join([p["xname"] for p in port_data_list])}')
 
-        # Check if any port sets exist and/or if we are overwriting, for the
-        # port set for all ports, and each individual port set we are creating
-        self._check_port_set_does_not_exist(all_ports_port_set_name, overwrite)
-        for port in ports:
-            self._check_port_set_does_not_exist(f'{PS_PRE}{port}', overwrite)
-
-        # Create a port set for all the ports
-        self._create_port_set(all_ports_port_set_name, ports, save_port_set)
-
-        # Get and check configuration for all of the ports
-        port_set_config = self._get_port_set_config(all_ports_port_set_name)
-        self._check_port_set_config(ports, port_set_config)
-
-        # Create individual port sets for each port
-        for port in ports:
-            self._create_port_set(f'{PS_PRE}{port}', [port])
+        if save_ports:
+            ports_filename = f'{component_name}-ports.json'
+            output_json(port_data_list, ports_filename)
 
         if dry_run:
             LOGGER.info(f'Dry run, so not enabling/disabling {self.component_type} {component_name}')
+            print(f'Dry run completed with no action to enable/disable {self.component_type}.')
         else:
             LOGGER.info(
                 f'{("Disabling", "Enabling")[action == "enable"]} '
-                f'ports on {self.component_type} {self.component_name}'
+                f'ports on {self.component_type} {component_name}'
             )
-            if not self._apply_configuration(port_set_config, action):
+            if action == 'disable':
+                self.create_offline_port_policies(port_data_list)
+
+            if not self.update_ports_state(port_data_list, action):
+                # at least one of the enable/disable ports failed
                 LOGGER.error(f'Failed to {action} {self.component_type} {component_name}.')
-                self._clean_up_and_exit(ERR_PORTSET_TOGGLE_FAIL)
+                raise SystemExit(ERR_PORT_POLICY_TOGGLE_FAIL)
 
-        # Clean up port sets we created
-        self._clean_up_port_sets()
-
-        if dry_run:
-            print(f'Dry run completed with no action to enable/disable {self.component_type}.')
-        else:
             print(
                 f'{self.component_type.capitalize()} has '
                 f'been {("disabled", "enabled")[action == "enable"]}'
@@ -353,15 +249,15 @@ class Swapper(metaclass=abc.ABCMeta):
 class CableSwapper(Swapper):
     """Swaps cables.
 
-    Implements a get_ports method specific to cables that should take a list of jack xnames.
+    Implements a get_port_data method specific to cables that should take a list of jack xnames.
     """
 
     def __init__(self):
         super().__init__()
         self.component_type = 'cable'
 
-    def get_ports(self, component_id, force):
-        """Get a list of ports for this cable.
+    def get_port_data(self, component_id, force):
+        """Get a list of dictionaries for ports for this cable.
 
         Args:
             component_id (list): a list of jack xnames
@@ -369,9 +265,9 @@ class CableSwapper(Swapper):
                 connected by a single cable.
 
         Returns:
-            A list of ports or None if getting ports failed.
+            A list of dictionaries for ports or None if getting ports failed.
         """
-        return self.port_manager.get_jack_ports(component_id, force)
+        return self.port_manager.get_jack_port_data_list(component_id, force)
 
     def component_name(self, component_id):
         """Get a string name of a component id.
@@ -390,24 +286,25 @@ class CableSwapper(Swapper):
 class SwitchSwapper(Swapper):
     """Swaps switches.
 
-    Implements a get_ports method specific to switches that should take a single switch xname.
+    Implements a get_port_data method specific to switches that should take a single switch xname.
     """
 
     def __init__(self):
         super().__init__()
         self.component_type = 'switch'
 
-    def get_ports(self, component_id, force):
-        """Get a list of ports for this switch.
+    def get_port_data(self, component_id, force):
+        """Get a list of dictionaries for ports for this switch.
 
         Args:
             component_id (str): the switch xname
             force: unused
 
         Returns:
-            A list of ports or None if getting ports failed.
+            A list of dictionaries for ports or None if getting ports failed.
         """
-        return self.port_manager.get_switch_ports(component_id)
+
+        return self.port_manager.get_switch_port_data_list(component_id)
 
 
 def output_json(switch_ports, filepath):

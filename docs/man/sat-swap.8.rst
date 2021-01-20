@@ -67,16 +67,8 @@ These options must be specified after the subcommand.
         jacks are connected by a cable.  Only valid when swapping a
         cable.
 
-**--overwrite**
-        In the unexpected event of a port set to be created already
-        existing, delete the port set and then create it. The port set
-        name is prefixed by "SAT-" and includes the switch xname or jack
-        xnames. Port sets are created for the switch or cable and each
-        port. This option is for contingencies such as an interrupted
-        command that left port sets that would otherwise be deleted.
-
-**-s, --save-portset**
-        Save the switch or cable port set as a JSON file in the current
+**-s, --save-ports**
+        Save the switch or cable ports as a JSON file in the current
         working directory with name "<xname>-ports.json". This option
         can be useful even without enable/disable of the switch ports.
 
@@ -99,7 +91,7 @@ Perform a dry run and save the port set for a switch:
 
 ::
 
-    # sat swap switch --dry-run --save-portset x1000c6r7
+    # sat swap switch --dry-run --save-ports x1000c6r7
     # ls x1000*
     x1000c6r7-ports.json
 
