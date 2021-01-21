@@ -1,6 +1,6 @@
 # Changelog
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the platform services stage of ``sat bootsys shutdown`` to
   shut down containerd containers using crictl, and to stop the containerd
   service using ``systemctl``.
+- Changed the platform services stage of ``sat bootsys boot`` to start
+  containerd on the management NCNs and ensure it's enabled.
 
 ### Removed
 - Removed the ``hsn-bringup`` stage of ``sat bootsys boot`` due to removal of
