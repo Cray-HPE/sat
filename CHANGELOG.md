@@ -37,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   health of the Ceph cluster and freeze the Ceph cluster before shutting down.
 - Changed the platform services stage of ``sat bootsys boot`` to start
   containerd on the management NCNs and ensure it's enabled.
+- Changed the platform services stage of ``sat bootsys shutdown`` to stop and
+  disable kubelet on the Kubernetes management NCNs.
+- Changed the platform services stage of ``sat bootsys boot`` to start and
+  enable kubelet on the Kubernetes management NCNs.
 
 ### Removed
 - Removed the ``hsn-bringup`` stage of ``sat bootsys boot`` due to removal of

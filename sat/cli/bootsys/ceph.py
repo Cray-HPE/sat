@@ -204,7 +204,7 @@ def freeze_ceph():
     """Freeze the Ceph cluster.
 
     Raises:
-        SystemExit: if a command failed.
+        RuntimeError: if a command failed.
     """
     ceph_freeze_commands = [
         ['ceph', 'osd', 'set', 'noout'],
@@ -219,8 +219,7 @@ def freeze_ceph():
             LOGGER.info('Running command: %s', ' '.join(ceph_freeze_command))
             LOGGER.info('Command output: %s', output.decode())
         except subprocess.CalledProcessError as e:
-            LOGGER.error('Failed to freeze Ceph: %s', e)
-            raise SystemExit(1)
+            raise RuntimeError(f'Failed to freeze Ceph: {e}')
 
 
 def do_ceph_check(args):
