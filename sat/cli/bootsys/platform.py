@@ -27,6 +27,7 @@ import socket
 from paramiko import SSHClient, SSHException, WarningPolicy
 from threading import Thread
 
+from sat.cli.bootsys.ceph import ceph_healthy, freeze_ceph
 from sat.cli.bootsys.util import get_mgmt_ncn_hostnames
 from sat.cli.bootsys.waiting import Waiter
 
@@ -238,6 +239,12 @@ def do_platform_stop(args):
         waiter.wait_for_completion_async()
     for waiter in containerd_stop_waiters:
         waiter.wait_for_completion_await()
+
+    print('Freezing Ceph cluster')
+    if not ceph_healthy():
+        LOGGER.error('Ceph is not healthy. Please correct Ceph health and try again.')
+        raise SystemExit(1)
+    freeze_ceph()
 
 
 def do_platform_start(args):

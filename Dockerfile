@@ -1,4 +1,4 @@
-# Copyright 2020 Hewlett Packard Enterprise Development LP
+# Copyright 2020-2021 Hewlett Packard Enterprise Development LP
 #
 # Dockerfile for SAT
 
@@ -16,7 +16,7 @@ COPY ./docker_entrypoint.sh /docker_entrypoint.sh
 
 RUN apk update && \
     apk add --no-cache python3-dev py3-pip bash openssl-dev libffi-dev \
-        openssh curl musl-dev git make gcc mandoc ipmitool && \
+        openssh curl musl-dev git make gcc mandoc ipmitool ceph-common && \
     PIP_INDEX_URL=http://dst.us.cray.com/dstpiprepo/simple \
     PIP_TRUSTED_HOST=dst.us.cray.com \
     pip3 install --no-cache-dir -U pip && \
