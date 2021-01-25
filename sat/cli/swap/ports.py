@@ -326,7 +326,7 @@ class PortManager:
         else:
             new_policy_config = {}
             new_policy_config['state'] = 'OFFLINE'
-            new_policy_config['documentSelfLink'] = offline_policy
+            new_policy_config['documentSelfLink'] = new_policy_prefix + path_parts[-1]
             config_json = json.dumps(new_policy_config)
             LOGGER.debug(f'Creating offline policy: {offline_policy}')
             LOGGER.debug(f'config_json: {config_json}')
