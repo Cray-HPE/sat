@@ -28,7 +28,7 @@ import socket
 from paramiko import SSHClient, SSHException, WarningPolicy
 from threading import Thread
 
-from sat.cli.bootsys.ceph import ceph_healthy, freeze_ceph
+from sat.cli.bootsys.ceph import ceph_healthy, toggle_ceph_freeze_flags
 from sat.cli.bootsys.util import get_mgmt_ncn_hostnames
 from sat.cli.bootsys.waiting import Waiter
 from sat.util import pester_choices
@@ -343,10 +343,24 @@ def do_ceph_freeze(ncn_groups):
     Raises:
         FatalPlatformError: if ceph is not healthy or if freezing ceph fails.
     """
-    if not ceph_healthy():
+    if not ceph_healthy(expecting_osdmap_flags=False):
         raise FatalPlatformError('Ceph is not healthy. Please correct Ceph health and try again.')
     try:
-        freeze_ceph()
+        toggle_ceph_freeze_flags(freeze=True)
+    except RuntimeError as err:
+        raise FatalPlatformError(str(err))
+
+
+def do_ceph_unfreeze(ncn_groups):
+    """Check ceph health and unfreeze if healthy.
+
+    Raises:
+        FatalPlatformError: if ceph is not healthy or if unfreezing ceph fails.
+    """
+    if not ceph_healthy(expecting_osdmap_flags=True):
+        raise FatalPlatformError('Ceph is not healthy. Please correct Ceph health and try again.')
+    try:
+        toggle_ceph_freeze_flags(freeze=False)
     except RuntimeError as err:
         raise FatalPlatformError(str(err))
 
@@ -358,6 +372,7 @@ STEPS_BY_ACTION = {
     # The ordered steps to start platform services
     'start': [
         PlatformServicesStep('Start containerd on all Kubernetes NCNs.', do_containerd_start),
+        PlatformServicesStep('Check health of Ceph cluster and unfreeze state.', do_ceph_unfreeze),
         PlatformServicesStep('Start and enable kubelet on all Kubernetes NCNs.', do_kubelet_start)
     ],
     # The ordered steps to stop platform services
