@@ -37,7 +37,7 @@ LOGGER = logging.getLogger(__name__)
 INF = inflect.engine()
 
 # Prefix for offline port policy created.
-POL_PRE = 'SAT-OFFLINE-'
+POL_PRE = 'sat-offline-'
 
 ERR_INVALID_OPTIONS = 1
 ERR_NO_PORTS_FOUND = 2
