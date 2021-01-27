@@ -199,12 +199,10 @@ class TestFreezeCeph(ExtendedTestCase):
         self.ceph_osd_command.assert_has_calls(self.expected_calls)
 
     def test_freeze_ceph_failure(self):
-        """Test an error is logged and we exit when a ceph freezing command fails."""
+        """Test an error is raised when a ceph freezing command fails."""
         self.ceph_osd_command.side_effect = CalledProcessError(returncode=1, cmd='ceph osd set noout')
-        with self.assertLogs(level=logging.ERROR) as error_logs:
-            with self.assertRaises(SystemExit):
-                freeze_ceph()
-        self.assert_in_element('Failed to freeze Ceph', error_logs.output)
+        with self.assertRaises(RuntimeError):
+            freeze_ceph()
 
 
 class TestCephHealthy(ExtendedTestCase):

@@ -29,8 +29,21 @@ from argparse import Namespace
 from paramiko import SSHException, WarningPolicy
 from unittest import mock
 
-from sat.cli.bootsys.platform import do_platform_stop, stop_containers, RemoteServiceWaiter, \
-    CONTAINER_STOP_SCRIPT
+from sat.cli.bootsys.platform import (
+    CONTAINER_STOP_SCRIPT,
+    do_ceph_freeze,
+    do_containerd_stop,
+    do_platform_action,
+    do_platform_start,
+    do_platform_stop,
+    do_service_action_on_hosts,
+    FatalPlatformError,
+    PlatformServicesStep,
+    prompt_for_ncn_verification,
+    RemoteServiceWaiter,
+    SERVICE_ACTION_TIMEOUT,
+    stop_containers
+)
 
 
 class TestStopContainers(unittest.TestCase):
@@ -126,6 +139,37 @@ class TestRemoteServiceWaiter(unittest.TestCase):
         self.assertEqual(self.waiter.timeout, self.timeout)
         self.assertEqual(self.waiter.host, self.host)
         self.assertEqual(self.waiter.service_name, self.service_name)
+        self.assertEqual(f'service {self.service_name} inactive on {self.host}',
+                         self.waiter.condition_name())
+
+    def test_condition_name_with_enabled(self):
+        """Test the condition_name method with target_enabled specified."""
+        waiter = RemoteServiceWaiter(self.host, self.service_name, 'active',
+                                     self.timeout, target_enabled='enabled')
+        self.assertEqual(f'service {self.service_name} active and enabled on {self.host}',
+                         waiter.condition_name())
+
+    def test_target_state_validation(self):
+        """Test that only valid values for target_state are accepted."""
+        valid_vals = ('active', 'inactive')
+        invalid_vals = ('', 'ready', 4, None)
+        for val in valid_vals:
+            RemoteServiceWaiter(self.host, self.service_name, val, self.timeout)
+        for val in invalid_vals:
+            with self.assertRaisesRegex(ValueError, f'Invalid target state {val}'):
+                RemoteServiceWaiter(self.host, self.service_name, val, self.timeout)
+
+    def test_target_enabled_validation(self):
+        """Test that only valid values for target_enabled are accepted."""
+        valid_vals = ('enabled', 'disabled')
+        invalid_vals = ('', 'hibernating', 17)
+        for val in valid_vals:
+            RemoteServiceWaiter(self.host, self.service_name, 'active', self.timeout,
+                                target_enabled=val)
+        for val in invalid_vals:
+            with self.assertRaisesRegex(ValueError, f'Invalid target enabled {val}'):
+                RemoteServiceWaiter(self.host, self.service_name, 'active', self.timeout,
+                                    target_enabled=val)
 
     def test_wait_for_stop(self):
         """When the service stops, the waiter should complete."""
@@ -145,9 +189,20 @@ class TestRemoteServiceWaiter(unittest.TestCase):
                                                        mock.call(f'systemctl start {self.service_name}'),
                                                        mock.call(f'systemctl is-active {self.service_name}')])
 
+    def test_wait_for_enable_only(self):
+        """When target_enabled='enabled', an active but disabled service should be enabled."""
+        self.waiter.target_enabled = 'enabled'
+        self.waiter.target_state = 'active'
+        self.enabled_status = b'disabled\n'
+        self.assertTrue(self.waiter.wait_for_completion())
+        self.assert_ssh_connected()
+        self.ssh_client.exec_command.assert_has_calls([mock.call(f'systemctl is-active {self.service_name}'),
+                                                       mock.call(f'systemctl is-enabled {self.service_name}'),
+                                                       mock.call(f'systemctl enable {self.service_name}')])
+
     def test_wait_for_start_with_enable(self):
-        """When enable_service = True, a disabled service should be enabled."""
-        self.waiter.enable_service = True
+        """When target_enabled='enabled', a disabled service should be enabled."""
+        self.waiter.target_enabled = 'enabled'
         self.waiter.target_state = 'active'
         self.service_status = b'inactive\n'
         self.enabled_status = b'disabled\n'
@@ -160,14 +215,41 @@ class TestRemoteServiceWaiter(unittest.TestCase):
                                                        mock.call(f'systemctl is-active {self.service_name}')])
 
     def test_wait_for_start_with_enable_already_enabled(self):
-        """When enable_service = True, an already-enabled service should be left alone."""
-        self.waiter.enable_service = True
+        """When target_enabled='enabled', an already-enabled service should be left alone."""
+        self.waiter.target_enabled = 'enabled'
         self.waiter.target_state = 'active'
         self.service_status = b'inactive\n'
         self.assertTrue(self.waiter.wait_for_completion())
         self.assert_ssh_connected()
         self.ssh_client.exec_command.assert_has_calls([mock.call(f'systemctl is-active {self.service_name}'),
                                                        mock.call(f'systemctl start {self.service_name}'),
+                                                       mock.call(f'systemctl is-enabled {self.service_name}'),
+                                                       mock.call(f'systemctl is-active {self.service_name}')])
+
+    def test_wait_for_stop_with_disable(self):
+        """When target_enabled='disabled', an enabled service should be disabled."""
+        self.waiter.target_enabled = 'disable'
+        self.waiter.target_state = 'inactive'
+        self.service_status = b'active\n'
+        self.enabled_status = b'enabled\n'
+        self.assertTrue(self.waiter.wait_for_completion())
+        self.assert_ssh_connected()
+        self.ssh_client.exec_command.assert_has_calls([mock.call(f'systemctl is-active {self.service_name}'),
+                                                       mock.call(f'systemctl stop {self.service_name}'),
+                                                       mock.call(f'systemctl is-enabled {self.service_name}'),
+                                                       mock.call(f'systemctl disable {self.service_name}'),
+                                                       mock.call(f'systemctl is-active {self.service_name}')])
+
+    def test_wait_for_stop_with_disable_already_disabled(self):
+        """When target_enabled='enabled', an already-enabled service should be left alone."""
+        self.waiter.target_enabled = 'disabled'
+        self.waiter.target_state = 'inactive'
+        self.service_status = b'active\n'
+        self.enabled_status = b'disabled\n'
+        self.assertTrue(self.waiter.wait_for_completion())
+        self.assert_ssh_connected()
+        self.ssh_client.exec_command.assert_has_calls([mock.call(f'systemctl is-active {self.service_name}'),
+                                                       mock.call(f'systemctl stop {self.service_name}'),
                                                        mock.call(f'systemctl is-enabled {self.service_name}'),
                                                        mock.call(f'systemctl is-active {self.service_name}')])
 
@@ -226,69 +308,289 @@ class TestRemoteServiceWaiter(unittest.TestCase):
                 self.assertFalse(self.waiter.wait_for_completion())
 
 
-class TestDoPlatformStop(unittest.TestCase):
-    """Tests for the do_platform_stop function."""
+class TestDoPlatformAction(unittest.TestCase):
+    """Tests for the do_platform_action function."""
+
     def setUp(self):
         """Set up mocks."""
-        self.args = Namespace()
-        self.expected_subroles = ['managers', 'workers']
-        self.get_mgmt_ncn_hostnames = mock.patch('sat.cli.bootsys.platform.get_mgmt_ncn_hostnames').start()
-        self.hosts = ['ncn-w001', 'ncn-w002', 'ncn-w003', 'ncn-m001', 'ncn-m002']
-        self.get_mgmt_ncn_hostnames.return_value = self.hosts
-        self.stop_containers = mock.patch('sat.cli.bootsys.platform.stop_containers').start()
-        self.ceph_healthy = mock.patch('sat.cli.bootsys.platform.ceph_healthy').start()
-        self.ceph_healthy.return_value = True
-        self.freeze_ceph = mock.patch('sat.cli.bootsys.platform.freeze_ceph').start()
-        self.remote_service_stopped_waiter = mock.patch('sat.cli.bootsys.platform.RemoteServiceWaiter').start()
+        self.known_action = 'start'
+        self.mock_first_step = mock.Mock()
+        self.mock_second_step = mock.Mock()
+        self.mock_steps = {
+            self.known_action: [
+                PlatformServicesStep('first step', self.mock_first_step),
+                PlatformServicesStep('second step', self.mock_second_step)
+            ]
+            # Not necessary to test another valid action. Code path is the same.
+        }
+        mock.patch('sat.cli.bootsys.platform.STEPS_BY_ACTION', self.mock_steps).start()
+
+        self.mock_prompt_for_ncn_verification = mock.patch(
+            'sat.cli.bootsys.platform.prompt_for_ncn_verification').start()
+
+        self.mock_print = mock.patch('builtins.print').start()
 
     def tearDown(self):
         mock.patch.stopall()
 
+    def test_invalid_action(self):
+        """Test giving an invalid action."""
+        invalid_action = 'bounce'
+        with self.assertRaises(SystemExit):
+            with self.assertLogs(level=logging.ERROR) as cm:
+                do_platform_action(invalid_action)
+
+        expected_err = f'Invalid action "{invalid_action}" to perform on platform services.'
+        self.assertEqual(cm.records[0].message, expected_err)
+
+    def test_failed_ncn_verification(self):
+        """Test do_platform_action when NCN verification fails."""
+        bad_ncn_msg = 'bad NCNs'
+        self.mock_prompt_for_ncn_verification.side_effect = FatalPlatformError(bad_ncn_msg)
+        with self.assertRaises(SystemExit):
+            with self.assertLogs(level=logging.ERROR) as cm:
+                do_platform_action(self.known_action)
+
+        expected_err = f'Not proceeding with platform {self.known_action}: {bad_ncn_msg}'
+        self.assertEqual(cm.records[0].message, expected_err)
+
+    def test_do_platform_action_success(self):
+        """Test do_platform_action when all steps are successful."""
+        with self.assertLogs(level=logging.INFO) as cm:
+            do_platform_action(self.known_action)
+
+        self.mock_print.assert_has_calls([
+            mock.call('Executing step: first step'),
+            mock.call('Executing step: second step')
+        ])
+        self.assertEqual(cm.records[0].message, 'Executing step: first step')
+        self.assertEqual(cm.records[1].message, 'Executing step: second step')
+
+    def test_do_platform_action_failed_step(self):
+        """Test do_platform_action when a step fails."""
+        self.mock_first_step.side_effect = FatalPlatformError('fail')
+        with self.assertLogs(level=logging.INFO) as cm:
+            with self.assertRaises(SystemExit):
+                do_platform_action(self.known_action)
+
+        self.mock_print.assert_called_once_with("Executing step: first step")
+        self.assertEqual(cm.records[0].message, 'Executing step: first step')
+        self.assertEqual(cm.records[1].message, 'Fatal error while stopping platform services '
+                                                'during step "first step": fail')
+
+
+class TestDoPlatformStartStop(unittest.TestCase):
+    """Tests for the do_platform_start and do_platform_stop functions."""
+
+    def setUp(self):
+        """Set up mocks."""
+        self.args = Namespace()
+        self.mock_do_platform_action = mock.patch('sat.cli.bootsys.platform.do_platform_action').start()
+
+    def tearDown(self):
+        mock.patch.stopall()
+
+    def test_do_platform_start(self):
+        """Test that do_platform_start correctly calls do_platform_action."""
+        do_platform_start(self.args)
+        self.mock_do_platform_action.assert_called_once_with('start')
+
     def test_do_platform_stop(self):
-        """Test a basic call of do_platform_stop."""
+        """Test that do_platform_stop correctly calls do_platform_action."""
         do_platform_stop(self.args)
-        self.get_mgmt_ncn_hostnames.assert_called_once_with(subroles=self.expected_subroles)
-        self.stop_containers.assert_has_calls([mock.call(host) for host in self.hosts], any_order=True)
-        self.remote_service_stopped_waiter.assert_has_calls(
-            [mock.call(host, 'containerd', target_state='inactive', timeout=30) for host in self.hosts]
-        )
-        self.remote_service_stopped_waiter.return_value.wait_for_completion_async.assert_has_calls(
-            [mock.call() for host in self.hosts]
-        )
-        self.remote_service_stopped_waiter.return_value.wait_for_completion_await.assert_has_calls(
-            [mock.call() for host in self.hosts]
-        )
+        self.mock_do_platform_action.assert_called_once_with('stop')
+
+
+class TestDoContainerdStop(unittest.TestCase):
+    """Tests for the do_containerd_stop function."""
+    def setUp(self):
+        """Set up mocks."""
+        self.k8s_ncns = ['ncn-w001', 'ncn-w002', 'ncn-w003', 'ncn-m001', 'ncn-m002']
+        self.ncn_groups = {'kubernetes': self.k8s_ncns}
+        self.stop_containers = mock.patch('sat.cli.bootsys.platform.stop_containers').start()
+        self.mock_do_service_action = mock.patch(
+            'sat.cli.bootsys.platform.do_service_action_on_hosts').start()
+
+    def tearDown(self):
+        mock.patch.stopall()
+
+    def test_do_containerd_stop(self):
+        """Test a basic call of do_containerd_stop."""
+        do_containerd_stop(self.ncn_groups)
+        self.stop_containers.assert_has_calls([mock.call(ncn) for ncn in self.k8s_ncns],
+                                              any_order=True)
+        self.mock_do_service_action.assert_called_once_with(self.k8s_ncns,
+                                                            'containerd', target_state='inactive')
+
+    def test_do_containerd_stop_error(self):
+        """Test a call of do_containerd_stop when there is a SystemExit in one of the threads."""
+        self.stop_containers.side_effect = SystemExit
+        do_containerd_stop(self.ncn_groups)
+        self.stop_containers.assert_has_calls([mock.call(ncn) for ncn in self.k8s_ncns],
+                                              any_order=True)
+        self.mock_do_service_action.assert_called_once_with(self.k8s_ncns,
+                                                            'containerd', target_state='inactive')
+
+
+class TestDoCephFreeze(unittest.TestCase):
+    """Tests for the do_ceph_freeze function."""
+
+    def setUp(self):
+        """Set up mocks."""
+        # NCN groups are not used by this step of stopping platform services
+        self.ncn_groups = {}
+        self.ceph_healthy = mock.patch('sat.cli.bootsys.platform.ceph_healthy').start()
+        self.ceph_healthy.return_value = True
+        self.freeze_ceph = mock.patch('sat.cli.bootsys.platform.freeze_ceph').start()
+
+    def test_do_ceph_freeze_success(self):
+        """Test do_ceph_freeze in the successful case."""
+        do_ceph_freeze(self.ncn_groups)
         self.ceph_healthy.assert_called_once_with()
         self.freeze_ceph.assert_called_once_with()
 
-    def test_do_platform_stop_error(self):
-        """Test a call of do_platform_stop when there is a SystemExit in one of the container threads."""
-        self.stop_containers.side_effect = SystemExit
-        do_platform_stop(self.args)
-        self.get_mgmt_ncn_hostnames.assert_called_once_with(subroles=self.expected_subroles)
-        self.stop_containers.assert_has_calls([mock.call(host) for host in self.hosts], any_order=True)
-
-    def test_do_platform_stop_waiter_error(self):
-        """Test a call of do_platform_stop when there is a RuntimeError in one of the containerd waiters."""
-        self.remote_service_stopped_waiter.return_value.has_completed.side_effect = RuntimeError
-        do_platform_stop(self.args)
-        self.get_mgmt_ncn_hostnames.assert_called_once_with(subroles=self.expected_subroles)
-        self.stop_containers.assert_has_calls([mock.call(host) for host in self.hosts], any_order=True)
-        self.remote_service_stopped_waiter.return_value.wait_for_completion_async.assert_has_calls(
-            [mock.call() for host in self.hosts]
-        )
-
-    def test_do_platform_stop_no_ncns(self):
-        """When get_mgmt_ncn_hostnames returns no NCNs, exit with an error."""
-        self.get_mgmt_ncn_hostnames.return_value = []
-        with self.assertLogs(level=logging.ERROR):
-            with self.assertRaises(SystemExit):
-                do_platform_stop(self.args)
-
-    def test_do_platform_stop_ceph_unhealthy(self):
+    def test_do_ceph_freeze_unhealthy(self):
         """When Ceph is not healthy, do not freeze Ceph."""
         self.ceph_healthy.return_value = False
-        with self.assertLogs(level=logging.ERROR):
-            with self.assertRaises(SystemExit):
-                do_platform_stop(self.args)
+        with self.assertRaises(FatalPlatformError):
+            do_ceph_freeze(self.ncn_groups)
         self.freeze_ceph.assert_not_called()
+
+
+class TestPromptForNCNVerification(unittest.TestCase):
+    """Tests for prompt_for_ncn_verification function."""
+
+    def setUp(self):
+        """Set up mocks."""
+        self.mock_print = mock.patch('builtins.print').start()
+
+        self.mock_managers = ['ncn-m001', 'ncn-m002', 'ncn-m003']
+        self.mock_workers = ['ncn-w001', 'ncn-w002', 'ncn-w003']
+
+        def mock_get_hostnames(subroles):
+            if subroles == ['managers']:
+                return set(self.mock_managers)
+            elif subroles == ['workers']:
+                return set(self.mock_workers)
+            elif subroles == ['managers', 'workers']:
+                return set(self.mock_managers + self.mock_workers)
+            else:
+                return set()
+
+        self.mock_get_hostnames = mock.patch(
+            'sat.cli.bootsys.platform.get_mgmt_ncn_hostnames', mock_get_hostnames).start()
+
+        self.mock_pester_choices = mock.patch(
+            'sat.cli.bootsys.platform.pester_choices').start()
+
+    def tearDown(self):
+        mock.patch.stopall()
+
+    def assert_printed_messages(self):
+        """Helper function to assert proper messages printed."""
+        self.mock_print.assert_has_calls([
+            mock.call('Identified the following Non-compute Node (NCN) groups as follows.'),
+            mock.call(f'managers: {self.mock_managers}'),
+            mock.call(f'workers: {self.mock_workers}'),
+            mock.call(f'kubernetes: {self.mock_managers + self.mock_workers}')
+        ])
+
+    @staticmethod
+    def get_empty_group_message(group_names):
+        """Helper to get a message for the empty group(s)
+
+        Args:
+            group_names (list of str): The list of empty group names.
+        """
+        return f'Failed to identify members of the following NCN group(s): {group_names}'
+
+    def test_empty_managers(self):
+        """Test with no managers identified."""
+        self.mock_managers = []
+        with self.assertRaises(FatalPlatformError) as err:
+            prompt_for_ncn_verification()
+        self.assertEqual(str(err.exception), self.get_empty_group_message(['managers']))
+        self.assert_printed_messages()
+
+    def test_empty_workers(self):
+        """Test with no workers identified."""
+        self.mock_workers = []
+        with self.assertRaises(FatalPlatformError) as err:
+            prompt_for_ncn_verification()
+        self.assertEqual(str(err.exception), self.get_empty_group_message(['workers']))
+        self.assert_printed_messages()
+
+    def test_empty_managers_and_workers(self):
+        """Test with no managers or workers identified."""
+        self.mock_managers = []
+        self.mock_workers = []
+        with self.assertRaises(FatalPlatformError) as err:
+            prompt_for_ncn_verification()
+        self.assertEqual(str(err.exception),
+                         self.get_empty_group_message(['managers', 'workers', 'kubernetes']))
+        self.assert_printed_messages()
+
+    def test_groups_confirmed(self):
+        """Test with user confirming the identified groups."""
+        self.mock_pester_choices.return_value = 'yes'
+        ncn_groups = prompt_for_ncn_verification()
+        expected_groups = {
+            'managers': self.mock_managers,
+            'workers': self.mock_workers,
+            'kubernetes': self.mock_managers + self.mock_workers
+        }
+        self.assertEqual(expected_groups, ncn_groups)
+
+    def test_groups_denied(self):
+        """Test with user denying the identified groups."""
+        self.mock_pester_choices.return_value = 'no'
+        err_regex = 'User indicated NCN groups are incorrect'
+        with self.assertRaisesRegex(FatalPlatformError, err_regex):
+            prompt_for_ncn_verification()
+
+
+class TestDoServiceActionOnHosts(unittest.TestCase):
+    """Tests for do_service_action_on_hosts function."""
+
+    def setUp(self):
+        """Set up mocks."""
+        self.hosts = ['ncn-w001', 'ncn-w002', 'ncn-w003', 'ncn-m001', 'ncn-m002']
+        self.service = 'exampled'
+        self.target_state = 'active'
+        self.target_enabled = 'enabled'
+
+        # Create a separate RemoteServiceWaiter per host, and default to successful
+        self.mock_waiters = [mock.Mock(completed=True) for _ in self.hosts]
+        self.mock_waiter = mock.patch('sat.cli.bootsys.platform.RemoteServiceWaiter',
+                                      side_effect=self.mock_waiters).start()
+
+    def test_all_successful(self):
+        """Test doing a service action when it is successful on all hosts."""
+        do_service_action_on_hosts(self.hosts, self.service, self.target_state,
+                                   target_enabled=self.target_enabled)
+        self.mock_waiter.assert_has_calls([
+            mock.call(host, self.service, target_state=self.target_state,
+                      timeout=SERVICE_ACTION_TIMEOUT, target_enabled=self.target_enabled)
+            for host in self.hosts
+        ])
+        for waiter in self.mock_waiters:
+            waiter.wait_for_completion_async.assert_called_once_with()
+            waiter.wait_for_completion_await.assert_called_once_with()
+
+    def test_one_failure(self):
+        """Test doing a service action when it fails on a single host."""
+        # Pick a host in the middle
+        self.mock_waiters[2].completed = False
+        err_regex = (f'Failed to ensure {self.service} is {self.target_state} '
+                     f'and {self.target_enabled} on all hosts.')
+        with self.assertRaisesRegex(FatalPlatformError, err_regex):
+            do_service_action_on_hosts(self.hosts, self.service, self.target_state,
+                                       target_enabled=self.target_enabled)
+        self.mock_waiter.assert_has_calls([
+            mock.call(host, self.service, target_state=self.target_state,
+                      timeout=SERVICE_ACTION_TIMEOUT, target_enabled=self.target_enabled)
+            for host in self.hosts
+        ])
+        for waiter in self.mock_waiters:
+            waiter.wait_for_completion_async.assert_called_once_with()
+            waiter.wait_for_completion_await.assert_called_once_with()
