@@ -90,7 +90,7 @@ class CephHealthWaiter(Waiter):
 def restart_ceph_services():
     """Restart ceph services on the storage nodes.
 
-    This uses the ansible inventory to get the list of nodes designated as
+    This uses the hosts file to get the list of nodes designated as
     'storage' nodes.
 
     It iterates first over the nodes on which to restart the services,

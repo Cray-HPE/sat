@@ -325,8 +325,6 @@ def do_power_on_ncns(args):
                                  'after powering them on: %s. Troubleshoot the '
                                  'issue and then try again.',
                                  ', '.join(inaccessible_nodes))
-                    # Have to exit here because playbook will fail if nodes are
-                    # not available for SSH.
                     raise SystemExit(1)
                 else:
                     print(f'Powered on NCNs: {", ".join(ncn_group)}')
