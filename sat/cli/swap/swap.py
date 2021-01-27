@@ -134,8 +134,8 @@ class Swapper(metaclass=abc.ABCMeta):
         """
 
         # Create new policies to OFFLINE ports
-        # Name the new policies with SAT-OFFLINE- followed by the current policy name
-        # unless the current policy name is already a SAT-OFFLINE- policy
+        # Name the new policies with POL_PRE followed by the current policy name
+        # unless the current policy name is already a POL_PRE policy
         #
         # Create a unique list of policies and create a new policy for each one
         policy_list = list(set(p['policy_link'] for p in port_data_list))
