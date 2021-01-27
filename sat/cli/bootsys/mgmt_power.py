@@ -1,7 +1,7 @@
 """
 Management cluster boot, shutdown, and IPMI power support.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -32,7 +32,6 @@ from paramiko.client import SSHClient
 from paramiko.ssh_exception import BadHostKeyException, AuthenticationException, SSHException
 
 from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger
-from sat.cli.bootsys.mgmt_hosts import do_enable_hosts_entries, do_disable_hosts_entries
 from sat.cli.bootsys.util import get_mgmt_ncn_hostnames, RunningService
 from sat.cli.bootsys.waiting import GroupWaiter
 from sat.config import get_config_value
@@ -269,8 +268,6 @@ def do_power_off_ncns(args):
         args: The argparse.Namespace object containing the parsed arguments
             passed to this stage.
     """
-    print('Enabling required entries in /etc/hosts for NCN mgmt interfaces.')
-    do_enable_hosts_entries()
 
     action_msg = 'shutdown of management NCNs'
     prompt_continue(action_msg)
@@ -299,8 +296,6 @@ def do_power_on_ncns(args):
     """
     username, password = get_username_and_password_interactively(username_prompt='IPMI username',
                                                                  password_prompt='IPMI password')
-
-    do_enable_hosts_entries()
 
     with RunningService('dhcpd', sleep_after_start=5):
         # First master node is already on as it is where "sat bootsys" runs.
@@ -335,6 +330,3 @@ def do_power_on_ncns(args):
                     raise SystemExit(1)
                 else:
                     print(f'Powered on NCNs: {", ".join(ncn_group)}')
-
-    LOGGER.info('Disabling entries in /etc/hosts to prepare for starting DNS.')
-    do_disable_hosts_entries()

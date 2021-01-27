@@ -45,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed the ``hsn-bringup`` stage of ``sat bootsys boot`` due to removal of
   underlying Ansible playbook and old fabric controller service.
+- Removed calls to removed Ansible playbooks ``enable-dns-conflict-hosts.yml``
+  and ``disable-dns-conflict-hosts.yml`` during ``ncn-power`` stage of
+  ``sat bootsys``.
 
 ### Fixed
 - Removed error message and 'ERROR' value for Slurm version in system
