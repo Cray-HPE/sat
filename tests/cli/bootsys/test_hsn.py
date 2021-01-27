@@ -1,7 +1,7 @@
 """
 Unit tests for the sat.cli.bootsys.hsn module.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -31,7 +31,6 @@ from sat.cli.bootsys.state_recorder import StateError
 class TestHSNBringupWaiter(unittest.TestCase):
     """Test the HSN bringup waiter"""
     def setUp(self):
-        self.mock_run_playbook = patch('sat.cli.bootsys.hsn.run_ansible_playbook').start()
         self.mock_session = patch('sat.cli.bootsys.hsn.SATSession').start()
         mock_fabric_client_cls = patch('sat.cli.bootsys.hsn.FabricControllerClient').start()
         self.mock_fabric_client = mock_fabric_client_cls.return_value
@@ -119,7 +118,7 @@ class TestHSNBringupWaiter(unittest.TestCase):
         self.mock_hsn_recorder.get_stored_state.assert_called_once_with()
 
     def test_pre_wait_action(self):
-        """Test that the pre_wait_action calls the bringup playbook and sets up members."""
+        """Test that the pre_wait_action sets up members."""
         expected_members = {
             HSNPort('fabric-ports', 'x3000c0r24j4p0'),
             HSNPort('fabric-ports', 'x3000c0r24j4p1'),
@@ -132,10 +131,6 @@ class TestHSNBringupWaiter(unittest.TestCase):
         }
         self.waiter.pre_wait_action()
 
-        self.mock_run_playbook.assert_called_once_with(
-            '/opt/cray/crayctl/ansible_framework/main/ncmp_hsn_bringup.yaml',
-            exit_on_err=False
-        )
         self.assertEqual(expected_members, self.waiter.members)
 
     def test_ports_basic_enabled(self):
