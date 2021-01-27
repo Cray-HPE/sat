@@ -47,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   table in ``sat showrev`` when Slurm is not present.
 - Add missing space in help text for ``sat showrev`` ``--all`` option.
 
+### Security
+- Incremented required version of Python PyYAML package to 5.4.1.
+- Incremented required version of Python RSA package to 4.7.
+
 ## [3.2.0] - 2020-12-17
 
 ### Changed
