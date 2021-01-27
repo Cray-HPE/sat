@@ -1,7 +1,7 @@
 """
 Unit tests for the sat.cli.bootsys.bgp module.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -32,6 +32,8 @@ from sat.cli.bootsys.bgp import BGPSpineStatusWaiter
 class TestBGPSpineStatusWaiter(unittest.TestCase):
     """Tests for the spine BGP status waiting functionality."""
 
+    # TODO: Once automation formerly provided by Ansible playbook is implemented,
+    # update the format of this output to reflect the output of the new tooling.
     INCOMPLETE_OUTPUT = dedent("""\
     PLAY [spines_mtl]
     ****************************************************************************************************
@@ -75,6 +77,8 @@ class TestBGPSpineStatusWaiter(unittest.TestCase):
     Playbook run took 0 days, 0 hours, 0 minutes, 5 seconds
     """)
 
+    # TODO: Once automation formerly provided by Ansible playbook is implemented,
+    # update the format of this output to reflect the output of the new tooling.
     COMPLETE_OUTPUT = dedent("""\
     PLAY [spines_mtl]
     ****************************************************************************************************
@@ -118,12 +122,6 @@ class TestBGPSpineStatusWaiter(unittest.TestCase):
     Playbook run took 0 days, 0 hours, 0 minutes, 5 seconds
     """)
 
-    def setUp(self):
-        self.mock_run_playbook = patch('sat.cli.bootsys.bgp.run_ansible_playbook').start()
-
-    def tearDown(self):
-        patch.stopall()
-
     def test_spine_bgp_established(self):
         """Test if established BGP peers are recognized."""
         self.assertTrue(BGPSpineStatusWaiter.all_established(self.COMPLETE_OUTPUT))
@@ -132,25 +130,17 @@ class TestBGPSpineStatusWaiter(unittest.TestCase):
         """Test if idle BGP peers are detected."""
         self.assertFalse(BGPSpineStatusWaiter.all_established(self.INCOMPLETE_OUTPUT))
 
+    # TODO: Once new automation for getting spine status is implemented, update this test
     def test_get_spine_status(self):
         """Test the get_spine_status helper function."""
-        result = 'result of running playbook'
-        self.mock_run_playbook.return_value = result
-
-        self.assertEqual(BGPSpineStatusWaiter.get_spine_status(), result)
-        self.mock_run_playbook.assert_called_once_with('/opt/cray/crayctl/ansible_framework/main/spine-bgp-status.yml',
-                                                       exit_on_err=False)
+        with self.assertRaises(NotImplementedError):
+            BGPSpineStatusWaiter.get_spine_status()
 
     @patch('sat.cli.bootsys.bgp.BGPSpineStatusWaiter.get_spine_status')
     def test_completion_successful(self, mock_spine_status):
         """Test the BGP waiter when the BGP peers have been established."""
         mock_spine_status.return_value = self.COMPLETE_OUTPUT
         self.assertTrue(BGPSpineStatusWaiter(10).has_completed())
-
-    def test_completion_when_called_process_error(self):
-        """Test the BGP waiter when there's an issue running ansible-playbook."""
-        self.mock_run_playbook.return_value = None
-        self.assertFalse(BGPSpineStatusWaiter(10).has_completed())
 
     @patch('sat.cli.bootsys.bgp.BGPSpineStatusWaiter.get_spine_status')
     def test_waiting_for_bgp_completion(self, mock_spine_status):
