@@ -1,7 +1,7 @@
 """
 Unit tests for sat.cli.swap.main
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -33,7 +33,6 @@ def set_options(namespace):
     namespace.target = 'cable'
 
 
-@unittest.skip('SAT-713: Temporarily remove sat swap')
 class TestSwapMain(unittest.TestCase):
 
     def setUp(self):
@@ -45,6 +44,7 @@ class TestSwapMain(unittest.TestCase):
     def tearDown(self):
         mock.patch.stopall()
 
+    @unittest.skip('SAT-779: Temporarily remove sat swap cable')
     def test_swap_cable(self):
         """Running swap cable calls the swap cable function"""
         do_swap(self.fake_args)

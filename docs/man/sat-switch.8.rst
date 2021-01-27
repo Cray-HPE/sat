@@ -7,7 +7,7 @@ Disable/enable switch before/after replacement
 ----------------------------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2020 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -48,36 +48,26 @@ These options must be specified after the subcommand.
 **--disruptive**
         Perform disable/enable action without a prompt to continue.
 
-**--overwrite**
-        In the unexpected event of a port set to be created already
-        existing, delete the port set and then create it. The port set
-        name is prefixed by "SAT-" and includes the switch xname. Port
-        sets are created for the switch and each port. This option is
-        for contingencies such as an interrupted command that left port
-        sets that would otherwise be deleted.
-
 **--dry-run** 
         Perform a dry run without action to disable/enable the switch.
         The dry run obtains port links and port sets and configurations
         of ports, and creates port sets and deletes port sets. This can
         be used to check in advance there are no error conditions.
 
-**-s, --save-portset**
-        Save the switch port set as a JSON file in the current working
-        directory with name "<xname>-ports.json". This option can be
-        useful even without enable/disable of the switch ports.
+**-s, --save-ports**
+        Save data about the switch ports affected as a JSON file
+        in the current working directory with name "<xname>-ports.json". 
+        For each port that is affected, the xname, port_link, and
+        policy_link is included in the JSON output. This option
+        can be useful even without enable/disable of the switch ports.
 
 EXIT STATUS
 ===========
 
 | 1: An invalid combination of options was given
-| 2: Error getting ports for system
-| 3: No ports found for the switch
-| 4: Port set to be created already exists
-| 5: Creation of port set failed
-| 6: Deletion of existing port set failed
-| 7: Problem getting port configuration
-| 8: Disable/enable of port set failed
+| 2: No ports found for the switch
+| 3: Creation of port policy failed
+| 4: Disable/enable of one or more ports failed
 
 EXAMPLES
 ========
@@ -86,7 +76,7 @@ Perform a dry run and save the port set for the switch:
 
 ::
 
-    # sat switch --dry-run --save-portset x1000c6r7
+    # sat switch --dry-run --save-ports x1000c6r7
     # ls x1000*
     x1000c6r7-ports.json
 
