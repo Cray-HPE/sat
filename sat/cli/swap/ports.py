@@ -48,7 +48,7 @@ class PortManager:
         """Get a list of port document links
 
         Returns:
-            A dictionary that contains a documentLinks key which is a list of port paths or None
+            A list of port paths or None
         """
 
         # Get ports information using fabric manager API.
@@ -65,10 +65,13 @@ class PortManager:
             LOGGER.error(f'Failed to parse JSON from fabric manager response: {err}')
             return None
 
-        return ports
+        return ports.get('documentLinks')
 
     def get_port(self, port_link):
         """Get port data using document link
+
+        Args:
+            port_link (str): The full path of the port document link
 
         Returns:
             A dictionary of port data or None if there is an error
@@ -91,10 +94,10 @@ class PortManager:
         return port
 
     def get_switches(self):
-        """Get all switches
+        """Get a list of switch document links
 
         Returns:
-            A dictionary that contains a documentLinks key which is a list of switch paths or None
+            A list of switch paths or None
         """
 
         # Get switches information using fabric manager API.
@@ -111,10 +114,13 @@ class PortManager:
             LOGGER.error('Failed to parse JSON from fabric manager response: {}'.format(err))
             return None
 
-        return switches
+        return switches.get('documentLinks')
 
     def get_switch(self, switch_link):
         """Get switch data using document link
+
+        Args:
+            switch_link (str): The full path of the switch document link
 
         Returns:
             A dictionary of switch data or None if there is an error
@@ -141,13 +147,13 @@ class PortManager:
 
         Args:
             port_links (list): a list of port document links
-            Example: [/fabric/ports/x3000c0r15j14p0]
+                Example: [/fabric/ports/x3000c0r15j14p0]
 
         Returns:
             A list of dictionaries for ports or None if there is an error
-            Example: {"xname": "x3000c0r21j14p0",
-                      "port_link": "/fabric/ports/x3000c0r21j14p0",
-                      "policy_link: "/fabric/port-policies/fabric-policy"}
+                Example: {"xname": "x3000c0r21j14p0",
+                          "port_link": "/fabric/ports/x3000c0r21j14p0",
+                          "policy_link: "/fabric/port-policies/fabric-policy"}
         """
 
         port_data_list = []
@@ -155,7 +161,7 @@ class PortManager:
             port = self.get_port(port_link)
 
             if port is None:
-                LOGGER.error('Failed to get port.')
+                LOGGER.error(f'Failed to get port data for {port_link}.')
                 return None
 
             port_data = {}
@@ -163,8 +169,8 @@ class PortManager:
                 port_data['xname'] = port['conn_port']
                 port_data['port_link'] = port_link
                 port_data['policy_link'] = port['portPolicyLinks'][0]
-            except KeyError:
-                LOGGER.error('Key for port data missing from fabric manager switch information.')
+            except KeyError as e:
+                LOGGER.error('Key %s for port data missing from fabric manager switch information.', e)
                 return None
 
             port_data_list.append(port_data)
@@ -181,7 +187,7 @@ class PortManager:
                 cases.
 
         Returns:
-            A ist of dictionaries for ports or None if there is an error
+            A list of dictionaries for ports or None if there is an error
         """
 
         # If a non-jack was given, return None
@@ -199,7 +205,7 @@ class PortManager:
 
         port_links = []
         for jack_xname in jack_xnames:
-            for doc_link in ports['documentLinks']:
+            for doc_link in ports:
                 port = doc_link.split('/')[-1]
                 if port.startswith(f'{jack_xname}p'):
                     port_links.append(doc_link)
@@ -220,7 +226,7 @@ class PortManager:
             switch_xname: component name of switch
 
         Returns:
-            A ist of dictionaries for ports or None if there is an error
+            A list of dictionaries for ports or None if there is an error
         """
 
         switches = self.get_switches()
@@ -231,15 +237,11 @@ class PortManager:
         # Get the document link for the switch_xname input
         # Should only be one so break after find it
         switch_link = None
-        try:
-            for doc_link in switches['documentLinks']:
-                switch = doc_link.split('/')[-1]
-                if switch in (switch_xname, f'{switch_xname}b0'):
-                    switch_link = doc_link
-                    break
-        except KeyError:
-            LOGGER.error('Key "documentLinks" missing from fabric manager switches information.')
-            return None
+        for doc_link in switches:
+            switch = doc_link.split('/')[-1]
+            if switch in (switch_xname, f'{switch_xname}b0'):
+                switch_link = doc_link
+                break
 
         if switch_link is None:
             LOGGER.error(f'Switch {switch_xname} missing from fabric manager switches.')
@@ -247,25 +249,23 @@ class PortManager:
 
         switch = self.get_switch(switch_link)
         if switch is None:
-            LOGGER.error('Failed to get switch data.')
+            LOGGER.error(f'Failed to get switch data for {switch_link}.')
             return None
 
-        port_data_list = []
+        edge_ports = []
+        fabric_ports = []
         try:
-            port_data_list = self.get_port_data_list(switch['edgePortLinks'])
-        except KeyError:
-            LOGGER.error('Key "edgePortLinks" missing from fabric manager switch information.')
-            return None
+            edge_ports = switch['edgePortLinks']
+            fabric_ports = switch['fabricPortLinks']
+        except KeyError as e:
+            LOGGER.warning('Key %s for switch data missing from fabric manager switch information.', e)
 
-        try:
-            fabric_list = self.get_port_data_list(switch['fabricPortLinks'])
-            if port_data_list is not None:
-                port_data_list.extend(fabric_list)
-            else:
-                port_data_list = fabric_list
-        except KeyError:
-            LOGGER.error('Key "fabricPortLinks" missing from fabric manager switch information.')
-            return None
+        port_data_list = self.get_port_data_list(edge_ports)
+        fabric_list = self.get_port_data_list(fabric_ports)
+        if port_data_list is None:
+            port_data_list = fabric_list
+        elif fabric_list is not None:
+            port_data_list.extend(fabric_list)
 
         return port_data_list
 
@@ -273,8 +273,8 @@ class PortManager:
         """Update a port to use a new policy
 
         Args:
-            port_link: The full path of the port document link
-            policy_link: The full path of the new port policy
+            port_link (str): The full path of the port document link
+            policy_link (str): The full path of the new port policy
 
         Returns:
             True if update is successful
@@ -324,16 +324,16 @@ class PortManager:
         if offline_policy_exists:
             LOGGER.info(f'Using existing offline policy: {offline_policy}')
         else:
-            new_policy_config = {}
-            new_policy_config['state'] = 'OFFLINE'
-            new_policy_config['documentSelfLink'] = new_policy_prefix + path_parts[-1]
-            config_json = json.dumps(new_policy_config)
+            new_policy_config = {
+                'state': 'OFFLINE',
+                'documentSelfLink': new_policy_prefix + path_parts[-1]
+            }
             LOGGER.debug(f'Creating offline policy: {offline_policy}')
-            LOGGER.debug(f'config_json: {config_json}')
+            LOGGER.debug(f'new_policy_config: {new_policy_config}')
 
             # Create port policy through fabric manager API.
             try:
-                self.fabric_client.post('/'.join(path_parts[:-1]), payload=config_json)
+                self.fabric_client.post('/'.join(path_parts[:-1]), json=new_policy_config)
             except APIError as err:
                 LOGGER.error('Failed to create port policy {} '
                              'through fabric manager: {}'.format(offline_policy, err))

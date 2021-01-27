@@ -1,7 +1,7 @@
 """
 Unit tests for sat.cli.swap.swap
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -400,7 +400,7 @@ class TestSwitchSwapper(unittest.TestCase):
         """Test swap_component saves a ports file"""
         self.swap_args['save_ports'] = True
         self.run_swap_component()
-        self.mock_port_manager.get_switch_port_data_list.assert_called_once()
+        self.mock_port_manager.get_switch_port_data_list.assert_called_once_with(switch_xname='x1000c6r7')
         self.mock_output_json.assert_called_once()
         self.mock_port_manager.create_offline_port_policy.assert_not_called()
         self.mock_port_manager.update_port_policy_link.assert_not_called()

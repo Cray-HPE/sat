@@ -1,7 +1,7 @@
 """
 Unit tests for sat.cli.swap.ports
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -59,13 +59,10 @@ class TestGetSwitchPortDataList(unittest.TestCase):
 
         self.mock_get_switches = mock.patch('sat.cli.swap.ports.PortManager.get_switches',
                                             autospec=True).start()
-        self.mock_get_switches.return_value = {
-            'totalCount': 2,
-            'documentLinks': [
-                '/fabric/switches/x1000c6r7b0',
-                '/fabric/switches/x1000c0r7b1'
-            ]
-        }
+        self.mock_get_switches.return_value = [
+            '/fabric/switches/x1000c6r7b0',
+            '/fabric/switches/x1000c0r7b1'
+        ]
 
         self.mock_get_switch = mock.patch('sat.cli.swap.ports.PortManager.get_switch',
                                           autospec=True).start()

@@ -28,7 +28,6 @@ import logging
 
 import inflect
 
-from sat.cached_property import cached_property
 from sat.cli.swap.ports import PortManager
 from sat.util import pester
 
@@ -85,8 +84,7 @@ class Swapper(metaclass=abc.ABCMeta):
 
         Args:
             action (str): 'enable' or 'disable'
-            dry_run (bool): if True, skip applying configuration to ports,
-                but still create port sets.
+            dry_run (bool): if True, skip applying configuration to ports
             disruptive (bool): if True, do not confirm disable/enable
 
         Raises:
@@ -116,11 +114,10 @@ class Swapper(metaclass=abc.ABCMeta):
             A list of dictionaries for ports
 
         Raises:
-            SystemExit(2): if getting ports failed
-            SystemExit(3): if no ports were found
+            SystemExit(2): if no ports werre found or getting ports failed
         """
         ports = self.get_port_data(component_id, force)
-        if ports is None:
+        if not ports:
             LOGGER.error(f'No ports found for {self.component_type} {component_id}')
             raise SystemExit(ERR_NO_PORTS_FOUND)
 
@@ -128,11 +125,12 @@ class Swapper(metaclass=abc.ABCMeta):
 
     def create_offline_port_policies(self, port_data_list):
         """Create port policies to be used to OFFLINE ports
+
         Args:
             port_data_list (list): list of dictionaries with current port data
 
         Raises:
-            SystemExit(4): if creating a new port policy fails
+            SystemExit(3): if creating a new port policy fails
         """
 
         # Create new policies to OFFLINE ports
@@ -142,20 +140,21 @@ class Swapper(metaclass=abc.ABCMeta):
         # Create a unique list of policies and create a new policy for each one
         policy_list = list(set(p['policy_link'] for p in port_data_list))
         LOGGER.debug(f'policy_list: {policy_list}')
-        for policy in (p for p in policy_list if not p.startswith(POL_PRE)):
-            new_policy_name = POL_PRE + policy.split('/')[-1]
-            LOGGER.debug(f'Creating policy {new_policy_name} for {policy}')
-            if not self.port_manager.create_offline_port_policy(policy, POL_PRE):
-                LOGGER.error(f'Error creating policy {new_policy_name} for {policy}')
-                raise SystemExit(ERR_PORT_POLICY_CREATE_FAIL)
+        for policy in policy_list:
+            policy_name = policy.split('/')[-1]
+            if not policy_name.startswith(POL_PRE):
+                new_policy_name = POL_PRE + policy_name
+                LOGGER.debug(f'Creating policy {new_policy_name} for {policy}')
+                if not self.port_manager.create_offline_port_policy(policy, POL_PRE):
+                    LOGGER.error(f'Error creating policy {new_policy_name} for {policy}')
+                    raise SystemExit(ERR_PORT_POLICY_CREATE_FAIL)
 
     def update_ports_state(self, port_data_list, action):
         """Update the state for ports based on action
 
         Args:
             port_data_list (list): list of dictionaries with current port data
-            force (bool): if True, skip checking that supplied ports are
-                connected by a single cable.  (Not used for switch swapping)
+            action (str): the action to perform, ('enable' or 'disable')
 
         Returns:
             True if all ports were successfully updated, else False.
@@ -170,10 +169,10 @@ class Swapper(metaclass=abc.ABCMeta):
             # Determine which policy to use depending on action and current policy
             path_parts = port_data['policy_link'].split('/')
             policy_name = path_parts[-1]
-            if (action == "enable") and (policy_name.startswith(POL_PRE)):
+            if action == "enable" and policy_name.startswith(POL_PRE):
                 # Remove prefix and use original policy
                 policy_name = policy_name[len(POL_PRE):]
-            elif (action == "disable") and (not policy_name.startswith(POL_PRE)):
+            elif action == "disable" and not policy_name.startswith(POL_PRE):
                 # Add prefix to policy
                 policy_name = POL_PRE + policy_name
 
@@ -195,8 +194,8 @@ class Swapper(metaclass=abc.ABCMeta):
             disruptive (bool): if True, do not confirm disable/enable
             dry_run (bool): if True, skip applying action to ports,
                 but still create the port set affected.
-            save_ports (bool): if True, save ports  (for all ports affected)
-                to a file in the local working directory.
+            save_ports (bool): if True, save port_data (xname, port_link, policy_link)
+                (for all ports affected) to a file in the local working directory.
             force (bool): if True, skip checking that supplied ports are
                 connected by a single cable.  (Not used for switch swapping)
 
@@ -205,7 +204,7 @@ class Swapper(metaclass=abc.ABCMeta):
                 1 if invalid options were given.
                 2 if no ports were found for the component.
                 3 if creation of port policy used to disable port fails.
-                4 if disable/enable of any port fails.
+                4 if applying a port policy to any port fails.
         """
 
         # For a switch, this is the switch xname, and for a cable it is a comma-separated string of xnames
