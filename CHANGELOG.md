@@ -53,6 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ``sat bootsys``.
 - Removed the ``bgp-check`` stage of ``sat bootsys {boot,shutdown}`` due to
   removal of underlying Ansible playbook that implemented this stage.
+- Removed ``run_ansible_playbook`` function from ``sat.cli.bootsys.util`` module
+  since it is no longer used anywhere.
 
 ### Fixed
 - Removed error message and 'ERROR' value for Slurm version in system
