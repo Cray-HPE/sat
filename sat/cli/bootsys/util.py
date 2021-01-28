@@ -1,7 +1,7 @@
 """
 Generic common utilities for the bootsys subcommand.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -156,42 +156,3 @@ def k8s_pods_to_status_dict(v1_pod_list):
         pods_dict[pod.metadata.namespace][pod.metadata.name] = pod.status.phase
 
     return pods_dict
-
-
-def run_ansible_playbook(playbook_file, opts='', exit_on_err=True):
-    """Run the given ansible playbook. Log stderr, and optionally exit on failure
-
-    Args:
-        playbook_file (str): The path to the playbook file to run.
-        opts (str): Additional options to use with ansible-playbook as a string.
-        exit_on_err (bool): If True, exit on error. If False, just log the error.
-
-    Raises:
-        SystemExit if the ansible playbook fails and `exit_on_err` is True.
-
-    Returns:
-        The output of the ansible playbook or None if it fails and `exit_on_err`
-        is False.
-    """
-    cmd = f'ansible-playbook {opts + " " if opts else ""}{playbook_file}'
-    LOGGER.debug('Invoking Ansible: %s', cmd)
-
-    try:
-        proc = subprocess.run(shlex.split(cmd), stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE, encoding='utf-8')
-    except OSError as err:
-        LOGGER.error("Failed to invoke '%s': %s", cmd, err)
-        if exit_on_err:
-            raise SystemExit(1)
-        else:
-            return
-
-    if proc.returncode:
-        LOGGER.error("Command '%s' failed. stderr: %s", cmd, proc.stderr)
-        if exit_on_err:
-            raise SystemExit(1)
-        else:
-            return
-    else:
-        LOGGER.info('Ansible playbook %s completed successfully.', playbook_file)
-        return proc.stdout

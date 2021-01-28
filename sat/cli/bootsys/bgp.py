@@ -1,7 +1,7 @@
 """
-Resets BPG peering sessions and waits for them to be established.
+Resets BGP peering sessions and waits for them to be established.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,6 @@ import logging
 import re
 import sys
 
-from sat.cli.bootsys.util import run_ansible_playbook
 from sat.cli.bootsys.waiting import Waiter
 from sat.config import get_config_value
 from sat.util import BeginEndLogger
@@ -48,8 +47,8 @@ class BGPSpineStatusWaiter(Waiter):
         are all "ESTABLISHED".
 
         Args:
-            stdout (str): The stdout of the 'spine-bgp-status.yml'
-                ansible playbook
+            stdout (str): The stdout of the BGP status commands executed
+                across all spine switches.
 
         Returns:
             True if it is believed that all peers have been established,
@@ -63,14 +62,11 @@ class BGPSpineStatusWaiter(Waiter):
     def get_spine_status():
         """Simple helper function to get spine BGP status.
 
-        Runs run_ansible_playbook() with the spine-bgp-status.yml playbook.
-
-        Args: None.
-        Returns: The stdout resulting when running the spine-bgp-status.yml
-            playbook or None if it fails.
+        Raises:
+            NotImplementedError: this method is not currently implemented.
         """
-        return run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/spine-bgp-status.yml',
-                                    exit_on_err=False)
+        # TODO: Once new automation exists for obtaining spine status, call it here
+        raise NotImplementedError('Retrieval of spine BGP status not implemented.')
 
     def pre_wait_action(self):
         # Do one quick check for establishment prior to waiting, and
@@ -79,19 +75,18 @@ class BGPSpineStatusWaiter(Waiter):
         self.completed = BGPSpineStatusWaiter.all_established(spine_bgp_status)
         if not self.completed:
             LOGGER.info('Screen scrape indicated BGP peers are idle. Resetting.')
-            run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/metallb-bgp-reset.yml',
-                                 exit_on_err=False)
+            # TODO: Add something here to reset BGP peering sessions
 
     def has_completed(self):
         spine_status_output = BGPSpineStatusWaiter.get_spine_status()
         if spine_status_output is None:
-            LOGGER.error('Failed to run spine-bgp-status.yml playbook.')
+            LOGGER.error('Failed to get BGP status.')
             return False
         return BGPSpineStatusWaiter.all_established(spine_status_output)
 
 
 def do_bgp_check(args):
-    """Run BGP playbooks and wait for BGP peering sessions to be established.
+    """Check whether BGP peering sessions are established, resetting if necessary.
 
     Args:
         args: The argparse.Namespace object containing the parsed arguments

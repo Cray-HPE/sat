@@ -60,7 +60,6 @@ STAGES_BY_ACTION = {
         ('session-checks', ('service_activity', 'do_service_activity_check')),
         ('bos-operations', ('bos', 'do_bos_shutdowns')),
         ('cabinet-power', ('cabinet_power', 'do_cabinets_power_off')),
-        ('bgp-check', ('bgp', 'do_bgp_check')),
         ('platform-services', ('platform', 'do_platform_stop')),
         ('ncn-power', ('mgmt_power', 'do_power_off_ncns'))
     ]),
@@ -69,7 +68,6 @@ STAGES_BY_ACTION = {
         ('platform-services', ('platform', 'do_platform_start')),
         ('k8s-check', ('k8s', 'do_k8s_check')),
         ('ceph-check', ('ceph', 'do_ceph_check')),
-        ('bgp-check', ('bgp', 'do_bgp_check')),
         ('cabinet-power', ('cabinet_power', 'do_cabinets_power_on')),
         ('bos-operations', ('bos', 'do_bos_boots'))
     ])
