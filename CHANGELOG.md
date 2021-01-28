@@ -59,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removal of underlying Ansible playbook that implemented this stage.
 - Removed ``run_ansible_playbook`` function from ``sat.cli.bootsys.util`` module
   since it is no longer used anywhere.
+- Removed ``RunningService`` context manager since it is no longer used.
 
 ### Fixed
 - Removed error message and 'ERROR' value for Slurm version in system

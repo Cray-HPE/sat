@@ -26,7 +26,7 @@ from textwrap import dedent
 import unittest
 from unittest.mock import call, mock_open, patch
 
-from sat.cli.bootsys.util import get_mgmt_ncn_hostnames, RunningService
+from sat.cli.bootsys.util import get_mgmt_ncn_hostnames
 
 
 class TestGetNcns(unittest.TestCase):
@@ -123,44 +123,3 @@ class TestGetNcns(unittest.TestCase):
         self.assertEqual(cm.records[0].message, 'Unable to read /etc/hosts to obtain '
                                                 'management NCN hostnames: dne')
         self.assertEqual(set(), actual)
-
-
-class TestRunningService(unittest.TestCase):
-    """Tests for the RunningService class."""
-    def setUp(self):
-        self.svc_name = 'foo'
-
-    @patch('sat.cli.bootsys.util.subprocess.check_call')
-    def test_systemctl_start(self, mock_check_call):
-        """Test starting systemd services."""
-        svc = RunningService(self.svc_name)
-        svc._systemctl_start_stop(True)
-        mock_check_call.assert_called_once_with(['systemctl', 'start', self.svc_name])
-
-    @patch('sat.cli.bootsys.util.subprocess.check_call')
-    def test_systemctl_stop(self, mock_check_call):
-        """Test stopping systemd services."""
-        svc = RunningService(self.svc_name)
-        svc._systemctl_start_stop(False)
-        mock_check_call.assert_called_once_with(['systemctl', 'stop', self.svc_name])
-
-    @patch('time.sleep')
-    @patch('sat.cli.bootsys.util.RunningService._systemctl_start_stop')
-    def test_running_service_context_manager(self, mock_start_stop, mock_sleep):
-        """Test that the RunningService manager starts, then stops the service"""
-        with RunningService(self.svc_name):
-            pass
-
-        mock_start_stop.assert_has_calls([call(True), call(False)])
-        mock_sleep.assert_not_called()
-
-    @patch('time.sleep')
-    @patch('sat.cli.bootsys.util.RunningService._systemctl_start_stop')
-    def test_running_service_context_manager_sleep(self, mock_start_stop, mock_sleep):
-        """Test that the RunningService manager starts, sleeps, then stops the service"""
-        sleep_time = 5
-        with RunningService(self.svc_name, sleep_after_start=sleep_time):
-            pass
-
-        mock_start_stop.assert_has_calls([call(True), call(False)])
-        mock_sleep.assert_called_once_with(sleep_time)
