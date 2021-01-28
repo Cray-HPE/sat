@@ -42,6 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the platform services stage of ``sat bootsys boot`` to start and
   enable kubelet on the Kubernetes management NCNs.
 - Changed ``sat swap switch`` to use the new Fabric Manager API.
+- Changed the ``ncn-power`` stage of ``sat bootsys`` to no longer start and stop
+  dhcpd, which is unnecessary now that NCNs and their management interfaces have
+  statically assigned IP addresses.
 
 ### Removed
 - Removed the ``hsn-bringup`` stage of ``sat bootsys boot`` due to removal of
