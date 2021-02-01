@@ -32,7 +32,7 @@ from paramiko.client import SSHClient
 from paramiko.ssh_exception import BadHostKeyException, AuthenticationException, SSHException
 
 from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger
-from sat.cli.bootsys.util import get_mgmt_ncn_hostnames, RunningService
+from sat.cli.bootsys.util import get_mgmt_ncn_hostnames
 from sat.cli.bootsys.waiting import GroupWaiter
 from sat.config import get_config_value
 from sat.util import BeginEndLogger, get_username_and_password_interactively, prompt_continue
@@ -219,21 +219,20 @@ def finish_shutdown(hosts, username, password, ncn_shutdown_timeout, ipmi_timeou
     Raises:
         SystemExit: if any of the `hosts` failed to reach powered off state
     """
-    with RunningService('dhcpd', sleep_after_start=5):
-        ipmi_waiter = IPMIPowerStateWaiter(hosts, 'off', ncn_shutdown_timeout, username, password)
-        pending_hosts = ipmi_waiter.wait_for_completion()
+    ipmi_waiter = IPMIPowerStateWaiter(hosts, 'off', ncn_shutdown_timeout, username, password)
+    pending_hosts = ipmi_waiter.wait_for_completion()
 
-        if pending_hosts:
-            LOGGER.warning('Forcibly powering off nodes: %s', ', '.join(pending_hosts))
+    if pending_hosts:
+        LOGGER.warning('Forcibly powering off nodes: %s', ', '.join(pending_hosts))
 
-            # Confirm all nodes have actually turned off.
-            failed_hosts = IPMIPowerStateWaiter(pending_hosts, 'off', ipmi_timeout, username, password,
-                                                send_command=True).wait_for_completion()
+        # Confirm all nodes have actually turned off.
+        failed_hosts = IPMIPowerStateWaiter(pending_hosts, 'off', ipmi_timeout, username, password,
+                                            send_command=True).wait_for_completion()
 
-            if failed_hosts:
-                LOGGER.error('The following nodes failed to reach powered '
-                             'off state: %s', ', '.join(failed_hosts))
-                sys.exit(1)
+        if failed_hosts:
+            LOGGER.error('The following nodes failed to reach powered '
+                         'off state: %s', ', '.join(failed_hosts))
+            sys.exit(1)
 
 
 def do_mgmt_shutdown_power(ssh_client, username, password, ncn_shutdown_timeout, ipmi_timeout):
@@ -262,7 +261,7 @@ def do_mgmt_shutdown_power(ssh_client, username, password, ncn_shutdown_timeout,
 
 
 def do_power_off_ncns(args):
-    """Power off NCNs.
+    """Power off NCNs while monitoring consoles with ipmitool.
 
     Args:
         args: The argparse.Namespace object containing the parsed arguments
@@ -284,11 +283,7 @@ def do_power_off_ncns(args):
 
 
 def do_power_on_ncns(args):
-    """Power on NCNs.
-
-    This stage also enables/disables entries in the hosts file, starts/stops
-    IPMI console logging, and starts/stops dhcpd on the worker node on which
-    the stage is running.
+    """Power on NCNs while monitoring consoles with ipmitool.
 
     Args:
         args: The argparse.Namespace object containing the parsed arguments
@@ -297,34 +292,33 @@ def do_power_on_ncns(args):
     username, password = get_username_and_password_interactively(username_prompt='IPMI username',
                                                                  password_prompt='IPMI password')
 
-    with RunningService('dhcpd', sleep_after_start=5):
-        # First master node is already on as it is where "sat bootsys" runs.
-        # TODO: Is there a better way to get the hostname of the first master node?
-        master_nodes = get_mgmt_ncn_hostnames(['managers']) - {'ncn-m001'}
-        storage_nodes = get_mgmt_ncn_hostnames(['storage'])
-        worker_nodes = get_mgmt_ncn_hostnames(['workers'])
-        ncn_groups = [master_nodes, storage_nodes, worker_nodes]
-        # flatten lists of ncn groups
-        non_bis_ncns = set(ncn for sublist in ncn_groups for ncn in sublist)
-        with IPMIConsoleLogger(non_bis_ncns):
-            for ncn_group in ncn_groups:
-                print(f'Powering on NCNs: {", ".join(ncn_group)}')
+    # First master node is already on as it is where "sat bootsys" runs.
+    # TODO: Is there a better way to get the hostname of the first master node?
+    master_nodes = get_mgmt_ncn_hostnames(['managers']) - {'ncn-m001'}
+    storage_nodes = get_mgmt_ncn_hostnames(['storage'])
+    worker_nodes = get_mgmt_ncn_hostnames(['workers'])
+    ncn_groups = [master_nodes, storage_nodes, worker_nodes]
+    # flatten lists of ncn groups
+    non_bis_ncns = set(ncn for sublist in ncn_groups for ncn in sublist)
+    with IPMIConsoleLogger(non_bis_ncns):
+        for ncn_group in ncn_groups:
+            print(f'Powering on NCNs: {", ".join(ncn_group)}')
 
-                # TODO (SAT-555): Probably should not send a power on if it's already on.
-                ipmi_waiter = IPMIPowerStateWaiter(ncn_group, 'on',
-                                                   get_config_value('bootsys.ipmi_timeout'),
-                                                   username, password, send_command=True)
-                ipmi_waiter.wait_for_completion()
+            # TODO (SAT-555): Probably should not send a power on if it's already on.
+            ipmi_waiter = IPMIPowerStateWaiter(ncn_group, 'on',
+                                               get_config_value('bootsys.ipmi_timeout'),
+                                               username, password, send_command=True)
+            ipmi_waiter.wait_for_completion()
 
-                ssh_waiter = SSHAvailableWaiter(ncn_group,
-                                                get_config_value('bootsys.ncn_boot_timeout'))
-                inaccessible_nodes = ssh_waiter.wait_for_completion()
+            ssh_waiter = SSHAvailableWaiter(ncn_group,
+                                            get_config_value('bootsys.ncn_boot_timeout'))
+            inaccessible_nodes = ssh_waiter.wait_for_completion()
 
-                if inaccessible_nodes:
-                    LOGGER.error('Unable to reach the following NCNs via SSH '
-                                 'after powering them on: %s. Troubleshoot the '
-                                 'issue and then try again.',
-                                 ', '.join(inaccessible_nodes))
-                    raise SystemExit(1)
-                else:
-                    print(f'Powered on NCNs: {", ".join(ncn_group)}')
+            if inaccessible_nodes:
+                LOGGER.error('Unable to reach the following NCNs via SSH '
+                             'after powering them on: %s. Troubleshoot the '
+                             'issue and then try again.',
+                             ', '.join(inaccessible_nodes))
+                raise SystemExit(1)
+            else:
+                print(f'Powered on NCNs: {", ".join(ncn_group)}')
