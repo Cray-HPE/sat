@@ -32,6 +32,7 @@ from unittest import mock
 from sat.cli.bootsys.platform import (
     CONTAINER_STOP_SCRIPT,
     do_ceph_freeze,
+    do_ceph_unfreeze,
     do_containerd_stop,
     do_platform_action,
     do_platform_start,
@@ -441,20 +442,45 @@ class TestDoCephFreeze(unittest.TestCase):
         self.ncn_groups = {}
         self.ceph_healthy = mock.patch('sat.cli.bootsys.platform.ceph_healthy').start()
         self.ceph_healthy.return_value = True
-        self.freeze_ceph = mock.patch('sat.cli.bootsys.platform.freeze_ceph').start()
+        self.toggle_ceph_freeze_flags = mock.patch('sat.cli.bootsys.platform.toggle_ceph_freeze_flags').start()
 
     def test_do_ceph_freeze_success(self):
         """Test do_ceph_freeze in the successful case."""
         do_ceph_freeze(self.ncn_groups)
-        self.ceph_healthy.assert_called_once_with()
-        self.freeze_ceph.assert_called_once_with()
+        self.ceph_healthy.assert_called_once_with(expecting_osdmap_flags=False)
+        self.toggle_ceph_freeze_flags.assert_called_once_with(freeze=True)
 
     def test_do_ceph_freeze_unhealthy(self):
         """When Ceph is not healthy, do not freeze Ceph."""
         self.ceph_healthy.return_value = False
         with self.assertRaises(FatalPlatformError):
             do_ceph_freeze(self.ncn_groups)
-        self.freeze_ceph.assert_not_called()
+        self.toggle_ceph_freeze_flags.assert_not_called()
+
+
+class TestDoCephUnfreeze(unittest.TestCase):
+    """Tests for the do_ceph_unfreeze function."""
+
+    def setUp(self):
+        """Set up mocks."""
+        # NCN groups are not used by this step of starting platform services
+        self.ncn_groups = {}
+        self.ceph_healthy = mock.patch('sat.cli.bootsys.platform.ceph_healthy').start()
+        self.ceph_healthy.return_value = True
+        self.toggle_ceph_freeze_flags = mock.patch('sat.cli.bootsys.platform.toggle_ceph_freeze_flags').start()
+
+    def test_do_ceph_unfreeze_success(self):
+        """Test do_ceph_unfreeze in the successful case."""
+        do_ceph_unfreeze(self.ncn_groups)
+        self.ceph_healthy.assert_called_once_with(expecting_osdmap_flags=True)
+        self.toggle_ceph_freeze_flags.assert_called_once_with(freeze=False)
+
+    def test_do_ceph_unfreeze_unhealthy(self):
+        """When Ceph is not healthy, do not unfreeze Ceph."""
+        self.ceph_healthy.return_value = False
+        with self.assertRaises(FatalPlatformError):
+            do_ceph_unfreeze(self.ncn_groups)
+        self.toggle_ceph_freeze_flags.assert_not_called()
 
 
 class TestPromptForNCNVerification(unittest.TestCase):
