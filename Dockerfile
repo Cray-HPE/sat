@@ -8,11 +8,12 @@ WORKDIR /sat
 COPY CHANGELOG.md README.md /sat/
 COPY setup.cfg setup.py /sat/
 COPY requirements.docker.txt /sat/requirements.txt
-COPY config-docker-sat.sh /sat/
+COPY docker_scripts/config-docker-sat.sh /sat/
 COPY sat /sat/sat
 COPY docs/man /sat/docs/man
 COPY tools /sat/tools
-COPY ./docker_entrypoint.sh /docker_entrypoint.sh
+COPY docker_scripts/docker_entrypoint.sh /docker_entrypoint.sh
+COPY docker_scripts/sat_container_prompt.sh /etc/profile.d/sat_container_prompt.sh
 
 RUN apk update && \
     apk add --no-cache python3-dev py3-pip bash openssl-dev libffi-dev \

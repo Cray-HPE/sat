@@ -47,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the ``ncn-power`` stage of ``sat bootsys`` to no longer start and stop
   dhcpd, which is unnecessary now that NCNs and their management interfaces have
   statically assigned IP addresses.
+- Changed the command prompt in ``sat bash`` to display 'sat-container' in
+  addition to the container ID.
 
 ### Removed
 - Removed the ``hsn-bringup`` stage of ``sat bootsys boot`` due to removal of
