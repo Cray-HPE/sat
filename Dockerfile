@@ -13,6 +13,7 @@ COPY sat /sat/sat
 COPY docs/man /sat/docs/man
 COPY tools /sat/tools
 COPY ./docker_entrypoint.sh /docker_entrypoint.sh
+COPY ./sat_container_prompt.sh /etc/profile.d/sat_container_prompt.sh
 
 RUN apk update && \
     apk add --no-cache python3-dev py3-pip bash openssl-dev libffi-dev \
