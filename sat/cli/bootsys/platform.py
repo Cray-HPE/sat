@@ -29,6 +29,7 @@ from paramiko import SSHClient, SSHException, WarningPolicy
 from threading import Thread
 
 from sat.cli.bootsys.ceph import ceph_healthy, toggle_ceph_freeze_flags
+from sat.cli.bootsys.etcd import save_etcd_snapshot_on_host, EtcdSnapshotFailure
 from sat.cli.bootsys.util import get_mgmt_ncn_hostnames
 from sat.cli.bootsys.waiting import Waiter
 from sat.util import pester_choices
@@ -365,6 +366,34 @@ def do_ceph_unfreeze(ncn_groups):
         raise FatalPlatformError(str(err))
 
 
+def do_etcd_snapshot(ncn_groups):
+    """Save an etcd snapshot on all manager NCNs.
+
+    Raises:
+        FatalPlatformError: if etcd snapshot fails
+    """
+    managers = ncn_groups['managers']
+    # A dict mapping from failed hostnames to EtcdSnapshotFailure instances
+    snapshot_errs = {}
+
+    for manager in managers:
+        try:
+            save_etcd_snapshot_on_host(manager)
+        except EtcdSnapshotFailure as err:
+            snapshot_errs[manager] = err
+
+    if snapshot_errs:
+        for hostname, err in snapshot_errs.items():
+            LOGGER.error(f'Failed to create etcd snapshot on {hostname}: {err}')
+        raise FatalPlatformError(f'Failed to create etcd snapshot on hosts: '
+                                 f'{", ".join(snapshot_errs.keys())}')
+
+
+def do_etcd_stop(ncn_groups):
+    """Stop etcd service on all manager NCNs."""
+    do_service_action_on_hosts(ncn_groups['managers'], 'etcd', target_state='inactive')
+
+
 # Each step has a description that is printed and an action that is called
 # with the single argument being a dict mapping from NCN group names to hosts.
 PlatformServicesStep = namedtuple('PlatformServicesStep', ('description', 'action'))
@@ -377,6 +406,8 @@ STEPS_BY_ACTION = {
     ],
     # The ordered steps to stop platform services
     'stop': [
+        PlatformServicesStep('Create etcd snapshot on all Kubernetes manager NCNs.', do_etcd_snapshot),
+        PlatformServicesStep('Stop etcd on all Kubernetes manager NCNs.', do_etcd_stop),
         PlatformServicesStep('Stop and disable kubelet on all Kubernetes NCNs.', do_kubelet_stop),
         PlatformServicesStep('Stop containers running under containerd and stop containerd '
                              'on all Kubernetes NCNs.',
