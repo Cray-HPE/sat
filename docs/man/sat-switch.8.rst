@@ -65,9 +65,10 @@ EXIT STATUS
 ===========
 
 | 1: An invalid combination of options was given
-| 2: No ports found for the switch
-| 3: Creation of port policy failed
-| 4: Disable/enable of one or more ports failed
+| 2: Error getting ports for system
+| 3: No ports found for the switch
+| 4: Creation of port policy failed
+| 5: Disable/enable of one or more ports failed
 
 EXAMPLES
 ========

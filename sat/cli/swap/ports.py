@@ -29,13 +29,12 @@ import re
 import inflect
 
 from sat.apiclient import APIError, FabricControllerClient
+from sat.cli.swap.cable_endpoints import JACK_XNAME_REGEX, CableEndpoints
 from sat.session import SATSession
 
 LOGGER = logging.getLogger(__name__)
 
 INF = inflect.engine()
-
-JACK_XNAME_REGEX = re.compile(r'^x\d+c\d+r\d+j\d+$')
 
 
 class PortManager:
@@ -43,6 +42,7 @@ class PortManager:
 
     def __init__(self):
         self.fabric_client = FabricControllerClient(SATSession())
+        self.cable_endpoints = CableEndpoints()
 
     def get_ports(self):
         """Get a list of port document links
@@ -169,8 +169,8 @@ class PortManager:
                 port_data['xname'] = port['conn_port']
                 port_data['port_link'] = port_link
                 port_data['policy_link'] = port['portPolicyLinks'][0]
-            except KeyError as e:
-                LOGGER.error('Key %s for port data missing from fabric manager switch information.', e)
+            except KeyError as err:
+                LOGGER.error('Key %s for port data missing from fabric manager switch information.', err)
                 return None
 
             port_data_list.append(port_data)
@@ -182,9 +182,9 @@ class PortManager:
 
         Args:
             jack_xnames (list): a list of jack xnames
-            force (bool): Ignore if supplied jacks are not connected by a cable
-                or if unable to get linked ports.  If False, return None for these
-                cases.
+            force (bool): Ignore if unable to validate jack_xnames or
+                if supplied jacks are not connected by a cable.
+                If False, return None for these cases.
 
         Returns:
             A list of dictionaries for ports or None if there is an error
@@ -198,23 +198,44 @@ class PortManager:
                          f'{INF.plural_verb("does", num_non_matching)} not match the format of a jack xname.')
             return None
 
+        # Load the p2p file in order to get the endpoints and validate the jack_xnames input
+        valid_p2p_jacks = False
+        valid_p2p_file = self.cable_endpoints.load_cables_from_p2p_file()
+        if not valid_p2p_file:
+            LOGGER.warning('Error loading cable data from p2p file')
+        else:
+            # Check if all jacks given are in the p2p file
+            # Check if all jacks given are for the same single cable
+            valid_p2p_jacks = self.cable_endpoints.validate_jacks_using_p2p_file(jack_xnames)
+
+        if not valid_p2p_jacks and not force:
+            LOGGER.error(f'Exiting due to errors validating jack xnames {jack_xnames}')
+            return None
+
+        if valid_p2p_jacks:
+            # Add the linked jacks to the list of jacks input
+            all_jack_xnames = []
+            for jack in jack_xnames:
+                linked_jacks = self.cable_endpoints.get_linked_jack_list(jack)
+                if linked_jacks is not None:
+                    all_jack_xnames.extend(linked_jacks)
+            all_jack_xnames = set(all_jack_xnames)
+        else:
+            LOGGER.info(f'Continuing with errors validating jack xnames {jack_xnames}')
+            all_jack_xnames = jack_xnames
+
+        LOGGER.info(f'Using jack xname list: {all_jack_xnames}')
         ports = self.get_ports()
         if ports is None:
             LOGGER.error('Failed to get ports.')
             return None
 
         port_links = []
-        for jack_xname in jack_xnames:
+        for jack_xname in all_jack_xnames:
             for doc_link in ports:
                 port = doc_link.split('/')[-1]
                 if port.startswith(f'{jack_xname}p'):
                     port_links.append(doc_link)
-
-        # TODO Get all endpoints that are linked to the jack and add to list of port_links
-        if force:
-            LOGGER.debug('Ignore errors getting endpoints')
-        else:
-            LOGGER.debug('Exit if errors getting endpoints')
 
         port_data_list = self.get_port_data_list(port_links)
         return port_data_list
@@ -257,8 +278,8 @@ class PortManager:
         try:
             edge_ports = switch['edgePortLinks']
             fabric_ports = switch['fabricPortLinks']
-        except KeyError as e:
-            LOGGER.warning('Key %s for switch data missing from fabric manager switch information.', e)
+        except KeyError as err:
+            LOGGER.warning('Key %s for switch data missing from fabric manager switch information.', err)
 
         port_data_list = self.get_port_data_list(edge_ports)
         fabric_list = self.get_port_data_list(fabric_ports)

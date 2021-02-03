@@ -23,7 +23,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import logging
-import sys
 
 from sat.cli.swap.switch import swap_switch
 from sat.cli.swap.cable import swap_cable
@@ -42,9 +41,6 @@ def do_swap(args):
     """
 
     if args.target == 'cable':
-        LOGGER.error('The swap cable subcommand is no longer supported using the Fabric Controller API.')
-        LOGGER.error('See the documentation for how to swap a cable.')
-        sys.exit(1)
         swap_cable(args)
     elif args.target == 'switch':
         swap_switch(args)

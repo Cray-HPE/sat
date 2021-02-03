@@ -39,9 +39,10 @@ INF = inflect.engine()
 POL_PRE = 'sat-offline-'
 
 ERR_INVALID_OPTIONS = 1
-ERR_NO_PORTS_FOUND = 2
-ERR_PORT_POLICY_CREATE_FAIL = 3
-ERR_PORT_POLICY_TOGGLE_FAIL = 4
+ERR_GET_PORTS_FAIL = 2
+ERR_NO_PORTS_FOUND = 3
+ERR_PORT_POLICY_CREATE_FAIL = 4
+ERR_PORT_POLICY_TOGGLE_FAIL = 5
 
 
 class Swapper(metaclass=abc.ABCMeta):
@@ -114,9 +115,12 @@ class Swapper(metaclass=abc.ABCMeta):
             A list of dictionaries for ports
 
         Raises:
-            SystemExit(2): if no ports werre found or getting ports failed
+            SystemExit(2): if getting ports failed
+            SystemExit(3): if no ports were found
         """
         ports = self.get_port_data(component_id, force)
+        if ports is None:
+            raise SystemExit(ERR_GET_PORTS_FAIL)
         if not ports:
             LOGGER.error(f'No ports found for {self.component_type} {component_id}')
             raise SystemExit(ERR_NO_PORTS_FOUND)
@@ -130,7 +134,7 @@ class Swapper(metaclass=abc.ABCMeta):
             port_data_list (list): list of dictionaries with current port data
 
         Raises:
-            SystemExit(3): if creating a new port policy fails
+            SystemExit(4): if creating a new port policy fails
         """
 
         # Create new policies to OFFLINE ports
@@ -202,9 +206,10 @@ class Swapper(metaclass=abc.ABCMeta):
         Raises:
             SystemExit: if a failure occurred.  Exit codes are as follows:
                 1 if invalid options were given.
-                2 if no ports were found for the component.
-                3 if creation of port policy used to disable port fails.
-                4 if applying a port policy to any port fails.
+                2 for an error getting ports.
+                3 if no ports were found for the component.
+                4 if creation of port policy used to disable port fails.
+                5 if applying a port policy to any port fails.
         """
 
         # For a switch, this is the switch xname, and for a cable it is a comma-separated string of xnames

@@ -29,38 +29,26 @@ from sat.cli.swap.swap import SwitchSwapper, CableSwapper, output_json
 from sat.cli.swap import swap
 
 
-@unittest.skip('SAT-779: Temporarily remove sat swap cable')
 class TestCableSwapper(unittest.TestCase):
 
     def setUp(self):
         """Mock functions called."""
         self.mock_port_manager = mock.patch('sat.cli.swap.swap.PortManager',
                                             autospec=True).start().return_value
-        self.mock_port_manager.get_jack_ports.return_value = ['x1000c6r7j101p0', 'x1000c6r7j2p0']
-        self.mock_port_manager.get_port_set_config.return_value = {
-            'ports': [
-                {'config':
-                    {'autoneg': True, 'enable': True,
-                     'flowControl': {'rx': True, 'tx': True},
-                     'mac': '02:00:00:00:00:00', 'speed': '100'},
-                 'xname': 'x1000c6r7j101p0'},
-                {'config':
-                    {'autoneg': True, 'enable': True,
-                     'flowControl': {'rx': True, 'tx': True},
-                     'mac': '02:00:00:00:00:00', 'speed': '100'},
-                 'xname': 'x1000c6r7j101p1'},
-                {'config':
-                    {'autoneg': True, 'enable': True,
-                     'flowControl': {'rx': True, 'tx': True},
-                     'mac': '02:00:00:00:00:00', 'speed': '200'},
-                 'xname': 'x1000c6r7j2p0'},
-                {'config':
-                    {'autoneg': True, 'enable': True,
-                     'flowControl': {'rx': True, 'tx': True},
-                     'mac': '02:00:00:00:00:00', 'speed': '200'},
-                 'xname': 'x1000c6r7j2p1'}
-            ]
-        }
+        self.mock_port_manager.get_jack_port_data_list.return_value = [
+            {'xname': 'x1000c6r7j101p0',
+             'port_link': '/fabric/ports/x1000c6r7j101p0',
+             'policy_link': '/fabric/port-policies/fabric-policy'},
+            {'xname': 'x1000c6r7j101p1',
+             'port_link': '/fabric/ports/x1000c6r7j101p1',
+             'policy_link': '/fabric/port-policies/fabric-policy'},
+            {'xname': 'x1000c6r7j2p0',
+             'port_link': '/fabric/ports/x1000c6r7j2p0',
+             'policy_link': '/fabric/port-policies/edge-policy'},
+            {'xname': 'x1000c6r7j2p1',
+             'port_link': '/fabric/ports/x1000c6r7j2p1',
+             'policy_link': '/fabric/port-policies/edge-policy'}
+        ]
 
         self.mock_pester = mock.patch('sat.cli.swap.swap.pester', autospec=True).start()
         self.mock_pester.return_value = True
@@ -86,66 +74,53 @@ class TestCableSwapper(unittest.TestCase):
     def test_basic(self):
         """Test basic swap cable"""
         self.run_swap_component()
-        self.mock_port_manager.get_jack_ports.assert_called_once()
+        self.mock_port_manager.get_jack_port_data_list.assert_called_once()
         self.mock_output_json.assert_not_called()
-        self.mock_port_manager.get_port_sets.assert_called_once()
-        self.mock_port_manager.create_port_set.assert_called()
-        self.mock_port_manager.get_port_set_config.assert_called_once()
-        self.mock_port_manager.update_port_set.assert_not_called()
-        self.mock_port_manager.delete_port_set_list.assert_called()
-        self.mock_print.assert_called_once()
+        self.mock_port_manager.create_offline_port_policy.assert_not_called()
+        self.mock_port_manager.update_port_policy_link.assert_not_called()
+        self.assertEqual(self.mock_print.call_count, 2)
 
     def test_swap_force(self):
         """Test swap cable with force"""
         self.swap_args['force'] = True
         self.run_swap_component()
-        self.mock_port_manager.get_jack_ports.assert_called_once_with(self.swap_args['component_id'], force=True)
+        self.mock_port_manager.get_jack_port_data_list.assert_called_once_with(self.swap_args['component_id'], force=True)
         self.mock_output_json.assert_not_called()
-        self.mock_port_manager.get_port_sets.assert_called_once()
-        self.mock_port_manager.create_port_set.assert_called()
-        self.mock_port_manager.get_port_set_config.assert_called_once()
-        self.mock_port_manager.update_port_set.assert_not_called()
-        self.mock_port_manager.delete_port_set_list.assert_called()
-        self.mock_print.assert_called_once()
+        self.mock_port_manager.create_offline_port_policy.assert_not_called()
+        self.mock_port_manager.update_port_policy_link.assert_not_called()
+        self.assertEqual(self.mock_print.call_count, 2)
 
     def test_save_ports_file(self):
         """Test swap_component saves a ports file"""
         self.swap_args['save_ports'] = True
         self.run_swap_component()
-        self.mock_port_manager.get_jack_ports.assert_called_once()
+        self.mock_port_manager.get_jack_port_data_list.assert_called_once()
         self.mock_output_json.assert_called_once()
-        self.mock_port_manager.get_port_sets.assert_called_once()
-        self.mock_port_manager.create_port_set.assert_called()
-        self.mock_port_manager.get_port_set_config.assert_called_once()
-        self.mock_port_manager.update_port_set.assert_not_called()
-        self.mock_port_manager.delete_port_set_list.assert_called()
-        self.mock_print.assert_called_once()
+        self.mock_port_manager.create_offline_port_policy.assert_not_called()
+        self.mock_port_manager.update_port_policy_link.assert_not_called()
+        self.assertEqual(self.mock_print.call_count, 2)
 
     def test_enable(self):
         """Test swap_component enables components"""
         self.swap_args['dry_run'] = False
         self.swap_args['action'] = 'enable'
         self.run_swap_component()
-        self.mock_port_manager.get_jack_ports.assert_called_once()
-        self.mock_port_manager.get_port_sets.assert_called_once()
-        self.mock_port_manager.create_port_set.assert_called()
-        self.mock_port_manager.get_port_set_config.assert_called_once()
-        self.mock_port_manager.update_port_set.assert_called()
-        self.mock_port_manager.delete_port_set_list.assert_called()
-        self.mock_print.assert_called_once()
+        self.mock_port_manager.get_jack_port_data_list.assert_called_once()
+        self.mock_output_json.assert_not_called()
+        self.mock_port_manager.create_offline_port_policy.assert_not_called()
+        self.mock_port_manager.update_port_policy_link.assert_called()
+        self.assertEqual(self.mock_print.call_count, 2)
 
     def test_disable(self):
         """Test swap_component disables components"""
         self.swap_args['dry_run'] = False
         self.swap_args['action'] = 'disable'
         self.run_swap_component()
-        self.mock_port_manager.get_jack_ports.assert_called_once()
-        self.mock_port_manager.get_port_sets.assert_called_once()
-        self.mock_port_manager.create_port_set.assert_called()
-        self.mock_port_manager.get_port_set_config.assert_called_once()
-        self.mock_port_manager.update_port_set.assert_called()
-        self.mock_port_manager.delete_port_set_list.assert_called()
-        self.mock_print.assert_called_once()
+        self.mock_port_manager.get_jack_port_data_list.assert_called_once()
+        self.mock_output_json.assert_not_called()
+        self.mock_port_manager.create_offline_port_policy.assert_called()
+        self.mock_port_manager.update_port_policy_link.assert_called()
+        self.assertEqual(self.mock_print.call_count, 2)
 
     def test_not_disruptive_not_dry(self):
         """Test swap_component not disruptive and not dry run"""
@@ -154,13 +129,11 @@ class TestCableSwapper(unittest.TestCase):
         self.swap_args['action'] = 'enable'
         self.run_swap_component()
         self.mock_pester.assert_called_once()
-        self.mock_port_manager.get_jack_ports.assert_called_once()
-        self.mock_port_manager.get_port_sets.assert_called_once()
-        self.mock_port_manager.create_port_set.assert_called()
-        self.mock_port_manager.get_port_set_config.assert_called_once()
-        self.mock_port_manager.update_port_set.assert_called()
-        self.mock_port_manager.delete_port_set_list.assert_called()
-        self.mock_print.assert_called_once()
+        self.mock_port_manager.get_jack_port_data_list.assert_called_once()
+        self.mock_output_json.assert_not_called()
+        self.mock_port_manager.create_offline_port_policy.assert_not_called()
+        self.mock_port_manager.update_port_policy_link.assert_called()
+        self.assertEqual(self.mock_print.call_count, 2)
 
     def test_not_dry_without_action(self):
         """Test swap_component not dry run without action"""
@@ -170,12 +143,10 @@ class TestCableSwapper(unittest.TestCase):
             self.run_swap_component()
         self.assertEqual(cm.exception.code, swap.ERR_INVALID_OPTIONS)
         self.mock_pester.assert_not_called()
-        self.mock_port_manager.get_jack_ports.assert_not_called()
-        self.mock_port_manager.get_port_sets.assert_not_called()
-        self.mock_port_manager.create_port_set.assert_not_called()
-        self.mock_port_manager.get_port_set_config.assert_not_called()
-        self.mock_port_manager.update_port_set.assert_not_called()
-        self.mock_port_manager.delete_port_set_list.assert_not_called()
+        self.mock_port_manager.get_jack_port_data_list.assert_not_called()
+        self.mock_output_json.assert_not_called()
+        self.mock_port_manager.create_offline_port_policy.assert_not_called()
+        self.mock_port_manager.update_port_policy_link.assert_not_called()
         self.mock_print.assert_not_called()
 
     def test_dry_run_and_action(self):
@@ -186,164 +157,77 @@ class TestCableSwapper(unittest.TestCase):
             self.run_swap_component()
         self.assertEqual(cm.exception.code, swap.ERR_INVALID_OPTIONS)
         self.mock_pester.assert_not_called()
-        self.mock_port_manager.get_jack_ports.assert_not_called()
-        self.mock_port_manager.get_port_sets.assert_not_called()
-        self.mock_port_manager.create_port_set.assert_not_called()
-        self.mock_port_manager.get_port_set_config.assert_not_called()
-        self.mock_port_manager.update_port_set.assert_not_called()
-        self.mock_port_manager.delete_port_set_list.assert_not_called()
+        self.mock_port_manager.get_jack_port_data_list.assert_not_called()
+        self.mock_output_json.assert_not_called()
+        self.mock_port_manager.create_offline_port_policy.assert_not_called()
+        self.mock_port_manager.update_port_policy_link.assert_not_called()
         self.mock_print.assert_not_called()
 
-    def test_get_ports_error(self):
-        """Test swap_component error getting ports"""
-        self.mock_port_manager.get_jack_ports.return_value = None
+    def test_get_ports_data_error(self):
+        """Test swap_component error getting ports data"""
+        self.mock_port_manager.get_jack_port_data_list.return_value = None
         with self.assertRaises(SystemExit) as cm:
             self.run_swap_component()
         self.assertEqual(cm.exception.code, swap.ERR_GET_PORTS_FAIL)
-        self.mock_port_manager.get_jack_ports.assert_called_once()
+        self.mock_port_manager.get_jack_port_data_list.assert_called_once()
         self.mock_output_json.assert_not_called()
-        self.mock_port_manager.get_port_sets.assert_not_called()
-        self.mock_port_manager.create_port_set.assert_not_called()
-        self.mock_port_manager.get_port_set_config.assert_not_called()
-        self.mock_port_manager.update_port_set.assert_not_called()
-        self.mock_port_manager.delete_port_set_list.assert_not_called()
-        self.mock_print.assert_not_called()
-
-    def test_update_port_set_error(self):
-        """Test swap_component with an error updating port set configuration"""
-        self.swap_args['dry_run'] = False
-        self.swap_args['action'] = 'disable'
-        self.mock_port_manager.update_port_set.return_value = None
-        with self.assertRaises(SystemExit) as cm:
-            self.run_swap_component()
-        self.assertEqual(cm.exception.code, swap.ERR_PORTSET_TOGGLE_FAIL)
-        self.mock_port_manager.get_jack_ports.assert_called_once()
-        self.mock_output_json.assert_not_called()
-        self.mock_port_manager.get_port_sets.assert_called()
-        self.mock_port_manager.create_port_set.assert_called()
-        self.mock_port_manager.get_port_set_config.assert_called()
-        self.mock_port_manager.update_port_set.assert_called()
-        self.mock_port_manager.delete_port_set_list.assert_called()
+        self.mock_port_manager.create_offline_port_policy.assert_not_called()
+        self.mock_port_manager.update_port_policy_link.assert_not_called()
         self.mock_print.assert_not_called()
 
     def test_no_jack_ports(self):
         """Test swap_component when no jack ports are returned"""
-        self.mock_port_manager.get_jack_ports.return_value = []
+        self.mock_port_manager.get_jack_port_data_list.return_value = []
         with self.assertRaises(SystemExit) as cm:
             self.run_swap_component()
         self.assertEqual(cm.exception.code, swap.ERR_NO_PORTS_FOUND)
-        self.mock_port_manager.get_jack_ports.assert_called_once()
+        self.mock_port_manager.get_jack_port_data_list.assert_called_once()
         self.mock_output_json.assert_not_called()
-        self.mock_port_manager.get_port_sets.assert_not_called()
-        self.mock_port_manager.create_port_set.assert_not_called()
-        self.mock_port_manager.get_port_set_config.assert_not_called()
-        self.mock_port_manager.update_port_set.assert_not_called()
-        self.mock_port_manager.delete_port_set_list.assert_not_called()
+        self.mock_port_manager.create_offline_port_policy.assert_not_called()
+        self.mock_port_manager.update_port_policy_link.assert_not_called()
         self.mock_print.assert_not_called()
 
-    def test_port_set_cable_exists(self):
-        """Test swap_component when a port set for the cable already exists"""
-        self.mock_port_manager.get_port_sets.return_value = {'names': ['SAT-x1000c6r7j101']}
+    def test_create_port_policy_error(self):
+        """Test swap_component disable with an error creating port policy"""
+        self.swap_args['dry_run'] = False
+        self.swap_args['action'] = 'disable'
+        self.mock_port_manager.create_offline_port_policy.return_value = None
         with self.assertRaises(SystemExit) as cm:
             self.run_swap_component()
-        self.assertEqual(cm.exception.code, swap.ERR_PORTSET_EXISTS)
-        self.mock_port_manager.get_jack_ports.assert_called_once()
+        self.assertEqual(cm.exception.code, swap.ERR_PORT_POLICY_CREATE_FAIL)
+        self.mock_port_manager.get_jack_port_data_list.assert_called_once()
         self.mock_output_json.assert_not_called()
-        self.mock_port_manager.get_port_sets.assert_called_once()
-        self.mock_port_manager.create_port_set.assert_not_called()
-        self.mock_port_manager.get_port_set_config.assert_not_called()
-        self.mock_port_manager.update_port_set.assert_not_called()
-        self.mock_port_manager.delete_port_set_list.assert_not_called()
-        self.mock_print.assert_not_called()
+        self.mock_port_manager.create_offline_port_policy.assert_called()
+        self.mock_port_manager.update_port_policy_link.assert_not_called()
+        self.assertEqual(self.mock_print.call_count, 1)
 
-    def test_port_set_port_exists(self):
-        """Test swap_component when portset for a port already exists"""
-        self.mock_port_manager.get_port_sets.return_value = {'names': ['SAT-x1000c6r7j101p0']}
+    def test_enable_update_port_policy_link_error(self):
+        """Test swap_component enable with an error updating port policy link"""
+        self.swap_args['dry_run'] = False
+        self.swap_args['action'] = 'enable'
+        self.mock_port_manager.update_port_policy_link.return_value = None
         with self.assertRaises(SystemExit) as cm:
             self.run_swap_component()
-        self.assertEqual(cm.exception.code, swap.ERR_PORTSET_EXISTS)
-        self.mock_port_manager.get_jack_ports.assert_called_once()
+        self.assertEqual(cm.exception.code, swap.ERR_PORT_POLICY_TOGGLE_FAIL)
+        self.mock_port_manager.get_jack_port_data_list.assert_called_once()
         self.mock_output_json.assert_not_called()
-        self.mock_port_manager.get_port_sets.assert_called_once()
-        self.mock_port_manager.create_port_set.assert_not_called()
-        self.mock_port_manager.get_port_set_config.assert_not_called()
-        self.mock_port_manager.update_port_set.assert_not_called()
-        self.mock_port_manager.delete_port_set_list.assert_not_called()
-        self.mock_print.assert_not_called()
+        self.mock_port_manager.create_offline_port_policy.assert_not_called()
+        self.assertEqual(self.mock_port_manager.update_port_policy_link.call_count, 4)
+        self.assertEqual(self.mock_print.call_count, 1)
 
-    def test_port_config_missing(self):
-        """Test swap_component when there is no configuration for the port"""
-        self.mock_port_manager.get_port_set_config.return_value = {
-            'ports': [
-                {'config':
-                    {'autoneg': True, 'enable': True,
-                     'flowControl': {'rx': True, 'tx': True},
-                     'mac': '02:00:00:00:00:00', 'speed': '100'},
-                 'xname': 'x1000c6r7j101p0'},
-                {'config':
-                    {'autoneg': True, 'enable': True,
-                     'flowControl': {'rx': True, 'tx': True},
-                     'mac': '02:00:00:00:00:00', 'speed': '100'},
-                 'xname': 'x1000c6r7j101p1'},
-                {'config':
-                    {'autoneg': True, 'enable': True,
-                     'flowControl': {'rx': True, 'tx': True},
-                     'mac': '02:00:00:00:00:00', 'speed': '200'},
-                 'xname': 'x1000c6r7j2p1'}
-            ]
-        }
+    def test_disable_update_port_policy_link_error(self):
+        """Test swap_component disable with an error updating port policy link"""
+        self.swap_args['dry_run'] = False
+        self.swap_args['action'] = 'disable'
+        self.mock_port_manager.update_port_policy_link.return_value = None
         with self.assertRaises(SystemExit) as cm:
             self.run_swap_component()
-        self.assertEqual(cm.exception.code, swap.ERR_PORTSET_GET_CONFIG)
-        self.mock_port_manager.get_jack_ports.assert_called_once()
+        self.assertEqual(cm.exception.code, swap.ERR_PORT_POLICY_TOGGLE_FAIL)
+        self.mock_port_manager.get_jack_port_data_list.assert_called_once()
         self.mock_output_json.assert_not_called()
-        self.mock_port_manager.get_port_sets.assert_called_once()
-        self.mock_port_manager.create_port_set.assert_called()
-        self.mock_port_manager.get_port_set_config.assert_called()
-        self.mock_port_manager.update_port_set.assert_not_called()
-        self.mock_port_manager.delete_port_set_list.assert_called()
-        self.mock_print.assert_not_called()
-
-    def test_port_config_missing_with_xname(self):
-        """Test swap_component when there is no configuration for the port, but its xname appears"""
-        self.mock_port_manager.get_port_set_config.return_value = {
-            'ports': [
-                {'config':
-                    {'autoneg': True, 'enable': True,
-                     'flowControl': {'rx': True, 'tx': True},
-                     'mac': '02:00:00:00:00:00', 'speed': '100'},
-                 'xname': 'x1000c6r7j101p0'},
-                {'config':
-                    {'autoneg': True, 'enable': True,
-                     'flowControl': {'rx': True, 'tx': True},
-                     'mac': '02:00:00:00:00:00', 'speed': '100'},
-                 'xname': 'x1000c6r7j101p1'},
-                {'config':
-                    {'autoneg': True, 'enable': True,
-                     'flowControl': {'rx': True, 'tx': True},
-                     'mac': '02:00:00:00:00:00', 'speed': '200'},
-                 'xname': 'x1000c6r7j2p1'},
-                {'xname': 'x1000c6r7j2p0'}
-            ]
-        }
-        with self.assertRaises(SystemExit) as cm:
-            self.run_swap_component()
-        self.assertEqual(cm.exception.code, swap.ERR_PORTSET_GET_CONFIG)
-        self.mock_port_manager.get_jack_ports.assert_called_once()
-        self.mock_output_json.assert_not_called()
-        self.mock_port_manager.get_port_sets.assert_called_once()
-        self.mock_port_manager.create_port_set.assert_called()
-        self.mock_port_manager.get_port_set_config.assert_called()
-        self.mock_port_manager.update_port_set.assert_not_called()
-        self.mock_port_manager.delete_port_set_list.assert_called()
-        self.mock_print.assert_not_called()
-
-    def test_swap_cable_get_port_set_fail(self):
-        """Test swapping a cable when get_port_sets returns None"""
-        self.mock_port_manager.get_port_sets.return_value = None
-        with self.assertRaises(SystemExit) as cm:
-            self.run_swap_component()
-        self.assertEqual(cm.exception.code, swap.ERR_GET_PORTS_FAIL)
+        self.mock_port_manager.create_offline_port_policy.assert_called()
+        self.assertEqual(self.mock_port_manager.update_port_policy_link.call_count, 4)
+        self.assertEqual(self.mock_print.call_count, 1)
 
 
 class TestSwitchSwapper(unittest.TestCase):
@@ -472,6 +356,18 @@ class TestSwitchSwapper(unittest.TestCase):
     def test_get_ports_data_error(self):
         """Test swap_component error getting ports data"""
         self.mock_port_manager.get_switch_port_data_list.return_value = None
+        with self.assertRaises(SystemExit) as cm:
+            self.run_swap_component()
+        self.assertEqual(cm.exception.code, swap.ERR_GET_PORTS_FAIL)
+        self.mock_port_manager.get_switch_port_data_list.assert_called_once()
+        self.mock_output_json.assert_not_called()
+        self.mock_port_manager.create_offline_port_policy.assert_not_called()
+        self.mock_port_manager.update_port_policy_link.assert_not_called()
+        self.mock_print.assert_not_called()
+
+    def test_no_jack_ports(self):
+        """Test swap_component when no jack ports are returned"""
+        self.mock_port_manager.get_switch_port_data_list.return_value = []
         with self.assertRaises(SystemExit) as cm:
             self.run_swap_component()
         self.assertEqual(cm.exception.code, swap.ERR_NO_PORTS_FOUND)
