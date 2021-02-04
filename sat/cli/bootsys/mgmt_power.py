@@ -31,7 +31,7 @@ import inflect
 from paramiko.client import SSHClient
 from paramiko.ssh_exception import BadHostKeyException, AuthenticationException, SSHException
 
-from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger
+from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger, ConsoleLoggingError
 from sat.cli.bootsys.util import get_mgmt_ncn_hostnames
 from sat.cli.bootsys.waiting import GroupWaiter
 from sat.config import get_config_value
@@ -252,12 +252,16 @@ def do_mgmt_shutdown_power(ssh_client, username, password, ncn_shutdown_timeout,
     # where "sat bootsys" commands are being run.
     # TODO: Is there a better way to get the hostname of the first master node?
     other_ncns = get_mgmt_ncn_hostnames(['managers', 'storage', 'workers']) - {'ncn-m001'}
-    with IPMIConsoleLogger(other_ncns):
-        start_shutdown(other_ncns, ssh_client)
+    try:
+        with IPMIConsoleLogger(other_ncns, username, password):
+            start_shutdown(other_ncns, ssh_client)
 
-        finish_shutdown(other_ncns, username, password,
-                        ncn_shutdown_timeout, ipmi_timeout)
-        LOGGER.info('Shutdown complete.')
+            finish_shutdown(other_ncns, username, password,
+                            ncn_shutdown_timeout, ipmi_timeout)
+            LOGGER.info('Shutdown complete.')
+    except ConsoleLoggingError as err:
+        LOGGER.error(f'Aborting shutdown of NCNs due failure to set up NCN console logging: {err}')
+        raise SystemExit(1)
 
 
 def do_power_off_ncns(args):
@@ -300,25 +304,29 @@ def do_power_on_ncns(args):
     ncn_groups = [master_nodes, storage_nodes, worker_nodes]
     # flatten lists of ncn groups
     non_bis_ncns = set(ncn for sublist in ncn_groups for ncn in sublist)
-    with IPMIConsoleLogger(non_bis_ncns):
-        for ncn_group in ncn_groups:
-            print(f'Powering on NCNs: {", ".join(ncn_group)}')
+    try:
+        with IPMIConsoleLogger(non_bis_ncns, username, password):
+            for ncn_group in ncn_groups:
+                print(f'Powering on NCNs: {", ".join(ncn_group)}')
 
-            # TODO (SAT-555): Probably should not send a power on if it's already on.
-            ipmi_waiter = IPMIPowerStateWaiter(ncn_group, 'on',
-                                               get_config_value('bootsys.ipmi_timeout'),
-                                               username, password, send_command=True)
-            ipmi_waiter.wait_for_completion()
+                # TODO (SAT-555): Probably should not send a power on if it's already on.
+                ipmi_waiter = IPMIPowerStateWaiter(ncn_group, 'on',
+                                                   get_config_value('bootsys.ipmi_timeout'),
+                                                   username, password, send_command=True)
+                ipmi_waiter.wait_for_completion()
 
-            ssh_waiter = SSHAvailableWaiter(ncn_group,
-                                            get_config_value('bootsys.ncn_boot_timeout'))
-            inaccessible_nodes = ssh_waiter.wait_for_completion()
+                ssh_waiter = SSHAvailableWaiter(ncn_group,
+                                                get_config_value('bootsys.ncn_boot_timeout'))
+                inaccessible_nodes = ssh_waiter.wait_for_completion()
 
-            if inaccessible_nodes:
-                LOGGER.error('Unable to reach the following NCNs via SSH '
-                             'after powering them on: %s. Troubleshoot the '
-                             'issue and then try again.',
-                             ', '.join(inaccessible_nodes))
-                raise SystemExit(1)
-            else:
-                print(f'Powered on NCNs: {", ".join(ncn_group)}')
+                if inaccessible_nodes:
+                    LOGGER.error('Unable to reach the following NCNs via SSH '
+                                 'after powering them on: %s. Troubleshoot the '
+                                 'issue and then try again.',
+                                 ', '.join(inaccessible_nodes))
+                    raise SystemExit(1)
+                else:
+                    print(f'Powered on NCNs: {", ".join(ncn_group)}')
+    except ConsoleLoggingError as err:
+        LOGGER.error(f'Aborting boot of NCNs due failure to set up NCN console logging: {err}')
+        raise SystemExit(1)

@@ -49,6 +49,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   statically assigned IP addresses.
 - Changed the command prompt in ``sat bash`` to display 'sat-container' in
   addition to the container ID.
+- Changed the ``ncn-power`` stage of ``sat bootsys`` to start console monitoring
+  of NCNs using ``screen`` sessions launched over an SSH connection to ncn-m001
+  instead of using ``ipmi_console_start.sh`` and ``ipmi_console_stop.sh``
+  scripts.
+- Changed the ``ncn-power`` stage of ``sat bootsys`` to exit with an error if it
+  cannot start console monitoring prior to booting or shutting down NCNs.
 
 ### Removed
 - Removed the ``hsn-bringup`` stage of ``sat bootsys boot`` due to removal of
