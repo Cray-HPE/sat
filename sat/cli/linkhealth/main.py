@@ -1,7 +1,7 @@
 """
 The main entry point for the linkhealth subcommand.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -173,10 +173,15 @@ def get_cable_presence(xnames, username, password):
                 presence_mapping[xname][id] = response['CableStatus']
             elif 'Status' in response:
                 status = response['Status']
-                if 'Health' in status and 'State' in status:
+                health = status.get('Health')
+                state = status.get('State')
+                if health is None or state is None:
+                    LOGGER.error('Invalid "Status" found for {}{}.'.format(xname, id))
+                    presence_mapping[xname][id] = 'MISSING'
+                elif health == 'OK' and state == 'Enabled':
+                    presence_mapping[xname][id] = CABLE_STATUS_PRESENT
+                else:
                     presence_mapping[xname][id] = CABLE_STATUS_NOT_PRESENT
-                    if status['Health'] == 'OK' and status['State'] == 'Enabled':
-                        presence_mapping[xname][id] = CABLE_STATUS_PRESENT
             else:
                 LOGGER.error('No "CableStatus" or "Status" found for {}{}.'.format(xname, id))
                 presence_mapping[xname][id] = 'MISSING'
