@@ -412,13 +412,22 @@ def do_etcd_stop(ncn_groups):
     do_service_action_on_hosts(ncn_groups['managers'], 'etcd', target_state='inactive')
 
 
+def do_etcd_start(ncn_groups):
+    """Ensure etcd service is started and enabled on all manager NCNs."""
+    do_service_action_on_hosts(ncn_groups['managers'], 'etcd', target_state='active',
+                               target_enabled='enabled')
+
+
 # Each step has a description that is printed and an action that is called
 # with the single argument being a dict mapping from NCN group names to hosts.
 PlatformServicesStep = namedtuple('PlatformServicesStep', ('description', 'action'))
 STEPS_BY_ACTION = {
     # The ordered steps to start platform services
     'start': [
-        PlatformServicesStep('Start containerd on all Kubernetes NCNs.', do_containerd_start),
+        PlatformServicesStep('Ensure containerd is running and enabled on all Kubernetes NCNs.',
+                             do_containerd_start),
+        PlatformServicesStep('Ensure etcd is running and enabled on all Kubernetes manager NCNs.',
+                             do_etcd_start),
         PlatformServicesStep('Check health of Ceph cluster and unfreeze state.', do_ceph_unfreeze),
         PlatformServicesStep('Start and enable kubelet on all Kubernetes NCNs.', do_kubelet_start)
     ],
