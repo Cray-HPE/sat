@@ -29,7 +29,7 @@ from paramiko import SSHClient, SSHException, WarningPolicy
 from threading import Thread
 
 from sat.cli.bootsys.ceph import ceph_healthy, toggle_ceph_freeze_flags
-from sat.cli.bootsys.etcd import save_etcd_snapshot_on_host, EtcdSnapshotFailure
+from sat.cli.bootsys.etcd import save_etcd_snapshot_on_host, EtcdInactiveFailure, EtcdSnapshotFailure
 from sat.cli.bootsys.util import get_mgmt_ncn_hostnames
 from sat.cli.bootsys.waiting import Waiter
 from sat.util import pester_choices
@@ -49,7 +49,20 @@ SERVICE_ACTION_TIMEOUT = 30
 
 
 class FatalPlatformError(Exception):
-    """A fatal error occurred during the shutdown or startup of platform services."""
+    """A fatal error occurred during the shutdown or startup of platform services.
+
+    If this error is raised by a step, the stage will be aborted, and the admin
+    will have to try again.
+    """
+    pass
+
+
+class NonFatalPlatformError(Exception):
+    """A non-fatal error occurred during the shutdown or startup of platform services.
+
+    If this error is raised by a step, we will prompt the admin if they want to
+    continue with the stage or exit.
+    """
     pass
 
 
@@ -370,7 +383,9 @@ def do_etcd_snapshot(ncn_groups):
     """Save an etcd snapshot on all manager NCNs.
 
     Raises:
-        FatalPlatformError: if etcd snapshot fails
+        NonFatalPlatformError: if etcd is inactive on some managers and thus
+            could not have a snapshot saved.
+        FatalPlatformError: if etcd snapshot command fails for another reason
     """
     managers = ncn_groups['managers']
     # A dict mapping from failed hostnames to EtcdSnapshotFailure instances
@@ -384,9 +399,12 @@ def do_etcd_snapshot(ncn_groups):
 
     if snapshot_errs:
         for hostname, err in snapshot_errs.items():
-            LOGGER.error(f'Failed to create etcd snapshot on {hostname}: {err}')
-        raise FatalPlatformError(f'Failed to create etcd snapshot on hosts: '
-                                 f'{", ".join(snapshot_errs.keys())}')
+            log_level = logging.WARNING if isinstance(err, EtcdInactiveFailure) else logging.ERROR
+            LOGGER.log(log_level, f'Failed to create etcd snapshot on {hostname}: {err}')
+        non_fatal = all(isinstance(err, EtcdInactiveFailure) for err in snapshot_errs.values())
+        exc_cls = NonFatalPlatformError if non_fatal else FatalPlatformError
+        raise exc_cls(f'Failed to create etcd snapshot on hosts: '
+                      f'{", ".join(snapshot_errs.keys())}')
 
 
 def do_etcd_stop(ncn_groups):
@@ -447,9 +465,22 @@ def do_platform_action(action):
             print(info_message)
             LOGGER.info(info_message)
             step.action(ncn_groups)
+        except NonFatalPlatformError as err:
+            LOGGER.warning(f'Non-fatal error in step "{step.description}" of '
+                           f'platform services {action}: {err}')
+            answer = pester_choices(f'Continue with platform services {action}?', ('yes', 'no'))
+            if answer == 'yes':
+                continue_message = 'Continuing.'
+                LOGGER.info(continue_message)
+                print(continue_message)
+            else:
+                abort_message = 'Aborting.'
+                LOGGER.info(abort_message)
+                print(abort_message)
+                raise SystemExit(1)
         except FatalPlatformError as err:
-            LOGGER.error(f'Fatal error while stopping platform services during '
-                         f'step "{step.description}": {err}')
+            LOGGER.error(f'Fatal error in step "{step.description}" of '
+                         f'platform services {action}: {err}')
             raise SystemExit(1)
 
 

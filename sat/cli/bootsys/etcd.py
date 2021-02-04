@@ -38,6 +38,12 @@ ETCD_SNAPSHOT_FILE = 'backup.db'
 
 
 class EtcdSnapshotFailure(Exception):
+    """Failed to save a snapshot of etcd."""
+    pass
+
+
+class EtcdInactiveFailure(EtcdSnapshotFailure):
+    """Failed to save a snapshot of etcd because etcd was inactive."""
     pass
 
 
@@ -48,6 +54,8 @@ def save_etcd_snapshot_on_host(hostname):
         hostname (str): the hostname to connect to
 
     Raises:
+        EtcdInactiveFailure: if the etcd service is inactive, indicating that
+            an attempt to save a snapshot would hang
         EtcdSnapshotFailure: if there is a failure to create the directory for
             the snapshot or a failure to create the snapshot
     """
@@ -68,9 +76,8 @@ def save_etcd_snapshot_on_host(hostname):
 
     exit_status = stdout.channel.recv_exit_status()
     if exit_status:
-        LOGGER.info('The etcd service is not active on %s so a snapshot '
-                    'will not be created.', hostname)
-        return
+        raise EtcdInactiveFailure(f'The etcd service is not active on {hostname} '
+                                  f'so a snapshot cannot be created.')
 
     mkdir_cmd = f'mkdir -p {ETCD_SNAPSHOT_DIR}'
     etcd_cmd = (f'ETCDCTL_API=3 '

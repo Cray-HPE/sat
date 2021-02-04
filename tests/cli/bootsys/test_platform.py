@@ -39,6 +39,7 @@ from sat.cli.bootsys.platform import (
     do_platform_stop,
     do_service_action_on_hosts,
     FatalPlatformError,
+    NonFatalPlatformError,
     PlatformServicesStep,
     prompt_for_ncn_verification,
     RemoteServiceWaiter,
@@ -367,8 +368,8 @@ class TestDoPlatformAction(unittest.TestCase):
         self.assertEqual(cm.records[0].message, 'Executing step: first step')
         self.assertEqual(cm.records[1].message, 'Executing step: second step')
 
-    def test_do_platform_action_failed_step(self):
-        """Test do_platform_action when a step fails."""
+    def test_do_platform_action_fatal_step(self):
+        """Test do_platform_action when a step fails fatally."""
         self.mock_first_step.side_effect = FatalPlatformError('fail')
         with self.assertLogs(level=logging.INFO) as cm:
             with self.assertRaises(SystemExit):
@@ -376,8 +377,52 @@ class TestDoPlatformAction(unittest.TestCase):
 
         self.mock_print.assert_called_once_with("Executing step: first step")
         self.assertEqual(cm.records[0].message, 'Executing step: first step')
-        self.assertEqual(cm.records[1].message, 'Fatal error while stopping platform services '
-                                                'during step "first step": fail')
+        self.assertEqual(cm.records[0].levelno, logging.INFO)
+        self.assertEqual(cm.records[1].message, f'Fatal error in step "first step" of '
+                                                f'platform services {self.known_action}: fail')
+        self.assertEqual(cm.records[1].levelno, logging.ERROR)
+
+    @mock.patch('sat.cli.bootsys.platform.pester_choices', return_value='no')
+    def test_do_platform_action_non_fatal_step_abort(self, mock_pester_choices):
+        """Test do_platform_action when a step fails non-fatally, but the user aborts."""
+        self.mock_first_step.side_effect = NonFatalPlatformError('fail')
+        with self.assertLogs(level=logging.INFO) as cm:
+            with self.assertRaises(SystemExit):
+                do_platform_action(self.known_action)
+
+        mock_pester_choices.assert_called_once()
+        self.assertEqual([mock.call("Executing step: first step"),
+                          mock.call("Aborting.")],
+                         self.mock_print.mock_calls)
+        self.assertEqual(cm.records[0].message, 'Executing step: first step')
+        self.assertEqual(cm.records[0].levelno, logging.INFO)
+        self.assertEqual(cm.records[1].message, f'Non-fatal error in step "first step" of '
+                                                f'platform services {self.known_action}: fail')
+        self.assertEqual(cm.records[1].levelno, logging.WARNING)
+        self.assertEqual(cm.records[2].message, 'Aborting.')
+        self.assertEqual(cm.records[2].levelno, logging.INFO)
+
+    @mock.patch('sat.cli.bootsys.platform.pester_choices', return_value='yes')
+    def test_do_platform_action_non_fatal_step_continue(self, mock_pester_choices):
+        """Test do_platform_action when a step fails non-fatally, and the user continues."""
+        self.mock_first_step.side_effect = NonFatalPlatformError('fail')
+        with self.assertLogs(level=logging.INFO) as cm:
+            do_platform_action(self.known_action)
+
+        mock_pester_choices.assert_called_once()
+        self.assertEqual([mock.call("Executing step: first step"),
+                          mock.call("Continuing."),
+                          mock.call("Executing step: second step")],
+                         self.mock_print.mock_calls)
+        self.assertEqual(cm.records[0].message, 'Executing step: first step')
+        self.assertEqual(cm.records[0].levelno, logging.INFO)
+        self.assertEqual(cm.records[1].message, f'Non-fatal error in step "first step" of '
+                                                f'platform services {self.known_action}: fail')
+        self.assertEqual(cm.records[1].levelno, logging.WARNING)
+        self.assertEqual(cm.records[2].message, 'Continuing.')
+        self.assertEqual(cm.records[2].levelno, logging.INFO)
+        self.assertEqual(cm.records[3].message, 'Executing step: second step')
+        self.assertEqual(cm.records[3].levelno, logging.INFO)
 
 
 class TestDoPlatformStartStop(unittest.TestCase):
