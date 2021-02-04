@@ -55,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scripts.
 - Changed the ``ncn-power`` stage of ``sat bootsys`` to exit with an error if it
   cannot start console monitoring prior to booting or shutting down NCNs.
+- Changed ``sat linkhealth`` to correctly process status output from
+  the Redfish API for newer versions of Rosetta switch firmware.
 
 ### Removed
 - Removed the ``hsn-bringup`` stage of ``sat bootsys boot`` due to removal of

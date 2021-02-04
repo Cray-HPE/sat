@@ -1,7 +1,7 @@
 """
 The main entry point for the linkhealth subcommand.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -37,6 +37,9 @@ from sat.xname import XName
 
 
 LOGGER = logging.getLogger(__name__)
+
+CABLE_STATUS_PRESENT = 'Present'
+CABLE_STATUS_NOT_PRESENT = 'Not Present'
 
 
 class ResettableDefault:
@@ -105,7 +108,11 @@ def get_cable_presence(xnames, username, password):
     endpoint is queried, and reports the jack IDs along with whether or
     not a cable is present in the jack.
 
-        'j' ports can report 'Present' or 'Not Present'
+        'j' ports can report either 'CableStatus' or 'Status'.
+            The valid values for 'CableStatus' are: 'Present' and 'Not Present'.
+            If CableStatus is not reported, it is set to 'Present' when
+            Status['Health'] is set to 'OK' and Status['State'] is set to 'Enabled'.
+            It is set to 'Not Present' for all other values of 'Health' and 'State'.
         'bp' ports can report 'No Device'.
 
     Args:
@@ -162,10 +169,21 @@ def get_cable_presence(xnames, username, password):
                     '{}.'.format(ce, '/'.join([xname] + endpoint_addr)))
                 continue
 
-            try:
+            if 'CableStatus' in response:
                 presence_mapping[xname][id] = response['CableStatus']
-            except KeyError:
-                LOGGER.error('No "CableStatus" found for {}{}.'.format(xname, id))
+            elif 'Status' in response:
+                status = response['Status']
+                health = status.get('Health')
+                state = status.get('State')
+                if health is None or state is None:
+                    LOGGER.error('Invalid "Status" found for {}{}.'.format(xname, id))
+                    presence_mapping[xname][id] = 'MISSING'
+                elif health == 'OK' and state == 'Enabled':
+                    presence_mapping[xname][id] = CABLE_STATUS_PRESENT
+                else:
+                    presence_mapping[xname][id] = CABLE_STATUS_NOT_PRESENT
+            else:
+                LOGGER.error('No "CableStatus" or "Status" found for {}{}.'.format(xname, id))
                 presence_mapping[xname][id] = 'MISSING'
 
     return presence_mapping
@@ -242,7 +260,7 @@ def get_report(xname_port_map, username, password, args):
             if jack in presence_mapping[xname]:
                 entry['cable_present'] = presence_mapping[xname][jack]
 
-                if entry['cable_present'] == 'Not Present':
+                if entry['cable_present'] == CABLE_STATUS_NOT_PRESENT:
                     default_provider.reset('NOT APPLICABLE')
 
             try:
