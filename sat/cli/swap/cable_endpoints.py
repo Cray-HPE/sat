@@ -33,7 +33,7 @@ from yaml import YAMLLoadWarning
 
 from kubernetes.client import CoreV1Api
 from kubernetes.client.rest import ApiException
-from kubernetes.config import load_kube_config
+from kubernetes.config import load_kube_config, ConfigException
 
 LOGGER = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class CableEndpoints:
         self.dest_dir = '/sat/'
         self.cables = None
 
-    def get_shasta_p2p_file(self):
+    def copy_shasta_p2p_file(self):
         """Get Shasta p2p file from the fabric-manager pod.
 
         Returns:
@@ -61,15 +61,11 @@ class CableEndpoints:
 
         try:
             with warnings.catch_warnings():
-                # Ignore YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated
-                # kubernetes/config/kube_config.py should use yaml.safe_load()
                 warnings.filterwarnings('ignore', category=YAMLLoadWarning)
                 load_kube_config()
-        except ApiException as err:
-            LOGGER.error('Reading kubernetes config: {}'.format(err))
-            return False
-        except FileNotFoundError as err:
-            LOGGER.error('Kubernetes config not found: {}'.format(err))
+        # Earlier versions: FileNotFoundError; later versions: ConfigException
+        except (FileNotFoundError, ConfigException) as err:
+            LOGGER.error('Failed to load kubernetes config: {}'.format(err))
             return False
 
         namespace = 'services'
@@ -85,8 +81,8 @@ class CableEndpoints:
             LOGGER.info(f'No pods with label {pod_label} could be found.')
             return False
 
-        src_file = self.src_dir + self.p2p_file
-        dest_file = self.dest_dir + self.p2p_file
+        src_file = os.path.join(self.src_dir, self.p2p_file)
+        dest_file = os.path.join(self.dest_dir, self.p2p_file)
         cmd = f'kubectl -n {namespace} -c {container} cp {pod}:{src_file} {dest_file}'
         LOGGER.info(f'Running {cmd}')
 
@@ -114,11 +110,11 @@ class CableEndpoints:
             False if any errors
         """
 
-        if not self.get_shasta_p2p_file():
+        if not self.copy_shasta_p2p_file():
             LOGGER.error(f'Error copying file from fabric manager pod: {self.p2p_file}')
             return False
 
-        csv_filename = self.dest_dir + self.p2p_file
+        csv_filename = os.path.join(self.dest_dir, self.p2p_file)
         cables = []
         try:
             with open(csv_filename, 'r', encoding='utf-8-sig') as csvfile:
@@ -129,8 +125,8 @@ class CableEndpoints:
                     if line.startswith('cable_id'):
                         header = line.split(',')
                         break
-        except (OSError, IOError):
-            LOGGER.error(f'Unable to open file for reading: {csv_filename}')
+        except OSError as err:
+            LOGGER.error(f'Unable to open file {csv_filename} for reading: {err}')
             return False
 
         try:
@@ -149,8 +145,8 @@ class CableEndpoints:
                             cables.append(cable)
                     except KeyError as err:
                         LOGGER.error('Key %s for cable data missing from p2p file.', err)
-        except (OSError, IOError):
-            LOGGER.error(f'Unable to open file for reading: {csv_filename}')
+        except OSError as err:
+            LOGGER.error(f'Unable to open file {csv_filename} for reading: {err}')
             return False
 
         if not cables:

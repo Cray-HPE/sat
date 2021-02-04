@@ -84,7 +84,9 @@ class TestCableSwapper(unittest.TestCase):
         """Test swap cable with force"""
         self.swap_args['force'] = True
         self.run_swap_component()
-        self.mock_port_manager.get_jack_port_data_list.assert_called_once_with(self.swap_args['component_id'], force=True)
+        self.mock_port_manager.get_jack_port_data_list.assert_called_once_with(
+            self.swap_args['component_id'], force=True
+        )
         self.mock_output_json.assert_not_called()
         self.mock_port_manager.create_offline_port_policy.assert_not_called()
         self.mock_port_manager.update_port_policy_link.assert_not_called()
