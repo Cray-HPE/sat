@@ -38,6 +38,9 @@ from sat.xname import XName
 
 LOGGER = logging.getLogger(__name__)
 
+CABLE_STATUS_PRESENT = 'Present'
+CABLE_STATUS_NOT_PRESENT = 'Not Present'
+
 
 class ResettableDefault:
     """A callable for defaultdict() that provides mutability.
@@ -105,7 +108,11 @@ def get_cable_presence(xnames, username, password):
     endpoint is queried, and reports the jack IDs along with whether or
     not a cable is present in the jack.
 
-        'j' ports can report 'Present' or 'Not Present'
+        'j' ports can report either 'CableStatus' or 'Status'.
+            The valid values for 'CableStatus' are: 'Present' and 'Not Present'.
+            If CableStatus is not reported, it is set to 'Present' when
+            Status['Health'] is set to 'OK' and Status['State'] is set to 'Enabled'.
+            It is set to 'Not Present' for all other values of 'Health' and 'State'.
         'bp' ports can report 'No Device'.
 
     Args:
@@ -162,10 +169,16 @@ def get_cable_presence(xnames, username, password):
                     '{}.'.format(ce, '/'.join([xname] + endpoint_addr)))
                 continue
 
-            try:
+            if 'CableStatus' in response:
                 presence_mapping[xname][id] = response['CableStatus']
-            except KeyError:
-                LOGGER.error('No "CableStatus" found for {}{}.'.format(xname, id))
+            elif 'Status' in response:
+                status = response['Status']
+                if 'Health' in status and 'State' in status:
+                    presence_mapping[xname][id] = CABLE_STATUS_NOT_PRESENT
+                    if status['Health'] == 'OK' and status['State'] == 'Enabled':
+                        presence_mapping[xname][id] = CABLE_STATUS_PRESENT
+            else:
+                LOGGER.error('No "CableStatus" or "Status" found for {}{}.'.format(xname, id))
                 presence_mapping[xname][id] = 'MISSING'
 
     return presence_mapping
@@ -242,7 +255,7 @@ def get_report(xname_port_map, username, password, args):
             if jack in presence_mapping[xname]:
                 entry['cable_present'] = presence_mapping[xname][jack]
 
-                if entry['cable_present'] == 'Not Present':
+                if entry['cable_present'] == CABLE_STATUS_NOT_PRESENT:
                     default_provider.reset('NOT APPLICABLE')
 
             try:
