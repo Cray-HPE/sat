@@ -41,9 +41,7 @@ JACK_XNAME_REGEX = re.compile(r'^x\d+c\d+r\d+j\d+$')
 
 
 class CableEndpoints:
-    """Manage cable endpoints using data from the Shasta p2p file.
-       The Shasta p2p file is copied from the fabric-manager pod.
-    """
+    """Manages cable endpoints using data from the Shasta p2p file."""
 
     def __init__(self):
         self.p2p_file = 'Shasta_system_hsn_pt_pt.csv'
@@ -52,11 +50,11 @@ class CableEndpoints:
         self.cables = None
 
     def copy_shasta_p2p_file(self):
-        """Get Shasta p2p file from the fabric-manager pod.
+        """Copy Shasta p2p file from the fabric-manager pod.
 
         Returns:
-            True if p2p file was copied and is available in the sat container
-            False if there is an error copying the p2p file
+            True if p2p file was copied and is available in the sat container.
+            False if there is an error copying the p2p file.
         """
 
         try:
@@ -102,12 +100,13 @@ class CableEndpoints:
 
     def load_cables_from_p2p_file(self):
         """Load cable data from Shasta p2p file.
-           Loads keys: src_conn_a, src_conn_b, dst_conn_a, dst_conn_b.
-           Replaces any '.' with '' in the xname.
+
+        Loads keys: src_conn_a, src_conn_b, dst_conn_a, dst_conn_b.
+        Replaces any '.' with '' in the xname.
 
         Returns:
-            True if cable data was successfully created from the p2p file
-            False if any errors
+            True if cable data was successfully created from the p2p file.
+            False if any errors.
         """
 
         if not self.copy_shasta_p2p_file():
@@ -116,6 +115,7 @@ class CableEndpoints:
 
         csv_filename = os.path.join(self.dest_dir, self.p2p_file)
         cables = []
+        header = ''
         try:
             with open(csv_filename, 'r', encoding='utf-8-sig') as csvfile:
                 # Skip preamble
@@ -159,58 +159,52 @@ class CableEndpoints:
         """Get the cable data for a jack xname.
 
         Args:
-            jack_xname (str): The xname of the jack
+            jack_xname (str): The xname of the jack.
 
         Returns:
-            A dictionary of cable data or None
+            A dictionary of cable data or None.
         """
 
         if self.cables is None:
             return None
 
         for cable in self.cables:
-            if jack_xname in [cable['src_conn_a'], cable['src_conn_b'], cable['dst_conn_a'], cable['dst_conn_b']]:
+            if jack_xname in cable.values():
                 return cable
+
         return None
 
     def get_linked_jack_list(self, jack_xname):
         """Get the linked jacks for a jack xname using the cable data.
-           Only returns endpoints that are jack xnames, i.e., match JACK_XNAME_REGEX.
+
+        Only returns endpoints that are jack xnames, i.e., match JACK_XNAME_REGEX.
 
         Args:
-            jack_xname (str): The xname of the jack
+            jack_xname (str): The xname of the jack.
 
         Returns:
-            A list of str of jack xnames that are linked
+            A list of str of jack xnames that are linked.
         """
 
-        linked_jack_list = []
         cable = self.get_cable(jack_xname)
         if cable is None:
             LOGGER.warning(f'Jack data for {jack_xname} not available from p2p file')
             return None
 
-        if re.match(JACK_XNAME_REGEX, cable['src_conn_a']):
-            linked_jack_list.append(cable['src_conn_a'])
-        if re.match(JACK_XNAME_REGEX, cable['src_conn_b']):
-            linked_jack_list.append(cable['src_conn_b'])
-        if re.match(JACK_XNAME_REGEX, cable['dst_conn_a']):
-            linked_jack_list.append(cable['dst_conn_a'])
-        if re.match(JACK_XNAME_REGEX, cable['dst_conn_b']):
-            linked_jack_list.append(cable['dst_conn_b'])
-        return linked_jack_list
+        return [jack for jack in cable.values() if re.match(JACK_XNAME_REGEX, jack)]
 
     def validate_jacks_using_p2p_file(self, jack_xnames):
-        """Validate a list or jack xnames that match the format JACK_XNAME_REGEX.
-           Uses the cable data from the p2p file to validate the jacks.
-           Checks if all jacks are in the p2p file.
-           If all jacks are in the p2p file, checks if all jacks are for the same single cable.
+        """Validate a list of jack xnames that match the format JACK_XNAME_REGEX.
+
+        Uses the cable data from the p2p file to validate the jacks.
+        Checks if all jacks are in the p2p file.
+        If all jacks are in the p2p file, checks if all jacks are for the same single cable.
 
         Args:
-            jack_xnames ([str]): A list of jack xnames
+            jack_xnames ([str]): A list of jack xnames.
 
         Returns:
-            True or False if valid or not
+            True or False if valid or not.
         """
 
         if self.cables is None:
