@@ -115,7 +115,7 @@ class CableEndpoints:
 
         csv_filename = os.path.join(self.dest_dir, self.p2p_file)
         cables = []
-        header = ''
+        header = []
         try:
             with open(csv_filename, 'r', encoding='utf-8-sig') as csvfile:
                 # Skip preamble

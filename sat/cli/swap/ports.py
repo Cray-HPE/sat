@@ -212,15 +212,21 @@ class PortManager:
             LOGGER.error(f'Exiting due to errors validating jack xnames {jack_xnames}')
             return None
 
-        if valid_p2p_jacks:
+        all_jack_xnames = []
+        if valid_p2p_file:
             # Add the linked jacks to the list of jacks input
             all_jack_xnames = []
             for jack in jack_xnames:
-                linked_jacks = self.cable_endpoints.get_linked_jack_list(jack)
-                if linked_jacks is not None:
-                    all_jack_xnames.extend(linked_jacks)
-            all_jack_xnames = set(all_jack_xnames)
-        else:
+                # Make sure that the jack is in the p2p file
+                cable = self.cable_endpoints.get_cable(jack)
+                if cable:
+                    linked_jacks = self.cable_endpoints.get_linked_jack_list(jack)
+                    if linked_jacks is not None:
+                        all_jack_xnames.extend(linked_jacks)
+            if all_jack_xnames:
+                all_jack_xnames = set(all_jack_xnames)
+
+        if not all_jack_xnames:
             LOGGER.info(f'Continuing with errors validating jack xnames {jack_xnames}')
             all_jack_xnames = jack_xnames
 
