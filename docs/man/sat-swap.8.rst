@@ -57,15 +57,13 @@ These options must be specified after the subcommand.
 
 **--dry-run**
         Perform a dry run without action to disable/enable the switch
-        or cable.  The dry run obtains port links and port sets and
-        configurations of ports, and creates port sets and deletes
-        port sets. This can be used to check in advance there are no
-        error conditions.
+        or cable.  The dry run obtains port links and port policies.
+        This can be used to check in advance there are no error conditions.
 
 **-f, --force**
-        If specified, the command will not verify that the specified
-        jacks are connected by a cable.  Only valid when swapping a
-        cable.
+        If specified, the command will continue if there are errors when
+        verifying that the specified jacks are connected by a single cable.
+        Only valid when swapping a cable.
 
 **-s, --save-ports**
         Save data about the switch or cable ports affected as a JSON file
@@ -78,9 +76,10 @@ EXIT STATUS
 ===========
 
 | 1: An invalid combination of options was given
-| 2: No ports found for the switch/cable
-| 3: Creation of port policy failed
-| 4: Disable/enable of one or more ports failed
+| 2: Error getting ports for system
+| 3: No ports found for the switch/cable
+| 4: Creation of port policy failed
+| 5: Disable/enable of one or more ports failed
 
 EXAMPLES
 ========
@@ -125,8 +124,8 @@ by the cable:
     Ports: x5000c3r7j18p0 x5000c1r3j16p0 x5000c3r7j18p1 x5000c1r3j16p1
     Cable has been disabled and is ready for replacement.
 
-Disable all ports on given jacks, using **--force** to skip checking that they
-are connected by a cable:
+Disable all ports on given jacks, using **--force** to continue even though they
+are not connected by a single cable:
 
 ::
 

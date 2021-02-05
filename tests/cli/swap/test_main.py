@@ -44,7 +44,6 @@ class TestSwapMain(unittest.TestCase):
     def tearDown(self):
         mock.patch.stopall()
 
-    @unittest.skip('SAT-779: Temporarily remove sat swap cable')
     def test_swap_cable(self):
         """Running swap cable calls the swap cable function"""
         do_swap(self.fake_args)
