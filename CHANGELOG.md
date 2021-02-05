@@ -44,7 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the platform services stage of ``sat bootsys boot`` to start and
   enable kubelet on the Kubernetes management NCNs.
 - Changed the platform services stage of ``sat bootsys shutdown`` to save a
-  snapshot of etcd on each manager and stop the etcd service.
+  snapshot of etcd and stop the etcd service on the manager Kubernetes NCNs.
+- Changed the platform services stage of ``sat bootsys boot`` to ensure etcd is
+  started and enabled on the manager Kubernetes NCNs.
 - Changed ``sat swap switch`` to use the new Fabric Manager API.
 - Changed the ``ncn-power`` stage of ``sat bootsys`` to no longer start and stop
   dhcpd, which is unnecessary now that NCNs and their management interfaces have
