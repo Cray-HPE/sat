@@ -1,7 +1,7 @@
 """
 The parser for the swap subcommand.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -39,16 +39,12 @@ def _add_common_arguments(parser, component):
         help=f'Perform action to disable/enable the {component}. Required if not a dry run.')
 
     parser.add_argument(
-        '--save-portset', '-s', action='store_true',
-        help=f'Save {component} portset JSON as <xname>-ports.json file in current directory.')
+        '--save-ports', '-s', action='store_true',
+        help=f'Save {component} ports JSON as <xname>-ports.json file in current directory.')
 
     parser.add_argument(
         '--disruptive', action='store_true',
         help='Do not ask whether to continue.')
-
-    parser.add_argument(
-        '--overwrite', action='store_true',
-        help=f'Delete and recreate any existing SAT port sets for the {component}.')
 
     parser.add_argument(
         '--dry-run', action='store_true',

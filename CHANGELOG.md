@@ -1,6 +1,6 @@
 # Changelog
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,68 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [3.3.0] - 2021-02-05
+
+### Changed
+- Changed method of getting hostnames of management non-compute nodes (NCNs) in
+  ``sat bootsys`` from using Ansible groups to using the ``/etc/hosts`` file.
+- Changed the platform services stage of ``sat bootsys shutdown`` to
+  shut down containerd containers using crictl, and to stop the containerd
+  service using ``systemctl``.
+- Changed the platform services stage of ``sat bootsys shutdown`` to check
+  health of the Ceph cluster and freeze the Ceph cluster before shutting down.
+- Changed the platform services stage of ``sat bootsys boot`` to check
+  health of the Ceph cluster and unfreeze the Ceph cluster before booting.
+- Changed the platform services stage of ``sat bootsys boot`` to start
+  containerd on the management NCNs and ensure it's enabled.
+- Changed the platform services stage of ``sat bootsys shutdown`` to stop and
+  disable kubelet on the Kubernetes management NCNs.
+- Changed the platform services stage of ``sat bootsys boot`` to start and
+  enable kubelet on the Kubernetes management NCNs.
+- Changed the platform services stage of ``sat bootsys shutdown`` to save a
+  snapshot of etcd and stop the etcd service on the manager Kubernetes NCNs.
+- Changed the platform services stage of ``sat bootsys boot`` to ensure etcd is
+  started and enabled on the manager Kubernetes NCNs.
+- Changed ``sat swap switch`` to use the new Fabric Manager API.
+- Changed the ``ncn-power`` stage of ``sat bootsys`` to no longer start and stop
+  dhcpd, which is unnecessary now that NCNs and their management interfaces have
+  statically assigned IP addresses.
+- Changed the command prompt in ``sat bash`` to display 'sat-container' in
+  addition to the container ID.
+- Changed the ``ncn-power`` stage of ``sat bootsys`` to start console monitoring
+  of NCNs using ``screen`` sessions launched over an SSH connection to ncn-m001
+  instead of using ``ipmi_console_start.sh`` and ``ipmi_console_stop.sh``
+  scripts.
+- Changed the ``ncn-power`` stage of ``sat bootsys`` to exit with an error if it
+  cannot start console monitoring prior to booting or shutting down NCNs.
+- Changed ``sat linkhealth`` to correctly process status output from
+  the Redfish API for newer versions of Rosetta switch firmware.
+- Changed ``sat swap cable`` to use the new Fabric Manager API and Shasta p2p file.
+
+### Removed
+- Removed the ``hsn-bringup`` stage of ``sat bootsys boot`` due to removal of
+  underlying Ansible playbook, ``ncmp_hsn_bringup.yaml``, and old fabric
+  controller service.
+- Removed call to ``ncmp_hsn_bringup.yaml`` Ansible playbook from currently
+  unused ``HSNBringupWaiter`` class.
+- Removed calls to removed Ansible playbooks ``enable-dns-conflict-hosts.yml``
+  and ``disable-dns-conflict-hosts.yml`` during ``ncn-power`` stage of
+  ``sat bootsys``.
+- Removed the ``bgp-check`` stage of ``sat bootsys {boot,shutdown}`` due to
+  removal of underlying Ansible playbook that implemented this stage.
+- Removed ``run_ansible_playbook`` function from ``sat.cli.bootsys.util`` module
+  since it is no longer used anywhere.
+- Removed ``RunningService`` context manager since it is no longer used.
+
+### Fixed
+- Removed error message and 'ERROR' value for Slurm version in system
+  table in ``sat showrev`` when Slurm is not present.
+- Add missing space in help text for ``sat showrev`` ``--all`` option.
+
+### Security
+- Incremented required version of Python PyYAML package to 5.4.1.
+- Incremented required version of Python RSA package to 4.7.
 
 ## [3.2.0] - 2020-12-17
 

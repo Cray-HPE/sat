@@ -1,7 +1,7 @@
 """
 Management cluster boot, shutdown, and IPMI power support.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -31,9 +31,8 @@ import inflect
 from paramiko.client import SSHClient
 from paramiko.ssh_exception import BadHostKeyException, AuthenticationException, SSHException
 
-from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger
-from sat.cli.bootsys.mgmt_hosts import do_enable_hosts_entries, do_disable_hosts_entries
-from sat.cli.bootsys.util import get_ncns, RunningService
+from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger, ConsoleLoggingError
+from sat.cli.bootsys.util import get_mgmt_ncn_hostnames
 from sat.cli.bootsys.waiting import GroupWaiter
 from sat.config import get_config_value
 from sat.util import BeginEndLogger, get_username_and_password_interactively, prompt_continue
@@ -220,21 +219,20 @@ def finish_shutdown(hosts, username, password, ncn_shutdown_timeout, ipmi_timeou
     Raises:
         SystemExit: if any of the `hosts` failed to reach powered off state
     """
-    with RunningService('dhcpd', sleep_after_start=5):
-        ipmi_waiter = IPMIPowerStateWaiter(hosts, 'off', ncn_shutdown_timeout, username, password)
-        pending_hosts = ipmi_waiter.wait_for_completion()
+    ipmi_waiter = IPMIPowerStateWaiter(hosts, 'off', ncn_shutdown_timeout, username, password)
+    pending_hosts = ipmi_waiter.wait_for_completion()
 
-        if pending_hosts:
-            LOGGER.warning('Forcibly powering off nodes: %s', ', '.join(pending_hosts))
+    if pending_hosts:
+        LOGGER.warning('Forcibly powering off nodes: %s', ', '.join(pending_hosts))
 
-            # Confirm all nodes have actually turned off.
-            failed_hosts = IPMIPowerStateWaiter(pending_hosts, 'off', ipmi_timeout, username, password,
-                                                send_command=True).wait_for_completion()
+        # Confirm all nodes have actually turned off.
+        failed_hosts = IPMIPowerStateWaiter(pending_hosts, 'off', ipmi_timeout, username, password,
+                                            send_command=True).wait_for_completion()
 
-            if failed_hosts:
-                LOGGER.error('The following nodes failed to reach powered '
-                             'off state: %s', ', '.join(failed_hosts))
-                sys.exit(1)
+        if failed_hosts:
+            LOGGER.error('The following nodes failed to reach powered '
+                         'off state: %s', ', '.join(failed_hosts))
+            sys.exit(1)
 
 
 def do_mgmt_shutdown_power(ssh_client, username, password, ncn_shutdown_timeout, ipmi_timeout):
@@ -250,24 +248,29 @@ def do_mgmt_shutdown_power(ssh_client, username, password, ncn_shutdown_timeout,
             power state after IPMI power off.    """
     LOGGER.info('Sending shutdown command to hosts.')
 
-    non_bis_hosts = get_ncns(['managers', 'storage', 'workers'], exclude=['bis'])
-    with IPMIConsoleLogger(non_bis_hosts):
-        start_shutdown(non_bis_hosts, ssh_client)
+    # Ensure we do not shut down the first master node yet, as it is the node
+    # where "sat bootsys" commands are being run.
+    # TODO: Is there a better way to get the hostname of the first master node?
+    other_ncns = get_mgmt_ncn_hostnames(['managers', 'storage', 'workers']) - {'ncn-m001'}
+    try:
+        with IPMIConsoleLogger(other_ncns, username, password):
+            start_shutdown(other_ncns, ssh_client)
 
-        finish_shutdown(non_bis_hosts, username, password,
-                        ncn_shutdown_timeout, ipmi_timeout)
-        LOGGER.info('Shutdown complete.')
+            finish_shutdown(other_ncns, username, password,
+                            ncn_shutdown_timeout, ipmi_timeout)
+            LOGGER.info('Shutdown complete.')
+    except ConsoleLoggingError as err:
+        LOGGER.error(f'Aborting shutdown of NCNs due failure to set up NCN console logging: {err}')
+        raise SystemExit(1)
 
 
 def do_power_off_ncns(args):
-    """Power off NCNs.
+    """Power off NCNs while monitoring consoles with ipmitool.
 
     Args:
         args: The argparse.Namespace object containing the parsed arguments
             passed to this stage.
     """
-    print('Enabling required entries in /etc/hosts for NCN mgmt interfaces.')
-    do_enable_hosts_entries()
 
     action_msg = 'shutdown of management NCNs'
     prompt_continue(action_msg)
@@ -284,11 +287,7 @@ def do_power_off_ncns(args):
 
 
 def do_power_on_ncns(args):
-    """Power on NCNs.
-
-    This stage also enables/disables entries in the hosts file, starts/stops
-    IPMI console logging, and starts/stops dhcpd on the worker node on which
-    the stage is running.
+    """Power on NCNs while monitoring consoles with ipmitool.
 
     Args:
         args: The argparse.Namespace object containing the parsed arguments
@@ -297,16 +296,16 @@ def do_power_on_ncns(args):
     username, password = get_username_and_password_interactively(username_prompt='IPMI username',
                                                                  password_prompt='IPMI password')
 
-    do_enable_hosts_entries()
-
-    with RunningService('dhcpd', sleep_after_start=5):
-        master_nodes = get_ncns(['managers'])
-        storage_nodes = get_ncns(['storage'])
-        worker_nodes = get_ncns(['workers'], exclude=['bis'])
-        ncn_groups = [master_nodes, storage_nodes, worker_nodes]
-        # flatten lists of ncn groups
-        non_bis_ncns = set(ncn for sublist in ncn_groups for ncn in sublist)
-        with IPMIConsoleLogger(non_bis_ncns):
+    # First master node is already on as it is where "sat bootsys" runs.
+    # TODO: Is there a better way to get the hostname of the first master node?
+    master_nodes = get_mgmt_ncn_hostnames(['managers']) - {'ncn-m001'}
+    storage_nodes = get_mgmt_ncn_hostnames(['storage'])
+    worker_nodes = get_mgmt_ncn_hostnames(['workers'])
+    ncn_groups = [master_nodes, storage_nodes, worker_nodes]
+    # flatten lists of ncn groups
+    non_bis_ncns = set(ncn for sublist in ncn_groups for ncn in sublist)
+    try:
+        with IPMIConsoleLogger(non_bis_ncns, username, password):
             for ncn_group in ncn_groups:
                 print(f'Powering on NCNs: {", ".join(ncn_group)}')
 
@@ -325,11 +324,9 @@ def do_power_on_ncns(args):
                                  'after powering them on: %s. Troubleshoot the '
                                  'issue and then try again.',
                                  ', '.join(inaccessible_nodes))
-                    # Have to exit here because playbook will fail if nodes are
-                    # not available for SSH.
                     raise SystemExit(1)
                 else:
                     print(f'Powered on NCNs: {", ".join(ncn_group)}')
-
-    LOGGER.info('Disabling entries in /etc/hosts to prepare for starting DNS.')
-    do_disable_hosts_entries()
+    except ConsoleLoggingError as err:
+        LOGGER.error(f'Aborting boot of NCNs due failure to set up NCN console logging: {err}')
+        raise SystemExit(1)

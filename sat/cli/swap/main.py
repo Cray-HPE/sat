@@ -1,7 +1,7 @@
 """
 The main entry point for the swap command.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import logging
-import sys
 
 from sat.cli.swap.switch import swap_switch
 from sat.cli.swap.cable import swap_cable
@@ -40,12 +39,6 @@ def do_swap(args):
     Returns:
         None
     """
-
-    # SAT-753 - temporarily remove sat swap
-    # SAT-713 - Update "sat swap" to work with next-gen fabric controller
-    LOGGER.error('The swap subcommand is no longer supported using the Fabric Controller API.')
-    LOGGER.error('See the documentation for how to swap a cable or switch.')
-    sys.exit(1)
 
     if args.target == 'cable':
         swap_cable(args)

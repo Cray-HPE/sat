@@ -1,7 +1,7 @@
 """
 Unit tests for sat.cli.swap.switch
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -34,8 +34,7 @@ def set_options(namespace):
     namespace.action = None
     namespace.disruptive = True
     namespace.dry_run = True
-    namespace.overwrite = False
-    namespace.save_portset = False
+    namespace.save_ports = False
 
 
 class TestSwapSwitch(unittest.TestCase):
@@ -56,8 +55,7 @@ class TestSwapSwitch(unittest.TestCase):
                                                          self.fake_args.xname,
                                                          self.fake_args.disruptive,
                                                          self.fake_args.dry_run,
-                                                         self.fake_args.overwrite,
-                                                         self.fake_args.save_portset)
+                                                         self.fake_args.save_ports)
 
 
 if __name__ == '__main__':

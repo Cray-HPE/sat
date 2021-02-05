@@ -1,7 +1,7 @@
 """
 Common code for waiting for a condition.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -91,6 +91,10 @@ class Waiter(metaclass=abc.ABCMeta):
             bool: True if condition succeeded, False if timed out.
         """
         self.pre_wait_action()
+
+        # Allow pre_wait_action() to set self.completed to prevent needless waiting.
+        if self.completed:
+            return True
 
         start_time = time.monotonic()
 

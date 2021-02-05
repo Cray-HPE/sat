@@ -7,7 +7,7 @@ Disable/enable a component before/after replacement
 ---------------------------------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2020 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -57,27 +57,19 @@ These options must be specified after the subcommand.
 
 **--dry-run**
         Perform a dry run without action to disable/enable the switch
-        or cable.  The dry run obtains port links and port sets and
-        configurations of ports, and creates port sets and deletes
-        port sets. This can be used to check in advance there are no
-        error conditions.
+        or cable.  The dry run obtains port links and port policies.
+        This can be used to check in advance there are no error conditions.
 
 **-f, --force**
-        If specified, the command will not verify that the specified
-        jacks are connected by a cable.  Only valid when swapping a
-        cable.
+        If specified, the command will continue if there are errors when
+        verifying that the specified jacks are connected by a single cable.
+        Only valid when swapping a cable.
 
-**--overwrite**
-        In the unexpected event of a port set to be created already
-        existing, delete the port set and then create it. The port set
-        name is prefixed by "SAT-" and includes the switch xname or jack
-        xnames. Port sets are created for the switch or cable and each
-        port. This option is for contingencies such as an interrupted
-        command that left port sets that would otherwise be deleted.
-
-**-s, --save-portset**
-        Save the switch or cable port set as a JSON file in the current
-        working directory with name "<xname>-ports.json". This option
+**-s, --save-ports**
+        Save data about the switch or cable ports affected as a JSON file
+        in the current working directory with name "<xname>-ports.json".
+        For each port that is affected, the xname, port_link, and
+        policy_link is included in the JSON output. This option
         can be useful even without enable/disable of the switch ports.
 
 EXIT STATUS
@@ -86,11 +78,8 @@ EXIT STATUS
 | 1: An invalid combination of options was given
 | 2: Error getting ports for system
 | 3: No ports found for the switch/cable
-| 4: Port set to be created already exists
-| 5: Creation of port set failed
-| 6: Deletion of existing port set failed
-| 7: Problem getting port configuration
-| 8: Disable/enable of port set failed
+| 4: Creation of port policy failed
+| 5: Disable/enable of one or more ports failed
 
 EXAMPLES
 ========
@@ -99,7 +88,7 @@ Perform a dry run and save the port set for a switch:
 
 ::
 
-    # sat swap switch --dry-run --save-portset x1000c6r7
+    # sat swap switch --dry-run --save-ports x1000c6r7
     # ls x1000*
     x1000c6r7-ports.json
 
@@ -135,8 +124,8 @@ by the cable:
     Ports: x5000c3r7j18p0 x5000c1r3j16p0 x5000c3r7j18p1 x5000c1r3j16p1
     Cable has been disabled and is ready for replacement.
 
-Disable all ports on given jacks, using **--force** to skip checking that they
-are connected by a cable:
+Disable all ports on given jacks, using **--force** to continue even though they
+are not connected by a single cable:
 
 ::
 

@@ -1,7 +1,7 @@
 """
 Performs High-speed Network (HSN) bringup and waits for it to be healthy.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -30,7 +30,6 @@ import inflect
 from sat.apiclient import FabricControllerClient
 from sat.cached_property import cached_property
 from sat.cli.bootsys.state_recorder import HSNStateRecorder, StateError
-from sat.cli.bootsys.util import run_ansible_playbook
 from sat.cli.bootsys.waiting import GroupWaiter
 from sat.config import get_config_value
 from sat.session import SATSession
@@ -59,8 +58,7 @@ class HSNBringupWaiter(GroupWaiter):
         return "HSN bringup"
 
     def pre_wait_action(self):
-        run_ansible_playbook('/opt/cray/crayctl/ansible_framework/main/ncmp_hsn_bringup.yaml',
-                             exit_on_err=False)
+        # TODO (SAT-591): Add HSN bringup here
 
         # Populate members with known members from fabric controller API
         self.members = {HSNPort(port_set, port_xname)
@@ -116,6 +114,14 @@ class HSNBringupWaiter(GroupWaiter):
 
 def do_hsn_bringup(args):
     """Bring up HSN and wait for it to be healthy.
+
+    NOTE: This stage is not currently supported because both the procedure to
+    bring up the HSN and the fabric controller API have changed completely. As
+    such, it is not included in STAGES_BY_ACTION in sat.cli.bootsys.stages, so
+    it is not possible to execute this stage through the `sat` CLI.
+
+    TODO (SAT-591): Update stage to bring up HSN using next-gen fabric controller
+    TODO (SAT-780): Update stage to capture HSN state using next-gen fabric controller
 
     Args:
         args: The argparse.Namespace object containing the parsed arguments

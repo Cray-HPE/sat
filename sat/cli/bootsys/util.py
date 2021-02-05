@@ -1,7 +1,7 @@
 """
 Generic common utilities for the bootsys subcommand.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -25,98 +25,64 @@ OTHER DEALINGS IN THE SOFTWARE.
 from collections import defaultdict
 import logging
 import re
-import shlex
-import subprocess
-import time
 
 LOGGER = logging.getLogger(__name__)
 
 
-class RunningService:
-    def __init__(self, service, sleep_after_start=0):
-        """
-        Create a new context manager that starts a service in a context and
-        stops it when leaving the context.
-
-        Note that if a service was already running, it will be stopped after
-        the context is exited. It does not leave the service in the state it
-        was in before entering the context.
-
-        Args:
-            service (str): name of the service to start/stop
-            sleep_after_start (int): number of seconds to sleep after starting
-                the service when entering the context.
-        """
-        self._service = service
-        self._sleep_after_start = sleep_after_start
-
-    def _systemctl_start_stop(self, state):
-        """Start or stop the given service.
-
-        Args:
-            state (bool): If True, start the service. If False, stop it.
-
-        Returns:
-            None.
-        """
-        cmd = 'systemctl {} {}'.format('start' if state else 'stop',
-                                       self._service)
-        LOGGER.info('Running `%s`', cmd)
-        subprocess.check_call(shlex.split(cmd))
-
-    def __enter__(self):
-        self._systemctl_start_stop(True)
-
-        if self._sleep_after_start:
-            LOGGER.info("Sleeping for %s seconds after starting service %s.",
-                        self._sleep_after_start, self._service)
-            time.sleep(self._sleep_after_start)
-
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        self._systemctl_start_stop(False)
+# Maps from management NCN subroles to prefixes for those hostnames
+MGMT_NCN_HOSTNAME_PREFIXES = {
+    'managers': 'ncn-m',
+    'workers': 'ncn-w',
+    'storage': 'ncn-s'
+}
 
 
-def get_groups(groups):
-    """Get a set of hosts in a given group.
+def get_mgmt_ncn_hostnames(subroles):
+    """Get a set of management non-compute node (NCN) hostnames.
+
+    The hostnames of the NCNs are parsed from the hosts file on the local host
+    where this is executed.
 
     Args:
-        groups ([str]): a list of groups to retrieve hosts from.
-
-    Returns: a set of all hosts in the given groups.
-    """
-    if not groups:
-        return set()
-
-    host_regex = re.compile(r'\s+\"([\w-]+)\",?$')
-
-    spec = '+'.join(['groups["{}"]'.format(g) for g in groups])
-    cmd = 'ansible localhost -m debug -a \'var={}\''.format(spec)
-    pc = subprocess.run(shlex.split(cmd), stdout=subprocess.PIPE, encoding='utf-8')
-
-    group = set()
-
-    for line in pc.stdout.splitlines():
-        m = host_regex.match(line)
-        if m:
-            group.add(m.group(1))
-
-    return group
-
-
-def get_ncns(groups, exclude=None):
-    """Get a set of nodes from the specified groups.
-
-    Args:
-        groups ([str]): groups to get nodes from.
-        exclude ([str]): groups which should be excluded.
+        subroles (list of str): subroles for which to get hostnames, possible
+            values are keys of `MGMT_NCN_HOSTNAME_PREFIXES`.
 
     Returns:
-        iterator containing all nodes from groups minus the
-        ones from exclude in alphabetical order.
+        Set of hostnames for the management NCNs which have the given subroles.
+
+    Raises:
+        ValueError: if given any invalid subroles values
     """
-    all_groups = get_groups(groups)
-    excluded = get_groups(exclude or [])
-    return all_groups - excluded
+    ncn_hostnames = set()
+
+    invalid_subroles = [subrole for subrole in subroles
+                        if subrole not in MGMT_NCN_HOSTNAME_PREFIXES]
+    if invalid_subroles:
+        raise ValueError(f'Invalid subroles given: {", ".join(invalid_subroles)}')
+
+    # The NCN hostname should have whitespace before it and after it unless
+    # it is the end of the line.
+    hostname_regexes = [
+        re.compile(fr'{MGMT_NCN_HOSTNAME_PREFIXES[subrole]}\d{{3}}')
+        for subrole in subroles
+    ]
+
+    try:
+        with open('/etc/hosts', 'r') as f:
+            for line in f.readlines():
+                # Strip comments
+                stripped_line = line.split('#', 1)[0]
+                for word in stripped_line.split():
+                    for hostname_regex in hostname_regexes:
+                        match = hostname_regex.fullmatch(word)
+                        if match:
+                            ncn_hostnames.add(word)
+
+    except OSError as err:
+        LOGGER.error('Unable to read /etc/hosts to obtain management NCN '
+                     'hostnames: %s', err)
+
+    return ncn_hostnames
 
 
 def k8s_pods_to_status_dict(v1_pod_list):
@@ -143,42 +109,3 @@ def k8s_pods_to_status_dict(v1_pod_list):
         pods_dict[pod.metadata.namespace][pod.metadata.name] = pod.status.phase
 
     return pods_dict
-
-
-def run_ansible_playbook(playbook_file, opts='', exit_on_err=True):
-    """Run the given ansible playbook. Log stderr, and optionally exit on failure
-
-    Args:
-        playbook_file (str): The path to the playbook file to run.
-        opts (str): Additional options to use with ansible-playbook as a string.
-        exit_on_err (bool): If True, exit on error. If False, just log the error.
-
-    Raises:
-        SystemExit if the ansible playbook fails and `exit_on_err` is True.
-
-    Returns:
-        The output of the ansible playbook or None if it fails and `exit_on_err`
-        is False.
-    """
-    cmd = f'ansible-playbook {opts + " " if opts else ""}{playbook_file}'
-    LOGGER.debug('Invoking Ansible: %s', cmd)
-
-    try:
-        proc = subprocess.run(shlex.split(cmd), stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE, encoding='utf-8')
-    except OSError as err:
-        LOGGER.error("Failed to invoke '%s': %s", cmd, err)
-        if exit_on_err:
-            raise SystemExit(1)
-        else:
-            return
-
-    if proc.returncode:
-        LOGGER.error("Command '%s' failed. stderr: %s", cmd, proc.stderr)
-        if exit_on_err:
-            raise SystemExit(1)
-        else:
-            return
-    else:
-        LOGGER.info('Ansible playbook %s completed successfully.', playbook_file)
-        return proc.stdout

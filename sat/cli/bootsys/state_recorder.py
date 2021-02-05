@@ -312,7 +312,7 @@ class HSNStateRecorder(StateRecorder):
 
 
 def do_state_capture(args):
-    """Capture and record state about k8s pods and the HSN.
+    """Capture and record state about k8s pods.
 
     Args:
         args: The argparse.Namespace object containing the parsed arguments
@@ -324,7 +324,7 @@ def do_state_capture(args):
     Raises:
         SystemExit: if there is a failure to capture state.
     """
-    state_recorders = [HSNStateRecorder(), PodStateRecorder()]
+    state_recorders = [PodStateRecorder()]
 
     failed = []
     print('Capturing system state.')

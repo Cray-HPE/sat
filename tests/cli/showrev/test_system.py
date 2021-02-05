@@ -71,9 +71,7 @@ class TestSystem(unittest.TestCase):
             'sat.cli.showrev.system.kubernetes.config.load_kube_config',
             side_effect=ApiException).start()
 
-        slurm_version = sat.cli.showrev.system.get_slurm_version()
-
-        self.assertEqual('ERROR', slurm_version)
+        self.assertIsNone(sat.cli.showrev.system.get_slurm_version())
 
     def test_get_slurm_version_pod_exception(self):
         """get_slurm_version kubernetes list pod exception test.
@@ -86,8 +84,7 @@ class TestSystem(unittest.TestCase):
             'sat.cli.showrev.system.kubernetes.client.CoreV1Api.list_namespaced_pod',
             side_effect=ApiException).start()
 
-        slurm_version = sat.cli.showrev.system.get_slurm_version()
-        self.assertEqual('ERROR', slurm_version)
+        self.assertIsNone(sat.cli.showrev.system.get_slurm_version())
 
     def test_get_slurm_version_subprocess_exception(self):
         """get_slurm_version subprocess parsing had an error.
@@ -119,8 +116,7 @@ class TestSystem(unittest.TestCase):
             'sat.cli.showrev.system.subprocess.check_output',
             side_effect=subprocess.CalledProcessError(cmd=['whatever'], returncode=1)).start()
 
-        slurm_version = sat.cli.showrev.system.get_slurm_version()
-        self.assertEqual('ERROR', slurm_version)
+        self.assertIsNone(sat.cli.showrev.system.get_slurm_version())
 
     def test_get_slurm_version_kube_file_not_found(self):
         """get_slurm_version FileNotFound error when reading kube config.
@@ -129,8 +125,7 @@ class TestSystem(unittest.TestCase):
             'sat.cli.showrev.system.kubernetes.config.load_kube_config',
             side_effect=FileNotFoundError).start()
 
-        slurm_version = sat.cli.showrev.system.get_slurm_version()
-        self.assertEqual('ERROR', slurm_version)
+        self.assertIsNone(sat.cli.showrev.system.get_slurm_version())
 
     def test_get_site_data_from_s3(self):
         """Test get_site_data downloads from S3."""
@@ -147,6 +142,15 @@ class TestSystem(unittest.TestCase):
         mock_yaml_load.assert_called_once_with(
             mock_open.return_value.__enter__.return_value.read.return_value
         )
+
+    def test_get_system_version_null_values(self):
+        """Test get_system_version does not return a row with a null Slurm version."""
+        mock.patch('sat.cli.showrev.system.get_slurm_version', return_value=None).start()
+        mock.patch('sat.cli.showrev.system.get_site_data').start()
+        mock.patch('sat.cli.showrev.system.get_interconnects').start()
+        sitefile = '/opt/cray/etc/site_info.yml'
+        rows = sat.cli.showrev.system.get_system_version(sitefile)
+        self.assertFalse(any(row[0] == 'Slurm version' for row in rows))
 
 
 if __name__ == '__main__':

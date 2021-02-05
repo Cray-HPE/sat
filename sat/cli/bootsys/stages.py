@@ -1,7 +1,7 @@
 """
 Stages of the bootsys command.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -60,18 +60,15 @@ STAGES_BY_ACTION = {
         ('session-checks', ('service_activity', 'do_service_activity_check')),
         ('bos-operations', ('bos', 'do_bos_shutdowns')),
         ('cabinet-power', ('cabinet_power', 'do_cabinets_power_off')),
-        ('bgp-check', ('bgp', 'do_bgp_check')),
-        ('platform-services', ('mgmt_ansible', 'do_shutdown_playbook')),
+        ('platform-services', ('platform', 'do_platform_stop')),
         ('ncn-power', ('mgmt_power', 'do_power_off_ncns'))
     ]),
     'boot': OrderedDict([
         ('ncn-power', ('mgmt_power', 'do_power_on_ncns')),
-        ('platform-services', ('mgmt_ansible', 'do_startup_playbook')),
+        ('platform-services', ('platform', 'do_platform_start')),
         ('k8s-check', ('k8s', 'do_k8s_check')),
         ('ceph-check', ('ceph', 'do_ceph_check')),
-        ('bgp-check', ('bgp', 'do_bgp_check')),
         ('cabinet-power', ('cabinet_power', 'do_cabinets_power_on')),
-        ('hsn-bringup', ('hsn', 'do_hsn_bringup')),
         ('bos-operations', ('bos', 'do_bos_boots'))
     ])
 }

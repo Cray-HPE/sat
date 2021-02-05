@@ -1,7 +1,7 @@
 """
-A helper subclass of TestCase that implements an additional assertion.
+A helper subclass of TestCase that implements additional assertions.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,7 @@ import unittest
 
 
 class ExtendedTestCase(unittest.TestCase):
-    """A subclass that implements an additional helpful assertion."""
+    """A subclass that implements additional helpful assertions."""
 
     def assert_in_element(self, element, container):
         """Assert the given element is in one of the elements in container.
@@ -41,3 +41,17 @@ class ExtendedTestCase(unittest.TestCase):
                 return
         self.fail("Element '{}' is not in any of the elements in "
                   "the given container.".format(element))
+
+    def assert_not_in_element(self, element, container):
+        """Assert the given element is not in one of the elements in container.
+
+        Returns:
+            None.
+
+        Raises:
+            AssertionError: if the assertion fails.
+        """
+        for item in container:
+            if element in item:
+                self.fail("Element '{}' is in one of the elements in "
+                          "the given container.".format(element))

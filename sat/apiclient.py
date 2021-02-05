@@ -1,7 +1,7 @@
 """
 Client for querying the API gateway.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -111,6 +111,8 @@ class APIGatewayClient:
                                    json=json, timeout=self.timeout)
             elif req_type == 'PUT':
                 r = requester.put(url, data=req_param, verify=self.cert_verify, timeout=self.timeout)
+            elif req_type == 'PATCH':
+                r = requester.patch(url, data=req_param, verify=self.cert_verify, timeout=self.timeout)
             elif req_type == 'DELETE':
                 r = requester.delete(url, verify=self.cert_verify, timeout=self.timeout)
             else:
@@ -189,6 +191,26 @@ class APIGatewayClient:
 
         return r
 
+    def patch(self, *args, payload):
+        """Issue an HTTP PATCH request to resource given in `args`.
+
+        Args:
+            *args: Variable length list of path components used to construct
+                the path to PATCH target.
+            payload: JSON data to put.
+
+        Returns:
+            The requests.models.Response object if the request was successful.
+
+        Raises:
+            APIError: if the status code of the response is >= 400 or requests.put
+                raises a RequestException of any kind.
+        """
+
+        r = self._make_req(*args, req_type='PATCH', req_param=payload)
+
+        return r
+
     def delete(self, *args):
         """Issue an HTTP DELETE resource given in `args`.
 
@@ -261,7 +283,7 @@ class HSMClient(APIGatewayClient):
 
 
 class FabricControllerClient(APIGatewayClient):
-    base_resource_path = 'fc/v2/'
+    base_resource_path = 'fabric-manager/'
     default_port_set_names = ['fabric-ports', 'edge-ports']
 
     def get_fabric_edge_ports(self):
