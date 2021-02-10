@@ -29,7 +29,7 @@ from paramiko import SSHClient, SSHException, WarningPolicy
 from threading import Thread
 
 from sat.cached_property import cached_property
-from sat.cli.bootsys.ceph import ceph_healthy, toggle_ceph_freeze_flags
+from sat.cli.bootsys.ceph import check_ceph_health, toggle_ceph_freeze_flags, CephHealthCheckError
 from sat.cli.bootsys.etcd import save_etcd_snapshot_on_host, EtcdInactiveFailure, EtcdSnapshotFailure
 from sat.cli.bootsys.util import get_mgmt_ncn_hostnames
 from sat.cli.bootsys.waiting import Waiter
@@ -497,8 +497,10 @@ def do_ceph_freeze(ncn_groups):
     Raises:
         FatalPlatformError: if ceph is not healthy or if freezing ceph fails.
     """
-    if not ceph_healthy(expecting_osdmap_flags=False):
-        raise FatalPlatformError('Ceph is not healthy. Please correct Ceph health and try again.')
+    try:
+        check_ceph_health(expecting_osdmap_flags=False)
+    except CephHealthCheckError as err:
+        raise FatalPlatformError(f'Ceph is not healthy. Please correct Ceph health and try again. Error: {err}')
     try:
         toggle_ceph_freeze_flags(freeze=True)
     except RuntimeError as err:
@@ -511,8 +513,10 @@ def do_ceph_unfreeze(ncn_groups):
     Raises:
         FatalPlatformError: if ceph is not healthy or if unfreezing ceph fails.
     """
-    if not ceph_healthy(expecting_osdmap_flags=True):
-        raise FatalPlatformError('Ceph is not healthy. Please correct Ceph health and try again.')
+    try:
+        check_ceph_health(expecting_osdmap_flags=True)
+    except CephHealthCheckError as err:
+        raise FatalPlatformError(f'Ceph is not healthy. Please correct Ceph health and try again. Error: {err}')
     try:
         toggle_ceph_freeze_flags(freeze=False)
     except RuntimeError as err:

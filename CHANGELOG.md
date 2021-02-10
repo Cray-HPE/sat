@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Changed the Ceph health check in ``sat bootsys boot --stage ceph-check``
+  to be consistent with the check in the ``platform-services`` stage of
+  ``sat bootsys boot`` and ``sat bootsys shutdown``.
+
 ### Removed
 - Removed the ``cray-sat-crayctldeploy`` subpackage.
 - Removed ``sat linkhealth`` which has been replaced by
