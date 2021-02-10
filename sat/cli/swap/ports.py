@@ -230,7 +230,7 @@ class PortManager:
             LOGGER.info(f'Continuing with errors validating jack xnames {jack_xnames}')
             all_jack_xnames = jack_xnames
 
-        LOGGER.info(f'Using jack xname list: {all_jack_xnames}')
+        LOGGER.info(f'Using jack xname list: {sorted(all_jack_xnames)}')
         ports = self.get_ports()
         if ports is None:
             LOGGER.error('Failed to get ports.')
@@ -243,7 +243,7 @@ class PortManager:
                 if port.startswith(f'{jack_xname}p'):
                     port_links.append(doc_link)
 
-        port_data_list = self.get_port_data_list(port_links)
+        port_data_list = self.get_port_data_list(sorted(port_links))
         return port_data_list
 
     def get_switch_port_data_list(self, switch_xname):
