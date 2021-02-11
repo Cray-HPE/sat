@@ -24,6 +24,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import unittest
 from unittest import mock
+from unittest.mock import call
 
 from sat.cli.swap.ports import PortManager
 
@@ -93,18 +94,12 @@ class TestGetJackPortDataList(unittest.TestCase):
     def setUp(self):
         """Mock functions called."""
 
-        self.mock_sat_session = mock.Mock()
-        self.mock_fc_client_cls = mock.patch('sat.cli.swap.ports.SATSession').start()
-
-        self.mock_fc_response = mock.Mock()
-        self.mock_fc_client = mock.Mock()
-        self.mock_fc_client.get.return_value = self.mock_fc_response
-        self.mock_fc_client_cls = mock.patch('sat.cli.swap.ports.FabricControllerClient',
-                                             return_value=self.mock_fc_client).start()
+        self.mock_sat_session = mock.patch('sat.cli.swap.ports.SATSession').start()
+        self.mock_fc_client = mock.patch('sat.cli.swap.ports.FabricControllerClient').start().return_value
         # The data that will be returned for the ports
         # Each call for the mock_fc_client will return an item from the list in order
         # Example URL: https://api-gw-service-nmn.local/apis/fabric-manager/fabric/ports/x9000c1r3j16p0
-        self.mock_fc_response.json.side_effect = [
+        self.mock_fc_client.get.return_value.json.side_effect = [
             {'id': 'x9000c1r3a0l14',
              'conn_port': 'x9000c1r3j16p0',
              'portPolicyLinks': [
@@ -183,6 +178,12 @@ class TestGetJackPortDataList(unittest.TestCase):
         self.mock_cable_endpoints.get_cable.assert_called()
         self.mock_cable_endpoints.get_linked_jack_list.assert_called()
         self.mock_get_ports.assert_called()
+        self.mock_fc_client.get.assert_has_calls(
+            [call('/fabric/ports/x9000c1r3j16p0'), call().json(),
+             call('/fabric/ports/x9000c1r3j16p1'), call().json(),
+             call('/fabric/ports/x9000c3r5j16p0'), call().json(),
+             call('/fabric/ports/x9000c3r5j16p1'), call().json()]
+        )
 
     def test_both_jacks(self):
         """get_jack_port_data_list() with jacks connected by a cable returns the endpoint data for the jacks"""
@@ -210,6 +211,12 @@ class TestGetJackPortDataList(unittest.TestCase):
         self.assertEqual(self.mock_cable_endpoints.get_cable.call_count, 2)
         self.assertEqual(self.mock_cable_endpoints.get_linked_jack_list.call_count, 2)
         self.mock_get_ports.assert_called()
+        self.mock_fc_client.get.assert_has_calls(
+            [call('/fabric/ports/x9000c1r3j16p0'), call().json(),
+             call('/fabric/ports/x9000c1r3j16p1'), call().json(),
+             call('/fabric/ports/x9000c3r5j16p0'), call().json(),
+             call('/fabric/ports/x9000c3r5j16p1'), call().json()]
+        )
 
     def test_invalid_jack_xname(self):
         """get_jack_port_data_list() with an invalid xname"""
@@ -248,13 +255,17 @@ class TestGetJackPortDataList(unittest.TestCase):
              'port_link': '/fabric/ports/x9000c1r3j16p1',
              'policy_link': '/fabric/port-policies/fabric-policy'}
         ]
-        result = self.pm.get_jack_port_data_list(['x9000c1r3j16'], force='True')
+        result = self.pm.get_jack_port_data_list(['x9000c1r3j16'], force=True)
         self.assertEqual(result, expected)
         self.mock_cable_endpoints.load_cables_from_p2p_file.assert_called()
         self.mock_cable_endpoints.validate_jacks_using_p2p_file.assert_not_called()
         self.mock_cable_endpoints.get_cable.assert_not_called()
         self.mock_cable_endpoints.get_linked_jack_list.assert_not_called()
         self.mock_get_ports.assert_called()
+        self.mock_fc_client.get.assert_has_calls(
+            [call('/fabric/ports/x9000c1r3j16p0'), call().json(),
+             call('/fabric/ports/x9000c1r3j16p1'), call().json()]
+        )
 
     def test_jack_not_valid_using_p2p_file(self):
         """get_jack_port_data_list() with jack not valid using p2p file"""
@@ -273,13 +284,19 @@ class TestGetJackPortDataList(unittest.TestCase):
         """get_jack_port_data_list() with jack not valid using p2p file with force"""
 
         self.mock_cable_endpoints.validate_jacks_using_p2p_file.return_value = False
-        result = self.pm.get_jack_port_data_list(['x9000c1r3j16'], force='True')
+        result = self.pm.get_jack_port_data_list(['x9000c1r3j16'], force=True)
         self.assertEqual(result, self.success_expected)
         self.mock_cable_endpoints.load_cables_from_p2p_file.assert_called()
         self.mock_cable_endpoints.validate_jacks_using_p2p_file.assert_called()
         self.assertEqual(self.mock_cable_endpoints.get_cable.call_count, 1)
         self.assertEqual(self.mock_cable_endpoints.get_linked_jack_list.call_count, 1)
         self.mock_get_ports.assert_called()
+        self.mock_fc_client.get.assert_has_calls(
+            [call('/fabric/ports/x9000c1r3j16p0'), call().json(),
+             call('/fabric/ports/x9000c1r3j16p1'), call().json(),
+             call('/fabric/ports/x9000c3r5j16p0'), call().json(),
+             call('/fabric/ports/x9000c3r5j16p1'), call().json()]
+        )
 
     def test_jacks_two_cables_with_force(self):
         """get_jack_port_data_list() with jacks for two separate cables with force"""
@@ -301,7 +318,7 @@ class TestGetJackPortDataList(unittest.TestCase):
             ['x9000c1r3j18',
              'x9000c3r3j16']
         ]
-        self.mock_fc_response.json.side_effect = [
+        self.mock_fc_client.get.return_value.json.side_effect = [
             {'id': 'x9000c1r3a0l14',
              'conn_port': 'x9000c1r3j16p0',
              'portPolicyLinks': [
@@ -369,13 +386,23 @@ class TestGetJackPortDataList(unittest.TestCase):
              'port_link': '/fabric/ports/x9000c3r5j16p1',
              'policy_link': '/fabric/port-policies/fabric-policy'}
         ]
-        result = self.pm.get_jack_port_data_list(['x9000c1r3j16', 'x9000c1r3j18'], force='True')
+        result = self.pm.get_jack_port_data_list(['x9000c1r3j16', 'x9000c1r3j18'], force=True)
         self.assertEqual(result, expected)
         self.mock_cable_endpoints.load_cables_from_p2p_file.assert_called()
         self.mock_cable_endpoints.validate_jacks_using_p2p_file.assert_called()
         self.assertEqual(self.mock_cable_endpoints.get_cable.call_count, 2)
         self.assertEqual(self.mock_cable_endpoints.get_linked_jack_list.call_count, 2)
         self.mock_get_ports.assert_called()
+        self.mock_fc_client.get.assert_has_calls(
+            [call('/fabric/ports/x9000c1r3j16p0'), call().json(),
+             call('/fabric/ports/x9000c1r3j16p1'), call().json(),
+             call('/fabric/ports/x9000c1r3j18p0'), call().json(),
+             call('/fabric/ports/x9000c1r3j18p1'), call().json(),
+             call('/fabric/ports/x9000c3r3j16p0'), call().json(),
+             call('/fabric/ports/x9000c3r3j16p1'), call().json(),
+             call('/fabric/ports/x9000c3r5j16p0'), call().json(),
+             call('/fabric/ports/x9000c3r5j16p1'), call().json()]
+        )
 
     def test_jack_not_in_port_list(self):
         """get_jack_port_data_list() with jack not in port list"""
