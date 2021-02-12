@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Changed the default for s3.endpoint in ``sat.toml``
   from ``https://rgw-vip`` to ``https://rgw-vip.nmn``.
+- Changed ``sat firmware`` to display both 'name' and 'targetName' fields from
+  FAS, and changed the 'ID' header in the table to read 'name'.
 
 ## [3.3.0] - 2021-02-05
 

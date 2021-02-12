@@ -1,7 +1,7 @@
 """
 Entry point for the firmware subcommand.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -25,13 +25,14 @@ import logging
 import sys
 
 from sat.apiclient import APIError
-from sat.fwclient import create_firmware_client
+from sat.fwclient import FUSClient, create_firmware_client
 from sat.config import get_config_value
 from sat.report import Report
 from sat.session import SATSession
 
 
-HEADERS = ('xname', 'ID', 'version')
+FUS_HEADERS = ('xname', 'ID', 'version')
+FAS_HEADERS = ('xname', 'name', 'target_name', 'version')
 
 LOGGER = logging.getLogger(__name__)
 
@@ -49,6 +50,11 @@ def do_firmware(args):
     except APIError as err:
         LOGGER.error(err)
         sys.exit(1)
+
+    if isinstance(client, FUSClient):
+        headers = FUS_HEADERS
+    else:
+        headers = FAS_HEADERS
 
     # title is key to tables.
     fw_tables = {}
@@ -108,7 +114,7 @@ def do_firmware(args):
 
     for title, table in sorted(fw_tables.items()):
         report = Report(
-            HEADERS, title,
+            headers, title,
             args.sort_by, args.reverse,
             get_config_value('format.no_headings'),
             get_config_value('format.no_borders'),

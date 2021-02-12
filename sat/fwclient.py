@@ -1,7 +1,7 @@
 """
-Client for querying the API gateway.
+Clients for querying the Firmware APIs provided by FUS and FAS.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@ import time
 from datetime import datetime, timedelta
 
 from sat.apiclient import APIGatewayClient, APIError
+from sat.constants import MISSING_VALUE
 from sat.xname import XName
 
 
@@ -80,7 +81,42 @@ class _FirmwareClient(APIGatewayClient):
     def get_active_updates(self):
         raise NotImplementedError
 
-    def _make_fw_table(self, fw_devs, name, version):
+    @staticmethod
+    def _create_row_from_target(target, xname, name_field, version_field, target_name_field):
+        """Given a 'target' dictionary, create a table row. Helper for _make_fw_table.
+
+        Args:
+            target: The dictionary containing the attributes of a single
+                firmware target.
+            xname: The xname of the component to which this firmware target
+                belongs.
+            name_field: The name of the 'name' field, for example 'name' for FAS.
+            version_field: The name of the 'version' field, for example
+                'firmwareVersion' for FAS.
+            target_name_field: The name of the 'target_name' field, for example
+                'targetName' for FAS, or None.
+
+        Returns:
+            A list of values from the 'target' dictionary, or None if 'target'
+                contains an error and not enough information to display a row.
+        """
+        fw_dev_fields = [name_field, version_field]
+        if target_name_field:
+            fw_dev_fields = [name_field, target_name_field, version_field]
+
+        if 'error' in target:
+            LOGGER.error('Error getting firmware for %s target %s: %s', xname,
+                         target.get(name_field) or target.get(target_name_field) or MISSING_VALUE,
+                         target['error'])
+            # In the event of an error, skip creating a row if either:
+            # - a version field does not exist
+            # - neither 'name' nor 'target_name' fields exist
+            if version_field not in target or not any(f in target for f in [name_field, target_name_field]):
+                return None
+        # Use XName class so xnames sort properly.
+        return [XName(xname)] + [target.get(f, MISSING_VALUE) for f in fw_dev_fields]
+
+    def _make_fw_table(self, fw_devs, name_field, version_field, target_name_field=None):
         """For creating rows to be fed into a Report.
 
         Meant to be called by the FASClient and FUSClient subclasses.
@@ -90,11 +126,13 @@ class _FirmwareClient(APIGatewayClient):
                 firmware elements and versions. See the FASClient and
                 FUSClient docstrings for what format this should take.
 
-            name, version: The FUS and FAS have different key-names for
-                the 'name' and 'version' fields within the payload.
+            name, version, target_name: The FUS and FAS have different
+                key-names for the 'name' and 'version' fields within the
+                payload. FAS gives a second 'name' field called targetName
+                as well.
 
                 FUS: 'id', 'version'
-                FAS: 'name', 'firmwareVersion'
+                FAS: 'name', 'firmwareVersion', 'targetName'
 
         Returns:
             A list-of-lists table of strings, each row representing
@@ -109,17 +147,12 @@ class _FirmwareClient(APIGatewayClient):
             xname = fw_dev['xname']
             if 'targets' in fw_dev and fw_dev['targets'] is not None:
                 targets = fw_dev['targets']
-                for target in targets:
-                    if 'error' in target:
-                        LOGGER.error('Error getting firmware for %s ID %s: %s', xname,
-                                     target.get(name, 'MISSING'), target['error'])
-                        # Fall through to show version only if ID and version values exist.
-                        if name not in target or version not in target:
-                            continue
-                    # Use XName class so xnames sort properly.
-                    fw_table.append([XName(xname), target.get(name, 'MISSING'),
-                                     target.get(version, 'MISSING')])
-
+                rows_to_add = [
+                    self._create_row_from_target(
+                        target, xname, name_field, version_field, target_name_field
+                    ) for target in targets
+                ]
+                fw_table.extend([row for row in rows_to_add if row])
             elif 'error' in fw_dev:
                 LOGGER.error('Error getting firmware for %s: %s', xname, fw_dev['error'])
             else:
@@ -181,7 +214,7 @@ class FASClient(_FirmwareClient):
         try:
             response = response.json()
         except ValueError as err:
-            raise APIError('The JSON payload was invalid.'.format(err))
+            raise APIError('The JSON payload was invalid: {}'.format(err))
 
         try:
             snapshots = response['snapshots']
@@ -329,7 +362,7 @@ class FASClient(_FirmwareClient):
             A list-of-lists table of strings, each row representing
             the firmware version for an xname and ID.
         """
-        return self._make_fw_table(fw_devs, 'name', 'firmwareVersion')
+        return self._make_fw_table(fw_devs, 'name', 'firmwareVersion', 'targetName')
 
 
 # Should have the same interface as FASClient
@@ -522,12 +555,12 @@ def create_firmware_client(session=None, host=None, cert_verify=None):
     client = FASClient(session, host, cert_verify)
 
     try:
-        response = client.get('service', 'status')
+        client.get('service', 'status')
         LOGGER.debug('Using the FAS')
     except APIError:
         client = FUSClient(session, host, cert_verify)
         try:
-            response = client.get('status')
+            client.get('status')
         except APIError:
             LOGGER.error('Neither the FUS or FAS was available.')
             raise
