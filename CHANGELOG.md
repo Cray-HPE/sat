@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - Removed the ``cray-sat-crayctldeploy`` subpackage.
+- Removed ``sat linkhealth``.
 
 ## [3.4.0] - 2021-03-03
 

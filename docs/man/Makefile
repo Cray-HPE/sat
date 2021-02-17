@@ -7,7 +7,6 @@ all: \
 	sat-hwmatch.8 \
 	sat-init.8 \
 	sat-k8s.8 \
-	sat-linkhealth.8 \
 	sat-sensors.8 \
 	sat-setrev.8 \
 	sat-showrev.8 \
