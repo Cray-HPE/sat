@@ -44,7 +44,7 @@ class TestGetNcns(unittest.TestCase):
             10.252.2.16     ncn-m002 ncn-m002.local ncn-m002.nmn
             #10.252.2.19     ncn-m001 ncn-m001.local ncn-m001.nmn
             10.252.2.20     uan01 uan01.nmn  # Repurposed ncn-w004
-            10.252.2.100    rgw-vip rgw-vip.local rgw rgw.local
+            10.252.2.100    rgw-vip rgw-vip.local rgw-vip.nmn rgw rgw.local
         """)
         patch('builtins.open', mock_open(read_data=self.hosts_file_contents)).start()
 

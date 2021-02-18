@@ -62,6 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed ``sat linkhealth`` to correctly process status output from
   the Redfish API for newer versions of Rosetta switch firmware.
 - Changed ``sat swap cable`` to use the new Fabric Manager API and Shasta p2p file.
+- Changed the default for s3.endpoint in ``sat.toml``
+  from ``https://rgw-vip`` to ``https://rgw-vip.nmn``.
 
 ### Removed
 - Removed the ``hsn-bringup`` stage of ``sat bootsys boot`` due to removal of
