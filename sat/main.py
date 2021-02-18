@@ -48,13 +48,15 @@ def main():
         # cablecheck has been removed in shasta 1.4 - see SAT-745
         if 'cablecheck' in sys.argv:
             LOGGER.warning(
-                'sat cablecheck has been replaced by \'slingshot-topology-tool --cmd "show cables"\'\n'
+                'sat cablecheck has been replaced by '
+                '\'slingshot-topology-tool --cmd "show cables"\'\n'
             )
 
         # linkhealth has been removed in shasta 1.5 - see SAT-827
         if 'linkhealth' in sys.argv:
             LOGGER.warning(
-                'sat linkhealth has been replaced by \'slingshot-topology-tool --cmd "show switch ports xname"\'\n'
+                'sat linkhealth has been replaced by '
+                '\'slingshot-topology-tool --cmd "show switch <ports,jacks> <switch xname>"\'\n'
             )
 
         parser = create_parent_parser()
