@@ -29,7 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - Removed the ``cray-sat-crayctldeploy`` subpackage.
-- Removed ``sat linkhealth``.
+- Removed ``sat linkhealth`` which has been replaced by
+  ``slingshot-topology-tool --cmd "show switch <ports,jacks> <switch xname>"``.
 
 ## [3.4.0] - 2021-03-03
 
