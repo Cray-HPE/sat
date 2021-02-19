@@ -1,6 +1,6 @@
 """
 Loads configuration from a config file in INI format.
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -98,7 +98,7 @@ SAT_CONFIG_SPEC = {
         'password': OptionSpec(str, '', None, None)
     },
     's3': {
-        'endpoint': OptionSpec(str, 'https://rgw-vip', None, None),
+        'endpoint': OptionSpec(str, 'https://rgw-vip.nmn', None, None),
         'bucket': OptionSpec(str, 'sat', None, None),
         'access_key_file': OptionSpec(str, '~/.config/sat/s3_access_key', None, None),
         'secret_key_file': OptionSpec(str, '~/.config/sat/s3_secret_key', None, None)
