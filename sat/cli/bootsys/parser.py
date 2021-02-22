@@ -1,7 +1,7 @@
 """
 The parser for the bootsys subcommand.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 from collections import namedtuple
 
-from sat.cli.bootsys.defaults import DEFAULT_UAN_BOS_TEMPLATE
 from sat.cli.bootsys.stages import STAGES_BY_ACTION
 
 
@@ -55,7 +54,7 @@ TIMEOUT_SPECS = [
                 'compute and application nodes have completed their BOS boot.'),
     TimeoutSpec('ncn-shutdown', ['shutdown'], 300,
                 'management NCNs have completed a graceful shutdown and have reached '
-                'the powered off state according to IMPI.'),
+                'the powered off state according to IPMI.'),
 ]
 
 
@@ -96,18 +95,30 @@ def _add_bos_template_options(subparser, action):
         None
     """
     subparser.add_argument(
+        '--bos-templates',
+        type=lambda x: x.split(','),
+        help=f'A comma-separated list of BOS session templates for {action} '
+             f'of compute and UAN nodes. If not specified, the values of '
+             f'deprecated options --cle-bos-template and --uan-bos-template '
+             f'will be used.'
+    )
+
+    subparser.add_argument(
         '--cle-bos-template',
-        help=f'The name of the BOS session template for {action} of CLE '
-             f'compute nodes. Defaults to template matching "cle-X.Y.Z".'
+        help=f'The name of the BOS session template for {action} of COS '
+             f'compute nodes. If not specified, no COS template will be used. '
+             f'This option is deprecated in favor of --bos-templates. It will '
+             f'be ignored if --bos-templates or its configuration-file '
+             f'equivalent bos_templates is specified.'
     )
 
     subparser.add_argument(
         '--uan-bos-template',
         help=f'The name of the BOS session template for {action} of User '
-             f'Access Nodes (UANs). Defaults to {DEFAULT_UAN_BOS_TEMPLATE}.'
-        # Note that we don't want to specify the default with the `default`
-        # kwarg here because then the value from the config file could never
-        # take precedence over the command-line default.
+             f'Access Nodes (UANs). If not specified, no UAN template will be '
+             f'used. This option is deprecated in favor of --bos-templates. It '
+             f'will be ignored if --bos-templates or its configuration-file '
+             f'equivalent bos_templates is specified.'
     )
 
 

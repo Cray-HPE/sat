@@ -7,7 +7,7 @@ The System Admin Toolkit
 ------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -111,25 +111,37 @@ BOOTSYS
         one is used to verify when the HSN is up after reboot. The default value
         is 10.
 
-**cle_bos_template**
-        The name of the BOS session template to use for shutting down and
-        booting the CLE compute nodes during a shutdown or boot action. If not
-        specified, this defaults to searching for a session template that
-        matches the pattern "cle-X.Y.Z" where X, Y, and Z are integer version
-        numbers. If this option is not specified, and more than one BOS session
-        template matches the pattern, the `bootsys` command will fail with a
-        message indicating that an explicit CLE BOS template must be specified.
+**bos_templates**
+        A TOML list of BOS session templates to use for shutting down and booting
+        the COS compute nodes and User Access Nodes (UANs) during a shutdown or
+        boot action. If not specified, the values of ``cle_bos_template`` and
+        ``uan_bos_template`` are used.
 
         This config file option can by overridden by the command-line option of
         the same name.
+
+**cle_bos_template**
+        The name of the BOS session template to use for shutting down and
+        booting the COS (formerly known as CLE) compute nodes during a
+        shutdown or boot action. If not specified, no COS BOS template will
+        be used.
+
+        This config file option can by overridden by the command-line option of
+        the same name.
+
+        This option is deprecated in favor of ``bos_templates``. It will be
+        ignored if ``bos_templates`` or its command-line equivalent is specified.
 
 **uan_bos_template**
         The name of the BOS session template to use for shutting down and
         booting the User Access Nodes (UANs) during a shutdown or boot action.
-        If not specified, this defaults to "uan".
+        If not specified, no UAN BOS template will be used.
 
         This config file option can by overridden by the command-line option of
         the same name.
+
+        This option is deprecated in favor of ``bos_templates``. It will be
+        ignored if ``bos_templates`` or its command-line equivalent is specified.
 
 **discovery_timeout**
         Timeout, in seconds, to wait until node controllers
