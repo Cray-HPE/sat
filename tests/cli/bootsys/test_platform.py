@@ -31,11 +31,16 @@ import unittest
 from unittest import mock
 
 from sat.cli.bootsys.ceph import CephHealthCheckError
+from sat.cli.bootsys.etcd import EtcdInactiveFailure, EtcdSnapshotFailure
 from sat.cli.bootsys.platform import (
     CONTAINER_STOP_SCRIPT,
     ContainerStopThread,
     do_ceph_freeze,
     do_ceph_unfreeze,
+    do_containerd_stop,
+    do_etcd_snapshot,
+    do_etcd_start,
+    do_etcd_stop,
     do_platform_action,
     do_platform_start,
     do_platform_stop,
@@ -970,3 +975,108 @@ class TestDoServiceActionOnHosts(unittest.TestCase):
         for waiter in self.mock_waiters:
             waiter.wait_for_completion_async.assert_called_once_with()
             waiter.wait_for_completion_await.assert_called_once_with()
+
+
+class TestDoEtcdSnapshotStartStop(unittest.TestCase):
+    """Test the do_etcd_snapshot, do_etcd_stop, and do_etcd_start functions."""
+
+    def setUp(self):
+        """Set up some mocks and input data."""
+        self.managers = ['ncn-m001', 'ncn-m002', 'ncn-m003']
+        self.ncn_groups = {'managers': self.managers}
+
+        self.mock_save_snapshot = mock.patch('sat.cli.bootsys.platform'
+                                             '.save_etcd_snapshot_on_host').start()
+        self.mock_do_service_action = mock.patch('sat.cli.bootsys.platform'
+                                                 '.do_service_action_on_hosts').start()
+
+    def tearDown(self):
+        mock.patch.stopall()
+
+    def test_do_etcd_snapshot_success(self):
+        """Test do_etcd_snapshot in with no errors."""
+        do_etcd_snapshot(self.ncn_groups)
+        self.mock_save_snapshot.assert_has_calls([mock.call(manager) for manager in self.managers])
+
+    def test_do_etcd_snapshot_all_etcd_inactive(self):
+        """Test do_etcd_snapshot when etcd is inactive on all managers."""
+        self.mock_save_snapshot.side_effect = [EtcdInactiveFailure('etcd inactive')] * len(self.managers)
+        err_regex = f'Failed to create etcd snapshot on hosts: {", ".join(self.managers)}'
+
+        with self.assertRaisesRegex(NonFatalPlatformError, err_regex):
+            with self.assertLogs(level=logging.WARNING) as logs:
+                do_etcd_snapshot(self.ncn_groups)
+
+        self.assertEqual(len(self.managers), len(logs.records))
+        log_messages = [record.message for record in logs.records]
+        for manager in self.managers:
+            self.assertIn(f'Failed to create etcd snapshot on {manager}: etcd inactive',
+                          log_messages)
+
+    def test_do_etcd_snapshot_one_etcd_inactive(self):
+        """Test do_etcd_snapshot when etcd is inactive on one manager."""
+        self.mock_save_snapshot.side_effect = [
+            None,                                  # ncn-m001
+            EtcdInactiveFailure('etcd inactive'),  # ncn-m002
+            None,                                  # ncn-m003
+        ]
+        err_regex = 'Failed to create etcd snapshot on hosts: ncn-m002'
+
+        with self.assertRaisesRegex(NonFatalPlatformError, err_regex):
+            with self.assertLogs(level=logging.WARNING) as logs:
+                do_etcd_snapshot(self.ncn_groups)
+
+        self.assertEqual(1, len(logs.records))
+        self.assertEqual('Failed to create etcd snapshot on ncn-m002: etcd inactive',
+                         logs.records[0].message)
+
+    def test_do_etcd_snapshot_one_failure(self):
+        """Test do_etcd_snapshot when etcd ommand failed on one manager."""
+        self.mock_save_snapshot.side_effect = [
+            None,                                  # ncn-m001
+            EtcdSnapshotFailure('etcd failure'),   # ncn-m002
+            None,                                  # ncn-m003
+        ]
+        err_regex = 'Failed to create etcd snapshot on hosts: ncn-m002'
+
+        with self.assertRaisesRegex(FatalPlatformError, err_regex):
+            with self.assertLogs(level=logging.ERROR) as logs:
+                do_etcd_snapshot(self.ncn_groups)
+
+        self.assertEqual(1, len(logs.records))
+        self.assertEqual('Failed to create etcd snapshot on ncn-m002: etcd failure',
+                         logs.records[0].message)
+
+    def test_do_etcd_snapshot_one_inactive_one_failure(self):
+        """Test do_etcd_snapshot when etcd inactive on on manager, failed command on another."""
+        self.mock_save_snapshot.side_effect = [
+            None,                                  # ncn-m001
+            EtcdInactiveFailure('etcd inactive'),  # ncn-m002
+            EtcdSnapshotFailure('etcd failure'),   # ncn-m003
+        ]
+        err_regex = 'Failed to create etcd snapshot on hosts: ncn-m002, ncn-m003'
+
+        with self.assertRaisesRegex(FatalPlatformError, err_regex):
+            with self.assertLogs(level=logging.WARNING) as logs:
+                do_etcd_snapshot(self.ncn_groups)
+
+        self.assertEqual(2, len(logs.records))
+        self.assertEqual('Failed to create etcd snapshot on ncn-m002: etcd inactive',
+                         logs.records[0].message)
+        self.assertEqual(logging.WARNING, logs.records[0].levelno)
+        self.assertEqual('Failed to create etcd snapshot on ncn-m003: etcd failure',
+                         logs.records[1].message)
+        self.assertEqual(logging.ERROR, logs.records[1].levelno)
+
+    def test_do_etcd_stop(self):
+        """Test that do_etcd_stop function properly calls do_service_action_on_hosts."""
+        do_etcd_stop(self.ncn_groups)
+        self.mock_do_service_action.assert_called_once_with(self.managers, 'etcd',
+                                                            target_state='inactive')
+
+    def test_do_etcd_start(self):
+        """Test that do_etcd_start function properly calls do_service_action_on_hosts."""
+        do_etcd_start(self.ncn_groups)
+        self.mock_do_service_action.assert_called_once_with(self.managers, 'etcd',
+                                                            target_state='active',
+                                                            target_enabled='enabled')
