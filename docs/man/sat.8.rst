@@ -19,9 +19,9 @@ DESCRIPTION
 ===========
 
 The System Admin Toolkit (SAT) is a command line utility meant to be run from
-the Bastion Inception Sentinel (BIS) server. Its purpose is to assist admins
-with troubleshooting and querying information about the system and its
-components at large.
+the Kubernetes manager nodes. Its purpose is to assist admins with common
+tasks, such as troubleshooting and querying information, system boot and
+shutdown, and replacing hardware components.
 
 This utility operates via "subcommands", and each has its own manual page.
 These are referenced in the **SEE ALSO** section.
@@ -78,8 +78,8 @@ API_GATEWAY
 
 **cert_verify**
         If "true", then SAT will validate the authenticity of the api-gateway
-        via a signed certificate before communicating. Per TOML specifiction,
-        this paramter must be "true" or "false". These values are
+        via a signed certificate before communicating. Per TOML specification,
+        this parameter must be "true" or "false". These values are
         case-sensitive.
 
         This parameter is set to "true" by default.
@@ -100,7 +100,7 @@ BOOTSYS
 **max_pod_states**
         Maximum number of pod-state files allowed to accumulate in
         /var/sat/bootsys/pod-states. These files record the state of all pods in
-        kubernetes at the time the system is shut down, and the latest one is
+        Kubernetes at the time the system is shut down, and the latest one is
         used to verify when the pods are up after reboot. The default value is
         10.
 
@@ -194,7 +194,7 @@ BOOTSYS
 **ncn_shutdown_timeout**
         Timeout, in seconds, to wait until management NCNs
         have completed a graceful shutdown and have reached the
-        powered off state according to IMPI. Defaults to 300.
+        powered off state according to IPMI. Defaults to 300.
 
 FORMAT
 ------
@@ -244,7 +244,7 @@ REDFISH
 **password**
         (optional) Default password to use when querying Cray services that are
         dependent on Redfish. Use caution, as the password is stored as
-        plaintext within the SAT configuration file. If not supplied, the user
+        plain text within the SAT configuration file. If not supplied, the user
         will be queried for a password on the command line when running
         diagnostics.
 

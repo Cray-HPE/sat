@@ -44,6 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed ``sat firmware`` to display both 'name' and 'targetName' fields from
   FAS, and changed the 'ID' header in the table to read 'name'.
 
+### Fixed
+- Changed "BIS server" in SAT man page to "Kubernetes manager nodes", reworded
+  description to discuss all of SAT's uses, and corrected several small typos
+  in the SAT man page.
+
 ## [3.3.0] - 2021-02-05
 
 ### Changed
