@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   This is intended to replace ``--cle-bos-template``, ``--uan-bos-template``,
   and their respective configuration file options, ``cle_bos_template`` and
   ``uan_bos_template``.
+- Added a confirmation message when generating a configuration file via
+  ``sat init``.
 
 ### Changed
 - ``--cle-bos-template`` and ``--uan-bos-template`` now no longer have defaults

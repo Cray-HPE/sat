@@ -24,11 +24,12 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import importlib
 import logging
+import os
 import sys
 
 import argcomplete
 
-from sat.config import generate_default_config, load_config
+from sat.config import ConfigFileExistsError, DEFAULT_CONFIG_PATH, generate_default_config, load_config
 from sat.logging import bootstrap_logging, configure_logging
 from sat.parser import create_parent_parser
 
@@ -57,7 +58,14 @@ def main():
         # `sat init`, don't bother loading configuration or configuring
         # logging either.
         if args.command != 'init':
-            generate_default_config(username=args.username)
+            try:
+                generate_default_config(
+                    os.getenv('SAT_CONFIG_FILE', DEFAULT_CONFIG_PATH),
+                    username=args.username
+                )
+            except ConfigFileExistsError:
+                # Would log a debug-level message here, but logging has not yet been configured
+                pass
             load_config(args)
             configure_logging()
 

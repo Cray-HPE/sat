@@ -1,7 +1,7 @@
 """
 The main entry point for the init subcommand.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -21,10 +21,10 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-
 import logging
+import os
 
-from sat.config import generate_default_config
+from sat.config import ConfigFileExistsError, DEFAULT_CONFIG_PATH, generate_default_config
 
 
 LOGGER = logging.getLogger(__name__)
@@ -37,4 +37,9 @@ def do_init(args):
         args: The argparse.Namespace object containing the parsed arguments
             passed to this subcommand.
     """
-    generate_default_config(path=args.output, username=args.username, force=args.force, log_when_file_exists=True)
+    config_file_path = args.output or os.getenv('SAT_CONFIG_FILE', DEFAULT_CONFIG_PATH)
+    try:
+        generate_default_config(config_file_path, username=args.username, force=args.force)
+        print(f'Configuration file "{config_file_path}" generated.')
+    except ConfigFileExistsError as err:
+        LOGGER.warning(err)
