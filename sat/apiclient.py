@@ -281,6 +281,29 @@ class HSMClient(APIGatewayClient):
         except KeyError as err:
             raise APIError(f'{err_prefix} due to missing {err} key in list of components.')
 
+    def get_node_components(self):
+        """Get the components of Type=Node from HSM.
+
+        Returns:
+            list of dictionaries of Node components.
+
+        Raises:
+            APIError: if there is a failure querying the HSM API or getting
+                the required information from the response.
+        """
+
+        err_prefix = 'Failed to get Node components'
+        try:
+            components = self.get('State', 'Components', params={'type': 'Node'}).json()['Components']
+        except APIError as err:
+            raise APIError(f'{err_prefix}: {err}')
+        except ValueError as err:
+            raise APIError(f'{err_prefix} due to bad JSON in response: {err}')
+        except KeyError as err:
+            raise APIError(f'{err_prefix} due to missing {err} key in response.')
+
+        return components
+
 
 class FabricControllerClient(APIGatewayClient):
     base_resource_path = 'fabric-manager/'

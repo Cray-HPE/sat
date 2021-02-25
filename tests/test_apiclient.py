@@ -208,6 +208,13 @@ class TestHSMClient(unittest.TestCase):
                                               params=params)
         self.assertEqual(self.xnames, result)
 
+    def test_get_components_success(self):
+        """Test get_node_components in the successful case."""
+        params = {'type': 'Node'}
+        result = self.hsm_client.get_node_components()
+        self.mock_get.assert_called_once_with('State', 'Components',
+                                              params=params)
+
 
 class TestFabricControllerClient(ExtendedTestCase):
     """Tests for the APIGatewayClient class: Fabric Controller client."""
