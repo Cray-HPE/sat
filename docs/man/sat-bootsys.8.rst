@@ -2,12 +2,12 @@
  SAT-BOOTSYS
 =============
 
------------------------------------------------------
-Shut down or boot the entire system gracefully.
------------------------------------------------------
+----------------------------------------------
+Shut down or boot the entire system gracefully
+----------------------------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2020 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -60,7 +60,7 @@ node where it is necessary. Once the playbook has completed, it will move on to
 the next phase.
 
 In the final phase, it will shut down linux on all NCNs, and it will power them
-off using IPMI. Once this has completed, the command will return, and it wil be
+off using IPMI. Once this has completed, the command will return, and it will be
 safe to shutdown and power off ncn-w001 where this command was run.
 
 BOOT ACTION
@@ -96,17 +96,29 @@ These options apply to both the ``shutdown`` and ``boot`` actions.
 **--list-stages**
         List the stages that can be run for the given action.
 
+**--bos-templates** *BOS_TEMPLATES*
+        A comma-separated list of BOS session templates for shutdown or boot of
+        COS compute nodes or User Access Nodes (UANs). This parameter takes
+        precedence over ``--cle-bos-template`` and ``--uan-bos-template``
+        (below). This overrides the option ``bootsys.bos_templates`` in the
+        config file.
+
 **--cle-bos-template** *CLE_BOS_TEMPLATE*
-        The name of the BOS session template for shutdown or boot of CLE compute
-        nodes. Defaults to a template matching the pattern "cle-X.Y.X" where
-        "X", "Y", and "Z" are integer version numbers. This overrides the option
-        ``bootsys.cle_bos_template`` in the config file.
+        The name of the BOS session template for shutdown or boot of
+        COS (formerly known as CLE) compute nodes. If not specified, no
+        COS BOS template will be used. This overrides the option
+        ``bootsys.cle_bos_template`` in the config file. This option is
+        deprecated in favor of ``--bos-templates`` (above). If
+        ``--bos-templates`` or its configuration-file equivalent is specified,
+        then this option will be ignored.
 
 **--uan-bos-template** *UAN_BOS_TEMPLATE*
         The name of the BOS session template for shutdown or boot of user
-        access nodes (UANs). Defaults to "uan". If the empty string is
-        specified, no UAN shutdown will be performed. This overrides the option
-        ``bootsys.uan_bos_template`` in the config file.
+        access nodes (UANs). If not specified, no UAN BOS template will be
+        used. This overrides the option ``bootsys.uan_bos_template`` in the
+        config file. This option is deprecated in favor of ``--bos-templates``
+        (above). If ``--bos-templates`` or its configuration-file equivalent is
+        specified, then this option will be ignored.
 
 SHUTDOWN TIMEOUT OPTIONS
 ------------------------
@@ -141,7 +153,7 @@ These options set the timeouts of various parts of the stages of the
 **--ncn-shutdown-timeout** *NCN_SHUTDOWN_TIMEOUT*
         Timeout, in seconds, to wait until management NCNs
         have completed a graceful shutdown and have reached the
-        powered off state according to IMPI. Defaults to 300.
+        powered off state according to IPMI. Defaults to 300.
         Overrides the option bootsys.ncn_shutdown_timeout in
         the config file.
 

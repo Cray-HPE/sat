@@ -1,7 +1,7 @@
 """
 Unit tests for the sat.cli.bootsys.bos module.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -32,7 +32,8 @@ from unittest.mock import Mock, call, patch
 from sat.cli.bootsys.bos import (
     BOSFailure,
     BOSSessionThread,
-    boa_job_successful
+    boa_job_successful,
+    get_session_templates
 )
 from tests.common import ExtendedTestCase
 
@@ -253,6 +254,91 @@ class TestBOSSessionThread(unittest.TestCase):
         self.assertEqual(self.mock_session_id, bos_thread.session_id)
         self.assertEqual(self.mock_create_response['links'][0]['jobId'],
                          bos_thread.boa_job_id)
+
+
+class TestGetSessionTemplates(ExtendedTestCase):
+    """Test the function which processes BOS template options and finds defaults."""
+    def setUp(self):
+        """Set up some mocks."""
+        # The deprecated parameters have empty strings as their defaults, while
+        # bos_templates has an empty list as its default.
+        self.fake_config = {
+            'cle_bos_template': '',
+            'uan_bos_template': '',
+            'bos_templates': []
+        }
+        patch('sat.cli.bootsys.bos.get_config_value', side_effect=self.fake_get_config_value).start()
+        self.deprecated_warning = (
+            'The --bos-templates/bos_templates option was not specified. Please '
+            'use this option to specify session templates. Proceeding with session '
+            'templates: {}'
+        )
+
+    def tearDown(self):
+        """Stop all patches."""
+        patch.stopall()
+
+    def fake_get_config_value(self, query_string):
+        """Mimic the behavior of get_config_value."""
+        return self.fake_config[query_string.split('.')[-1]]
+
+    def test_get_session_templates_defaults(self):
+        """With no options, a BOSFailure should occur as no templates were given."""
+        with self.assertRaisesRegex(BOSFailure, 'No BOS templates were specified.'):
+            get_session_templates()
+
+    def test_get_session_templates_bos_templates_option(self):
+        """With only bos_templates option given, the value specified by the bos_templates option is used."""
+        self.fake_config['bos_templates'] = ['cos-2.0.1', 'uan-2.0.1']
+        expected = ['cos-2.0.1', 'uan-2.0.1']
+        with patch('sat.cli.bootsys.bos.LOGGER') as mock_logger:
+            actual = get_session_templates()
+        mock_logger.warning.assert_not_called()
+        self.assertCountEqual(expected, actual)
+
+    def test_get_session_templates_just_one_template(self):
+        """With just one template given with bos_templates, use it."""
+        self.fake_config['bos_templates'] = ['cos-2.0.1']
+        expected = ['cos-2.0.1']
+        with patch('sat.cli.bootsys.bos.LOGGER') as mock_logger:
+            actual = get_session_templates()
+        mock_logger.warning.assert_not_called()
+        self.assertCountEqual(expected, actual)
+
+    def test_get_session_templates_bos_templates_and_cle_option(self):
+        """With bos_templates and cle_bos_template, prefer bos_templates."""
+        self.fake_config['bos_templates'] = ['cos-2.0.1', 'uan-2.0.1']
+        self.fake_config['cle_bos_template'] = 'cos-9.9.9'
+        expected = ['cos-2.0.1', 'uan-2.0.1']
+        actual = get_session_templates()
+        self.assertCountEqual(expected, actual)
+
+    def test_get_session_templates_bos_templates_and_uan_option(self):
+        """With bos_templates and uan_bos_template, prefer bos_templates."""
+        self.fake_config['bos_templates'] = ['cos-2.0.1', 'uan-2.0.1']
+        self.fake_config['uan_bos_template'] = 'uan-9.9.9'
+        expected = ['cos-2.0.1', 'uan-2.0.1']
+        actual = get_session_templates()
+        self.assertCountEqual(expected, actual)
+
+    def test_get_session_templates_all_options_given(self):
+        """With all options given, bos_templates is preferred."""
+        self.fake_config['bos_templates'] = ['cos-2.0.1', 'uan-2.0.1']
+        self.fake_config['cle_bos_template'] = 'cos-9.9.9'
+        self.fake_config['uan_bos_template'] = 'uan-9.9.9'
+        expected = ['cos-2.0.1', 'uan-2.0.1']
+        actual = get_session_templates()
+        self.assertCountEqual(expected, actual)
+
+    def test_get_session_templates_deprecated_options(self):
+        """With only deprecated options given, use their values and log a warning."""
+        self.fake_config['cle_bos_template'] = 'cos-2.0.1'
+        self.fake_config['uan_bos_template'] = 'uan-2.0.1'
+        expected = ['cos-2.0.1', 'uan-2.0.1']
+        with self.assertLogs(level=logging.WARNING) as logs:
+            actual = get_session_templates()
+        self.assert_in_element(self.deprecated_warning.format(','.join(expected)), logs.output)
+        self.assertCountEqual(expected, actual)
 
 
 if __name__ == '__main__':

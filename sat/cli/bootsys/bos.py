@@ -1,7 +1,7 @@
 """
 Bootsys operations that use the Boot Orchestration Service (BOS).
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -35,10 +35,7 @@ from time import sleep, monotonic
 from inflect import engine
 
 from sat.apiclient import APIError, BOSClient, HSMClient
-from sat.cli.bootsys.defaults import (
-    CLE_BOS_TEMPLATE_REGEX,
-    PARALLEL_CHECK_INTERVAL
-)
+from sat.cli.bootsys.defaults import PARALLEL_CHECK_INTERVAL
 from sat.cli.bootsys.power import do_nodes_power_off
 from sat.config import get_config_value
 from sat.session import SATSession
@@ -608,93 +605,83 @@ def get_templates_needing_operation(session_templates, operation):
     return needed_st + failed_st
 
 
-def find_cle_bos_template():
-    """Find the CLE BOS session template for booting/shutting down computes.
-
-    Returns:
-        The name of the CLE BOS session template.
-
-    Raises:
-        BOSFailure: if there was a failure to get the CLE session template due
-            to a failure within BOS or inability to find a session template
-            matching the CLE regex.
-    """
-    matching_templates = []
-
-    LOGGER.debug('Querying BOS to find CLE session template.')
-    bos_client = BOSClient(SATSession())
-    try:
-        session_templates = bos_client.get('sessiontemplate').json()
-    except (APIError, ValueError) as err:
-        raise BOSFailure('Failed to get list of BOS session templates to '
-                         'determine CLE session template: {}'.format(err))
-
-    for session_template in session_templates:
-        try:
-            name = session_template['name']
-        except KeyError as err:
-            LOGGER.warning("Encountered BOS session template with no '%s' key. "
-                           "Skipping.", err)
-            continue
-
-        LOGGER.debug("Checking BOS session template with name '%s' against "
-                     "regex '%s'.", name, CLE_BOS_TEMPLATE_REGEX.pattern)
-
-        if CLE_BOS_TEMPLATE_REGEX.match(name):
-            LOGGER.debug("Found matching BOS session template with name '%s'.",
-                         name)
-            matching_templates.append(name)
-
-    if not matching_templates:
-        raise BOSFailure("Unable to find CLE BOS session template matching "
-                         "regex '{}'.".format(CLE_BOS_TEMPLATE_REGEX.pattern))
-    elif len(matching_templates) > 1:
-        raise BOSFailure("Found multiple potential CLE BOS session templates "
-                         "based on match against regex '{}': {}. Use the "
-                         "'--cle-bos-template' option to specify the one to "
-                         "use.".format(CLE_BOS_TEMPLATE_REGEX.pattern,
-                                       ', '.join(matching_templates)))
-
-    return matching_templates[0]
-
-
 def get_session_templates():
     """Get the list of names of session templates on which we should operate.
 
-    This is based on the config file options, which can be overridden by
-    command-line options. If the empty string is specified for the UAN template,
-    that template will be omitted. In addition, if the templates are the same,
-    the returned list will not repeat the name of that session template.
+    This is based on the bos_templates config file option, which can be
+    overridden by the --bos-templates command-line option. This is expected
+    to be a list, and this function removes duplicates from the list.
+
+    If this option was not specified, then get_session_templates_deprecated() is
+    used to find suitable COS and UAN session templates based on deprecated
+    options.
 
     Returns:
         A list of session template names on which the operation should be
         performed.
 
     Raises:
-        BOSFailure: if failure to get find a CLE BOS template
+        BOSFailure: if no BOS templates were specified (from
+            get_session_templates_deprecated)
     """
-    cle_bos_template = get_config_value('bootsys.cle_bos_template')
-    if not cle_bos_template:
-        # Let any exceptions raise to caller
-        cle_bos_template = find_cle_bos_template()
+    bos_templates = get_config_value('bootsys.bos_templates')
+    if bos_templates:
+        session_templates = list(set(bos_templates))
+        LOGGER.info(
+            'Using session templates provided by --bos-templates/bos_templates option: %s',
+            session_templates
+        )
+    else:
+        session_templates = get_session_templates_deprecated()
 
-    # Default handled by `get_config_value`
+    return session_templates
+
+
+def get_session_templates_deprecated():
+    """Get default COS and UAN session templates.
+
+    This function gets default COS and UAN session templates based on the
+    deprecated 'cle_bos_template' and 'uan_bos_template' options, or their
+    defaults.
+
+    This function always logs a warning that it is preferred for the admin
+    to use the `--bos-templates` argument or its configuration file equivalent.
+
+    If the configured COS and UAN templates are the same then just one
+    session template is returned. If either template is specified as an empty
+    string or unspecified, then it is omitted from the list of session
+    templates.
+
+    Returns:
+        A list of names of BOS session templates.
+
+    Raises:
+        BOSFailure: if no BOS templates were specified.
+    """
+    cos_bos_template = get_config_value('bootsys.cle_bos_template')
     uan_bos_template = get_config_value('bootsys.uan_bos_template')
-
-    if cle_bos_template == uan_bos_template:
+    if cos_bos_template and cos_bos_template == uan_bos_template:
         # It is expected that computes and UANs use different session templates,
         # but if they are the same, don't do the operation twice against it.
-        LOGGER.info('The cle_bos_template and uan_bos_template are the same '
-                    '(%s), so only one session will be created.', cle_bos_template)
-        session_templates = [cle_bos_template]
-    # Not all systems may have UANs
-    elif uan_bos_template == '':
-        LOGGER.info('Skipping operation on UANs since the empty string was '
-                    'specified for the uan_bos_template.')
-        session_templates = [cle_bos_template]
+        LOGGER.info('The COS BOS template and UAN BOS template are the same '
+                    '(%s), so only one session will be created.', cos_bos_template)
+        session_templates = [cos_bos_template]
     else:
-        session_templates = [cle_bos_template, uan_bos_template]
+        # If either cos_bos_template or uan_bos_template are unspecified or
+        # empty strings, omit them.
+        session_templates = [template for template in
+                             (cos_bos_template, uan_bos_template) if template]
 
+    if not session_templates:
+        raise BOSFailure(
+            'No BOS templates were specified. Specify one with --bos-templates.'
+        )
+
+    LOGGER.warning(
+        'The --bos-templates/bos_templates option was not specified. Please '
+        'use this option to specify session templates. Proceeding with session '
+        'templates: %s', ','.join(session_templates)
+    )
     return session_templates
 
 

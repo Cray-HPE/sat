@@ -1,7 +1,7 @@
 """
 Some constant default values used in the bootsys code.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -21,7 +21,6 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-import re
 
 # The default directory where pre-shutdown state is captured (currently k8s pod
 # states, HSN status). This can be overridden on the command-line.
@@ -37,9 +36,5 @@ HSN_STATE_DIR = 'hsn-states/'
 # The prefix used for files that record HSN state
 HSN_STATE_FILE_PREFIX = 'hsn-state'
 
-# The regex matching standard CLE session templates, e.g. cle-1.3.0
-CLE_BOS_TEMPLATE_REGEX = re.compile(r'^cle-\d+.\d+.\d+$')
-# The name of the standard UAN session template
-DEFAULT_UAN_BOS_TEMPLATE = 'uan'
 # The number of seconds to wait between checks on parallel BOS operations
 PARALLEL_CHECK_INTERVAL = 10

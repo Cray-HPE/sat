@@ -29,7 +29,6 @@ from textwrap import dedent, indent
 
 import toml
 
-from sat.cli.bootsys.defaults import DEFAULT_UAN_BOS_TEMPLATE
 from sat.cli.bootsys.parser import TIMEOUT_SPECS
 
 DEFAULT_CONFIG_PATH = f'{os.getenv("HOME", "/root")}/.config/sat/sat.toml'
@@ -75,9 +74,9 @@ SAT_CONFIG_SPEC = {
     'bootsys': {
         'max_hsn_states': OptionSpec(int, 10, None, None),
         'max_pod_states': OptionSpec(int, 10, None, None),
+        'bos_templates': OptionSpec(list, [], None, 'bos_templates'),
         'cle_bos_template': OptionSpec(str, '', None, 'cle_bos_template'),
-        'uan_bos_template': OptionSpec(str, DEFAULT_UAN_BOS_TEMPLATE, None,
-                                       'uan_bos_template')
+        'uan_bos_template': OptionSpec(str, '', None, 'uan_bos_template')
     },
     'format': {
         'no_headings': OptionSpec(bool, False, None, 'no_headings'),
