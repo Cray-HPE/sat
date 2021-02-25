@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   This is intended to replace ``--cle-bos-template``, ``--uan-bos-template``,
   and their respective configuration file options, ``cle_bos_template`` and
   ``uan_bos_template``.
+- Added a confirmation message when generating a configuration file via
+  ``sat init``.
 
 ### Changed
 - ``--cle-bos-template`` and ``--uan-bos-template`` now no longer have defaults
@@ -48,6 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed "BIS server" in SAT man page to "Kubernetes manager nodes", reworded
   description to discuss all of SAT's uses, and corrected several small typos
   in the SAT man page.
+- Improved error handling in ``sat showrev`` when the cray-product-catalog
+  Kubernetes configuration map does not exist, and when an invalid value is
+  given for the S3 endpoint URL.
 
 ## [3.3.0] - 2021-02-05
 

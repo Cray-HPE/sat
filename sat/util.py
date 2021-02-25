@@ -1,7 +1,7 @@
 """
 Contains structures and code that is generally useful across all of SAT.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -476,24 +476,32 @@ def get_new_ordered_dict(orig_dict, dotted_paths, default_value=None, strip_path
 def get_s3_resource():
     """Helper function to load the S3 API from configuration variables.
 
+    Returns:
+        A boto3 ServiceResource object.
+
     Raises:
-        SystemExit: if unable to load the configuration values
+        SystemExit: if unable to load the configuration values, or unable
+            to create the boto3 ServiceResource object.
     """
     try:
         access_key = read_config_value_file('s3.access_key_file')
         secret_key = read_config_value_file('s3.secret_key_file')
+        return boto3.resource(
+                's3',
+                endpoint_url=get_config_value('s3.endpoint'),
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name='',
+                verify=False
+            )
     except OSError as err:
         LOGGER.error(f'Unable to load configuration: {err}')
         raise SystemExit(1)
-
-    return boto3.resource(
-        's3',
-        endpoint_url=get_config_value('s3.endpoint'),
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        region_name='',
-        verify=False
-    )
+    except ValueError as err:
+        # A ValueError is raised when an invalid value is given to boto3.resource,
+        # e.g. an endpoint URL that is not a valid URL.
+        LOGGER.error(f'Unable to load S3 API: {err}')
+        raise SystemExit(1)
 
 
 class BeginEndLogger:
