@@ -24,7 +24,7 @@ ARGUMENTS
 =========
 
 *nids*
-        A list of node IDs and node ID ranges.   A node ID (nid) is
+        A list of node IDs and node ID ranges.  A node ID (nid) is
         either an integer or a string of the form nid123456,
         that is “nid” and a six digit zero padded number.  The nids
         and nid ranges are separated by a comma or whitespace.

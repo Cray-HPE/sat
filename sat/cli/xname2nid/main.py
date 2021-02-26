@@ -24,11 +24,12 @@ OTHER DEALINGS IN THE SOFTWARE.
 import logging
 
 from sat.apiclient import APIError, HSMClient
-from sat.session import SATSession
 from sat.constants import MISSING_VALUE
+from sat.session import SATSession
 from sat.xname import XName
 
 LOGGER = logging.getLogger(__name__)
+NUM_NID_DIGITS = 6
 
 
 def get_nids_using_xname(xname, components):
@@ -52,7 +53,7 @@ def get_nids_using_xname(xname, components):
             nid = component.get('NID', MISSING_VALUE)
             LOGGER.info(f'xname: {cid}, nid: {nid}')
             if nid != MISSING_VALUE:
-                nids.append('nid' + str(nid).zfill(6))
+                nids.append('nid' + str(nid).zfill(NUM_NID_DIGITS))
             if XName.NODE_XNAME_REGEX.match(xname):
                 # There is only one match for the node xname
                 break

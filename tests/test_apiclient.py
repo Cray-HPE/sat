@@ -29,6 +29,7 @@ import requests
 
 import sat.apiclient
 import sat.config
+from sat.apiclient import APIError
 from tests.common import ExtendedTestCase
 
 
@@ -208,10 +209,41 @@ class TestHSMClient(unittest.TestCase):
                                               params=params)
         self.assertEqual(self.xnames, result)
 
-    def test_get_components_success(self):
+    def test_get_node_components_success(self):
         """Test get_node_components in the successful case."""
         params = {'type': 'Node'}
         result = self.hsm_client.get_node_components()
+        self.mock_get.assert_called_once_with('State', 'Components',
+                                              params=params)
+        self.assertEqual(result, [{'ID': xname, 'State': state}
+                                  for xname, state in zip(self.xnames, self.states)])
+
+    def test_get_node_components_api_error(self):
+        """Test an API error is handled by get_node_components"""
+        params = {'type': 'Node'}
+        self.mock_get.side_effect = APIError('HSM failed')
+        with self.assertRaisesRegex(APIError, 'Failed to get Node components: HSM failed'):
+            self.hsm_client.get_node_components()
+        self.mock_get.assert_called_once_with('State', 'Components',
+                                              params=params)
+
+    def test_get_node_components_missing_key(self):
+        """Test a missing JSON key is handled by get_node_components"""
+        params = {'type': 'Node'}
+        self.mock_get.return_value.json.return_value = {'Not Components': []}
+        err_regex = 'Failed to get Node components due to missing \'Components\' key in response'
+        with self.assertRaisesRegex(APIError, err_regex):
+            self.hsm_client.get_node_components()
+        self.mock_get.assert_called_once_with('State', 'Components',
+                                              params=params)
+
+    def test_get_node_components_bad_data(self):
+        """Test bad JSON is handled by get_node_components"""
+        params = {'type': 'Node'}
+        self.mock_get.return_value.json.side_effect = ValueError('Bad JSON')
+        err_regex = 'Failed to get Node components due to bad JSON in response: Bad JSON'
+        with self.assertRaisesRegex(APIError, err_regex):
+            self.hsm_client.get_node_components()
         self.mock_get.assert_called_once_with('State', 'Components',
                                               params=params)
 

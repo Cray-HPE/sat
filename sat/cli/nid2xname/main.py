@@ -24,8 +24,8 @@ OTHER DEALINGS IN THE SOFTWARE.
 import logging
 
 from sat.apiclient import APIError, HSMClient
-from sat.session import SATSession
 from sat.constants import MISSING_VALUE
+from sat.session import SATSession
 
 
 LOGGER = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ def fixup_nid(nid_arg):
     if nid_arg.startswith('nid'):
         nid_arg = nid_arg[3:]
 
-    return nid_arg.lstrip('0')
+    return nid_arg.lstrip('0') or '0'
 
 
 def parse_nid_arg(nid_arg):
