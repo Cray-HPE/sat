@@ -37,4 +37,4 @@ def add_xname2nid_subparser(subparsers):
         'xname2nid', help='Perform xname to nid translation.',
         description='Perform xname to nid translation.')
 
-    xname2nid_parser.add_argument('xnames', nargs='+', type=str, help='The xnames of the nodes.')
+    xname2nid_parser.add_argument('xnames', nargs='+', type=str, help='The xnames of the nodes or node BMCs.')
