@@ -245,20 +245,21 @@ def do_mgmt_shutdown_power(ssh_client, username, password, ncn_shutdown_timeout,
         ncn_shutdown_timeout (int): timeout, in seconds, after which to hard
             power off.
         ipmi_timeout (int): timeout, in seconds, for nodes to reach desired
-            power state after IPMI power off.    """
-    LOGGER.info('Sending shutdown command to hosts.')
-
+            power state after IPMI power off.
+    """
     # Ensure we do not shut down the first master node yet, as it is the node
     # where "sat bootsys" commands are being run.
     # TODO: Is there a better way to get the hostname of the first master node?
     other_ncns = get_mgmt_ncn_hostnames(['managers', 'storage', 'workers']) - {'ncn-m001'}
     try:
         with IPMIConsoleLogger(other_ncns, username, password):
+            print(f'Sending shutdown command to other NCNs: {", ".join(other_ncns)}')
             start_shutdown(other_ncns, ssh_client)
-
+            print(f'Waiting up to {ncn_shutdown_timeout} seconds for other NCNs to '
+                  f'reach powered off state according to ipmitool: {", ".join(other_ncns)}.')
             finish_shutdown(other_ncns, username, password,
                             ncn_shutdown_timeout, ipmi_timeout)
-            LOGGER.info('Shutdown complete.')
+            print('Shutdown and power off of all other NCNs complete.')
     except ConsoleLoggingError as err:
         LOGGER.error(f'Aborting shutdown of NCNs due failure to set up NCN console logging: {err}')
         raise SystemExit(1)
@@ -307,7 +308,9 @@ def do_power_on_ncns(args):
     try:
         with IPMIConsoleLogger(non_bis_ncns, username, password):
             for ncn_group in ncn_groups:
-                print(f'Powering on NCNs: {", ".join(ncn_group)}')
+                ncn_boot_timeout = get_config_value('bootsys.ncn_boot_timeout')
+                print(f'Powering on NCNs and waiting up to {ncn_boot_timeout} seconds '
+                      f'for them to be reachable via SSH: {", ".join(ncn_group)}')
 
                 # TODO (SAT-555): Probably should not send a power on if it's already on.
                 ipmi_waiter = IPMIPowerStateWaiter(ncn_group, 'on',
@@ -315,8 +318,7 @@ def do_power_on_ncns(args):
                                                    username, password, send_command=True)
                 ipmi_waiter.wait_for_completion()
 
-                ssh_waiter = SSHAvailableWaiter(ncn_group,
-                                                get_config_value('bootsys.ncn_boot_timeout'))
+                ssh_waiter = SSHAvailableWaiter(ncn_group, ncn_boot_timeout)
                 inaccessible_nodes = ssh_waiter.wait_for_completion()
 
                 if inaccessible_nodes:

@@ -51,6 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved console logging during `sat bootsys boot|shutdown --stage ncn-power`
   by adding a check for active screen sessions after they are created to account
   for the case when some other process like conman is holding the console.
+- Changed info-level log messages to print statements for important messages
+  about progress during the `ncn-power` stage of `sat bootsys`.
 
 ### Fixed
 - Changed "BIS server" in SAT man page to "Kubernetes manager nodes", reworded
