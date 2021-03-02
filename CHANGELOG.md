@@ -45,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from ``https://rgw-vip`` to ``https://rgw-vip.nmn``.
 - Changed ``sat firmware`` to display both 'name' and 'targetName' fields from
   FAS, and changed the 'ID' header in the table to read 'name'.
+- Improved step of ``sat bootsys shutdown --stage platform-services`` that stops
+  containers by adding prompt whether to continue if stopping containers fails
+  and added log messages about running and stopped containers.
 
 ### Fixed
 - Changed "BIS server" in SAT man page to "Kubernetes manager nodes", reworded
@@ -53,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved error handling in ``sat showrev`` when the cray-product-catalog
   Kubernetes configuration map does not exist, and when an invalid value is
   given for the S3 endpoint URL.
+- Stopped printing a byte string of every container ID that was stopped during
+  ``sat bootsys shutdown --stage platform-services`` when ``crictl stop``
+  command times out.
 
 ## [3.3.0] - 2021-02-05
 
