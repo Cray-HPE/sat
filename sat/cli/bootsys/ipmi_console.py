@@ -24,6 +24,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 import logging
 import os
 import socket
+from time import sleep
 
 from paramiko import SSHClient, SSHException
 
@@ -47,6 +48,8 @@ class IPMIConsoleLogger:
     * Quit any existing screen session left from failed boot/shutdown attempts
     * Create a new detached screen session that runs `ipmitool ... sol activate`
       and logs all output to a file.
+    * Sleep for IPMIConsoleLogger.SCREEN_ACTIVE_CHECK_DELAY seconds and then
+      check that the screen session for each BMC remains active.
 
     When exited, for each host, this context manager will SSH to the
     CONSOLE_MONITORING_HOST and do the following:
@@ -66,7 +69,11 @@ class IPMIConsoleLogger:
     # Prefix for console log files
     CONSOLE_LOG_FILE_PREFIX = 'console-'
 
+    # Suffix to append to hostname to get BMC hostname
     BMC_HOSTNAME_SUFFIX = "-mgmt"
+
+    # Number of seconds to wait before checking that screen sessions remain active
+    SCREEN_ACTIVE_CHECK_DELAY = 5
 
     def __init__(self, hosts, username, password, always_cleanup=False):
         """Create an IPMIConsoleLogger.
@@ -276,6 +283,28 @@ class IPMIConsoleLogger:
             )
             self._execute_remote_command(screen_cmd, environment=environment)
 
+    def _check_screen_sessions_active(self):
+        """Check whether screen session exists for each BMC in `self.bmc_hostnames`.
+
+        Raises:
+            ConsoleLoggingError: if a screen session does not exist for every BMC.
+        """
+        matching_screen_sessions = self._get_screen_session_ids()
+
+        missing_bmc_hostnames = []
+        for bmc_hostname in self.bmc_hostnames:
+            for screen_session in matching_screen_sessions:
+                # Session names are of the form {self.SCREEN_SESSION_PREFIX}{bmc_hostname}
+                if bmc_hostname in screen_session:
+                    break
+            else:
+                # BMC hostname was not found in any existing screen sessions
+                missing_bmc_hostnames.append(bmc_hostname)
+
+        if missing_bmc_hostnames:
+            raise ConsoleLoggingError(f'No screen session exists for BMC(s): '
+                                      f'{", ".join(missing_bmc_hostnames)}.')
+
     def __enter__(self):
         """Start console logging using SSH, screen, and ipmitool
 
@@ -292,6 +321,11 @@ class IPMIConsoleLogger:
         try:
             self._create_logging_directory()
             self._start_screen_sessions()
+            LOGGER.debug('Waiting %s seconds to ensure console logging screen sessions remain active.',
+                         self.SCREEN_ACTIVE_CHECK_DELAY)
+            sleep(self.SCREEN_ACTIVE_CHECK_DELAY)
+            self._check_screen_sessions_active()
+            LOGGER.debug('Console logging screen sessions remain active.')
         except ConsoleLoggingError as err:
             raise ConsoleLoggingError(f'Failed to start console logging: {err}')
 
