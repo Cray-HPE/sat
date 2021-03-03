@@ -1,6 +1,6 @@
 """
 Loads configuration from a config file in INI format.
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -29,7 +29,6 @@ from textwrap import dedent, indent
 
 import toml
 
-from sat.cli.bootsys.defaults import DEFAULT_UAN_BOS_TEMPLATE
 from sat.cli.bootsys.parser import TIMEOUT_SPECS
 
 DEFAULT_CONFIG_PATH = f'{os.getenv("HOME", "/root")}/.config/sat/sat.toml'
@@ -41,6 +40,11 @@ OptionSpec = namedtuple('OptionSpec', ['type', 'default', 'validation_func', 'cm
 
 class ConfigValidationError(Exception):
     """An error occurred during validation of configuration."""
+    pass
+
+
+class ConfigFileExistsError(Exception):
+    """The configuration file already exists."""
     pass
 
 
@@ -75,9 +79,9 @@ SAT_CONFIG_SPEC = {
     'bootsys': {
         'max_hsn_states': OptionSpec(int, 10, None, None),
         'max_pod_states': OptionSpec(int, 10, None, None),
+        'bos_templates': OptionSpec(list, [], None, 'bos_templates'),
         'cle_bos_template': OptionSpec(str, '', None, 'cle_bos_template'),
-        'uan_bos_template': OptionSpec(str, DEFAULT_UAN_BOS_TEMPLATE, None,
-                                       'uan_bos_template')
+        'uan_bos_template': OptionSpec(str, '', None, 'uan_bos_template')
     },
     'format': {
         'no_headings': OptionSpec(bool, False, None, 'no_headings'),
@@ -98,7 +102,7 @@ SAT_CONFIG_SPEC = {
         'password': OptionSpec(str, '', None, None)
     },
     's3': {
-        'endpoint': OptionSpec(str, 'https://rgw-vip', None, None),
+        'endpoint': OptionSpec(str, 'https://rgw-vip.nmn', None, None),
         'bucket': OptionSpec(str, 'sat', None, None),
         'access_key_file': OptionSpec(str, '~/.config/sat/s3_access_key', None, None),
         'secret_key_file': OptionSpec(str, '~/.config/sat/s3_secret_key', None, None)
@@ -351,7 +355,7 @@ def process_toml_output(toml_str):
     """
     copyright_stmt = """\
         Default configuration file for SAT.
-        (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+        (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
         Permission is hereby granted, free of charge, to any person obtaining a
         copy of this software and associated documentation files (the "Software"),
@@ -378,38 +382,39 @@ def process_toml_output(toml_str):
                                               not (line.startswith('username') and not line.endswith('""\n'))]))
 
 
-def generate_default_config(path=None, username=None, force=False, log_when_file_exists=False):
+def generate_default_config(path, username=None, force=False):
     """Generates a default SAT configuration file.
 
     This function generates a default SAT configuration file if one does not
-    already exist.  It generates the configuration file in the default
-    location or the location specified by $SAT_CONFIG_FILE.
+    already exist.  It generates the configuration file at the path specified
+    by 'path'.
 
     Args:
         path(str): write the configuration file to the given path.
         username(str): generate the configuration file with
             api_gateway.username set to the given username.
         force(bool): if True, overwrite existing configuration files.
-        log_when_file_exists(bool): if True, log that the log file exists
-            at ERROR level, else log at DEBUG level.
 
     Returns:
         None
+
+    Raises:
+        ConfigFileExistsError: if the configuration file already exists.
+        SystemExit: if unable to create the configuration directory or unable
+            to create the configuration file.
     """
-    # Allow the user to specify an alternate config file in an env variable
-    config_file_path = path or os.getenv('SAT_CONFIG_FILE', DEFAULT_CONFIG_PATH)
-    if os.path.isfile(config_file_path) and not force:
-        log_fn = LOGGER.error if log_when_file_exists else LOGGER.debug
-        log_fn(f'Configuration file "{config_file_path}" already exists.  Not generating configuration file.')
-        return
-    config_file_dir = os.path.dirname(config_file_path)
+    if os.path.isfile(path) and not force:
+        raise ConfigFileExistsError(
+            f'Configuration file "{path}" already exists. Not generating configuration file.'
+        )
+    config_file_dir = os.path.dirname(path)
     if not os.path.isdir(config_file_dir):
         try:
             os.makedirs(config_file_dir, exist_ok=True)
         except OSError as e:
             LOGGER.error(f'Unable to create directory {config_file_dir}: {e}')
             raise SystemExit(1)
-    LOGGER.info(f'Creating default configuration file at {config_file_path}')
+    LOGGER.info(f'Creating default configuration file at {path}')
 
     # Convert SAT_CONFIG_SPEC to a dict
     config_spec = {
@@ -424,7 +429,7 @@ def generate_default_config(path=None, username=None, force=False, log_when_file
         config_spec['api_gateway']['username'] = username
 
     try:
-        output_stream = open(config_file_path, 'w')
+        output_stream = open(path, 'w')
         with output_stream:
             toml_str = toml.dumps(config_spec)
             output_stream.write(process_toml_output(toml_str))

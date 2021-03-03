@@ -21,76 +21,362 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-
-import logging
-import socket
-import unittest
 from argparse import Namespace
+from contextlib import contextmanager
+import logging
 from paramiko import SSHException, WarningPolicy
+import socket
+import threading
+import unittest
 from unittest import mock
 
 from sat.cli.bootsys.platform import (
     CONTAINER_STOP_SCRIPT,
+    ContainerStopThread,
     do_ceph_freeze,
     do_ceph_unfreeze,
-    do_containerd_stop,
     do_platform_action,
     do_platform_start,
     do_platform_stop,
     do_service_action_on_hosts,
+    do_stop_containers,
     FatalPlatformError,
     NonFatalPlatformError,
     PlatformServicesStep,
     prompt_for_ncn_verification,
     RemoteServiceWaiter,
     SERVICE_ACTION_TIMEOUT,
-    stop_containers
 )
 
 
-class TestStopContainers(unittest.TestCase):
-    """Tests for the stop_containers function."""
+class TestContainerStopThread(unittest.TestCase):
+    """Test the ContainerStopThread class."""
 
     def setUp(self):
-        """Set up mocks"""
+        """Set up some mocks and a ContainerStopThread"""
+        self.host = 'ncn-w001'
         self.ssh_client_class = mock.patch('sat.cli.bootsys.platform.SSHClient').start()
         self.ssh_client = self.ssh_client_class.return_value
-        self.ssh_client.exec_command.return_value = mock.Mock(), mock.Mock(), mock.Mock()
-        self.ssh_client.exec_command.return_value[1].channel.recv_exit_status.return_value = 0
-        self.host = 'ncn-w001'
+
+        self.cst = ContainerStopThread(self.host)
 
     def tearDown(self):
         mock.patch.stopall()
 
-    def assert_ssh_client_created(self):
-        """Assert the SSH client was set up properly."""
+    def assert_ssh_connected(self):
+        """Assert the SSHClient is created and connected."""
         self.ssh_client_class.assert_called_once_with()
         self.ssh_client.load_system_host_keys.assert_called_once_with()
         self.ssh_client.set_missing_host_key_policy.assert_called_once_with(WarningPolicy)
         self.ssh_client.connect.assert_called_once_with(self.host)
 
-    def test_stop_containers(self):
-        """Test a basic call of stop_containers."""
-        stop_containers(self.host)
-        self.assert_ssh_client_created()
-        self.ssh_client.exec_command.assert_called_once_with(CONTAINER_STOP_SCRIPT)
+    @contextmanager
+    def assert_exits_with_err(self, err_msg, log_level=logging.ERROR):
+        """Context manager to assert code raises SystemExit(1), logs an error, and sets success to False
 
-    def test_stop_containers_ssh_error(self):
-        """Test stop_containers when an SSH error occurs."""
-        for exception_type in SSHException, socket.error:
-            with self.assertRaises(SystemExit):
-                with self.assertLogs(level=logging.ERROR):
-                    self.ssh_client.connect.side_effect = exception_type
-                    stop_containers(self.host)
-                    self.assert_ssh_client_created()
+        Args:
+            err_msg (str): the error message to assert is logged
+            log_level (int): the logging level to look for. Used by test methods
+                that also need to test that warnings are logged for timeouts.
 
-    def test_stop_containers_command_error(self):
-        """Test stop_containers when a command exits non-zero."""
-        self.ssh_client.exec_command.return_value[1].channel.recv_exit_status.return_value = 1
-        with self.assertLogs(level=logging.WARNING):
-            stop_containers(self.host)
-            self.assert_ssh_client_created()
-            self.ssh_client.exec_command.assert_called_once_with(CONTAINER_STOP_SCRIPT)
+        Yields:
+            The value yielded by `self.assertLogs`.
+        """
+        with self.assertRaises(SystemExit) as raises_cm:
+            with self.assertLogs(level=log_level) as logs_cm:
+                yield logs_cm
+
+        self.assertFalse(self.cst.success)
+        err_log_records = [record for record in logs_cm.records
+                           if record.levelno == logging.ERROR]
+        self.assertEqual(1, len(err_log_records))
+        self.assertEqual(err_msg, err_log_records[0].message)
+        self.assertEqual(1, raises_cm.exception.code)
+
+    @contextmanager
+    def assert_exits_successfully(self, info_msg):
+        """Context manager to assert code raises SystemExit(0), logs an info msg, and sets success to True
+
+        Args:
+            info_msg (str): the info message to assert is logged
+
+        Yields:
+            The value yielded by `self.assertLogs`.
+        """
+        with self.assertRaises(SystemExit) as raises_cm:
+            with self.assertLogs(level=logging.INFO) as logs_cm:
+                yield logs_cm
+
+        self.assertTrue(self.cst.success)
+        info_log_records = [record for record in logs_cm.records
+                            if record.levelno == logging.INFO]
+        self.assertEqual(1, len(info_log_records))
+        self.assertEqual(info_msg, info_log_records[0].message)
+        self.assertEqual(0, raises_cm.exception.code)
+
+    def test_init(self):
+        """Test the creation of a new ContainerStopThread."""
+        self.assertEqual(self.host, self.cst.host)
+        self.assertFalse(self.cst.success)
+
+    def test_err_exit(self):
+        """Test the _err_exit method logs an error, raises SystemExit(1), and sets success to False."""
+        err_msg = 'error message'
+        with self.assert_exits_with_err(err_msg):
+            self.cst._err_exit(err_msg)
+
+    def test_success_exit(self):
+        """Test the _success_exit method logs info msg, raises SystemExit(0), and sets success to True"""
+        info_msg = 'all done'
+        with self.assert_exits_successfully(info_msg):
+            self.cst._success_exit(info_msg)
+
+    def test_ssh_client_success(self):
+        """Test the ssh_client property of ContainerStopThread."""
+        ssh_client = self.cst.ssh_client
+        self.assertEqual(self.ssh_client, ssh_client)
+        self.assert_ssh_connected()
+        # Check that the property is cached by accessing it again and verifying
+        # that the SSHClient and its methods are not called again.
+        _ = self.cst.ssh_client
+        # The below assertion uses assert_called_once_with, which will fail if
+        # methods are called multiple times.
+        self.assert_ssh_connected()
+
+    def test_ssh_client_ssh_exception(self):
+        """Test the ssh_client property when SSHException is raised by connect."""
+        self.ssh_client.connect.side_effect = SSHException('ssh failed')
+
+        with self.assert_exits_with_err(f'Failed to connect to host {self.host}: ssh failed'):
+            _ = self.cst.ssh_client
+
+        self.assert_ssh_connected()
+
+    def test_ssh_client_socket_error(self):
+        """Test the ssh_client property when socket.error is raised by connect."""
+        self.ssh_client.connect.side_effect = socket.error
+        with self.assert_exits_with_err(f'Failed to connect to host {self.host}: '):
+            _ = self.cst.ssh_client
+
+        self.assert_ssh_connected()
+
+    def set_up_mock_exec_command(self, exit_status, stdout_bytes, stderr_bytes):
+        """Set up mock return value for exec_command method of SSHClient.
+
+        Args:
+            exit_status (int): the exit status for recv_exit_status
+            stdout_bytes (bytes): the byte string of stdout
+            stderr_bytes (bytes): the byte string of stderr
+        """
+        mock_channel = mock.Mock()
+        mock_channel.recv_exit_status.return_value = exit_status
+        mock_stdout = mock.Mock()
+        mock_stdout.channel = mock_channel
+        mock_stdout.read.return_value = stdout_bytes
+        mock_stderr = mock.Mock()
+        mock_stderr.read.return_value = stderr_bytes
+        self.ssh_client.exec_command.return_value = mock.Mock(), mock_stdout, mock_stderr
+
+    def test_run_remote_command_success(self):
+        """Test _run_remote_command method in the successful case."""
+        self.set_up_mock_exec_command(0, b'containerid1\ncontainerid2\n', b'')
+        command = 'crictl ps -q'
+
+        exit_status, stdout, stderr = self.cst._run_remote_command(command)
+
+        self.ssh_client.exec_command.assert_called_once_with(command)
+        self.assertEqual(0, exit_status)
+        self.assertEqual('containerid1\ncontainerid2\n', stdout)
+        self.assertEqual('', stderr)
+
+    def test_run_remote_command_ssh_exception(self):
+        """Test _run_remote_command method when exec_command raises SSHException"""
+        self.ssh_client.exec_command.side_effect = SSHException('ssh failure')
+        command = 'crictl ps -q'
+
+        with self.assert_exits_with_err(f'Failed to execute {command} on {self.host}: ssh failure'):
+            self.cst._run_remote_command(command)
+
+        self.ssh_client.exec_command.assert_called_once_with(command)
+
+    def test_run_remote_command_non_zero_exit(self):
+        """Test _run_remote_command method when command exits non-zero"""
+        self.set_up_mock_exec_command(1, b'', b'containerd down')
+        command = 'crictl ps -q'
+        err_msg = (f'Command "{command}" on {self.host} exited with exit status 1. '
+                   f'stdout: , stderr: containerd down')
+
+        with self.assert_exits_with_err(err_msg):
+            self.cst._run_remote_command(command)
+
+        self.ssh_client.exec_command.assert_called_once_with(command)
+
+    def test_run_remote_command_non_zero_exit_ignored(self):
+        """Test _run_remote_command method when command exits non-zero"""
+        self.set_up_mock_exec_command(1, b'okay', b'just a warning')
+        command = 'failing_command'
+
+        exit_status, stdout, stderr = self.cst._run_remote_command(command, err_on_non_zero=False)
+
+        self.ssh_client.exec_command.assert_called_once_with(command)
+        self.assertEqual(1, exit_status)
+        self.assertEqual('okay', stdout)
+        self.assertEqual('just a warning', stderr)
+
+    def test_get_running_containers(self):
+        """Test _get_running_containers method."""
+        container_ids = [
+            '858ce8607776a7c2c3904b742211735818fc1c25100163c5e49a5d2df15332ca',
+            '9f93f6c4bd634c789158502a8a3e7bd1a11490e3238b0a9b33e969ed89d95caa',
+            'a9d50ed782bdb89f798a1b7d1a78b50cede1a0a76fbfaf84eec2728128b86490',
+            'f3575f8e17f1455d183b5464fe67aa478ea1dfe8d4c358400c13f3e8c2653f91'
+        ]
+
+        with mock.patch.object(self.cst, '_run_remote_command') as mock_run:
+            mock_run.return_value = 0, '\n'.join(container_ids), ''
+            running_containers = self.cst._get_running_containers()
+
+        self.assertEqual(container_ids, running_containers)
+
+    def set_up_mock_run_remote_command(self, systemctl_fail=False, containerd_active=True,
+                                       stop_timeout=False):
+        """Set up a mocked version of _run_remote_command for testing the run method.
+
+        Args:
+            systemctl_fail (bool): If True, simulate a failure of 'systemctl is-active'
+            containerd_active (bool): Whether containerd is active or not.
+            stop_timeout (bool): Whether the stop command should time out and exit non-zero.
+        """
+        # These don't really matter for the tests
+        container_ids = ['a', 'b', 'c', 'd']
+
+        def fake_run_remote_command(command, *args, **kwargs):
+            if 'systemctl' in command:
+                if systemctl_fail:
+                    return 1, '', 'error'
+                elif containerd_active:
+                    return 0, 'active\n', ''
+                else:
+                    return 1, 'inactive\n', ''
+            elif 'crictl stop' in command:
+                if stop_timeout:
+                    return 1, '\n'.join(container_ids[:2]), ''
+                else:
+                    return 0, '\n'.join(container_ids), ''
+            else:
+                # Unknown command, fail
+                self.fail(f'_run_remote_command called with unexpected command "{command}"')
+
+        mock_run = mock.patch.object(self.cst, '_run_remote_command').start()
+        mock_run.side_effect = fake_run_remote_command
+
+    def test_run_success(self):
+        """Test run method in the successful case."""
+        self.set_up_mock_run_remote_command()
+        mock_get_containers = mock.patch.object(self.cst, '_get_running_containers').start()
+        # On first call, containers are running; on second call, there are none
+        mock_get_containers.side_effect = [['a', 'b', 'c'], []]
+
+        with self.assert_exits_successfully(f'All containers stopped on {self.host}.'):
+            self.cst.run()
+
+        self.assertEqual(
+            [mock.call('systemctl is-active containerd', err_on_non_zero=False),
+             mock.call(CONTAINER_STOP_SCRIPT, err_on_non_zero=False)],
+            self.cst._run_remote_command.mock_calls
+        )
+        self.assertEqual([mock.call()] * 2, mock_get_containers.mock_calls)
+
+    def test_run_containerd_inactive(self):
+        """Test run method when containerd is inactive."""
+        self.set_up_mock_run_remote_command()
+        mock_get_containers = mock.patch.object(self.cst, '_get_running_containers').start()
+        self.set_up_mock_run_remote_command(containerd_active=False)
+
+        with self.assert_exits_successfully(f'containerd is not active on {self.host} so '
+                                            f'there are no containers to stop.'):
+            self.cst.run()
+
+        self.cst._run_remote_command.assert_called_once_with('systemctl is-active containerd',
+                                                             err_on_non_zero=False)
+        mock_get_containers.assert_not_called()
+
+    def test_run_systemctl_failure(self):
+        """Test run method when containerd fails to query whether containerd is active."""
+        self.set_up_mock_run_remote_command()
+        mock_get_containers = mock.patch.object(self.cst, '_get_running_containers').start()
+        self.set_up_mock_run_remote_command(systemctl_fail=True)
+
+        with self.assert_exits_with_err(f'Failed to query if containerd is active. '
+                                        f'stdout: , stderr: error'):
+            self.cst.run()
+
+        self.assertEqual(
+            [mock.call('systemctl is-active containerd', err_on_non_zero=False)],
+            self.cst._run_remote_command.mock_calls
+        )
+        mock_get_containers.assert_not_called()
+
+    def test_run_no_running_containers(self):
+        """Test run method when there are no running containers."""
+        self.set_up_mock_run_remote_command()
+        mock_get_containers = mock.patch.object(self.cst, '_get_running_containers').start()
+        # On first call, no containers are running
+        mock_get_containers.return_value = []
+
+        with self.assert_exits_successfully(f'No containers to stop on {self.host}.'):
+            self.cst.run()
+
+        self.assertEqual(
+            [mock.call('systemctl is-active containerd', err_on_non_zero=False)],
+            self.cst._run_remote_command.mock_calls
+        )
+        mock_get_containers.assert_called_once_with()
+
+    def test_run_timeout_all_containers_stopped(self):
+        """Test run method when the stop command times out, but no containers remain running."""
+        self.set_up_mock_run_remote_command(stop_timeout=True)
+        mock_get_containers = mock.patch.object(self.cst, '_get_running_containers').start()
+        # On first call, containers are running; on second call, there are none
+        mock_get_containers.side_effect = [['a', 'b', 'c'], []]
+
+        with self.assert_exits_successfully(f'All containers stopped on {self.host}.') as logs_cm:
+            self.cst.run()
+
+        self.assertEqual(
+            [mock.call('systemctl is-active containerd', err_on_non_zero=False),
+             mock.call(CONTAINER_STOP_SCRIPT, err_on_non_zero=False)],
+            self.cst._run_remote_command.mock_calls
+        )
+        warnings = [record for record in logs_cm.records if record.levelno == logging.WARNING]
+        self.assertEqual(1, len(warnings))
+        self.assertEqual(f'One or more "crictl stop" commands timed out on {self.host}',
+                         warnings[0].message)
+        self.assertEqual([mock.call()] * 2, mock_get_containers.mock_calls)
+
+    def test_run_timeout_running_containers_exist(self):
+        """Test run method when the stop command times out, and containers remain running."""
+        self.set_up_mock_run_remote_command(stop_timeout=True)
+        mock_get_containers = mock.patch.object(self.cst, '_get_running_containers').start()
+        # On first call, 3 containers are running; on second call, one remains
+        mock_get_containers.side_effect = [['a', 'b', 'c'], ['c']]
+
+        err_msg = (f'Failed to stop 1 container(s) on {self.host}. Execute "crictl ps -q" '
+                   f'on the host to view running containers.')
+
+        with self.assert_exits_with_err(err_msg, log_level=logging.WARNING) as logs_cm:
+            self.cst.run()
+
+        self.assertEqual(
+            [mock.call('systemctl is-active containerd', err_on_non_zero=False),
+             mock.call(CONTAINER_STOP_SCRIPT, err_on_non_zero=False)],
+            self.cst._run_remote_command.mock_calls
+        )
+        warnings = [record for record in logs_cm.records if record.levelno == logging.WARNING]
+        self.assertEqual(1, len(warnings))
+        self.assertEqual(f'One or more "crictl stop" commands timed out on {self.host}',
+                         warnings[0].message)
+        self.assertEqual([mock.call()] * 2, mock_get_containers.mock_calls)
 
 
 class TestRemoteServiceWaiter(unittest.TestCase):
@@ -447,35 +733,55 @@ class TestDoPlatformStartStop(unittest.TestCase):
         self.mock_do_platform_action.assert_called_once_with('stop')
 
 
-class TestDoContainerdStop(unittest.TestCase):
-    """Tests for the do_containerd_stop function."""
+class TestDoStopContainers(unittest.TestCase):
+    """Tests for the do_stop_containers function."""
     def setUp(self):
         """Set up mocks."""
         self.k8s_ncns = ['ncn-w001', 'ncn-w002', 'ncn-w003', 'ncn-m001', 'ncn-m002']
+        self.failed_ncns = failed_ncns = []
+
+        class MockContainerStopThread(threading.Thread):
+            """Mock the ContainerStopThread for these tests."""
+
+            def __init__(self, host):
+                super().__init__()
+                self.host = host
+                self.success = False
+
+            def run(self):
+                self.success = self.host not in failed_ncns
+
         self.ncn_groups = {'kubernetes': self.k8s_ncns}
-        self.stop_containers = mock.patch('sat.cli.bootsys.platform.stop_containers').start()
-        self.mock_do_service_action = mock.patch(
-            'sat.cli.bootsys.platform.do_service_action_on_hosts').start()
+        mock.patch('sat.cli.bootsys.platform.ContainerStopThread', MockContainerStopThread).start()
 
     def tearDown(self):
         mock.patch.stopall()
 
-    def test_do_containerd_stop(self):
-        """Test a basic call of do_containerd_stop."""
-        do_containerd_stop(self.ncn_groups)
-        self.stop_containers.assert_has_calls([mock.call(ncn) for ncn in self.k8s_ncns],
-                                              any_order=True)
-        self.mock_do_service_action.assert_called_once_with(self.k8s_ncns,
-                                                            'containerd', target_state='inactive')
+    def test_do_stop_containers_threads_executed(self):
+        """Test that do_stop_containers calls thread methods appropriately."""
+        mock_threads = [mock.Mock(host=ncn, success=True) for ncn in self.k8s_ncns]
 
-    def test_do_containerd_stop_error(self):
-        """Test a call of do_containerd_stop when there is a SystemExit in one of the threads."""
-        self.stop_containers.side_effect = SystemExit
-        do_containerd_stop(self.ncn_groups)
-        self.stop_containers.assert_has_calls([mock.call(ncn) for ncn in self.k8s_ncns],
-                                              any_order=True)
-        self.mock_do_service_action.assert_called_once_with(self.k8s_ncns,
-                                                            'containerd', target_state='inactive')
+        with mock.patch('sat.cli.bootsys.platform.ContainerStopThread') as mock_cst:
+            mock_cst.side_effect = mock_threads
+            do_stop_containers(self.ncn_groups)
+
+        self.assertEqual([mock.call(ncn) for ncn in self.k8s_ncns],
+                         mock_cst.mock_calls)
+        for mock_thread in mock_threads:
+            self.assertEqual([mock.call.start(), mock.call.join()], mock_thread.mock_calls)
+
+    def test_do_stop_containers_successful(self):
+        """Test a do_stop_containers with all successful."""
+        do_stop_containers(self.ncn_groups)
+
+    def test_do_stop_containers_errors(self):
+        """Test a call of do_stop_containers when there a couple NCNs fail"""
+        self.failed_ncns.extend(['ncn-w002', 'ncn-m001'])
+
+        err_regex = r'Failed to stop containers on the following NCN\(s\): ncn-w002, ncn-m001'
+
+        with self.assertRaisesRegex(NonFatalPlatformError, err_regex):
+            do_stop_containers(self.ncn_groups)
 
 
 class TestDoCephFreeze(unittest.TestCase):

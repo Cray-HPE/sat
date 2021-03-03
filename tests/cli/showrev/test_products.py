@@ -1,7 +1,7 @@
 """
 Tests for sat.cli.showrev.products module.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -22,13 +22,18 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 import copy
+import logging
 import os
 import unittest
 from unittest.mock import patch
 from yaml import safe_dump
 
+from kubernetes.client.rest import ApiException
+from kubernetes.config import ConfigException
+
 from sat.cli.showrev.products import get_product_versions, get_release_file_versions, RELEASE_FILE_COLUMN
 from sat.constants import MISSING_VALUE
+from tests.test_util import ExtendedTestCase
 
 SAMPLES_DIR = os.path.join(os.path.dirname(__file__), 'samples')
 
@@ -86,7 +91,7 @@ MOCK_CONFIG_MAP = {
 }
 
 
-class TestGetProducts(unittest.TestCase):
+class TestGetProducts(ExtendedTestCase):
 
     def setUp(self):
         """Sets up patches."""
@@ -221,6 +226,21 @@ class TestGetProducts(unittest.TestCase):
         )
         self.assertEqual(expected_headers, actual_headers)
         self.assertEqual(expected_fields, actual_fields)
+
+    def test_get_product_versions_no_product_catalog(self):
+        """Test that the case when the product catalog configuration map does not exist is handled."""
+        # A 404 ApiException is raised when the config map is not found
+        self.mock_corev1_api.read_namespaced_config_map.side_effect = ApiException(reason='Not Found')
+        with self.assertLogs(level=logging.ERROR) as logs:
+            self.assertEqual(get_product_versions(), ([], []))
+        self.assert_in_element('Error reading cray-product-catalog configuration map: Not Found', logs.output)
+
+    def test_get_product_versions_config_exception(self):
+        """Test that the case when loading the kubernetes configuration fails is handled."""
+        self.mock_corev1_api.read_namespaced_config_map.side_effect = ConfigException('Bad config')
+        with self.assertLogs(level=logging.ERROR) as logs:
+            self.assertEqual(get_product_versions(), ([], []))
+        self.assert_in_element('Unable to load kubernetes configuration: Bad config', logs.output)
 
 
 class TestReleaseFiles(unittest.TestCase):

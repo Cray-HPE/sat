@@ -305,6 +305,45 @@ class TestIPMIConsoleLogger(unittest.TestCase):
             for bmc in self.console_logger.bmc_hostnames
         ])
 
+    def test_check_screen_session_active_pass(self):
+        """Test that _check_screen_sessions_active returns when all are active"""
+        screen_session_ids = [
+            f'{str(pid)}.SAT-console-{host}-mgmt'
+            for host, pid in zip(self.hosts, range(12345, 12345 + len(self.hosts) + 1))
+        ]
+        self.console_logger._get_screen_session_ids = Mock(return_value=screen_session_ids)
+
+        self.console_logger._check_screen_sessions_active()
+
+        self.console_logger._get_screen_session_ids.assert_called_once_with()
+
+    def test_check_screen_session_active_one_missing(self):
+        """Test that _check_screen_sessions_active raises exception when one is not active."""
+        missing_index = 2
+        screen_session_ids = [
+            f'{str(pid)}.SAT-console-{host}-mgmt'
+            for host, pid in zip(self.hosts, range(12345, 12345 + len(self.hosts) + 1))
+        ]
+        del screen_session_ids[missing_index]
+        self.console_logger._get_screen_session_ids = Mock(return_value=screen_session_ids)
+
+        err_regex = fr'No screen session exists for BMC\(s\): {self.hosts[missing_index]}-mgmt'
+        with self.assertRaisesRegex(ConsoleLoggingError, err_regex):
+            self.console_logger._check_screen_sessions_active()
+
+        self.console_logger._get_screen_session_ids.assert_called_once_with()
+
+    def test_check_screen_session_active_all_missing(self):
+        """Test that _check_screen_sessions_active raises exception when none are active."""
+        self.console_logger._get_screen_session_ids = Mock(return_value=[])
+
+        err_regex = (fr'No screen session exists for BMC\(s\): '
+                     fr'{", ".join([f"{h}-mgmt" for h in self.hosts])}')
+        with self.assertRaisesRegex(ConsoleLoggingError, err_regex):
+            self.console_logger._check_screen_sessions_active()
+
+        self.console_logger._get_screen_session_ids.assert_called_once_with()
+
     def assert_start_stop_info_logged(self, logs):
         """Helper to assert info-level messages were logged for starting and stopping"""
         info_logs = [record for record in logs.records if record.levelname == 'INFO']
@@ -329,6 +368,9 @@ class TestIPMIConsoleLogger(unittest.TestCase):
         self.console_logger._quit_existing_screens = top_mock._quit_existing_screens
         self.console_logger._create_logging_directory = top_mock._create_logging_directory
         self.console_logger._start_screen_sessions = top_mock._start_screen_sessions
+        # Mock sleep so tests don't take too long
+        patch('sat.cli.bootsys.ipmi_console.sleep', top_mock.sleep).start()
+        self.console_logger._check_screen_sessions_active = top_mock._check_screen_sessions_active
 
     def assert_console_logs_started_and_stopped(self):
         """Helper to assert the start and stop methods were called."""
@@ -337,7 +379,9 @@ class TestIPMIConsoleLogger(unittest.TestCase):
             [call._ipmitool_sol_deactivate(),
              call._quit_existing_screens(),
              call._create_logging_directory(),
-             call._start_screen_sessions,
+             call._start_screen_sessions(),
+             call.sleep(IPMIConsoleLogger.SCREEN_ACTIVE_CHECK_DELAY),
+             call._check_screen_sessions_active(),
              call._ipmitool_sol_deactivate(),
              call._quit_existing_screens()]
         )
@@ -349,7 +393,9 @@ class TestIPMIConsoleLogger(unittest.TestCase):
             [call._ipmitool_sol_deactivate(),
              call._quit_existing_screens(),
              call._create_logging_directory(),
-             call._start_screen_sessions]
+             call._start_screen_sessions(),
+             call.sleep(IPMIConsoleLogger.SCREEN_ACTIVE_CHECK_DELAY),
+             call._check_screen_sessions_active()]
         )
 
     def test_basic_start_stop_console_logging(self):
@@ -420,6 +466,25 @@ class TestIPMIConsoleLogger(unittest.TestCase):
                 self.console_logger.__enter__()
 
         self.assert_only_start_info_logged(logs)
+        self.assertEqual(
+            self.top_mock.mock_calls,
+            [call._ipmitool_sol_deactivate(),
+             call._quit_existing_screens(),
+             call._create_logging_directory(),
+             call._start_screen_sessions()]
+        )
+
+    def test_start_console_logging_check_screens_failed(self):
+        """Test that IPMIConsoleLogger raises exception if check for active sessions fails"""
+        self.set_up_enter_exit_mocks()
+        start_err = 'No screen sessions exist'
+        err_regex = f'Failed to start console logging: {start_err}'
+        self.console_logger._check_screen_sessions_active.side_effect = ConsoleLoggingError(start_err)
+        with self.assertLogs() as logs:
+            with self.assertRaisesRegex(ConsoleLoggingError, err_regex):
+                self.console_logger.__enter__()
+
+        self.assert_only_start_info_logged(logs)
         self.assert_console_logs_started_only()
 
     def test_stop_console_logging_deactivate_failed(self):
@@ -440,6 +505,8 @@ class TestIPMIConsoleLogger(unittest.TestCase):
              call._quit_existing_screens(),
              call._create_logging_directory(),
              call._start_screen_sessions,
+             call.sleep(IPMIConsoleLogger.SCREEN_ACTIVE_CHECK_DELAY),
+             call._check_screen_sessions_active(),
              call._ipmitool_sol_deactivate()]
         )
         warnings = [r for r in logs.records if r.levelno == logging.WARNING]

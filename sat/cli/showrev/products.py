@@ -1,7 +1,7 @@
 """
 Module for obtaining product version information.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@ import warnings
 from yaml import safe_load, YAMLLoadWarning
 
 from kubernetes.client import CoreV1Api
+from kubernetes.client.rest import ApiException
 from kubernetes.config import load_kube_config, ConfigException
 
 from sat.constants import MISSING_VALUE
@@ -90,14 +91,18 @@ def get_product_versions():
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=YAMLLoadWarning)
             load_kube_config()
+        config_map = CoreV1Api().read_namespaced_config_map(
+            name='cray-product-catalog',
+            namespace='services'
+        )
     # Earlier versions: FileNotFoundError; later versions: ConfigException
     except (FileNotFoundError, ConfigException) as err:
         LOGGER.error('Unable to load kubernetes configuration: %s', err)
         return [], []
-    config_map = CoreV1Api().read_namespaced_config_map(
-        name='cray-product-catalog',
-        namespace='services'
-    )
+    except ApiException as err:
+        # The full string representation of ApiException is very long, so just log err.reason.
+        LOGGER.error('Error reading cray-product-catalog configuration map: %s', err.reason)
+        return [], []
     products = []
     for product_name, product_data in config_map.data.items():
         # product_data is a multiline string in YAML format

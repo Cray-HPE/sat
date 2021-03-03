@@ -56,6 +56,7 @@ Generate a default configuration file in the default location:
 ::
 
     # sat init
+    Configuration file "/root/.config/sat/sat.toml" generated.
     # ls -l ~/.config/sat/sat.toml
     -rw-r--r-- 1 root root 1924 Nov 10 14:00 /root/.config/sat/sat.toml
 
@@ -74,6 +75,7 @@ Write the SAT configuration to an alternate location:
 ::
 
     # sat init --output /tmp/config/sat.toml
+    Configuration file "/tmp/config/sat.toml" generated.
     # ls -l /tmp/config/sat.toml
     -rw-r--r-- 1 root root 1924 Nov 10 14:50 /tmp/config/sat.toml
 
@@ -82,6 +84,7 @@ Write the SAT configuration with a custom username:
 ::
 
     # sat --username satuser init
+    Configuration file "/root/.config/sat/sat.toml" generated.
     # cat ~/.config/sat/sat.toml
     ...
     [api_gateway]

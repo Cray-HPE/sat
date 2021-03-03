@@ -1,7 +1,7 @@
 """
 Unit tests for sat.fwclient
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -23,20 +23,54 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import json
+import logging
 import unittest
 from unittest.mock import Mock, patch
 
-import sat.apiclient
 from sat.apiclient import APIError, APIGatewayClient
 from sat.fwclient import _DateTimeEncoder, FASClient, FUSClient, _now_and_later
+from sat.xname import XName
+from tests.test_util import ExtendedTestCase
 
 
-class TestFASClient(unittest.TestCase):
+class TestFASClient(ExtendedTestCase):
     """Test the FASClient class."""
 
     def setUp(self):
         """Set up some mocks."""
         self.fas_client = FASClient(session=Mock(), host=Mock(), cert_verify=True)
+        self.fas_firmware_devices = [
+            {
+                'xname': 'x3000c0r15b0',
+                'targets': [
+                    {
+                        'name': 'BMC',
+                        'targetName': '',
+                        'firmwareVersion': '1.00'
+                    },
+                    {
+                        'name': 'FPGA0',
+                        'targetName': '',
+                        'firmwareVersion': '2.00'
+                    }
+                ]
+            },
+            {
+                'xname': 'x3000c0s17b1',
+                'targets': [
+                    {
+                        'name': '8',
+                        'targetName': 'BMC',
+                        'firmwareVersion': '1.01'
+                    },
+                    {
+                        'name': '10',
+                        'targetName': 'FPGA0',
+                        'firmwareVersion': '2.01'
+                    }
+                ]
+            }
+        ]
         self.mock_get = patch.object(APIGatewayClient, 'get').start()
 
     def tearDown(self):
@@ -367,9 +401,8 @@ class TestFASClient(unittest.TestCase):
         with self.assertRaisesRegex(APIError, err_regex):
             self.fas_client.get_device_firmwares()
 
-    def test_get_device_firmwares_key_error(self):
-        """It should raise if the payload is missing a 'ready' entry.
-        """
+    def test_get_device_firmwares_ready_key_error(self):
+        """Raise an APIError if the payload is missing the 'ready' key."""
         payload = {'no-ready': False}
 
         self.mock_get.return_value.json.return_value = payload
@@ -385,13 +418,12 @@ class TestFASClient(unittest.TestCase):
         # this function calls sleep, and it doesn't need to for the test.
         patch('sat.fwclient.time.sleep').start()
 
-        err_regex = r'did not have a "ready" field'
+        err_regex = r'did not have "ready" field'
         with self.assertRaisesRegex(APIError, err_regex):
             self.fas_client.get_device_firmwares()
 
-    def test_get_device_firmwares_key_error(self):
-        """It should if the payload is missing a 'devices' entry.
-        """
+    def test_get_device_firmwares_devices_key_error(self):
+        """Raise an APIError if the payload is missing the 'devices' key"""
         payload = {'ready': True, 'not-devices': []}
 
         self.mock_get.return_value.json.return_value = payload
@@ -410,6 +442,65 @@ class TestFASClient(unittest.TestCase):
         err_regex = r'not contain a "devices" field'
         with self.assertRaisesRegex(APIError, err_regex):
             self.fas_client.get_device_firmwares()
+
+    def test_make_fw_table(self):
+        """Test creating a table from a basic firmware response"""
+        expected = [[XName('x3000c0r15b0'), 'BMC', '', '1.00'],
+                    [XName('x3000c0r15b0'), 'FPGA0', '', '2.00'],
+                    [XName('x3000c0s17b1'), '8', 'BMC', '1.01'],
+                    [XName('x3000c0s17b1'), '10', 'FPGA0', '2.01']]
+        result = self.fas_client.make_fw_table(self.fas_firmware_devices)
+        self.assertEqual(expected, result)
+
+    def test_make_fw_table_with_error_and_all_fields(self):
+        """When a target has an 'error' but all fields are present, log an error and display the row"""
+        self.fas_firmware_devices[0]['targets'][0]['error'] = 'firmware bad'
+        expected = [[XName('x3000c0r15b0'), 'BMC', '', '1.00'],
+                    [XName('x3000c0r15b0'), 'FPGA0', '', '2.00'],
+                    [XName('x3000c0s17b1'), '8', 'BMC', '1.01'],
+                    [XName('x3000c0s17b1'), '10', 'FPGA0', '2.01']]
+        with self.assertLogs(level=logging.ERROR) as logs:
+            result = self.fas_client.make_fw_table(self.fas_firmware_devices)
+        self.assert_in_element('Error getting firmware for x3000c0r15b0 target BMC: firmware bad', logs.output)
+        self.assertEqual(expected, result)
+
+    def test_make_fw_table_with_error_and_missing_version(self):
+        """When a target has an 'error' and no firmware version, log error and don't display the row."""
+        self.fas_firmware_devices[0]['targets'][0]['error'] = 'firmware bad'
+        del self.fas_firmware_devices[0]['targets'][0]['firmwareVersion']
+        expected = [[XName('x3000c0r15b0'), 'FPGA0', '', '2.00'],
+                    [XName('x3000c0s17b1'), '8', 'BMC', '1.01'],
+                    [XName('x3000c0s17b1'), '10', 'FPGA0', '2.01']]
+        with self.assertLogs(level=logging.ERROR) as logs:
+            result = self.fas_client.make_fw_table(self.fas_firmware_devices)
+        self.assert_in_element('Error getting firmware for x3000c0r15b0 target BMC: firmware bad', logs.output)
+        self.assertEqual(expected, result)
+
+    def test_make_fw_table_with_error_and_missing_targetname(self):
+        """When a target has an 'error' but all fields are present except targetName, log error and display the row."""
+        self.fas_firmware_devices[0]['targets'][0]['error'] = 'firmware bad'
+        del self.fas_firmware_devices[0]['targets'][0]['targetName']
+        expected = [[XName('x3000c0r15b0'), 'BMC', 'MISSING', '1.00'],
+                    [XName('x3000c0r15b0'), 'FPGA0', '', '2.00'],
+                    [XName('x3000c0s17b1'), '8', 'BMC', '1.01'],
+                    [XName('x3000c0s17b1'), '10', 'FPGA0', '2.01']]
+        with self.assertLogs(level=logging.ERROR) as logs:
+            result = self.fas_client.make_fw_table(self.fas_firmware_devices)
+        self.assert_in_element('Error getting firmware for x3000c0r15b0 target BMC: firmware bad', logs.output)
+        self.assertEqual(expected, result)
+
+    def test_make_fw_table_with_error_and_missing_targetname_and_name(self):
+        """When a target has an 'error' but all fields are present except targetName, log error and display the row."""
+        self.fas_firmware_devices[0]['targets'][0]['error'] = 'firmware bad'
+        del self.fas_firmware_devices[0]['targets'][0]['name']
+        del self.fas_firmware_devices[0]['targets'][0]['targetName']
+        expected = [[XName('x3000c0r15b0'), 'FPGA0', '', '2.00'],
+                    [XName('x3000c0s17b1'), '8', 'BMC', '1.01'],
+                    [XName('x3000c0s17b1'), '10', 'FPGA0', '2.01']]
+        with self.assertLogs(level=logging.ERROR) as logs:
+            result = self.fas_client.make_fw_table(self.fas_firmware_devices)
+        self.assert_in_element('Error getting firmware for x3000c0r15b0 target MISSING: firmware bad', logs.output)
+        self.assertEqual(expected, result)
 
 
 class TestFUSClient(unittest.TestCase):

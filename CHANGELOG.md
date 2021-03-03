@@ -25,6 +25,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.0] - 2021-03-03
+
+### Added
+- Added a new ``--bos-templates`` command-line option and a ``bos_templates``
+  configuration file option to ``sat bootsys boot|shutdown --stage bos-operations``.
+  This is intended to replace ``--cle-bos-template``, ``--uan-bos-template``,
+  and their respective configuration file options, ``cle_bos_template`` and
+  ``uan_bos_template``.
+- Added a confirmation message when generating a configuration file via
+  ``sat init``.
+
+### Changed
+- ``--cle-bos-template`` and ``--uan-bos-template`` now no longer have defaults
+  for ``sat bootsys boot|shutdown --stage bos-operations``. If a CLE or UAN
+  session template is not specified then it will not be used for the boot or
+  shutdown.
+- Changed the default for s3.endpoint in ``sat.toml``
+  from ``https://rgw-vip`` to ``https://rgw-vip.nmn``.
+- Changed ``sat firmware`` to display both 'name' and 'targetName' fields from
+  FAS, and changed the 'ID' header in the table to read 'name'.
+- Improved step of ``sat bootsys shutdown --stage platform-services`` that stops
+  containers by adding prompt whether to continue if stopping containers fails
+  and added log messages about running and stopped containers.
+- Improved console logging during `sat bootsys boot|shutdown --stage ncn-power`
+  by adding a check for active screen sessions after they are created to account
+  for the case when some other process like conman is holding the console.
+- Changed info-level log messages to print statements for important messages
+  about progress during the `ncn-power` stage of `sat bootsys`.
+
+### Fixed
+- Changed "BIS server" in SAT man page to "Kubernetes manager nodes", reworded
+  description to discuss all of SAT's uses, and corrected several small typos
+  in the SAT man page.
+- Improved error handling in ``sat showrev`` when the cray-product-catalog
+  Kubernetes configuration map does not exist, and when an invalid value is
+  given for the S3 endpoint URL.
+- Stopped printing a byte string of every container ID that was stopped during
+  ``sat bootsys shutdown --stage platform-services`` when ``crictl stop``
+  command times out.
+
 ## [3.3.0] - 2021-02-05
 
 ### Changed

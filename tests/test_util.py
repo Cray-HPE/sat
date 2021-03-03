@@ -1,7 +1,7 @@
 """
-Unit tests for sat/util.py .
+Unit tests for sat/util.py.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -419,7 +419,7 @@ class TestPromptContinue(unittest.TestCase):
                                                 'Exiting.'.format(action_msg))
 
 
-class TestGetS3Resource(unittest.TestCase):
+class TestGetS3Resource(ExtendedTestCase):
     """Test the get_s3_resource function"""
     def setUp(self):
         self.mock_boto3 = mock.patch('sat.util.boto3.resource').start()
@@ -458,11 +458,21 @@ class TestGetS3Resource(unittest.TestCase):
         )
         self.assertEqual(result, self.mock_boto3.return_value)
 
-    def test_get_s3_resource_error(self):
+    def test_get_s3_resource_open_file_error(self):
         """Test get_s3_resource when opening a file fails"""
-        self.mock_read_config_value_file.side_effect = OSError
-        with self.assertRaises(SystemExit):
-            util.get_s3_resource()
+        self.mock_read_config_value_file.side_effect = OSError('Failed to open file')
+        with self.assertLogs(level=logging.ERROR) as logs:
+            with self.assertRaises(SystemExit):
+                util.get_s3_resource()
+        self.assert_in_element('Unable to load configuration: Failed to open file', logs.output)
+
+    def test_get_s3_resource_value_error(self):
+        """Test get_s3_resource creating the S3 ServiceResource"""
+        self.mock_boto3.side_effect = ValueError('Bad URL value')
+        with self.assertLogs(level=logging.ERROR) as logs:
+            with self.assertRaises(SystemExit):
+                util.get_s3_resource()
+        self.assert_in_element('Unable to load S3 API: Bad URL value', logs.output)
 
 
 class TestBeginEndLogger(ExtendedTestCase):

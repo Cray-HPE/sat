@@ -28,6 +28,7 @@ import socket
 from paramiko import SSHClient, SSHException, WarningPolicy
 from threading import Thread
 
+from sat.cached_property import cached_property
 from sat.cli.bootsys.ceph import ceph_healthy, toggle_ceph_freeze_flags
 from sat.cli.bootsys.etcd import save_etcd_snapshot_on_host, EtcdInactiveFailure, EtcdSnapshotFailure
 from sat.cli.bootsys.util import get_mgmt_ncn_hostnames
@@ -239,36 +240,163 @@ def prompt_for_ncn_verification():
     return ncns_by_group
 
 
-def stop_containers(host):
-    """Stop containers running on a host under containerd using crictl.
+class ContainerStopThread(Thread):
+    """A thread that will stop containers on hosts."""
+    def __init__(self, host):
+        """Create a thread to stop containers in containerd on the given host.
 
-    Args:
-        host (str): The hostname of the node on which the containers should be
-            stopped.
+        Args:
+            host (str): The host on which to stop containers in containerd
+        """
+        super().__init__()
+        self.host = host
+        self.success = False
 
-    Returns:
-        None
+    @cached_property
+    def ssh_client(self):
+        """paramiko.SSHClient: an SSHClient connected to `self.host`
 
-    Raises:
-        SystemExit: if connecting to the host failed or if the command exited
-            with a non-zero code.
-    """
-    # Raises SSHException or socket.error
-    try:
-        ssh_client = SSHClient()
-        ssh_client.load_system_host_keys()
-        ssh_client.set_missing_host_key_policy(WarningPolicy)
-        ssh_client.connect(host)
-    except (socket.error, SSHException) as e:
-        LOGGER.error(f'Failed to connect to host {host}: {e}')
+        Raises:
+            SystemExit(1): if there is a failure to connect to `self.host`.
+        """
+        try:
+            ssh_client = SSHClient()
+            ssh_client.load_system_host_keys()
+            ssh_client.set_missing_host_key_policy(WarningPolicy)
+            ssh_client.connect(self.host)
+            return ssh_client
+        except (socket.error, SSHException) as err:
+            self._err_exit(f'Failed to connect to host {self.host}: {err}')
+
+    def _run_remote_command(self, cmd, err_on_non_zero=True):
+        """Run the given command on `self.host`.
+
+        Args:
+            cmd (str): The command to run on `self.host`.
+            err_on_non_zero (bool): If True, error on non-zero exit status. If
+                False, simply return the non-zero exit status.
+
+        Returns:
+            Tuple of:
+                exit_status (int): The exit status of the command
+                stdout (str): the stdout of the command decoded with utf-8
+                stderr (str): the stderr of the command decoded with utf-8
+
+        Raises:
+            SystemExit(1): if the command failed to execute on the remote host.
+        """
+        try:
+            _, stdout, stderr = self.ssh_client.exec_command(cmd)
+        except (SSHException, socket.error) as err:
+            self._err_exit(f'Failed to execute {cmd} on {self.host}: {err}')
+        else:
+            exit_status = stdout.channel.recv_exit_status()
+            stdout_str = stdout.read().decode()
+            stderr_str = stderr.read().decode()
+
+            if exit_status and err_on_non_zero:
+                self._err_exit(f'Command "{cmd}" on {self.host} exited with exit status {exit_status}. '
+                               f'stdout: {stdout_str}, stderr: {stderr_str}')
+
+            return exit_status, stdout_str, stderr_str
+
+    def _err_exit(self, err_msg):
+        """Log an error message, mark failure, and exit thread.
+
+        Args:
+            err_msg (str): The error message to log.
+
+        Raises:
+            SystemExit(1): unconditionally
+        """
+        LOGGER.error(err_msg)
+        self.success = False
         raise SystemExit(1)
 
-    stdin, stdout, stderr = ssh_client.exec_command(CONTAINER_STOP_SCRIPT)
-    if stdout.channel.recv_exit_status():
-        LOGGER.warning(
-            f'Stopping containerd containers on host {host} return non-zero exit status. '
-            f'Stdout:"{stdout.read()}". Stderr:"{stderr.read()}".'
-        )
+    def _success_exit(self, info_msg):
+        """Log an info message, mark success, and exit thread.
+
+        Args:
+            info_msg (str): The info message to log.
+
+        Raises:
+            SystemExit(0): unconditionally
+        """
+        LOGGER.info(info_msg)
+        self.success = True
+        raise SystemExit(0)
+
+    def _get_running_containers(self):
+        """Get the list of running containers on `self.host`.
+
+        Returns:
+            A list of container IDs of running containers.
+
+        Raises:
+            SystemExit(1): if the "crictl ps -q" command fails
+        """
+        return self._run_remote_command('crictl ps -q')[1].splitlines()
+
+    def run(self):
+        """Attempt to stop containers in containerd on the host.
+
+        If successful, the thread will exit with its `success` attribute set to
+        True. If unsuccessful, the `success` attribute will be False.
+
+        The following conditions are considered success:
+            - containerd is already inactive and thus containers would not be running
+            - No containers are found to be running before attempting to stop any
+            - No containers found to be running after attempting to stop them even
+              if the command to stop them encountered timeouts
+
+        The following conditions are considered failures:
+            - Failure to query the status of containerd
+            - Failure to query for running containers
+            - Running containers still exist after attempting to stop them, perhaps
+              due to a timeout in the command that stops them.
+
+        Raises:
+            SystemExit: if the container stop operation fails, raises a SystemExit
+                with code 1. If it's successful, raises a SystemExit with a code 0.
+                This is used to stop the thread.
+        """
+        exit_status, stdout, stderr = self._run_remote_command('systemctl is-active containerd',
+                                                               err_on_non_zero=False)
+        if exit_status:
+            if 'inactive' in stdout:
+                self._success_exit(f'containerd is not active on {self.host} so '
+                                   f'there are no containers to stop.')
+            else:
+                self._err_exit(f'Failed to query if containerd is active. '
+                               f'stdout: {stdout}, stderr: {stderr}')
+
+        running_containers = self._get_running_containers()
+
+        if not running_containers:
+            self._success_exit(f'No containers to stop on {self.host}.')
+
+        LOGGER.debug('The following containers were running before the stop attempt '
+                     'on %s: %s', self.host, running_containers)
+
+        exit_status, stdout, stderr = self._run_remote_command(CONTAINER_STOP_SCRIPT,
+                                                               err_on_non_zero=False)
+
+        stopped_containers = stdout.splitlines()
+        LOGGER.debug('The following containers were stopped successfully on %s: %s',
+                     self.host, stopped_containers)
+
+        if exit_status:
+            # This is most likely a timeout but not necessarily an error if
+            # containers have been stopped.
+            LOGGER.warning(f'One or more "crictl stop" commands timed out on {self.host}')
+
+        # Check and see if they've all been stopped.
+        running_containers = self._get_running_containers()
+        if running_containers:
+            self._err_exit(f'Failed to stop {len(running_containers)} container(s) on {self.host}. '
+                           f'Execute "crictl ps -q" on the host to view running containers.')
+        else:
+            self._success_exit(f'All containers stopped on {self.host}.')
 
 
 def do_service_action_on_hosts(hosts, service, target_state,
@@ -303,7 +431,7 @@ def do_service_action_on_hosts(hosts, service, target_state,
                                  f'on all hosts.')
 
 
-def do_containerd_stop(ncn_groups):
+def do_stop_containers(ncn_groups):
     """Stop containers in containerd and stop containerd itself on all K8s NCNs.
 
     Raises:
@@ -312,13 +440,25 @@ def do_containerd_stop(ncn_groups):
     k8s_ncns = ncn_groups['kubernetes']
     # This currently stops all containers in parallel before stopping containerd
     # on each ncn in parallel.  It probably could be faster if it was all in parallel.
-    container_stop_threads = [Thread(target=stop_containers, args=(ncn,)) for ncn in k8s_ncns]
+    container_stop_threads = [ContainerStopThread(ncn) for ncn in k8s_ncns]
     for thread in container_stop_threads:
         thread.start()
     for thread in container_stop_threads:
         thread.join()
 
-    do_service_action_on_hosts(k8s_ncns, 'containerd', target_state='inactive')
+    failed_ncns = [thread.host for thread in container_stop_threads if not thread.success]
+    if failed_ncns:
+        raise NonFatalPlatformError(f'Failed to stop containers on the following NCN(s): '
+                                    f'{", ".join(failed_ncns)}')
+
+
+def do_containerd_stop(ncn_groups):
+    """Stop containerd on all K8s NCNs.
+
+    Raises:
+        FatalPlatformError: if any nodes fail to stop containerd
+    """
+    do_service_action_on_hosts(ncn_groups['kubernetes'], 'containerd', target_state='inactive')
 
 
 def do_containerd_start(ncn_groups):
@@ -436,9 +576,9 @@ STEPS_BY_ACTION = {
         PlatformServicesStep('Create etcd snapshot on all Kubernetes manager NCNs.', do_etcd_snapshot),
         PlatformServicesStep('Stop etcd on all Kubernetes manager NCNs.', do_etcd_stop),
         PlatformServicesStep('Stop and disable kubelet on all Kubernetes NCNs.', do_kubelet_stop),
-        PlatformServicesStep('Stop containers running under containerd and stop containerd '
-                             'on all Kubernetes NCNs.',
-                             do_containerd_stop),
+        PlatformServicesStep('Stop containers running under containerd on all Kubernetes NCNs.',
+                             do_stop_containers),
+        PlatformServicesStep('Stop containerd on all Kubernetes NCNs.', do_containerd_stop),
         PlatformServicesStep('Check health of Ceph cluster and freeze state.', do_ceph_freeze)
     ]
 }

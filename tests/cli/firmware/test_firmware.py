@@ -1,7 +1,7 @@
 """
 Unit tests for sat.cli.firmware
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -27,7 +27,7 @@ import unittest
 from unittest import mock
 
 from sat.apiclient import APIError
-from sat.cli.firmware.main import do_firmware, HEADERS
+from sat.cli.firmware.main import do_firmware, FAS_HEADERS
 from sat.cli.firmware.parser import add_firmware_subparser
 
 
@@ -89,7 +89,7 @@ class TestFirmware(unittest.TestCase):
 
         # Test that the Report was created
         report_args = [
-            HEADERS, title, args.sort_by, args.reverse,
+            FAS_HEADERS, title, args.sort_by, args.reverse,
             self.fake_config['format.no_headings'],
             self.fake_config['format.no_borders']
         ]
