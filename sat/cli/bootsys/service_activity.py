@@ -1,7 +1,7 @@
 """
 Various checks on system services to ensure idleness before shutdown.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -41,7 +41,7 @@ from sat.apiclient import (
     NMDClient
 )
 from sat.constants import MISSING_VALUE
-from sat.fwclient import create_firmware_client, FASClient
+from sat.fwclient import FASClient
 from sat.report import Report
 from sat.session import SATSession
 from sat.util import get_new_ordered_dict, get_val_by_path
@@ -90,7 +90,7 @@ class ServiceActivityChecker(ABC):
         """str: The title for a report describing active sessions."""
         # This a title-cased version of the active_sessions_desc property below.
         # title() of that property is wrong because it converts the service name
-        # to have an uppercase letter followed by lowercase, e.g. FUS -> Fus.
+        # to have an uppercase letter followed by lowercase, e.g. FAS -> Fas.
         return 'Active {} {}'.format(self.service_name.upper(),
                                      INFLECTOR.plural(self.session_name).title())
 
@@ -289,32 +289,20 @@ class CRUSActivityChecker(ServiceActivityChecker):
 
 
 class FirmwareActivityChecker(ServiceActivityChecker):
-    """A class that checks for active FUS/FAS sessions."""
+    """A class that checks for active FAS sessions."""
 
     def __init__(self):
         """Create a new FirmwareActivityChecker"""
         super().__init__()
-        try:
-            self.fw_client = create_firmware_client(SATSession())
-        except APIError:
-            # Use a FASClient even though it might not be ready.
-            # Exceptions will be handled where it is used.
-            LOGGER.error('Failed to determine firmware service. Assuming FAS.')
-            self.fw_client = FASClient(SATSession())
+        self.fw_client = FASClient(SATSession())
 
-        if isinstance(self.fw_client, FASClient):
-            self.service_name = 'FAS'
-            self.session_name = 'action'
-            self.cray_cli_args = 'firmware actions describe'
-            self.id_field_name = 'actionID'
-        else:
-            self.service_name = 'FUS'
-            self.session_name = 'update'
-            self.cray_cli_args = 'firmware status describe'
-            self.id_field_name = 'updateID'
+        self.service_name = 'FAS'
+        self.session_name = 'action'
+        self.cray_cli_args = 'firmware actions describe'
+        self.id_field_name = 'actionID'
 
     def get_active_sessions(self):
-        """Check for active firmware updates in FUS or FAS.
+        """Check for active firmware updates in FAS.
 
         Returns:
             A list of dicts representing the active firmware upgrades/actions.
@@ -324,16 +312,12 @@ class FirmwareActivityChecker(ServiceActivityChecker):
                 actions.
         """
         try:
-            active_updates = self.fw_client.get_active_updates()
+            active_updates = self.fw_client.get_active_actions()
         except APIError as err:
             raise self.get_err(str(err))
 
-        # Fields differ between FUS and FAS
-        if isinstance(self.fw_client, FASClient):
-            fw_session_fields = [self.id_field_name, 'startTime', 'state',
-                                 'snapshotID', 'dryrun']
-        else:
-            fw_session_fields = [self.id_field_name, 'startTime', 'dryrun']
+        fw_session_fields = [self.id_field_name, 'startTime', 'state',
+                             'snapshotID', 'dryrun']
 
         return [
             get_new_ordered_dict(update, fw_session_fields, MISSING_VALUE)
