@@ -195,7 +195,7 @@ class TestSimulWaiter(WaiterTestCase):
 
         EventualWaiter = get_mock_waiter([False, True])
         SuccessfulWaiter = get_mock_waiter(True)
-        sw = SimultaneousWaiter([EventualWaiter, SuccessfulWaiter], 3)
+        sw = SimultaneousWaiter([EventualWaiter, SuccessfulWaiter], 5)
         self.assertTrue(sw.wait_for_completion())
 
     def test_simul_waiter_failed(self):
