@@ -131,7 +131,7 @@ def convert_pdsh_nid_list(nids):
     Returns:
         A new string where the brackets have been removed and the prefix added to
         each integer in the bracketed list.
-        Returns the original string if there are any brackets in the input string.
+        Returns the original string if there are not any brackets in the input string.
     """
 
     new_nids = ''
