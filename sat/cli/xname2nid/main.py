@@ -31,6 +31,9 @@ from sat.xname import XName
 LOGGER = logging.getLogger(__name__)
 NUM_NID_DIGITS = 6
 
+ERR_MISSING_NAMES = 1
+ERR_HSM_API_FAILED = 2
+
 
 def get_nids_using_xname(xname, components):
     """Get the nids for a given xname from node component data from the HSM API.
@@ -42,27 +45,32 @@ def get_nids_using_xname(xname, components):
 
     Returns:
         A list of nids corresponding to the xname.
+        A bool of True/False indicating whether or not any nids are MISSING.
     """
 
+    missing_nids = False
     nids = []
     for component in components:
-        cid = component.get('ID', MISSING_VALUE)
-        if cid == MISSING_VALUE:
+        cid = component.get('ID')
+        if not cid:
             continue
         if cid == xname or str(XName(cid).get_direct_parent()) == xname:
-            nid = component.get('NID', MISSING_VALUE)
-            LOGGER.info(f'xname: {cid}, nid: {nid}')
-            if nid != MISSING_VALUE:
+            nid = component.get('NID')
+            if nid:
                 nids.append('nid' + str(nid).zfill(NUM_NID_DIGITS))
+                LOGGER.info(f'xname: {cid}, nid: {nid}')
+            else:
+                missing_nids = True
+                LOGGER.error(f'HSM API has no NID for valid ID: {cid}')
             if XName.NODE_XNAME_REGEX.match(xname):
                 # There is only one match for the node xname
                 break
 
     if not nids:
-        LOGGER.info(f'xname: {xname}, nid: {MISSING_VALUE}')
-        nids.append(MISSING_VALUE)
+        missing_nids = True
+        LOGGER.error(f'xname: {xname}, nid: {MISSING_VALUE}')
 
-    return nids
+    return nids, missing_nids
 
 
 def do_xname2nid(args):
@@ -76,7 +84,8 @@ def do_xname2nid(args):
         None
 
     Raises:
-        SystemExit: if request to HSM API fails.
+        SystemExit(1): if one or more xnames can not be translated.
+        SystemExit(2): if request to HSM API fails.
     """
     hsm_client = HSMClient(SATSession())
 
@@ -84,11 +93,19 @@ def do_xname2nid(args):
         components = hsm_client.get_node_components()
     except APIError as err:
         LOGGER.error('Request to HSM API failed: %s', err)
-        raise SystemExit(1)
+        raise SystemExit(ERR_HSM_API_FAILED)
 
+    any_missing_nids = False
     nids = []
     for arg in args.xnames:
         for xname in [x for x in arg.split(',') if x]:
-            nids.extend(get_nids_using_xname(xname, components))
+            xname_nids, missing_nids = get_nids_using_xname(xname, components)
+            if missing_nids:
+                any_missing_nids = True
+            if xname_nids:
+                nids.extend(xname_nids)
 
-    print(','.join(nids))
+    if nids:
+        print(','.join(nids))
+    if any_missing_nids:
+        raise SystemExit(ERR_MISSING_NAMES)

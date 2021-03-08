@@ -19,7 +19,9 @@ DESCRIPTION
 ===========
 
 The sat xname2nid subcommand translates node and node BMC xnames
-to node IDs.
+to node IDs (nids). A node xname is translated to a nid. A node BMC
+xname is the parent xname of a set of node xnames and is translated
+to a list of nids.
 
 ARGUMENTS
 =========

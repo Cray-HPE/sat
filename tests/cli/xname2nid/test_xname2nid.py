@@ -28,7 +28,11 @@ from argparse import Namespace
 from unittest import mock
 
 from sat.apiclient import APIError
-from sat.cli.xname2nid.main import do_xname2nid
+from sat.cli.xname2nid.main import (
+    ERR_HSM_API_FAILED,
+    ERR_MISSING_NAMES,
+    do_xname2nid
+)
 from tests.common import ExtendedTestCase
 
 
@@ -70,8 +74,8 @@ class TestDoXname2nid(ExtendedTestCase):
         """Stop all patches."""
         mock.patch.stopall()
 
-    def test_one_xname_exists(self):
-        """Test do_xname2nid with one valid xname."""
+    def test_one_node_xname_exists(self):
+        """Test do_xname2nid with one valid node xname."""
         with self.assertLogs(level=logging.INFO) as logs:
             do_xname2nid(self.fake_args)
         self.assert_in_element(f'xname: {self.node_data[0]["ID"]}, nid: {self.node_data[0]["NID"]}',
@@ -79,17 +83,29 @@ class TestDoXname2nid(ExtendedTestCase):
         self.mock_hsm_client.get_node_components.assert_called_once_with()
         self.mock_print.assert_called_once_with('nid001006')
 
+    def test_one_node_bmc_xname_exists(self):
+        """Test do_xname2nid with one valid node BMC xname."""
+        self.fake_args.xnames = ['x1000c2s2b0']
+        with self.assertLogs(level=logging.INFO) as logs:
+            do_xname2nid(self.fake_args)
+        for node in self.node_data[2:3]:
+            self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
+        self.mock_hsm_client.get_node_components.assert_called_once_with()
+        self.mock_print.assert_called_once_with('nid001073,nid001074')
+
     def test_one_xname_not_exists(self):
         """Test do_xname2nid with one invalid xname."""
         self.fake_args.xnames = ['x1000c2s1b0n5']
-        with self.assertLogs(level=logging.INFO) as logs:
-            do_xname2nid(self.fake_args)
+        with self.assertLogs(level=logging.ERROR) as logs:
+            with self.assertRaises(SystemExit) as cm:
+                do_xname2nid(self.fake_args)
+        self.assertEqual(cm.exception.code, ERR_MISSING_NAMES)
         self.assert_in_element(f'xname: {self.fake_args.xnames[0]}, nid: MISSING', logs.output)
         self.mock_hsm_client.get_node_components.assert_called_once_with()
-        self.mock_print.assert_called_once_with('MISSING')
+        self.mock_print.assert_not_called()
 
-    def test_two_xnames_exist(self):
-        """Test do_xname2nid with two valid xnames."""
+    def test_two_node_xnames_exist(self):
+        """Test do_xname2nid with two valid node xnames."""
         self.fake_args.xnames = ['x1000c2s1b0n0', 'x1000c2s2b0n0']
         with self.assertLogs(level=logging.INFO) as logs:
             do_xname2nid(self.fake_args)
@@ -98,8 +114,8 @@ class TestDoXname2nid(ExtendedTestCase):
         self.mock_hsm_client.get_node_components.assert_called_once_with()
         self.mock_print.assert_called_once_with('nid001069,nid001073')
 
-    def test_two_comma_separated_xnames_exist(self):
-        """Test do_xname2nid with two valid comma separated xnames."""
+    def test_two_comma_separated_node_xnames_exist(self):
+        """Test do_xname2nid with two valid comma separated node xnames."""
         self.fake_args.xnames = ['x1000c2s1b0n0,x1000c2s2b0n0']
         with self.assertLogs(level=logging.INFO) as logs:
             do_xname2nid(self.fake_args)
@@ -108,8 +124,28 @@ class TestDoXname2nid(ExtendedTestCase):
         self.mock_hsm_client.get_node_components.assert_called_once_with()
         self.mock_print.assert_called_once_with('nid001069,nid001073')
 
-    def test_two_comma_separated_xnames_with_space_exist(self):
-        """Test do_xname2nid with two valid comma separated xnames with space."""
+    def test_two_node_and_bmc_xnames_exist(self):
+        """Test do_xname2nid with two valid node and BMC xnames."""
+        self.fake_args.xnames = ['x1000c2s1b0n0', 'x1000c2s2b0']
+        with self.assertLogs(level=logging.INFO) as logs:
+            do_xname2nid(self.fake_args)
+        for node in self.node_data[1:3]:
+            self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
+        self.mock_hsm_client.get_node_components.assert_called_once_with()
+        self.mock_print.assert_called_once_with('nid001069,nid001073,nid001074')
+
+    def test_two_comma_separated_node_and_bmc_xnames_exist(self):
+        """Test do_xname2nid with two valid comma separated node and BMC xnames."""
+        self.fake_args.xnames = ['x1000c2s1b0n0,x1000c2s2b0']
+        with self.assertLogs(level=logging.INFO) as logs:
+            do_xname2nid(self.fake_args)
+        for node in self.node_data[1:3]:
+            self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
+        self.mock_hsm_client.get_node_components.assert_called_once_with()
+        self.mock_print.assert_called_once_with('nid001069,nid001073,nid001074')
+
+    def test_two_comma_separated_node_xnames_with_space_exist(self):
+        """Test do_xname2nid with two valid comma separated node xnames with space."""
         self.fake_args.xnames = ['x1000c2s1b0n0,', 'x1000c2s2b0n0']
         with self.assertLogs(level=logging.INFO) as logs:
             do_xname2nid(self.fake_args)
@@ -118,26 +154,73 @@ class TestDoXname2nid(ExtendedTestCase):
         self.mock_hsm_client.get_node_components.assert_called_once_with()
         self.mock_print.assert_called_once_with('nid001069,nid001073')
 
-    def test_three_xnames_one_invalid(self):
-        """Test do_xname2nid with two valid xnames and one invalid string."""
+    def test_three_node_xnames_one_invalid(self):
+        """Test do_xname2nid with two valid node xnames and one invalid string."""
         self.fake_args.xnames = ['x1000c2s1b0n0', 'not-an-xname', 'x1000c2s2b0n0']
         with self.assertLogs(level=logging.INFO) as logs:
-            do_xname2nid(self.fake_args)
+            with self.assertRaises(SystemExit) as cm:
+                do_xname2nid(self.fake_args)
+        self.assertEqual(cm.exception.code, ERR_MISSING_NAMES)
         for node in self.node_data[1:2]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
         self.assert_in_element(f'xname: {self.fake_args.xnames[1]}, nid: MISSING', logs.output)
         self.mock_hsm_client.get_node_components.assert_called_once_with()
-        self.mock_print.assert_called_once_with('nid001069,MISSING,nid001073')
+        self.mock_print.assert_called_once_with('nid001069,nid001073')
+
+    def test_three_node_and_bmc_xnames_one_invalid(self):
+        """Test do_xname2nid with two valid node and BMC xnames and one invalid string."""
+        self.fake_args.xnames = ['x1000c2s1b0n0', 'not-an-xname', 'x1000c2s2b0']
+        with self.assertLogs(level=logging.INFO) as logs:
+            with self.assertRaises(SystemExit) as cm:
+                do_xname2nid(self.fake_args)
+        self.assertEqual(cm.exception.code, ERR_MISSING_NAMES)
+        for node in self.node_data[1:3]:
+            self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
+        self.assert_in_element(f'xname: {self.fake_args.xnames[1]}, nid: MISSING', logs.output)
+        self.mock_hsm_client.get_node_components.assert_called_once_with()
+        self.mock_print.assert_called_once_with('nid001069,nid001073,nid001074')
 
     def test_xname2nid_api_error(self):
         """Test xname2nid logs an error and exits when an APIError occurs."""
         self.mock_hsm_client.get_node_components.side_effect = APIError('HSM failed')
         with self.assertLogs(level=logging.ERROR) as logs:
-            with self.assertRaises(SystemExit):
+            with self.assertRaises(SystemExit) as cm:
                 do_xname2nid(self.fake_args)
+        self.assertEqual(cm.exception.code, ERR_HSM_API_FAILED)
         self.mock_hsm_client.get_node_components.assert_called_once_with()
         self.assert_in_element('Request to HSM API failed: HSM failed', logs.output)
         self.mock_print.assert_not_called()
+
+    def test_xname2nid_node_xname_invalid_hsm_data_error(self):
+        """Test xname2nid with node xname logs an error and exits non-zero when invalid data from HSM occurs."""
+        self.mock_hsm_client.get_node_components.return_value = [
+            {'Type': 'Node', 'ID': 'x1000c2s2b0n2'}
+        ]
+        self.fake_args.xnames = ['x1000c2s2b0n2']
+        with self.assertLogs(level=logging.ERROR) as logs:
+            with self.assertRaises(SystemExit) as cm:
+                do_xname2nid(self.fake_args)
+        self.assertEqual(cm.exception.code, ERR_MISSING_NAMES)
+        self.mock_hsm_client.get_node_components.assert_called_once_with()
+        self.assert_in_element('HSM API has no NID for valid ID: x1000c2s2b0n2', logs.output)
+        self.assert_in_element('xname: x1000c2s2b0n2, nid: MISSING', logs.output)
+        self.mock_print.assert_not_called()
+
+    def test_xname2nid_node_bmc_xname_invalid_hsm_data_error(self):
+        """Test xname2nid with node BMC xname logs an error and exits non-zero when invalid data from HSM occurs."""
+        self.mock_hsm_client.get_node_components.return_value = [
+            {'NID': 1073, 'Type': 'Node', 'ID': 'x1000c2s2b0n0'},
+            {'NID': 1074, 'Type': 'Node', 'ID': 'x1000c2s2b0n1'},
+            {'Type': 'Node', 'ID': 'x1000c2s2b0n2'}
+        ]
+        self.fake_args.xnames = ['x1000c2s2b0']
+        with self.assertLogs(level=logging.ERROR) as logs:
+            with self.assertRaises(SystemExit) as cm:
+                do_xname2nid(self.fake_args)
+        self.assertEqual(cm.exception.code, ERR_MISSING_NAMES)
+        self.mock_hsm_client.get_node_components.assert_called_once_with()
+        self.assert_in_element('HSM API has no NID for valid ID: x1000c2s2b0n2', logs.output)
+        self.mock_print.assert_called_once_with('nid001073,nid001074')
 
 
 if __name__ == '__main__':
