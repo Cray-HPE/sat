@@ -25,6 +25,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Added a new ``sat nid2xname`` subcommand to translate node IDs to node xnames.
+- Added a new ``sat xname2nid`` subcommand to translate node and node BMC xnames
+  to node IDs.
+
 ## [3.4.0] - 2021-03-03
 
 ### Added
@@ -35,9 +43,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ``uan_bos_template``.
 - Added a confirmation message when generating a configuration file via
   ``sat init``.
-- Added a new ``sat nid2xname`` subcommand to translate node IDs to node xnames.
-- Added a new ``sat xname2nid`` subcommand to translate node and node BMC xnames
-  to node IDs.
 
 ### Changed
 - ``--cle-bos-template`` and ``--uan-bos-template`` now no longer have defaults
