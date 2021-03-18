@@ -27,6 +27,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Improved error handling in several cases of ``sat firmware``.
+    - When multiple xnames and/or snapshots are given, a failure to query
+      one of them will be logged as an error, but the valid snapshots
+      and xnames will be printed.
+    - If a given xname is not in a requested snapshot, a warning is logged.
+    - If ``--snapshots`` is specified without arguments (to list all snapshot
+      names) and xnames are provided on the command line, a warning is logged
+      that the supplied xnames will be ignored.
+    - If a given snapshot and/or xname combination yields no results,
+      then the command will exit with an error.
+
 ### Changed
 - Changed the Ceph health check in ``sat bootsys boot --stage ceph-check``
   to be consistent with the check in the ``platform-services`` stage of
@@ -36,6 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the ``cray-sat-crayctldeploy`` subpackage.
 - Removed ``sat linkhealth`` which has been replaced by
   ``slingshot-topology-tool --cmd "show switch <ports,jacks> <switch xname>"``.
+- Removed support for Firmware Update Service (FUS) in ``sat firmware``
+  and ``sat bootsys shutdown --stage session-checks``. These commands now
+  only use Firmware Action Service (FAS).
 
 ## [3.4.0] - 2021-03-03
 
