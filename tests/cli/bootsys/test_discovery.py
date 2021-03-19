@@ -1,7 +1,7 @@
 """
 Unit tests for the sat.cli.bootsys.discovery module.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -219,6 +219,13 @@ class TestHMSDiscoveryScheduledWaiter(unittest.TestCase):
         last_schedule_time = self.next_sched_time
         self.mock_hd_cron_job.get_last_schedule_time.return_value = last_schedule_time
         self.assertTrue(self.hd_waiter.has_completed())
+
+    def test_has_completed_no_last_schedule_time(self):
+        """Test has_completed method of HMSDiscoveryScheduledWaiter when the cronjob has no last schedule time."""
+        # Make it look like there is no last schedule time.
+        self.mock_hd_cron_job.get_last_schedule_time.return_value = None
+        with self.assertLogs(level=logging.DEBUG):
+            self.assertFalse(self.hd_waiter.has_completed())
 
     def test_has_completed_error(self):
         """Test has_completed method of HMSDiscoveryScheduledWaiter when an error occurs."""

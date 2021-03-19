@@ -1,7 +1,7 @@
 """
 Functionality related to the hms-discovery cronjob in k8s.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -88,7 +88,8 @@ class HMSDiscoveryCronJob:
         """Get the last scheduled time, i.e. the last time k8s scheduled the job.
 
         Returns:
-            datetime: the last time the HMS discovery cronjob was scheduled.
+            datetime: the last time the HMS discovery cronjob was scheduled, or
+            None if there is no last scheduled time.
 
         Raises:
             HMSDiscoveryError: if there is an error loading k8s config or querying
@@ -202,6 +203,10 @@ class HMSDiscoveryScheduledWaiter(Waiter):
             last_schedule_time = self.hd_cron_job.get_last_schedule_time()
         except HMSDiscoveryError as err:
             LOGGER.warning(f'Failed to get last schedule time: {err}')
+            return False
+
+        if not last_schedule_time:
+            LOGGER.debug(f'No record of {self.hd_cron_job.FULL_NAME} being scheduled.')
             return False
 
         if last_schedule_time >= self.start_time:

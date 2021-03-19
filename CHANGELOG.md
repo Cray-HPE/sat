@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed ``sat swap`` to get all port policies when creating an offline port policy
   to check if the offline port policy already exists.
 
+### Fixed
+- Addressed an error in ``sat bootsys``  when waiting for the ``hms-discovery``
+  Kubernetes cronjob to be scheduled when there is no previous record of the
+  job being scheduled.
+
 ## [3.4.0] - 2021-03-03
 
 ### Added
