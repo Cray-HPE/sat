@@ -28,10 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-
 - Added a new ``sat nid2xname`` subcommand to translate node IDs to node xnames.
 - Added a new ``sat xname2nid`` subcommand to translate node and node BMC xnames
   to node IDs.
+
+### Changed
+- Changed ``sat swap`` to get all port policies when creating an offline port policy
+  to check if the offline port policy already exists.
 
 ## [3.4.0] - 2021-03-03
 
