@@ -125,6 +125,8 @@ class TestCreateOfflinePortPolicy(ExtendedTestCase):
             self.pm.create_offline_port_policy('/fabric/port-policies/edge-policy', 'sat-offline-')
         self.assert_in_element('Using existing offline policy: /fabric/port-policies/sat-offline-edge-policy',
                                logs.output)
+        self.mock_get_port_policies.assert_called_once()
+        self.mock_fc_client.post.assert_not_called()
 
     def test_new_policy(self):
         """Test create_offline_port_policy() that doesn't already exist"""
@@ -132,6 +134,8 @@ class TestCreateOfflinePortPolicy(ExtendedTestCase):
             self.pm.create_offline_port_policy('/fabric/port-policies/fabric-policy', 'sat-offline-')
         self.assert_in_element('Creating offline policy: /fabric/port-policies/sat-offline-fabric-policy',
                                logs.output)
+        self.mock_get_port_policies.assert_called_once()
+        self.mock_fc_client.post.assert_called_once()
 
 
 if __name__ == '__main__':
