@@ -37,3 +37,8 @@ add new ones.
 
 See [Python Style Guidelines](python_style_guidelines.md) for information on
 the Python style guidelines that ``sat`` code should follow.
+
+## SAT Python Dependencies
+
+See [SAT Python Dependencies](sat_python_dependencies.md) for information on
+how to add, remove and update SAT Python dependencies.
