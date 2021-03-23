@@ -33,11 +33,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to node IDs.
 
 ### Changed
-- Changed ``sat swap`` to get all port policies when creating an offline port policy
-  to check if the offline port policy already exists.
+- Changed ``sat swap`` to get all port policies when creating an offline port
+  policy to check if the offline port policy already exists.
 - Changed requirements files to ``requirements.txt`` and
   ``requirements-dev.txt``. Added ".lock" versions of these files and changed
   build process to use them, so that exact library versions are used.
+- ``sat bootsys shutdown --stage bos-operations`` no longer forcefully powers
+  off all compute nodes and application nodes using CAPMC when BOS sessions are
+  complete or when it times out waiting for BOS sessions to complete.
 
 ### Fixed
 - Addressed an error in ``sat bootsys``  when waiting for the ``hms-discovery``
