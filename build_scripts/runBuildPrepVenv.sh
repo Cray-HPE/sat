@@ -1,5 +1,5 @@
 #!/bin/bash
-# (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2021 Hewlett Packard Enterprise Development LP.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -19,6 +19,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-pip3 install -r requirements.txt
-pip3 install -r requirements-build.txt
-pip3 install -r requirements-test.txt
+base_dir=$(dirname "$0")
+rm -rf sat-venv && virtualenv -p $(which python3) ./sat-venv
+source sat-venv/bin/activate
+$base_dir/runBuildPrep.sh
