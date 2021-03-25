@@ -260,11 +260,13 @@ sat-hwmatch(8),
 sat-init(8),
 sat-k8s(8),
 sat-linkhealth(8),
+sat-nid2xname(8),
 sat-sensors(8),
 sat-setrev(8),
 sat-showrev(8),
 sat-status(8),
 sat-swap(8),
-sat-switch(8)
+sat-switch(8),
+sat-xname2nid(8)
 
 .. include:: _notice.rst
