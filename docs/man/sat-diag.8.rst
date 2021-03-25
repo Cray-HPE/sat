@@ -7,7 +7,7 @@ Run L1 diagnostics at scale
 ---------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -26,14 +26,14 @@ may be passed on the command line, from a file, and/or stdin, and will
 launch a given command on these controllers. Targets are polled at a
 specific interval. A report is printed after all targets have completed
 their diagnostics, either to stdout (default) or to files, one for each
-switch. A Redfish username and password is required.
+switch. API gateway authentication is required.
 
 ARGUMENTS
 =========
 
 *command* [args]
         Specify the alias of a diagnostic command which can be called
-        through Redfish, as well as arguments to pass to that command.
+        through Fox, as well as arguments to pass to that command.
 
 OPTIONS
 =======
@@ -78,7 +78,6 @@ These options must be specified after the subcommand.
 Exactly one of **command** or **--interactive** must be supplied.
 
 .. include:: _sat-xname-opts.rst
-.. include:: _sat-redfish-opts.rst
 
 EXAMPLES
 ========
