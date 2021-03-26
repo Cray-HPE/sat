@@ -254,7 +254,7 @@ class TestGetNodesByRoleAndState(unittest.TestCase):
             'application': self.application_nodes,
             'management': self.management_nodes
         }
-        self.nodes_by_state = {
+        self.all_nodes_by_state = {
             'on': self.management_nodes + self.application_nodes[:1],
             'off': self.compute_nodes + self.application_nodes[1:]
         }
@@ -262,10 +262,16 @@ class TestGetNodesByRoleAndState(unittest.TestCase):
         def mock_get_xnames(params):
             return self.nodes_by_role.get(params.get('role'), [])
 
+        def mock_get_xnames_power_state(xnames):
+            return {
+                'on': [node for node in self.all_nodes_by_state['on'] if node in xnames],
+                'off': [node for node in self.all_nodes_by_state['off'] if node in xnames],
+            }
+
         self.mock_hsm_client = patch('sat.cli.bootsys.power.HSMClient').start().return_value
         self.mock_hsm_client.get_component_xnames = mock_get_xnames
         self.mock_capmc_client = patch('sat.cli.bootsys.power.CAPMCClient').start().return_value
-        self.mock_capmc_client.get_xnames_power_state.return_value = self.nodes_by_state
+        self.mock_capmc_client.get_xnames_power_state = mock_get_xnames_power_state
         self.mock_sat_session = patch('sat.cli.bootsys.power.SATSession').start()
 
     def tearDown(self):
