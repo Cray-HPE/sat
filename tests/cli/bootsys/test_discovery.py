@@ -154,15 +154,19 @@ class TestHMSDiscoveryCronJob(unittest.TestCase):
         with self.assertRaisesRegex(HMSDiscoveryError, expected_regex):
             self.hdcj.set_suspend_status(True)
 
-    @patch('sat.cli.bootsys.discovery.datetime', spec=datetime)
-    def test_get_latest_next_schedule_time(self, mock_datetime):
+    def test_get_latest_next_schedule_time(self):
         """Test get_latest_next_schedule_time."""
-        mock_datetime.now.return_value = datetime(2020, 12, 31, 10, 0, 0)
+
+        # Create subclass of `datetime` to pass the `issubclass` check in `croniter._get_next`
+        class MockDateTime(datetime):
+            @classmethod
+            def now(cls, *args, **kwargs):
+                return datetime(2020, 12, 31, 10, 0, 0)
+
         self.mock_batch_api.read_namespaced_cron_job.return_value.spec = Mock(schedule='*/3 * * * *')
         expected = datetime(2020, 12, 31, 10, 3, 0)
 
-        # There is an issubclass check in croniter that fails because datetime is a MagicMock
-        with patch('builtins.issubclass', return_value=True):
+        with patch('sat.cli.bootsys.discovery.datetime', MockDateTime):
             # Call it twice to ensure it returns the same thing the second time
             # rather than the next expected schedule time.
             next_time = self.hdcj.get_latest_next_schedule_time()
