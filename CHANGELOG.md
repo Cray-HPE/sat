@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the Ceph health check in ``sat bootsys boot --stage ceph-check``
   to be consistent with the check in the ``platform-services`` stage of
   ``sat bootsys boot`` and ``sat bootsys shutdown``.
+- Changed the ``sat diag`` command to use the Fox API for launching controller
+  diagnostics instead of accessing Redfish directly.
 
 ### Removed
 - Removed the ``cray-sat-crayctldeploy`` subpackage.

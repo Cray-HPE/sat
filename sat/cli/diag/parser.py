@@ -33,11 +33,11 @@ def add_diag_subparser(subparsers):
     redfish_opts = sat.parsergroups.create_redfish_options()
 
     diag_parser = subparsers.add_parser(
-        'diag', help='Launch diagnostics for Rosetta switches.',
-        description='Launch diagnostics for Rosetta switches.',
+        'diag', help='Launch diagnostics for hardware controllers.',
+        description='Launch diagnostics for hardware controllers.',
         parents=[xname_opts, redfish_opts])
 
-    diag_parser.add_argument('-t', '--timeout', default=300, metavar='SECONDS',
+    diag_parser.add_argument('-t', '--timeout', default=300, metavar='SECONDS', type=int,
                              help='Timeout for a diagnostic run on a switch')
     diag_parser.add_argument('-i', '--interval', default=10, metavar='SECONDS', type=int,
                              help='Interval at which to poll the switch running the diagnostic')
@@ -48,7 +48,6 @@ def add_diag_subparser(subparsers):
     diag_parser.add_argument('--split', action='store_true',
                              help='Write a split report, writing output from each switch '
                              'to its own file rather than stdout.')
-
     diag_parser.add_argument('--interactive', action='store_true',
                              help='launch an interactive shell for running diagnostics.')
     diag_parser.add_argument('diag_command', metavar='command', nargs='?',
