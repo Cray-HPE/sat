@@ -36,7 +36,6 @@ from inflect import engine
 
 from sat.apiclient import APIError, BOSClient, HSMClient
 from sat.cli.bootsys.defaults import PARALLEL_CHECK_INTERVAL
-from sat.cli.bootsys.power import do_nodes_power_off
 from sat.config import get_config_value
 from sat.session import SATSession
 from sat.util import get_val_by_path
@@ -739,16 +738,6 @@ def do_bos_shutdowns(args):
         do_bos_operations('shutdown', get_config_value('bootsys.bos_shutdown_timeout'))
     except BOSFailure as err:
         LOGGER.error(err)
-        sys.exit(1)
-
-    timed_out, failed = do_nodes_power_off(get_config_value('bootsys.capmc_timeout'))
-    if timed_out:
-        LOGGER.error(f'Timed out while waiting for the following node(s) to reach '
-                     f'powered off state after CAPMC power off: {", ".join(timed_out)}')
-    if failed:
-        LOGGER.error(f'Failed to power of the following node(s) with CAPMC: '
-                     f'{", ".join(timed_out)}')
-    if timed_out or failed:
         sys.exit(1)
 
 

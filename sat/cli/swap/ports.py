@@ -142,6 +142,29 @@ class PortManager:
 
         return switch
 
+    def get_port_policies(self):
+        """Get a list of port policy document links
+
+        Returns:
+            A list of port policy paths or None
+        """
+
+        # Get port policy information using fabric manager API.
+        try:
+            response = self.fabric_client.get('fabric/port-policies')
+        except APIError as err:
+            LOGGER.error('Failed to get port policies from fabric manager: {}'.format(err))
+            return None
+
+        # Get result as JSON.
+        try:
+            port_policies = response.json()
+        except ValueError as err:
+            LOGGER.error('Failed to parse JSON from fabric manager response: {}'.format(err))
+            return None
+
+        return port_policies.get('documentLinks')
+
     def get_port_data_list(self, port_links):
         """Get a list of dictionaries for ports using document links for each port
 
@@ -337,18 +360,16 @@ class PortManager:
             False if there is an error with the fabric manager API
         """
 
-        # Check if the offline port policy already exists
+        # Get the list of port policies and see if the offline port policy already exists
+        port_policies = self.get_port_policies()
+        if port_policies is None:
+            LOGGER.error('Failed to get port policies.')
+            return False
+
         path_parts = existing_policy_link.split('/')
         offline_policy = '/'.join(path_parts[:-1]) + '/' + new_policy_prefix + path_parts[-1]
 
-        offline_policy_exists = True
-        try:
-            self.fabric_client.get(offline_policy)
-        except APIError as err:
-            offline_policy_exists = False
-            LOGGER.debug('Failed to get existing offline policy from fabric manager: {}'.format(err))
-
-        if offline_policy_exists:
+        if offline_policy in port_policies:
             LOGGER.info(f'Using existing offline policy: {offline_policy}')
         else:
             new_policy_config = {

@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       then the command will exit with an error.
 
 ### Changed
+- Incremented version of Alpine Linux from 3.12.0 to 3.13.2.
 - Changed the Ceph health check in ``sat bootsys boot --stage ceph-check``
   to be consistent with the check in the ``platform-services`` stage of
   ``sat bootsys boot`` and ``sat bootsys shutdown``.
@@ -47,12 +48,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diagnostics instead of accessing Redfish directly.
 
 ### Removed
+- Removed Ansible and all of its dependencies from our container image by
+  removing from our locked requirements files.
 - Removed the ``cray-sat-crayctldeploy`` subpackage.
 - Removed ``sat linkhealth`` which has been replaced by
   ``slingshot-topology-tool --cmd "show switch <ports,jacks> <switch xname>"``.
 - Removed support for Firmware Update Service (FUS) in ``sat firmware``
   and ``sat bootsys shutdown --stage session-checks``. These commands now
   only use Firmware Action Service (FAS).
+
+## [3.5.0] - 2021-03-24
+
+### Added
+- Added a new ``sat nid2xname`` subcommand to translate node IDs to node xnames.
+- Added a new ``sat xname2nid`` subcommand to translate node and node BMC xnames
+  to node IDs.
+
+### Changed
+- Changed ``sat swap`` to get all port policies when creating an offline port
+  policy to check if the offline port policy already exists.
+- Changed requirements files to ``requirements.txt`` and
+  ``requirements-dev.txt``. Added ".lock" versions of these files and changed
+  build process to use them, so that exact library versions are used.
+- ``sat bootsys shutdown --stage bos-operations`` no longer forcefully powers
+  off all compute nodes and application nodes using CAPMC when BOS sessions are
+  complete or when it times out waiting for BOS sessions to complete.
+
+### Fixed
+- Addressed an error in ``sat bootsys``  when waiting for the ``hms-discovery``
+  Kubernetes cronjob to be scheduled when there is no previous record of the
+  job being scheduled.
 
 ## [3.4.0] - 2021-03-03
 

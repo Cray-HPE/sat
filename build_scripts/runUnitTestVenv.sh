@@ -1,16 +1,16 @@
-# Top-level requirements for sat package to function.
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
-# 
+#!/bin/bash
+# (C) Copyright 2021 Hewlett Packard Enterprise Development LP.
+#
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
 # to deal in the Software without restriction, including without limitation
 # the rights to use, copy, modify, merge, publish, distribute, sublicense,
 # and/or sell copies of the Software, and to permit persons to whom the
 # Software is furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included
 # in all copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
@@ -18,18 +18,7 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-argcomplete
-boto3
-docker
-inflect >= 0.2.5, < 3.0
-kubernetes
-paramiko >= 2.4.2
-parsec == 3.5.0
-prettytable >= 0.7.2, < 1.0
-pyyaml >= 5.4.1
-requests < 3.0
-requests-oauthlib
-toml == 0.10.0
-urllib3 >= 1.0, < 2.0
-croniter >= 0.3, < 1.0
-python-dateutil >= 2.7.3, < 3.0
+
+base_dir=$(dirname "$0")
+source sat-venv/bin/activate
+$base_dir/runUnitTest.sh

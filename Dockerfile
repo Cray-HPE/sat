@@ -2,12 +2,12 @@
 #
 # Dockerfile for SAT
 
-FROM dtr.dev.cray.com/baseos/alpine:3.12.0 as base
+FROM arti.dev.cray.com/baseos-docker-master-local/alpine:3.13.2 as base
 
 WORKDIR /sat
 COPY CHANGELOG.md README.md /sat/
 COPY setup.cfg setup.py /sat/
-COPY requirements.docker.txt /sat/requirements.txt
+COPY requirements.lock.txt /sat/requirements.txt
 COPY docker_scripts/config-docker-sat.sh /sat/
 COPY sat /sat/sat
 COPY docs/man /sat/docs/man
@@ -17,11 +17,12 @@ COPY docker_scripts/sat_container_prompt.sh /etc/profile.d/sat_container_prompt.
 
 RUN apk update && \
     apk add --no-cache python3-dev py3-pip bash openssl-dev libffi-dev \
-        openssh curl musl-dev git make gcc mandoc ipmitool ceph-common && \
+        openssh curl musl-dev git make gcc mandoc ipmitool ceph-common rust cargo && \
     PIP_INDEX_URL=http://dst.us.cray.com/dstpiprepo/simple \
     PIP_TRUSTED_HOST=dst.us.cray.com \
     pip3 install --no-cache-dir -U pip && \
-    pip3 install --no-cache-dir .
+    pip3 install --no-cache-dir . && \
+    apk del cargo rust
 
 RUN /sat/config-docker-sat.sh
 

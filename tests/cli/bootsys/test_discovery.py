@@ -1,7 +1,7 @@
 """
 Unit tests for the sat.cli.bootsys.discovery module.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -154,15 +154,19 @@ class TestHMSDiscoveryCronJob(unittest.TestCase):
         with self.assertRaisesRegex(HMSDiscoveryError, expected_regex):
             self.hdcj.set_suspend_status(True)
 
-    @patch('sat.cli.bootsys.discovery.datetime', spec=datetime)
-    def test_get_latest_next_schedule_time(self, mock_datetime):
+    def test_get_latest_next_schedule_time(self):
         """Test get_latest_next_schedule_time."""
-        mock_datetime.now.return_value = datetime(2020, 12, 31, 10, 0, 0)
+
+        # Create subclass of `datetime` to pass the `issubclass` check in `croniter._get_next`
+        class MockDateTime(datetime):
+            @classmethod
+            def now(cls, *args, **kwargs):
+                return datetime(2020, 12, 31, 10, 0, 0)
+
         self.mock_batch_api.read_namespaced_cron_job.return_value.spec = Mock(schedule='*/3 * * * *')
         expected = datetime(2020, 12, 31, 10, 3, 0)
 
-        # There is an issubclass check in croniter that fails because datetime is a MagicMock
-        with patch('builtins.issubclass', return_value=True):
+        with patch('sat.cli.bootsys.discovery.datetime', MockDateTime):
             # Call it twice to ensure it returns the same thing the second time
             # rather than the next expected schedule time.
             next_time = self.hdcj.get_latest_next_schedule_time()
@@ -219,6 +223,13 @@ class TestHMSDiscoveryScheduledWaiter(unittest.TestCase):
         last_schedule_time = self.next_sched_time
         self.mock_hd_cron_job.get_last_schedule_time.return_value = last_schedule_time
         self.assertTrue(self.hd_waiter.has_completed())
+
+    def test_has_completed_no_last_schedule_time(self):
+        """Test has_completed method of HMSDiscoveryScheduledWaiter when the cronjob has no last schedule time."""
+        # Make it look like there is no last schedule time.
+        self.mock_hd_cron_job.get_last_schedule_time.return_value = None
+        with self.assertLogs(level=logging.DEBUG):
+            self.assertFalse(self.hd_waiter.has_completed())
 
     def test_has_completed_error(self):
         """Test has_completed method of HMSDiscoveryScheduledWaiter when an error occurs."""

@@ -22,11 +22,13 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
+import logging
 import unittest
 from unittest import mock
 from unittest.mock import call
 
 from sat.cli.swap.ports import PortManager
+from tests.common import ExtendedTestCase
 
 
 class TestGetSwitchPortDataList(unittest.TestCase):
@@ -421,7 +423,7 @@ class TestGetJackPortDataList(unittest.TestCase):
         mock.patch.stopall()
 
 
-class TestCreateOfflinePortPolicy(unittest.TestCase):
+class TestCreateOfflinePortPolicy(ExtendedTestCase):
     """Unit test for Switch create_offline_port_policy()."""
 
     def setUp(self):
@@ -437,6 +439,14 @@ class TestCreateOfflinePortPolicy(unittest.TestCase):
         self.mock_fc_client_cls = mock.patch('sat.cli.swap.ports.FabricControllerClient',
                                              return_value=self.mock_fc_client).start()
 
+        self.mock_get_port_policies = mock.patch('sat.cli.swap.ports.PortManager.get_port_policies',
+                                                 autospec=True).start()
+        self.mock_get_port_policies.return_value = [
+            '/fabric/port-policies/fabric-policy',
+            '/fabric/port-policies/edge-policy',
+            '/fabric/port-policies/sat-offline-edge-policy'
+        ]
+
         self.mock_json_dumps = mock.patch('json.dumps', autospec=True).start()
         self.pm = PortManager()
 
@@ -445,8 +455,21 @@ class TestCreateOfflinePortPolicy(unittest.TestCase):
 
     def test_basic(self):
         """Test create_offline_port_policy() that already exists"""
-        self.pm.create_offline_port_policy('/fabric/port-policies/edge-policy', 'SAT-OFFLINE-')
-        self.assertEqual(self.mock_json_dumps.call_count, 0)
+        with self.assertLogs(level=logging.INFO) as logs:
+            self.pm.create_offline_port_policy('/fabric/port-policies/edge-policy', 'sat-offline-')
+        self.assert_in_element('Using existing offline policy: /fabric/port-policies/sat-offline-edge-policy',
+                               logs.output)
+        self.mock_get_port_policies.assert_called_once()
+        self.mock_fc_client.post.assert_not_called()
+
+    def test_new_policy(self):
+        """Test create_offline_port_policy() that doesn't already exist"""
+        with self.assertLogs(level=logging.DEBUG) as logs:
+            self.pm.create_offline_port_policy('/fabric/port-policies/fabric-policy', 'sat-offline-')
+        self.assert_in_element('Creating offline policy: /fabric/port-policies/sat-offline-fabric-policy',
+                               logs.output)
+        self.mock_get_port_policies.assert_called_once()
+        self.mock_fc_client.post.assert_called_once()
 
 
 if __name__ == '__main__':
