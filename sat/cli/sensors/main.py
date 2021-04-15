@@ -42,14 +42,25 @@ from sat.cli.sensors.telemetry_client import TelemetryClient
 CHASSIS_XNAME_REGEX = re.compile(r'x\d+c\d$')
 CHASSIS_XNAME_PREFIX_REGEX = re.compile(r'x\d+c\d')
 
-HEADERS = ('xname',
-           'Type',
-           'Topic',
-           'Timestamp',
-           'Location',
-           'PhysicalContext',
-           'DeviceSpecificContext',
-           'Value')
+HEADERS = (
+    'xname',
+    'Type',
+    'Topic',
+    'Timestamp',
+    'Index',
+    'Location',
+    'Parental Context',
+    'Physical Context',
+    'Device Specific Context',
+    'Value')
+SENSOR_KEYS = (
+    'Timestamp',
+    'Index',
+    'Location',
+    'ParentalContext',
+    'PhysicalContext',
+    'DeviceSpecificContext',
+    'Value')
 
 inf = inflect.engine()
 LOGGER = logging.getLogger(__name__)
@@ -186,7 +197,7 @@ def make_raw_table(all_topics_results):
         all_topics_results ([dict]): A list of dictionaries with sensor data (one per topic).
 
     Returns:
-        A list of dictionaries with each dictionary containing sensor data for a BMC xname.
+        A list of lists containing sensor data for each BMC xname.
     """
 
     raw_table = []
@@ -197,19 +208,9 @@ def make_raw_table(all_topics_results):
                 context = metric['Context']
                 bmc_type = metric['Type']
                 for sensor in metric['Sensors']:
-                    timestamp = sensor.get('Timestamp', MISSING_VALUE)
-                    location = sensor.get('Location', MISSING_VALUE)
-                    physical_context = sensor.get('PhysicalContext', MISSING_VALUE)
-                    device_specific_context = sensor.get('DeviceSpecificContext', MISSING_VALUE)
-                    value = sensor.get('Value', MISSING_VALUE)
-                    row = {'xname': context,
-                           'Type': bmc_type,
-                           'Topic': topic,
-                           'Timestamp': timestamp,
-                           'Location': location,
-                           'PhysicalContext': physical_context,
-                           'DeviceSpecificContext': device_specific_context,
-                           'Value': value}
+                    row = [context, bmc_type, topic]
+                    for sensor_key in SENSOR_KEYS:
+                        row.append(sensor.get(sensor_key, MISSING_VALUE))
                     raw_table.append(row)
     except KeyError as err:
         LOGGER.error(f'Key not present in telemetry results: {err}')
