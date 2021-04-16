@@ -23,15 +23,19 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import argparse
+import logging
 import unittest
 from unittest import mock
 
+from tests.test_util import ExtendedTestCase
+
 from sat.apiclient import APIError
-from sat.cli.firmware.main import do_firmware, FAS_HEADERS
+from sat.fwclient import FASClient
+from sat.cli.firmware.main import do_firmware
 from sat.cli.firmware.parser import add_firmware_subparser
 
 
-class TestFirmware(unittest.TestCase):
+class TestFirmware(ExtendedTestCase):
 
     def setUp(self):
         """Set up mock objects and command parser"""
@@ -40,19 +44,16 @@ class TestFirmware(unittest.TestCase):
         self.subparser = self.parser.add_subparsers()
         add_firmware_subparser(self.subparser)
 
-        # Fake firmware client
-        self.fake_snaps = {
-            'foo': {},
-            'bar': {}
+        self.firmware_client_cls = mock.patch('sat.cli.firmware.main.FASClient').start()
+        self.firmware_client = self.firmware_client_cls.return_value
+        self.firmware_client_cls.headers = FASClient.headers
+        self.mock_snapshot_names = ['snap1', 'snap2', 'snap3']
+        self.mock_snapshots = {
+            'snap1': mock.Mock(),
+            'snap2': mock.Mock(),
+            'snap3': mock.Mock()
         }
-        self.create_firmware_client = mock.patch('sat.cli.firmware.main.create_firmware_client').start()
-        self.firmware_client = self.create_firmware_client.return_value
-        self.firmware_client.get_all_snapshot_names.return_value = {'foo', 'bar'}
-        self.firmware_client.get_snapshots.side_effect = self.fake_get_snapshots
-        self.device_firmwares = self.firmware_client.get_device_firmwares.return_value
-        self.fake_firmware_rows = [['abc', 'def', 'ghi'],
-                                   ['123', '456', '789']]
-        self.firmware_client.make_fw_table.return_value = self.fake_firmware_rows
+        self.firmware_client.get_all_snapshot_names.return_value = set(self.mock_snapshot_names)
 
         # Fake report
         self.mock_report = mock.patch('sat.cli.firmware.main.Report').start()
@@ -72,10 +73,6 @@ class TestFirmware(unittest.TestCase):
         """Stop mock objects"""
         mock.patch.stopall()
 
-    def fake_get_snapshots(self, snapshot_names):
-        """Mimic get_snapshots, which returns all matching snapshots"""
-        return {k: v for k, v in self.fake_snaps.items() if k in snapshot_names}
-
     def fake_get_config_value(self, option):
         """Mimic get_config_value"""
         return self.fake_config.get(option)
@@ -89,7 +86,7 @@ class TestFirmware(unittest.TestCase):
 
         # Test that the Report was created
         report_args = [
-            FAS_HEADERS, title, args.sort_by, args.reverse,
+            FASClient.headers, title, args.sort_by, args.reverse,
             self.fake_config['format.no_headings'],
             self.fake_config['format.no_borders']
         ]
@@ -104,24 +101,22 @@ class TestFirmware(unittest.TestCase):
         # Test that the report was printed
         self.mock_print.assert_any_call(report_obj)
 
-    def assertExitsWithError(self, function, args):
-        """Assert that an error is logged and that the program exits"""
-        with self.assertRaises(SystemExit):
-            with self.assertLogs(level='ERROR'):
+    def assertExitsWithError(self, function, args, error_message=None):
+        """Assert that an error is logged and that the program exits with the expected error code."""
+        with self.assertRaises(SystemExit) as raises_cm:
+            with self.assertLogs(level='ERROR') as logs:
                 function(args)
-
-    def test_client_creation_fail(self):
-        """A failure to create a firmware client should log an error and exit"""
-        args = self.parser.parse_args(['firmware'])
-        self.create_firmware_client.side_effect = APIError
-        self.assertExitsWithError(do_firmware, args)
+        if error_message:
+            self.assert_in_element(error_message, logs.output)
+        expected_exit_code = 1
+        self.assertEqual(expected_exit_code, raises_cm.exception.code)
 
     def test_get_snapshots(self):
-        """Running with --snapshots gets snapshot names and prints them"""
+        """Running with --snapshots gets snapshot names and prints them."""
         args = self.parser.parse_args(['firmware', '--snapshots'])
         do_firmware(args)
         self.firmware_client.get_all_snapshot_names.assert_called_once()
-        self.mock_print.assert_has_calls([mock.call('foo'), mock.call('bar')], any_order=True)
+        self.mock_print.assert_has_calls([mock.call(name) for name in self.mock_snapshot_names], any_order=True)
 
     def test_get_snapshot_names_error(self):
         """An APIError getting snapshot names logs an error and exits"""
@@ -129,97 +124,90 @@ class TestFirmware(unittest.TestCase):
         self.firmware_client.get_all_snapshot_names.side_effect = APIError
         self.assertExitsWithError(do_firmware, args)
 
+    def test_xname_and_snapshots_without_arguments(self):
+        """When giving --xname and --snapshots with no arguments, warn that --xname is ignored."""
+        args = self.parser.parse_args(['firmware', '--snapshots', '-x', 'x5000c0s3b0'])
+        with self.assertLogs(level=logging.WARNING) as logs:
+            do_firmware(args)
+        self.firmware_client.get_all_snapshot_names.assert_called_once_with()
+        self.mock_print.assert_has_calls([mock.call(name) for name in self.mock_snapshot_names], any_order=True)
+        self.assert_in_element(
+            '--snapshots was given with no arguments. The value of -x/--xname will be ignored.',
+            logs.output
+        )
+
     def test_get_snapshots_error(self):
         """An APIError getting snapshot data logs an error and exits"""
         args = self.parser.parse_args(['firmware', '--snapshots', 'foo'])
-        self.firmware_client.get_snapshots.side_effect = APIError
+        self.firmware_client.get_multiple_snapshot_devices.side_effect = APIError
         self.assertExitsWithError(do_firmware, args)
 
-    def test_get_known_snapshot(self):
+    def test_get_known_snapshots(self):
         """Getting a known snapshot produces a report for that snapshot"""
-        args = self.parser.parse_args(['firmware', '--snapshots', 'foo'])
+        args = self.parser.parse_args(['firmware', '--snapshots', 'snap1'])
+        self.firmware_client.get_multiple_snapshot_devices.return_value = {'snap1': self.mock_snapshots['snap1']}
         do_firmware(args)
-        self.firmware_client.get_all_snapshot_names.assert_called_once_with()
-        self.firmware_client.get_snapshots.assert_called_once_with(args.snapshots)
-        self.assertFirmwareTables([self.fake_snaps['foo']])
-        self.assertReport('foo', args, self.fake_firmware_rows)
+        self.firmware_client.get_multiple_snapshot_devices.assert_called_once_with(args.snapshots, None)
+        self.assertFirmwareTables([self.mock_snapshots['snap1']])
+        self.assertReport('snap1', args, self.firmware_client.make_fw_table.return_value)
+
+    def test_get_known_snapshot_with_xname(self):
+        """Getting a known snapshot with an xname produces a report for that snapshot and xname"""
+        args = self.parser.parse_args(['firmware', '--snapshots', 'snap1', '--xname', 'x3000c0s2b0'])
+        self.firmware_client.get_multiple_snapshot_devices.return_value = {'snap1': self.mock_snapshots['snap1']}
+        do_firmware(args)
+        self.firmware_client.get_multiple_snapshot_devices.assert_called_once_with(args.snapshots, ['x3000c0s2b0'])
+        self.assertFirmwareTables([self.mock_snapshots['snap1']])
+        self.assertReport('snap1', args, self.firmware_client.make_fw_table.return_value)
 
     def test_get_multiple_known_snapshots(self):
         """Getting multiple known snapshots produces a report for those snapshots"""
-        args = self.parser.parse_args(['firmware', '--snapshots', 'foo', 'bar'])
+        args = self.parser.parse_args(['firmware', '--snapshots', 'snap1', 'snap2'])
+        self.firmware_client.get_multiple_snapshot_devices.return_value = {
+            'snap1': self.mock_snapshots['snap1'],
+            'snap2': self.mock_snapshots['snap2']
+        }
         do_firmware(args)
-        self.firmware_client.get_snapshots.assert_called_once_with(args.snapshots)
-        self.assertFirmwareTables([self.fake_snaps['foo'], self.fake_snaps['bar']])
-        self.assertReport('foo', args, self.fake_firmware_rows)
-        self.assertReport('bar', args, self.fake_firmware_rows)
+        self.firmware_client.get_multiple_snapshot_devices.assert_called_once_with(args.snapshots, None)
+        self.assertFirmwareTables([self.mock_snapshots['snap1'], self.mock_snapshots['snap2']])
+        self.assertReport('snap1', args, self.firmware_client.make_fw_table.return_value)
+        self.assertReport('snap2', args, self.firmware_client.make_fw_table.return_value)
 
-    def test_get_unknown_snapshot(self):
-        """Getting an unknown snapshot prints nothing"""
-        # In real operation, the firmware client prints a warning for each snapshot that does not exist
-        args = self.parser.parse_args(['firmware', '--snapshots', 'doesNotExist'])
-        do_firmware(args)
-        self.firmware_client.make_fw_table.assert_not_called()
-        self.mock_report.assert_not_called()
-
-    def test_get_one_unknown_snapshot(self):
-        """Getting one unknown snapshot and one known prints a table for the known one"""
-        args = self.parser.parse_args(['firmware', '--snapshots', 'doesNotExist', 'foo'])
-        do_firmware(args)
-        self.assertFirmwareTables([self.fake_snaps['foo']])
-        self.assertReport('foo', args, self.fake_firmware_rows)
-
-    def test_get_no_known_snapshots(self):
-        """Getting a snapshot when no snapshots exist logs an error and exits"""
-        args = self.parser.parse_args(['firmware', '--snapshots', 'foo'])
-        self.firmware_client.get_all_snapshot_names.return_value = set()
-        self.assertExitsWithError(do_firmware, args)
-
-    def test_get_firmware_xname(self):
-        """Getting firmware by xname produces a report for the xname"""
-        args = self.parser.parse_args(['firmware', '-x', 'x5000c3r3b0'])
-        do_firmware(args)
-        self.firmware_client.get_device_firmwares.assert_called_once_with(*args.xnames)
-        self.assertFirmwareTables(self.device_firmwares)
-        self.assertReport(None, args, self.fake_firmware_rows)
-
-    def test_get_firmware_multiple_xnames(self):
-        """Getting firmware for several xnames produces a report for them"""
-        args = self.parser.parse_args(['firmware', '-x', 'x5000c3r3b0', '-x', 'x5000c3r1b0'])
-        do_firmware(args)
-        self.assertFirmwareTables(self.device_firmwares)
-        self.firmware_client.get_device_firmwares.assert_has_calls([mock.call(xname) for xname in args.xnames],
-                                                                   any_order=True)
-
-        # Because firmware rows were returned once for each xname, assert that the table has two sets of rows
-        self.assertReport(None, args, self.fake_firmware_rows * 2)
-
-    def test_get_firmware_xname_api_error(self):
-        """An API Error getting firmware by xname exits with an error"""
-        args = self.parser.parse_args(['firmware', '-x', 'x5000c3r3b0'])
-        self.firmware_client.get_device_firmwares.side_effect = APIError
-        self.assertExitsWithError(do_firmware, args)
-
-    def test_get_firmware_unknown_xname(self):
-        """Getting firmware with an unknown xname exits with an error"""
-        args = self.parser.parse_args(['firmware', '-x', 'doesNotExist'])
-        # Given an unknown xname, the client returns an empty list
-        self.firmware_client.get_device_firmwares.return_value = []
-        self.assertExitsWithError(do_firmware, args)
-        self.firmware_client.get_device_firmwares.assert_called_once_with(*args.xnames)
-
-    def test_get_complete_firmware(self):
-        """Getting firmware for everything produces a big report"""
+    def test_get_all_firmware(self):
+        """Getting all firmware uses get_device_firmwares to produce a report."""
         args = self.parser.parse_args(['firmware'])
         do_firmware(args)
         self.firmware_client.get_device_firmwares.assert_called_once_with()
-        self.assertFirmwareTables(self.device_firmwares)
-        self.assertReport(None, args, self.fake_firmware_rows)
+        self.assertFirmwareTables([self.firmware_client.get_device_firmwares.return_value])
+        self.assertReport(None, args, self.firmware_client.make_fw_table.return_value)
 
-    def test_get_complete_firmware_api_error(self):
-        """An APIError when producing a full report exits with an error"""
+    def test_get_all_firmware_error(self):
+        """An APIError getting all firmware exits with an error."""
         args = self.parser.parse_args(['firmware'])
-        self.firmware_client.get_device_firmwares.side_effect = APIError
-        self.assertExitsWithError(do_firmware, args)
+        self.firmware_client.get_device_firmwares.side_effect = APIError('No firmware found.')
+        self.assertExitsWithError(do_firmware, args, 'No firmware found.')
+
+    def test_get_firmware_xname(self):
+        """Getting firmware by xname produces a report for the xname"""
+        args = self.parser.parse_args(['firmware', '-x', 'x5000c0s3b0'])
+        do_firmware(args)
+        self.firmware_client.get_multiple_device_firmwares.assert_called_once_with(args.xnames)
+        self.assertFirmwareTables([self.firmware_client.get_multiple_device_firmwares.return_value])
+        self.assertReport(None, args, self.firmware_client.make_fw_table.return_value)
+
+    def test_get_firmware_multiple_xnames(self):
+        """Getting firmware for several xnames produces a report for them."""
+        args = self.parser.parse_args(['firmware', '-x', 'x3000c0s2b0', '-x', 'x5000c0s3b0', ])
+        do_firmware(args)
+        self.firmware_client.get_multiple_device_firmwares.assert_called_once_with(args.xnames)
+        self.assertFirmwareTables([self.firmware_client.get_multiple_device_firmwares.return_value])
+        self.assertReport(None, args, self.firmware_client.make_fw_table.return_value)
+
+    def test_get_firmware_xname_api_error(self):
+        """An API Error getting firmware by xname exits with an error."""
+        args = self.parser.parse_args(['firmware', '-x', 'x3000c0s0b0'])
+        self.firmware_client.get_multiple_device_firmwares.side_effect = APIError('No firmware found.')
+        self.assertExitsWithError(do_firmware, args, 'No firmware found.')
 
 
 if __name__ == '__main__':

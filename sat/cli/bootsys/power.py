@@ -56,13 +56,9 @@ def get_nodes_by_role_and_state(role, power_state):
         return role_nodes
 
     nodes_by_power_state = capmc_client.get_xnames_power_state(role_nodes)
-    power_state_nodes = nodes_by_power_state.get(power_state, [])
-    LOGGER.debug('Found %s node(s) with power state %s: %s', len(power_state_nodes),
-                 power_state, power_state_nodes)
-
-    matching_nodes = [node for node in role_nodes if node in power_state_nodes]
-    LOGGER.debug('Found %s node(s) with role %s and power state %s: %s',
-                 len(matching_nodes), role, power_state, matching_nodes)
+    matching_nodes = nodes_by_power_state.get(power_state, [])
+    LOGGER.debug('Found %s node(s) with role %s and power state %s: %s', len(matching_nodes),
+                 role, power_state, matching_nodes)
 
     return matching_nodes
 

@@ -1,7 +1,7 @@
 """
 The main entry point for the diag subcommand.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -26,13 +26,12 @@ from collections import defaultdict
 from datetime import date
 import logging
 import sys
-import time
 
 import inflect
 
-from sat import redfish as sat_redfish
-from sat.cli.diag import redfish as diag_redfish
+from sat.apiclient import APIError
 from sat.util import pester
+from sat.cli.diag.fox import RunningDiagPool
 
 
 inf = inflect.engine()
@@ -51,13 +50,14 @@ Usage:
 def report(finished_diags, timestamp, split):
     """Composes a report of the results of completed diagnostics.
 
-    This will print all outputs from diags returned by Redfish,
-    followed by a summary of the completion status of all xnames
-    running diagnostics.
+    This will print all outputs from diags returned by Fox, followed
+    by a summary of the completion status of all xnames running diagnostics.
 
     Args:
         finished_diags: a RunningDiagPool object containing the
             diags which have completed.
+        timestamp (str): The time at which the diagnostics started,
+            used for writing output to a file.
         split (bool): if True, then the content of stdout from
             each diagnostic will be written to its own file.
             Otherwise, all output is written to stdout.
@@ -85,18 +85,17 @@ def report(finished_diags, timestamp, split):
         print('{} did not complete diag {}. Status: {}'
               .format(diag.xname, diag.name, diag.taskstate))
 
-    for sev, switches in completion_stats.items():
+    for sev, controllers in completion_stats.items():
         if sev != 'OK':
             print('{}: {}'
-                  .format(sev, inf.join(switches)))
+                  .format(sev, inf.join(controllers)))
     # Summary line
     print(inf.join(['{} {} {}'
-                    .format(len(xnames), inf.plural('switch', len(xnames)), severity)
+                    .format(len(xnames), inf.plural('controller', len(xnames)), severity)
                     for severity, xnames in completion_stats.items()]))
 
 
-def run_diag_set(xnames, diag_command, diag_args,
-                 cli_args, username, password):
+def run_diag_set(xnames, diag_command, diag_args, cli_args):
     """Runs a diagnostic on some set of xnames.
 
     Args:
@@ -105,43 +104,31 @@ def run_diag_set(xnames, diag_command, diag_args,
         diag_args ([str]): args to pass to diag_command.
         cli_args (Namespace): contains CLI arguments determining
             behavior of the diagnostics.
-        username (str): username to authenticate against the
-            Rosetta Redfish endpoint.
-        password (str): password to authenticate against the
-            Rosetta Redfish endpoint.
     """
-    print_report = True
     running_diags = None
     try:
         # Initialize all diags
-        running_diags = diag_redfish.RunningDiagPool(
+        running_diags = RunningDiagPool(
             xnames, diag_command, diag_args,
-            cli_args.interval, cli_args.timeout,
-            username, password)
+            cli_args.interval, cli_args.timeout)
 
-        # Continually poll until all diags are complete.
-        while not running_diags.complete:
-            running_diags.poll_diag_statuses()
-            time.sleep(0.1)
+        # Continually poll until all diags have launched,
+        # then poll until all have completed.
+        running_diags.poll_until_launched()
+        running_diags.poll_until_complete()
 
-    except KeyboardInterrupt:
-        print_report = False
-        LOGGER.info("Received keyboard interrupt. Attempting to cancel diagnostics...")
-        if running_diags is not None:
-            for diag in running_diags:
-                diag.cancel()
+        report(running_diags,
+               date.fromtimestamp(running_diags.starttime).strftime("%Y%m%d-%H%M%S"),
+               cli_args.split)
 
-        raise
-
+    except APIError as err:
+        LOGGER.error(err)
     finally:
-        if print_report and running_diags is not None:
+        if running_diags is not None:
             running_diags.cleanup()
-            report(running_diags,
-                   date.fromtimestamp(running_diags.starttime).strftime("%Y%m%d-%H%M%S"),
-                   cli_args.split)
 
 
-def run_diags_from_prompt(xnames, cli_args, username, password):
+def run_diags_from_prompt(xnames, cli_args):
     """Prompts the user for diags to run.
 
     The user is prompted on stdin until Ctrl-C or Ctrl-D is pressed,
@@ -150,8 +137,6 @@ def run_diags_from_prompt(xnames, cli_args, username, password):
     Args:
         - xnames ([str]): xnames to run diags on.
         - cli_args (argparse.Namespace): arguments from the command line.
-        - username (str): Redfish username on the switch
-        - password (str): Redfish password on the switch
 
     """
     while True:
@@ -172,8 +157,7 @@ def run_diags_from_prompt(xnames, cli_args, username, password):
             print(_PROMPT_USAGE)
             continue
 
-        run_diag_set(xnames, diag_command, diag_args, cli_args,
-                     username, password)
+        run_diag_set(xnames, diag_command, diag_args, cli_args)
 
 
 def do_diag(args):
@@ -196,14 +180,12 @@ def do_diag(args):
         sys.exit(1)
 
     really_run = args.disruptive \
-        or pester("L1 Rosetta diagnostics can degrade or disrupt "
+        or pester("Controller diagnostics can degrade or disrupt "
                   "a running system. Really proceed?")
     if not really_run:
         sys.exit(0)
 
-    username, password = sat_redfish.get_username_and_pass(args.redfish_username)
     if args.interactive:
-        run_diags_from_prompt(args.xnames, args, username, password)
+        run_diags_from_prompt(args.xnames, args)
     else:
-        run_diag_set(args.xnames, args.diag_command, args.diag_args,
-                     args, username, password)
+        run_diag_set(args.xnames, args.diag_command, args.diag_args, args)
