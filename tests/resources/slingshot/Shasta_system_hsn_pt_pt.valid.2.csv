@@ -1,0 +1,15 @@
+﻿#run-time information,,,,,,,,,,,,,,,,
+"#	date run: 	Tue Aug 25 08:19:59 CDT 2020",,,,,,,,,,,,,,,,
+"#	sct directory: 	/usr/local/slingshot_tools/sct",,,,,,,,,,,,,,,,
+"#	sct head:	On branch master;Your branch is up to date with 'origin/master'.;;Changes not staged for commit:;  (use ""git add/rm <file>..."" to update what will be committed);  (use ""git checkout -- <file>..."" to discard changes in working directory);;	modified:   components/cabinet.yaml;	modified:   components/compute.yaml;	deleted:    logs/SSHOTCMP-638-2019-09-30_09-46-15.log;;Untracked files:;  (use ""git add <file>..."" to include in what will be committed);;	templates/groups/mappings/H_L1_2x4spg_v2.json;;no changes added to commit (use ""git add"" and/or ""git commit -a"");",,,,,,,,,,,,,,,,
+"#	sct timestamp: 	Jun 18 08:16",,,,,,,,,,,,,,,,
+"#	ls config file:	-rw-r--r-- 1 heath criemp 2477 Aug 25 08:19 /var/users/systems/Baldar/Baldar.yaml",,,,,,,,,,,,,,,,
+#,,,,,,,,,,,,,,,,
+cable_id,src_conn_a,src_conn_b,dst_conn_a,dst_conn_b,stage,src_egress_a,src_egress_b,dst_egress_a,dst_egress_b,link_type,src_group,dst_group,part_number,part_length,calculated_distance,route
+3000.3000.00.0000,x3000.c0.r15.j13,none,x3000.c0.s22.b1.n0.h0,x3000.c0.s24.b1.n0.h0,1,none,none,none,none,edge,0,n/a,102234601,1.5,1.2423762,[]
+3000.3000.00.0001,x3000.c0.r15.j14,none,x3000.c0.s04.b1.n0.h1,x3000.c0.s04.b1.n0.h0,1,none,none,none,none,edge,0,n/a,102234601,1.5,1.1532287,[]
+3000.3000.00.0002,x3000.c0.r15.j11,none,x3000.c0.s05.b1.n0.h1,x3000.c0.s05.b1.n0.h0,1,none,none,none,none,edge,0,n/a,102234601,1.5,1.0847825,[]
+3000.3000.00.0003,x3000.c0.r15.j12,none,x3000.c0.s19.b1.n0.h0,x3000.c0.s20.b1.n0.h0,1,none,none,none,none,edge,0,n/a,102234601,1.5,1.0401875,[]
+3000.3000.00.0004,x3000.c0.r15.j9,none,x3000.c0.s06.b1.n0.h1,x3000.c0.s06.b1.n0.h0,1,none,none,none,none,edge,0,n/a,102234601,1.5,1.0176226,[]
+3000.3000.00.0005,x3000.c0.r15.j15,none,x3000.c0.s27.b1.n0.h0,x3000.c0.s27.b2.n0.h0,1,none,none,none,none,edge,0,n/a,102234600,1,0.818406,[]
+3000.3000.00.0006,x3000.c0.r15.j7,none,x3000.c0.s27.b3.n0.h0,x3000.c0.s27.b4.n0.h0,1,none,none,none,none,edge,0,n/a,102234600,1,0.6721679,[]

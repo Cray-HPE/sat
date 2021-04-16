@@ -1,5 +1,5 @@
 """
-Clients for querying the Firmware APIs provided by FUS and FAS.
+Client for querying the Firmware Action Service (FAS) API.
 
 (C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
@@ -57,86 +57,72 @@ class _DateTimeEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, o)
 
 
-class _FirmwareClient(APIGatewayClient):
-    """Defines the interface for FASClient and FUSClient.
-    """
-    def get_all_snapshot_names(self):
-        raise NotImplementedError
-
-    def get_snapshot(self, name):
-        raise NotImplementedError
-
-    def get_snapshots(self, names):
-        raise NotImplementedError
-
-    def get_device_firmwares(self, xname=None):
-        raise NotImplementedError
-
-    def make_fw_table(self, fw_devs):
-        raise NotImplementedError
-
-    def get_updates(self):
-        raise NotImplementedError
-
-    def get_active_updates(self):
-        raise NotImplementedError
+class FASClient(APIGatewayClient):
+    """API Client for querying the Firmware Action Service (FAS)."""
+    # (str): The base URL of the service
+    base_resource_path = 'fas/v1/'
+    # (str): The name of the field in a response from FAS containing the
+    # firmware device's name.
+    name_field = 'name'
+    # (str): The name of the field in a response from FAS containing the
+    # firmware device's version.
+    version_field = 'firmwareVersion'
+    # (str): The name of the field in a response from FAS containing the
+    # device's 'target name' (typically, an alternative name to name_field).
+    target_name_field = 'targetName'
+    # (str): The string message of the APIError to raise when no firmware
+    # was found.
+    err_no_firmware_found = 'No firmware found.'
+    # (tuple): A tuple of headers that should be used when creating a firmware
+    # table.
+    headers = ('xname', 'name', 'target_name', 'version')
 
     @staticmethod
-    def _create_row_from_target(target, xname, name_field, version_field, target_name_field):
-        """Given a 'target' dictionary, create a table row. Helper for _make_fw_table.
+    def _create_row_from_target(target, xname):
+        """Given a 'target' dictionary, create a table row. Helper for make_fw_table.
 
         Args:
-            target: The dictionary containing the attributes of a single
+            target (dict): The dictionary containing the attributes of a single
                 firmware target.
-            xname: The xname of the component to which this firmware target
-                belongs.
-            name_field: The name of the 'name' field, for example 'name' for FAS.
-            version_field: The name of the 'version' field, for example
-                'firmwareVersion' for FAS.
-            target_name_field: The name of the 'target_name' field, for example
-                'targetName' for FAS, or None.
+            xname (str): The xname of the component to which this firmware
+                target belongs.
 
         Returns:
             A list of values from the 'target' dictionary, or None if 'target'
                 contains an error and not enough information to display a row.
         """
-        fw_dev_fields = [name_field, version_field]
-        if target_name_field:
-            fw_dev_fields = [name_field, target_name_field, version_field]
+        fw_dev_fields = [FASClient.name_field, FASClient.target_name_field, FASClient.version_field]
 
         if 'error' in target:
-            LOGGER.error('Error getting firmware for %s target %s: %s', xname,
-                         target.get(name_field) or target.get(target_name_field) or MISSING_VALUE,
-                         target['error'])
+            LOGGER.error(
+                'Error getting firmware for %s target %s: %s', xname,
+                target.get(FASClient.name_field) or target.get(FASClient.target_name_field) or MISSING_VALUE,
+                target['error']
+            )
             # In the event of an error, skip creating a row if either:
             # - a version field does not exist
             # - neither 'name' nor 'target_name' fields exist
-            if version_field not in target or not any(f in target for f in [name_field, target_name_field]):
+            if FASClient.version_field not in target or not any(f in target for f in [FASClient.name_field,
+                                                                                      FASClient.target_name_field]):
                 return None
         # Use XName class so xnames sort properly.
         return [XName(xname)] + [target.get(f, MISSING_VALUE) for f in fw_dev_fields]
 
-    def _make_fw_table(self, fw_devs, name_field, version_field, target_name_field=None):
+    @staticmethod
+    def make_fw_table(fw_devs):
         """For creating rows to be fed into a Report.
-
-        Meant to be called by the FASClient and FUSClient subclasses.
 
         Args:
             fw_devs (list): A list of dictionaries with xnames and their
-                firmware elements and versions. See the FASClient and
-                FUSClient docstrings for what format this should take.
-
-            name, version, target_name: The FUS and FAS have different
-                key-names for the 'name' and 'version' fields within the
-                payload. FAS gives a second 'name' field called targetName
-                as well.
-
-                FUS: 'id', 'version'
-                FAS: 'name', 'firmwareVersion', 'targetName'
+                firmware elements and versions. These dictionaries should
+                contain an 'xname' key and a 'targets' key. The value of the
+                'targets' key is a list of dictionaries each of which has
+                the values of name_field, target_name_field, and
+                version_field as keys.
 
         Returns:
-            A list-of-lists table of strings, each row representing
-            the firmware version for an xname and ID.
+            A list-of-lists table of strings, each row representing the
+            firmware version for a target beneath a component with an xname.
         """
         fw_table = []
         for fw_dev in fw_devs:
@@ -148,9 +134,7 @@ class _FirmwareClient(APIGatewayClient):
             if 'targets' in fw_dev and fw_dev['targets'] is not None:
                 targets = fw_dev['targets']
                 rows_to_add = [
-                    self._create_row_from_target(
-                        target, xname, name_field, version_field, target_name_field
-                    ) for target in targets
+                    FASClient._create_row_from_target(target, xname) for target in targets
                 ]
                 fw_table.extend([row for row in rows_to_add if row])
             elif 'error' in fw_dev:
@@ -161,45 +145,40 @@ class _FirmwareClient(APIGatewayClient):
 
         return fw_table
 
-
-# Should have the same interface as FUSClient
-class FASClient(_FirmwareClient):
-    base_resource_path = 'fas/v1/'
-
-    def get_updates(self):
-        """Get a list of all the firmware updates on the system.
+    def get_actions(self):
+        """Get a list of all the firmware actions on the system.
 
         Returns:
-            A list of dicts representing firmware updates on the system.
+            A list of dicts representing firmware actions on the system.
 
         Raises:
-            APIError: if request to get updates from FAS fails
+            APIError: if request to get actions from FAS fails
         """
         try:
             return self.get('actions').json()['actions']
         except ValueError as err:
             raise APIError('Unable to parse json in response from FAS: '
                            '{}'.format(err))
-        except KeyError as err:
+        except KeyError:
             raise APIError("No 'actions' key in response from FAS.")
 
-    def get_active_updates(self):
-        """Get a list of all the active firmware updates on the system.
+    def get_active_actions(self):
+        """Get a list of all the active firmware actions on the system.
 
         Returns:
-            A list of dicts representing active firmware updates on the system.
+            A list of dicts representing active firmware actions on the system.
 
         Raises:
-            APIError: if request to get updates from FAS fails
+            APIError: if request to get actions from FAS fails
         """
-        return [update for update in self.get_updates()
+        return [update for update in self.get_actions()
                 if update.get('state') not in ('aborted', 'completed')]
 
     def get_all_snapshot_names(self):
         """Return all snapshot names available in the FAS.
 
         Returns:
-            A list of snapshot names.
+            A set of snapshot names.
 
         Raises:
             APIError: - If querying the FAS failed.
@@ -209,12 +188,12 @@ class FASClient(_FirmwareClient):
         try:
             response = self.get('snapshots')
         except APIError as err:
-            raise APIError('Contacting the FW API: {}'.format(err))
+            raise APIError(f'Failed to get snapshots from the FAS API: {err}')
 
         try:
             response = response.json()
         except ValueError as err:
-            raise APIError('The JSON payload was invalid: {}'.format(err))
+            raise APIError(f'The JSON payload was invalid: {err}')
 
         try:
             snapshots = response['snapshots']
@@ -223,26 +202,34 @@ class FASClient(_FirmwareClient):
 
         return set([x['name'] for x in snapshots])
 
-    def get_snapshot(self, name):
-        """Describe data from a particular snapshot.
+    def get_snapshot_devices(self, name, xnames=None):
+        """Describe data from a particular snapshot, optionally filtered by xname.
+
+        If any xnames are not in the given snapshot, log a warning for
+        each xname not in the given snapshot.
 
         The output from this function can be passed to make_fw_table.
 
         Args:
-            name: Snapshot name.
+            name (str): Snapshot name.
+            xnames (list): A list of xnames for which the returned snapshot
+                should include data.
 
         Returns:
-            List of dicts that can be passed to make_fw_table.
+            List of device dictionaries for the given snapshot
+            that can be passed to make_fw_table. See the docstring of
+            make_fw_table for the format this takes.
 
         Raises:
             APIError: - The firmware api could not be queried.
                       - The payload did not contain a 'devices' entry.
                       - The payload was invalid JSON.
+                      - No firmware was found.
         """
         try:
             response = self.get('snapshots', name)
         except APIError as err:
-            raise APIError('Contacting the FAS for snapshot "{}": {}'.format(name, err))
+            raise APIError(f'Failed to get snapshot "{name}" from the FAS API: {err}')
 
         try:
             response = response.json()
@@ -254,64 +241,101 @@ class FASClient(_FirmwareClient):
         except KeyError:
             raise APIError('The payload from snapshot "{}" was missing a "devices" key.'.format(name))
 
-        return devices
+        if xnames:
+            devices_to_return = [dev for dev in devices if dev.get('xname') in xnames]
+            xnames_not_in_snapshot = [
+                xname for xname in xnames if not any(dev.get('xname') == xname for dev in devices)
+            ]
+            if xnames_not_in_snapshot:
+                LOGGER.warning('Warning: xname(s) %s not in snapshot %s', ','.join(xnames_not_in_snapshot), name)
+        else:
+            devices_to_return = devices
 
-    def get_snapshots(self, names):
+        if not devices_to_return:
+            err_message = (
+                f'Snapshot {name} did not have any devices under its "devices" key' +
+                f' for xname(s) {",".join(xnames)}.' if xnames else '.'
+            )
+            raise APIError(err_message)
+
+        return devices_to_return
+
+    def get_multiple_snapshot_devices(self, names, xnames=None):
         """Describe multiple snapshots.
 
-        If a name doesn't exist, then it isn't got.
+        Checks given snapshots against list of known snapshots,
+        and log a warning for each given snapshot that does not exist,
+        and skip attempting to get information for it.
 
         Args:
-            names: Snapshot names to get descriptions of.
+            names (list): Snapshot names to get descriptions of.
+            xnames (list): A list of xnames for which the returned snapshots
+                should include information. If unspecified, get_multiple_snapshot_devices
+                will return snapshot information for all xnames.
 
         Returns:
-            A dict where the keys are the snapshot names and the values are
-            the snapshots themselves. Each value may be passed to make_fw_table.
+            A dictionary where the keys are the snapshot names and the
+            values are the snapshots. Each value may be passed to
+            make_fw_table. See the docstring of make_fw_table for
+            the format the snapshots take.
 
         Raises:
             APIError: - The firmware api could not be queried.
                       - The payload did not contain a 'devices' entry.
                       - The payload was invalid JSON.
+                      - No firmware was found.
         """
         descriptions = {}
         known_snaps = self.get_all_snapshot_names()
 
         for name in names:
             if name not in known_snaps:
-                LOGGER.warning('Snapshot "{}" does not exist.'.format(name))
+                LOGGER.warning('Snapshot %s does not exist.', name)
                 continue
+            try:
+                descriptions[name] = self.get_snapshot_devices(name, xnames)
+            except APIError as err:
+                err_message = (
+                    f'Error getting snapshot {name}' +
+                    (f', xname(s) {",".join(xnames)}: {err}' if xnames else f': {err}')
+                )
+                LOGGER.error(err_message)
 
-            descriptions[name] = self.get_snapshot(name)
+        if not descriptions:
+            raise APIError(FASClient.err_no_firmware_found)
 
-        return descriptions
+        return {name: description for name, description in descriptions.items()}
 
-    def get_device_firmwares(self, xname=''):
-        """Returns devices associated with a particular xname.
+    def _create_temporary_snapshot(self, xnames=None):
+        """Create a temporary snapshot and return its data.
 
         Args:
-            xname: Xname to get device firmware information from. If no value
-                is provided, then all xnames will be queried.
+            xnames: A list of xnames for which to take the snapshot.
+                If not specified, then xnames will not be filtered.
 
         Returns:
-            A list of all devices for the specified xname.
+            A dictionary of response data from FAS, where the 'devices'
+            key points to a list of firmware device dictionaries.
 
         Raises:
-            APIError: If any call to the FAS failed to go through. This can also
-                raise if
-                    - The payload was missing either a 'ready' field while
-                      polling, or a 'devices' field.
-                    - If the FAS did not indicate if the snapshot was ready.
+            APIError: if FAS returned an APIError when creating the snapshot.
+                This can also raise if:
+                    - The payload from creating the temporary snapshot was
+                      missing either a 'ready' field while polling, or a
+                      'devices' field.
+                    - The FAS did not indicate if the snapshot was ready.
         """
         now, later = _now_and_later(10)
-        name = '{}-{}-{}-{}-{}-{}-all-xnames'.format(
-            now.year, now.month, now.day, now.hour, now.minute, now.second)
+        name = 'SAT-{}-{}-{}-{}-{}-{}'.format(
+            now.year, now.month, now.day, now.hour, now.minute, now.second
+        )
 
         # create a system snapshot set to expire in 10 minutes
         payload = {'name': name, 'expirationTime': later}
 
         # filter on xnames if provided.
-        if xname:
-            payload['stateComponentFilter'] = {'xnames': [xname]}
+        if xnames:
+            payload['stateComponentFilter'] = {'xnames': xnames}
 
         payload = json.dumps(payload, cls=_DateTimeEncoder)
 
@@ -338,233 +362,65 @@ class FASClient(_FirmwareClient):
             except KeyError:
                 raise APIError('Payload returned from GET to snapshots/name did not have "ready" field.')
 
+        return response
+
+    def get_device_firmwares(self, xname=None):
+        """Returns devices optionally associated with a particular xname.
+
+        Args:
+            xname (str): Xname to get device firmware information from.
+                If no value is provided, then all xnames will be queried.
+
+        Returns:
+            A list of device dictionaries for the given xname. This
+            can be passed to make_fw_table. See the docstring of
+            make_fw_table for the format this list of dictionaries
+            takes.
+
+        Raises:
+            APIError: If creating the temporary snapshot failed, or if
+                the resulting snapshot contained no data.
+        """
+        # This can raise APIError
+        response = self._create_temporary_snapshot(xnames=[xname] if xname else None)
         try:
-            return response['devices']
+            devices = response['devices']
+            if not devices:
+                err_message = (
+                    f'The snapshot does not have any devices under its "devices" key' +
+                    f' for xname {xname}.' if xname else '.'
+                )
+                raise APIError(err_message)
+            return devices
         except KeyError:
             raise APIError('The JSON payload did not contain a "devices" field.')
 
-    def make_fw_table(self, fw_devs):
-        """For creating rows to be fed into a Report.
+    def get_multiple_device_firmwares(self, xnames):
+        """Returns devices associated with a list of xnames.
+
+        This function wraps around get_device_firmwares and creates
+        a snapshot for each xname, so that if an API error occurs for
+        just one, the remaining xnames may still be queried.
 
         Args:
-            fw_devs (list): A list of dictionaries with xnames and their
-                firmware elements and versions.
-
-                fw_devs = [
-                    {
-                        xname: xname,
-                        'targets': [{'version': vers, 'id': id}, ...]
-                    },
-                    ...
-                ]
+            xnames (list): A list of xnames for which to query firmware.
 
         Returns:
-            A list-of-lists table of strings, each row representing
-            the firmware version for an xname and ID.
-        """
-        return self._make_fw_table(fw_devs, 'name', 'firmwareVersion', 'targetName')
-
-
-# Should have the same interface as FASClient
-class FUSClient(_FirmwareClient):
-    """Class for interacting with the FUS.
-    """
-    base_resource_path = 'fw-update/v1/'
-
-    def get_updates(self):
-        """Get a list of all the firmware updates on the system.
-
-        Returns:
-            A list of dicts representing firmware updates on the system.
+            A list of device dictionaries for the given xnames. This
+            can be passed to make_fw_table. See the docstring of
+            make_fw_table for the format this list of dictionaries
+            takes.
 
         Raises:
-            APIError: if request to get updates from FUS fails
+            APIError: if the given xnames yielded no firmware data.
         """
-        try:
-            return self.get('status').json()
-        except ValueError as err:
-            raise APIError('Unable to parse json in response from FUS: '
-                           '{}'.format(err))
-
-    def get_active_updates(self):
-        """Get a list of all the active firmware updates on the system.
-
-        Returns:
-            A list of dicts representing active firmware updates on the system.
-
-        Raises:
-            APIError: if request to get updates from FUS fails
-        """
-        return [update for update in self.get_updates()
-                if 'endTime' not in update]
-
-    def get_all_snapshot_names(self):
-        """Return all existing snapshots on the FUS.
-
-        Returns:
-            A set of all existing snapshot names.
-
-        Raises:
-            APIError: If the request to the FUS could not be made.
-        """
-        try:
-            response = self.get('snapshot')
-        except APIError as err:
-            raise APIError('Request to FW API failed: {}'.format(err))
-
-        try:
-            response = response.json()
-        except ValueError as err:
-            raise APIError('The JSON payload was invalid: {}'.format(err))
-
-        try:
-            snapshots = response['snapshots']
-        except KeyError:
-            raise APIError('The payload was missing an entry for "snapshots".')
-
-        return set([x['name'] for x in snapshots])
-
-    def get_snapshot(self, name):
-        """Get data from a particular snapshot.
-
-        The output from this function can be passed to make_fw_table.
-
-        Be careful - a snapshot of the matching name will be created if it
-        doesn't exist.
-
-        Args:
-            name: Snapshot name.
-
-        Returns:
-            List of dicts that can be passed to make_fw_table.
-
-        Raises:
-            APIError: - The firmware api could not be queried.
-                      - The payload received was invalid JSON.
-                      - The payload was missing a 'devices' entry.
-        """
-        try:
-            response = self.get('snapshot', name)
-        except APIError as err:
-            raise APIError('Request to firmware API failed for snapshot "{}": {}'.format(name, err))
-
-        try:
-            response = response.json()
-        except ValueError as err:
-            raise APIError('The JSON payload was invalid for snapshot "{}": {}'.format(name, err))
-
-        try:
-            devices = response['devices']
-        except KeyError:
-            raise APIError('The payload from snapshot "{}" was missing an entry for "devices".'.format(name))
-
-        return devices
-
-    def get_snapshots(self, names):
-        """Get multiple snapshots.
-
-        If a name doesn't exist, then it isn't retrieved, nor is it created.
-
-        Args:
-            names: Snapshot names to get descriptions of.
-
-        Returns:
-            A dict where the keys are the snapshot names and the values are
-            the snapshots themselves. Each value may be passed to make_fw_table.
-
-        Raises:
-            APIError: - The firmware api could not be queried.
-                      - If get_snapshot raised.
-        """
-        descriptions = {}
-        known_snaps = self.get_all_snapshot_names()
-
-        for name in names:
-            if name not in known_snaps:
-                LOGGER.warning('Snapshot "{}" does not exist.'.format(name))
-                continue
-
-            descriptions[name] = self.get_snapshot(name)
-
-        return descriptions
-
-    def get_device_firmwares(self, xname='all'):
-        """Get device firmware information for the specified xname.
-
-        Args:
-            xname: Xname for which devices should be obtained. Omit to
-                get 'all' xnames.
-
-        Raises:
-            APIError: - The call to the FUS failed.
-                      - Invalid JSON was returned.
-                      - There was no 'devices' field in the JSON.
-        """
-        try:
-            response = self.get('version', xname)
-        except APIError as err:
-            raise APIError('Error contacting the FUS: {}'.format(err))
-
-        try:
-            response_json = response.json()
-        except ValueError as err:
-            raise APIError('The JSON received was invalid: {}'.format(err))
-
-        # can raise KeyError
-        try:
-            ret = response_json['devices']
-            return ret or []
-        except KeyError:
-            raise APIError('The JSON payload was missing an entry for "devices".')
-
-    def make_fw_table(self, fw_devs):
-        """For creating rows to be fed into a Report.
-
-        Args:
-            fw_devs (list): A list of dictionaries with xnames and their
-                firmware elements and versions.
-
-                fw_devs = [
-                    {
-                        xname: xname,
-                        'targets': [{'version': vers, 'id': id}, ...]
-                    },
-                    ...
-                ]
-
-        Returns:
-            A list-of-lists table of strings, each row representing
-            the firmware version for an xname and ID.
-        """
-        return self._make_fw_table(fw_devs, 'id', 'version')
-
-
-def create_firmware_client(session=None, host=None, cert_verify=None):
-    """Determines which client type (FUS or FAS) to initialize.
-
-    Args:
-        Same as APIGatewayClient.__init__.
-
-    Returns:
-        A new instance of FASClient or FUSClient depending on which service
-        was available.
-
-    Raises:
-        APIError: Neither service was available.
-    """
-    client = FASClient(session, host, cert_verify)
-
-    try:
-        client.get('service', 'status')
-        LOGGER.debug('Using the FAS')
-    except APIError:
-        client = FUSClient(session, host, cert_verify)
-        try:
-            client.get('status')
-        except APIError:
-            LOGGER.error('Neither the FUS or FAS was available.')
-            raise
-
-        LOGGER.debug('Using the FUS')
-
-    return client
+        device_firmwares = []
+        for xname in xnames:
+            try:
+                xname_device_firmwares = self.get_device_firmwares(xname)
+                device_firmwares.extend(xname_device_firmwares)
+            except APIError as err:
+                LOGGER.error('Error getting firmware for xname %s: %s', xname, err)
+        if not device_firmwares:
+            raise APIError(FASClient.err_no_firmware_found)
+        return device_firmwares

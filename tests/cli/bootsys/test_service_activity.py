@@ -41,7 +41,7 @@ from sat.cli.bootsys.service_activity import (
     _report_active_sessions,
     do_service_activity_check
 )
-from sat.fwclient import FASClient, FUSClient
+from sat.fwclient import FASClient
 from sat.report import Report
 
 
@@ -524,18 +524,6 @@ class TestCRUSActivityChecker(unittest.TestCase):
 class TestFirmwareActivityChecker(ExtendedTestCase):
     """Test the FirmwareActivityChecker class."""
 
-    def get_fus_update(self, **kwargs):
-        """Get a FUS update data structure.
-
-        Args:
-            **kwargs: Keyword arguments used as values in FUS session.
-        """
-        fus_update_fields = ['updateID', 'startTime', 'dryrun']
-        return {
-            field: kwargs.get(field, self.defaults.get(field))
-            for field in fus_update_fields
-        }
-
     def get_fas_action(self, **kwargs):
         """Get a FAS action data structure.
 
@@ -560,43 +548,22 @@ class TestFirmwareActivityChecker(ExtendedTestCase):
             'state': 'complete'
         }
 
-        # Tests can set this to FUSClient or FASClient to test FUS or FAS
-        self.fw_client = FASClient
         self.fas_actions = [
             self.get_fas_action(actionID='fas-action-{}'.format(num))
             for num in range(2)
         ]
-        self.fus_actions = [
-            self.get_fus_update(updateID='fus-update-{}'.format(num))
-            for num in range(2)
-        ]
 
-        # If not None, causes create_firmware_client to raise this
-        self.create_err = None
-        # If not None, causes FUSClient/FASClient to raise this
+        # If not None, causes FASClient to raise this
         self.fw_err = None
 
         def mock_get_active_updates():
             if self.fw_err:
                 raise self.fw_err
-            elif self.fw_client == FASClient:
-                return self.fas_actions
             else:
-                return self.fus_actions
+                return self.fas_actions
 
-        def mock_create_firmware_client(*args, **kwargs):
-            if self.create_err:
-                raise self.create_err
-
-            return Mock(spec=self.fw_client,
-                        get_active_updates=mock_get_active_updates)
-
-        patch('sat.cli.bootsys.service_activity.create_firmware_client',
-              mock_create_firmware_client).start()
-
-        # Since the FirmwareActivityChecker() calls create_firmware_client, and
-        # we want to influence the result in each test case by setting
-        # self.fw_client, we create the instances in each test method.
+        self.fw_client = patch('sat.cli.bootsys.service_activity.FASClient').start().return_value
+        self.fw_client.get_active_actions.side_effect = mock_get_active_updates
 
     def tearDown(self):
         """Stop mocks at the end of each unit test."""
@@ -604,30 +571,7 @@ class TestFirmwareActivityChecker(ExtendedTestCase):
 
     def test_init_fas(self):
         """Test creation of a FirmwareActivityChecker with FAS"""
-        self.fw_client = FASClient
         fw_checker = FirmwareActivityChecker()
-        self.assertEqual('FAS', fw_checker.service_name)
-        self.assertEqual('action', fw_checker.session_name)
-        self.assertEqual('firmware actions describe', fw_checker.cray_cli_args)
-        self.assertEqual('actionID', fw_checker.id_field_name)
-
-    def test_init_fus(self):
-        """Test creation of a FirmwareActivityChecker with FUS"""
-        self.fw_client = FUSClient
-        fw_checker = FirmwareActivityChecker()
-        self.assertEqual('FUS', fw_checker.service_name)
-        self.assertEqual('update', fw_checker.session_name)
-        self.assertEqual('firmware status describe', fw_checker.cray_cli_args)
-        self.assertEqual('updateID', fw_checker.id_field_name)
-
-    def test_init_fus_fas_unavailable(self):
-        """Test creation of a FirmwareActivityChecker with FUS and FAS unavailable."""
-        self.create_err = APIError("Neither FUS nor FAS is available.")
-        with self.assertLogs(level=logging.ERROR) as cm:
-            fw_checker = FirmwareActivityChecker()
-
-        self.assert_in_element(
-            'Failed to determine firmware service. Assuming FAS.', cm.output)
         self.assertEqual('FAS', fw_checker.service_name)
         self.assertEqual('action', fw_checker.session_name)
         self.assertEqual('firmware actions describe', fw_checker.cray_cli_args)
@@ -635,7 +579,6 @@ class TestFirmwareActivityChecker(ExtendedTestCase):
 
     def test_get_active_sessions_two_active_fas(self):
         """Test get_active_sessions with two active FAS actions."""
-        self.fw_client = FASClient
         fw_checker = FirmwareActivityChecker()
 
         expected_active_sessions = []
@@ -645,22 +588,6 @@ class TestFirmwareActivityChecker(ExtendedTestCase):
                 ('startTime', action['startTime']),
                 ('state', action['state']),
                 ('snapshotID', action['snapshotID']),
-                ('dryrun', action['dryrun'])
-            ]))
-
-        active_sessions = fw_checker.get_active_sessions()
-        self.assertEqual(expected_active_sessions, active_sessions)
-
-    def test_get_active_sessions_two_active_fus(self):
-        """Test get_active_sessions with two active FUS updates."""
-        self.fw_client = FUSClient
-        fw_checker = FirmwareActivityChecker()
-
-        expected_active_sessions = []
-        for action in self.fus_actions:
-            expected_active_sessions.append(OrderedDict([
-                ('updateID', action['updateID']),
-                ('startTime', action['startTime']),
                 ('dryrun', action['dryrun'])
             ]))
 

@@ -18,7 +18,6 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-%define ansible_framework_dir /opt/cray/crayctl/ansible_framework
 %define satmandir %{_mandir}/man8
 
 Name: cray-sat
@@ -56,14 +55,6 @@ SAT was created to provide functionality similar to what was provided by the
 xt-prefixed commands in the XC platform, such as xthwinv, xtshowrev,
 xtcli, and others.
 
-%package crayctldeploy
-Summary: System Admin Toolkit (SAT) Deployment Ansible role
-Requires: cray-crayctl
-
-%description crayctldeploy
-The Ansible role within the crayctl Ansible Framework that installs the System
-Admin Toolkit (SAT).
-
 %prep
 %setup -n %{name}-%{version}
 
@@ -95,10 +86,6 @@ install -m 755 -d %{buildroot}/var/sat/bootsys
 # Holds pod state dumps gathered during shutdown.
 install -m 755 -d %{buildroot}/var/sat/bootsys/pod-states
 
-# Install ansible content for crayctldeploy subpackage
-install -m 755 -d %{buildroot}/%{ansible_framework_dir}/roles
-cp -r ansible/roles/cray_sat %{buildroot}/%{ansible_framework_dir}/roles/
-
 # Install man pages
 install -m 755 -d %{buildroot}%{satmandir}/
 cp docs/man/*.8 %{buildroot}%{satmandir}/
@@ -125,6 +112,3 @@ cat INSTALLED_FILES | grep __pycache__ | xargs dirname | xargs dirname | uniq >>
 %dir /var/sat/bootsys/pod-states
 %{satmandir}/*.8.gz
 /etc/bash_completion.d/sat-completion.bash
-
-%files crayctldeploy
-%{ansible_framework_dir}/roles/cray_sat

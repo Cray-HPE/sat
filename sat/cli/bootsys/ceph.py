@@ -37,53 +37,23 @@ from sat.util import BeginEndLogger
 LOGGER = logging.getLogger(__name__)
 
 
+class CephHealthCheckError(Exception):
+    """Ceph was determined to be unhealthy."""
+    pass
+
+
 class CephHealthWaiter(Waiter):
     """Waiter for the Ceph cluster health status."""
-
-    def __init__(self, timeout, poll_interval=1, allow_ceph_health_warn=False):
-        self.host = 'ncn-m001'
-
-        self.ssh_client = SSHClient()
-        self.ssh_client.load_system_host_keys()
-        self.ssh_client.connect(self.host)
-        self.allow_ceph_health_warn = allow_ceph_health_warn
-
-        super().__init__(timeout, poll_interval=poll_interval)
 
     def condition_name(self):
         return "Ceph cluster in healthy state"
 
     def has_completed(self):
         try:
-            ceph_command = 'ceph -s --format=json'
-            _, stdout, _ = self.ssh_client.exec_command(ceph_command)
-
-        except SSHException:
-            LOGGER.error('Failed to execute command "%s" on host "%s".', ceph_command, self.host)
-            return False
-
-        try:
-            rsp_dict = json.load(stdout)
-
-        except json.decoder.JSONDecodeError as jde:
-            LOGGER.error('Received malformed response from Ceph: %s', jde)
-            return False
-
-        try:
-            # TODO: If the Ceph health criteria are updated, this will
-            # need to be changed. (See SAT-559 for further
-            # information.)
-            acceptable_statuses = ['HEALTH_OK', 'HEALTH_WARN'] if self.allow_ceph_health_warn else ['HEALTH_OK']
-            return rsp_dict['health']['status'] in acceptable_statuses
-
-        except KeyError:
-            LOGGER.error('Ceph JSON response is well-formed, but has an unexpected schema.')
-
-            if 'health' not in rsp_dict:
-                LOGGER.error('Missing top-level "health" key in Ceph JSON response.')
-            elif 'status' not in rsp_dict['health']:
-                LOGGER.error('Missing "status" key under "health" key in Ceph JSON response.')
-
+            check_ceph_health(expecting_osdmap_flags=False)
+            return True
+        except CephHealthCheckError as err:
+            LOGGER.info('Ceph is not healthy: %s', err)
             return False
 
 
@@ -143,7 +113,7 @@ def validate_ceph_warning_state(ceph_check_data, expecting_osdmap_flags=False):
     PGs per OSD' and/or 'large omap objects'). If all the 'checks' in
     ceph_check_data are considered acceptable (by checking against a list of
     known 'acceptable' warnings, then Ceph is considered healthy and the
-    function will return True.
+    function will return.
 
     The 'OSDMAP_FLAGS' check (indicating that one or more OSD flags are set) is
     considered acceptable but only on the condition that the specific OSD flags
@@ -151,10 +121,11 @@ def validate_ceph_warning_state(ceph_check_data, expecting_osdmap_flags=False):
     'nobackfill', or 'norecover' (or any combination of the three), then Ceph
     is considered healthy. Otherwise, it is considered unhealthy.
 
-    If Ceph is healthy with warnings, a warning is logged. If Ceph is
-    unhealthy, an error is logged. However, if the only warning that
-    exists is OSDMAP_FLAGS, then the warning will be skipped when
-    expecting_osdmap_flags is set to True.
+    If Ceph is considered unhealthy, a CephHealthCheckError is raised.
+
+    If Ceph is healthy with warnings, a warning is logged. However,
+    if the only warning that exists is OSDMAP_FLAGS, then the warning will
+    be skipped when expecting_osdmap_flags is set to True.
 
     For a full list of Ceph health checks, see:
     https://docs.ceph.com/en/latest/rados/operations/health-checks/
@@ -167,23 +138,19 @@ def validate_ceph_warning_state(ceph_check_data, expecting_osdmap_flags=False):
             are all acceptable. Otherwise, skip logging this warning.
 
     Returns:
-        True if the given health check information amounts to an 'acceptable'
-            warning state.
+        None
 
     Raises:
-        KeyError: if an expected dictionary key is missing.
+        CephHealthCheckError: if Ceph is not healthy.
     """
     acceptable_checks = ['LARGE_OMAP_OBJECTS', 'TOO_FEW_PGS', 'POOL_NEAR_FULL', 'OSD_NEARFULL', 'OSDMAP_FLAGS']
     unacceptable_checks_found = [check for check in ceph_check_data if check not in acceptable_checks]
     if ceph_check_data and unacceptable_checks_found:
-        LOGGER.error(
-            'Ceph is not healthy. The following fatal Ceph health warnings were found: %s ',
-            ','.join(unacceptable_checks_found)
+        raise CephHealthCheckError(
+            f'The following fatal Ceph health warnings were found: {",".join(unacceptable_checks_found)}'
         )
-        ceph_is_healthy = False
     elif not ceph_check_data:
-        LOGGER.error('Ceph is not healthy. Ceph is in HEALTH_WARN state with unknown warnings.')
-        ceph_is_healthy = False
+        raise CephHealthCheckError('Ceph is in HEALTH_WARN state with unknown warnings.')
     elif 'OSDMAP_FLAGS' in ceph_check_data:
         acceptable_flags = ['noout', 'nobackfill', 'norecover']
         try:
@@ -192,30 +159,16 @@ def validate_ceph_warning_state(ceph_check_data, expecting_osdmap_flags=False):
         except (IndexError, KeyError, AttributeError):
             flags = None
         if not flags:
-            LOGGER.error(
-                'Ceph is not healthy. The OSDMAP_FLAGS check failed with unknown OSD flags.'
-            )
-            ceph_is_healthy = False
+            raise CephHealthCheckError('The OSDMAP_FLAGS check failed with unknown OSD flags.')
         elif not all(flag in acceptable_flags for flag in flags):
-            LOGGER.error(
-                'Ceph is not healthy. The OSDMAP_FLAGS check failed. OSD flags: %s', ','.join(flags)
-            )
-            ceph_is_healthy = False
-        else:
-            # Ceph has OSDMAP_FLAGS, and 'acceptable' flags, and is otherwise healthy.
-            ceph_is_healthy = True
-    else:
-        # Ceph has only 'acceptable' flags.
-        ceph_is_healthy = True
+            raise CephHealthCheckError(f'The OSDMAP_FLAGS check failed. OSD flags: {",".join(flags)}')
 
-    if ceph_is_healthy and (list(ceph_check_data.keys()) != ['OSDMAP_FLAGS'] or not expecting_osdmap_flags):
+    if list(ceph_check_data.keys()) != ['OSDMAP_FLAGS'] or not expecting_osdmap_flags:
         LOGGER.warning('Ceph is healthy with warnings: %s', ','.join(ceph_check_data.keys()))
 
-    return ceph_is_healthy
 
-
-def ceph_healthy(expecting_osdmap_flags=False):
-    """Get the current health of the Ceph cluster.
+def check_ceph_health(expecting_osdmap_flags=False):
+    """Check the current health of the Ceph cluster.
 
     This function uses the JSON object returned from `ceph -s --format=json`
     to determine Ceph health. The JSON object should contain a 'health' key
@@ -223,19 +176,16 @@ def ceph_healthy(expecting_osdmap_flags=False):
 
     In the 'health' dictionary, there is a 'status' key whose value is a string
     describing the overall health of the Ceph cluster. If this value is 'HEALTH_OK',
-    then the cluster is considered healthy, and the function will return True.
+    then the cluster is considered healthy, and the function will return.
 
     If the status is 'HEALTH_WARN', then the function will check the dictionary
     value of the 'checks' key in the 'health' dict. For a description of how
     the 'HEALTH_WARN' status is evaluated, see validate_ceph_warning_state().
+    This will raise a CephHealthCheckError if Ceph is not healthy.
 
     If the status is anything other than 'HEALTH_WARN' or 'HEALTH_OK', then
-    Ceph is considered unhealthy and the function will return False.
-
-    TODO (SAT-788): Module organization and slight differences in behavior
-    This function is used by do_platform_stop in platform.py, in the
-    platform-services stage of `sat bootsys shutdown`, but not in the
-    CephHealthWaiter class, which simply allows both HEALTH_OK and HEALTH_WARN.
+    Ceph is considered unhealthy and the function will raise a
+    CephHealthCheckError.
 
     Args:
         expecting_osdmap_flags (bool): If False, then log a warning even
@@ -243,7 +193,10 @@ def ceph_healthy(expecting_osdmap_flags=False):
             are all acceptable. Otherwise, skip logging this warning.
 
     Returns:
-        True if the Ceph cluster is healthy, otherwise False.
+        None
+
+    Raises:
+        CephHealthCheckError: if Ceph is not healthy.
     """
     LOGGER.info('Checking Ceph health')
     ceph_command = ['ceph', '-s', '--format=json']
@@ -251,25 +204,21 @@ def ceph_healthy(expecting_osdmap_flags=False):
         ceph_command_output = subprocess.check_output(ceph_command)
 
     except subprocess.CalledProcessError as cpe:
-        LOGGER.error('Failed to check ceph health: %s', cpe)
-        return False
+        raise CephHealthCheckError(f'Failed to check ceph health: {cpe}')
 
     try:
         ceph_response_dict = json.loads(ceph_command_output)
     except json.decoder.JSONDecodeError as jde:
-        LOGGER.error('Received malformed response from Ceph: %s', jde)
-        return False
+        raise CephHealthCheckError(f'Received malformed response from Ceph: {jde}')
 
     try:
         overall_status = ceph_response_dict['health']['status']
-        if overall_status == 'HEALTH_OK':
-            return True
-        elif overall_status == 'HEALTH_WARN':
-            return validate_ceph_warning_state(ceph_response_dict['health']['checks'], expecting_osdmap_flags)
-        return False
+        if overall_status == 'HEALTH_WARN':
+            validate_ceph_warning_state(ceph_response_dict['health']['checks'], expecting_osdmap_flags)
+        elif overall_status != 'HEALTH_OK':
+            raise CephHealthCheckError('Ceph health is not HEALTH_OK or HEALTH_WARN')
     except KeyError as e:
-        LOGGER.error('Ceph JSON response is missing expected key: %s', e)
-        return False
+        raise CephHealthCheckError(f'Ceph JSON response is missing expected key: {e}')
 
 
 def toggle_ceph_freeze_flags(freeze=True):

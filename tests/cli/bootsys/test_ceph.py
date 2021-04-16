@@ -23,7 +23,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 import json
 import logging
-from io import StringIO
 import unittest
 from unittest.mock import patch, Mock, call
 
@@ -31,7 +30,13 @@ from paramiko import SSHException
 import subprocess
 from subprocess import CalledProcessError
 
-from sat.cli.bootsys.ceph import ceph_healthy, toggle_ceph_freeze_flags, restart_ceph_services, CephHealthWaiter
+from sat.cli.bootsys.ceph import (
+    CephHealthWaiter,
+    CephHealthCheckError,
+    check_ceph_health,
+    restart_ceph_services,
+    toggle_ceph_freeze_flags
+)
 from tests.common import ExtendedTestCase
 
 
@@ -121,51 +126,22 @@ class TestCephWaiter(unittest.TestCase):
     """Tests for the CephHealthWaiter class"""
 
     def setUp(self):
-        self.mock_ssh_client = patch('sat.cli.bootsys.ceph.SSHClient').start()
-
-        # TODO: if the Ceph health criteria change, these will need to
-        # be modified. (See SAT-559 for further information.)
-        self.HEALTH_OK = StringIO('{"health": {"status": "HEALTH_OK"}}')
-        self.HEALTH_WARN = StringIO('{"health": {"status": "HEALTH_WARN"}}')
-
-        self.mock_ssh_client.return_value.exec_command.return_value = (None, self.HEALTH_OK, None)
-
+        self.mock_check_ceph_health = patch('sat.cli.bootsys.ceph.check_ceph_health').start()
         self.waiter = CephHealthWaiter(10)
 
     def tearDown(self):
         patch.stopall()
 
-    def test_ceph_health_connects_ssh(self):
-        """Test that CephHealthWaiter connects over SSH properly."""
-        self.waiter.has_completed()
-        self.mock_ssh_client.return_value.load_system_host_keys.assert_called_once()
-        self.mock_ssh_client.return_value.connect.assert_called_once_with(self.waiter.host)
-        self.mock_ssh_client.return_value.exec_command.assert_called_once()
-
-    def test_ceph_health_is_ready(self):
-        """Test that Ceph readiness is detected."""
+    def test_ceph_waiter_healthy(self):
+        """Test that CephHealthWaiter is complete when Ceph is healthy."""
         self.assertTrue(self.waiter.has_completed())
+        self.mock_check_ceph_health.assert_called_once_with(expecting_osdmap_flags=False)
 
-    def test_ceph_health_is_not_ready(self):
-        """Test that Ceph not being ready is detected."""
-        self.mock_ssh_client.return_value.exec_command.return_value = (None, self.HEALTH_WARN, None)
+    def test_ceph_waiter_unhealthy(self):
+        """Test that CephHealthWaiter is not complete when Ceph is unhealthy."""
+        self.mock_check_ceph_health.side_effect = CephHealthCheckError
         self.assertFalse(self.waiter.has_completed())
-
-    def test_ceph_health_ssh_broken(self):
-        """Test that Ceph health is not complete if there's an SSH problem."""
-        self.mock_ssh_client.return_value.exec_command.side_effect = SSHException()
-        self.assertFalse(self.waiter.has_completed())
-
-    @patch('sat.cli.bootsys.ceph.json.loads')
-    def test_ceph_health_malformed_json(self, mock_json_loads):
-        """Test that Ceph health is not complete if Ceph returns malformed JSON."""
-        mock_json_loads.side_effect = json.decoder.JSONDecodeError('bad json', 'it is wrong', 0)
-        self.assertFalse(self.waiter.has_completed())
-
-    def test_ceph_health_json_bad_schema(self):
-        """Test that Ceph health is not complete if the JSON schema is incorrect."""
-        self.mock_ssh_client.return_value.exec_command.return_value = (None, StringIO('{"foo": {"bar": "baz"}'), None)
-        self.assertFalse(self.waiter.has_completed())
+        self.mock_check_ceph_health.assert_called_once_with(expecting_osdmap_flags=False)
 
 
 class TestToggleCephFreezeFlags(ExtendedTestCase):
@@ -229,8 +205,8 @@ class TestToggleCephFreezeFlags(ExtendedTestCase):
             toggle_ceph_freeze_flags(freeze=False)
 
 
-class TestCephHealthy(ExtendedTestCase):
-    """Tests for the ceph_healthy function."""
+class TestCheckCephHealth(ExtendedTestCase):
+    """Tests for the check_ceph_health function."""
     def setUp(self):
         """Set up patches."""
         self.ceph_health_command = patch('sat.cli.bootsys.ceph.subprocess.check_output').start()
@@ -331,132 +307,111 @@ class TestCephHealthy(ExtendedTestCase):
         """Stop patches."""
         patch.stopall()
 
-    def test_ceph_healthy(self):
-        """Test ceph_healthy returns True when ceph is healthy."""
+    def test_check_ceph_health(self):
+        """Test check_ceph_health returns when ceph is healthy."""
         self.ceph_health_command.return_value = self.HEALTH_OK
-        self.assertTrue(ceph_healthy())
+        check_ceph_health()
         self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
 
     def test_ceph_unhealthy(self):
-        """Test ceph_healthy returns False when ceph is unhealthy with HEALTH_ERR."""
+        """Test check_ceph_health raises CephHealthCheckError when ceph is unhealthy with HEALTH_ERR."""
         self.ceph_health_command.return_value = self.HEALTH_ERR
-        self.assertFalse(ceph_healthy())
+        with self.assertRaisesRegex(CephHealthCheckError, 'Ceph health is not HEALTH_OK or HEALTH_WARN'):
+            check_ceph_health()
         self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
 
     def test_ceph_warn_healthy(self):
-        """Test ceph_healthy returns True when ceph is in an 'acceptable' warning state."""
+        """Test check_ceph_health warns and returns when ceph is in an 'acceptable' warning state."""
         self.ceph_health_command.return_value = self.HEALTH_WARN_OK
         with self.assertLogs(level=logging.WARNING) as logs:
-            self.assertTrue(ceph_healthy())
+            check_ceph_health()
         self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
         self.assert_in_element('Ceph is healthy with warnings: LARGE_OMAP_OBJECTS,TOO_FEW_PGS', logs.output)
 
     def test_ceph_warn_unhealthy(self):
-        """Test ceph_healthy returns False when ceph is in an 'unacceptable' warning state."""
+        """Test check_ceph_health raises CephHealthCheckError when ceph is in an 'unacceptable' warning state."""
         self.ceph_health_command.return_value = self.HEALTH_WARN_NOT_OK
-        with self.assertLogs(level=logging.WARNING) as logs:
-            self.assertFalse(ceph_healthy())
+        with self.assertRaisesRegex(
+                CephHealthCheckError,
+                'The following fatal Ceph health warnings were found: POOL_TARGET_SIZE_BYTES_OVERCOMMITTED'):
+            check_ceph_health()
         self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
-        self.assert_in_element(
-            'Ceph is not healthy. '
-            'The following fatal Ceph health warnings were found: POOL_TARGET_SIZE_BYTES_OVERCOMMITTED',
-            logs.output
-        )
-        self.assert_not_in_element('Ceph is healthy with warnings', logs.output)
 
     def test_ceph_warn_missing_checks(self):
-        """Test ceph_healthy returns False when ceph is HEALTH_WARN but missing the 'checks' key."""
+        """Test check_ceph_health raises CephHealthCheckError when ceph is HEALTH_WARN but missing the 'checks' key."""
         self.ceph_health_command.return_value = self.HEALTH_WARN_MISSING_CHECKS
-        with self.assertLogs(level=logging.ERROR) as logs:
-            self.assertFalse(ceph_healthy())
+        with self.assertRaisesRegex(CephHealthCheckError, 'Ceph JSON response is missing expected key: \'checks\''):
+            check_ceph_health()
         self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
-        self.assert_in_element('Ceph JSON response is missing expected key: \'checks\'', logs.output)
 
     def test_ceph_warn_empty_checks(self):
-        """Test ceph_healthy returns False when ceph is HEALTH_WARN but has no 'checks' data."""
+        """Test check_ceph_health raises CephHealthCheckError when ceph is HEALTH_WARN but has no 'checks' data."""
         self.ceph_health_command.return_value = self.HEALTH_WARN_EMPTY_CHECKS
-        with self.assertLogs(level=logging.ERROR) as logs:
-            self.assertFalse(ceph_healthy())
+        with self.assertRaisesRegex(CephHealthCheckError, 'Ceph is in HEALTH_WARN state with unknown warnings.'):
+            check_ceph_health()
         self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
-        self.assert_in_element('Ceph is not healthy. Ceph is in HEALTH_WARN state with unknown warnings.', logs.output)
 
     def test_ceph_osd_flags_healthy(self):
-        """Test ceph_healthy returns True when ceph has OSD_FLAGS that are acceptable"""
+        """Test check_ceph_health warns and returns when ceph has OSD_FLAGS that are acceptable"""
         self.ceph_health_command.return_value = self.HEALTH_WARN_OSDMAP_FLAGS_OK
         with self.assertLogs(level=logging.WARNING) as logs:
-            self.assertTrue(ceph_healthy())
+            check_ceph_health()
         self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
         self.assert_in_element('Ceph is healthy with warnings: OSDMAP_FLAGS', logs.output)
 
     def test_ceph_osd_flags_healthy_and_expected(self):
-        """Test Ceph is considered healthy when OSD flags are acceptable and expected, and no warning is logged."""
+        """Test check_ceph_health returns when OSD flags are acceptable and expected, but no warning is logged."""
         self.ceph_health_command.return_value = self.HEALTH_WARN_OSDMAP_FLAGS_OK
         with patch('sat.cli.bootsys.ceph.LOGGER') as logger:
-            self.assertTrue(ceph_healthy(expecting_osdmap_flags=True))
+            check_ceph_health(expecting_osdmap_flags=True)
         self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
         logger.warning.assert_not_called()
 
     def test_ceph_osd_flags_unhealthy(self):
-        """Test ceph_healthy returns False when ceph has OSD_FLAGS that are not acceptable"""
+        """Test check_ceph_health raises CephHealthCheckError when ceph has OSD_FLAGS that are not acceptable"""
         self.ceph_health_command.return_value = self.HEALTH_WARN_OSDMAP_FLAGS_NOT_OK
-        with self.assertLogs(level=logging.ERROR) as logs:
-            self.assertFalse(ceph_healthy())
+        with self.assertRaisesRegex(CephHealthCheckError, 'The OSDMAP_FLAGS check failed. OSD flags: full'):
+            check_ceph_health()
         self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
-        self.assert_in_element('Ceph is not healthy. The OSDMAP_FLAGS check failed. OSD flags: full', logs.output)
 
     def test_ceph_osd_flags_missing_data(self):
-        """Test ceph_healthy returns False when ceph has OSD_FLAGS and missing summary data."""
+        """Test check_ceph_health raises CephHealthCheckError when ceph has OSD_FLAGS and missing summary data."""
         self.ceph_health_command.return_value = self.HEALTH_WARN_OSDMAP_FLAGS_EMPTY_DATA
-        with self.assertLogs(level=logging.ERROR) as logs:
-            self.assertFalse(ceph_healthy())
+        with self.assertRaisesRegex(CephHealthCheckError, 'The OSDMAP_FLAGS check failed with unknown OSD flags.'):
+            check_ceph_health()
         self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
-        self.assert_in_element(
-            'Ceph is not healthy. The OSDMAP_FLAGS check failed with unknown OSD flags.', logs.output
-        )
-        self.assert_not_in_element('Ceph is healthy with warnings', logs.output)
 
     def test_ceph_osd_flags_empty_message(self):
-        """Test ceph_healthy returns False when ceph has OSD_FLAGS and missing summary message."""
+        """Test check_ceph_health raises CephHealthCheckError when ceph has OSD_FLAGS and missing summary message."""
         self.ceph_health_command.return_value = self.HEALTH_WARN_OSDMAP_FLAGS_EMPTY_MESSAGE
-        with self.assertLogs(level=logging.ERROR) as logs:
-            self.assertFalse(ceph_healthy())
+        with self.assertRaisesRegex(CephHealthCheckError, 'The OSDMAP_FLAGS check failed with unknown OSD flags.'):
+            check_ceph_health()
         self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
-        self.assert_in_element(
-            'Ceph is not healthy. The OSDMAP_FLAGS check failed with unknown OSD flags.', logs.output
-        )
-        self.assert_not_in_element('Ceph is healthy with warnings', logs.output)
 
     def test_ceph_osd_flags_wrong_type(self):
-        """Test ceph_healthy returns False when ceph has OSD_FLAGS and unexpected summary data type."""
+        """Test check_ceph_health raises CephHealthCheckError with OSD_FLAGS and unexpected summary data type."""
         self.ceph_health_command.return_value = self.HEALTH_WARN_OSDMAP_FLAGS_BAD_TYPE
-        with self.assertLogs(level=logging.ERROR) as logs:
-            self.assertFalse(ceph_healthy())
+        with self.assertRaisesRegex(CephHealthCheckError, 'The OSDMAP_FLAGS check failed with unknown OSD flags.'):
+            check_ceph_health()
         self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
-        self.assert_in_element(
-            'Ceph is not healthy. The OSDMAP_FLAGS check failed with unknown OSD flags.', logs.output
-        )
-        self.assert_not_in_element('Ceph is healthy with warnings', logs.output)
 
-    def test_ceph_healthy_command_failed(self):
-        """Test ceph_healthy when the ceph health command fails."""
+    def test_check_ceph_health_command_failed(self):
+        """Test check_ceph_health raises CephHealthCheckError when the ceph health command fails."""
         self.ceph_health_command.side_effect = CalledProcessError(returncode=1, cmd='ceph -s --format=json')
-        with self.assertLogs(level=logging.ERROR) as logs:
-            self.assertFalse(ceph_healthy())
+        with self.assertRaisesRegex(CephHealthCheckError, 'Failed to check ceph health'):
+            check_ceph_health()
         self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
-        self.assert_not_in_element('Ceph is healthy with warnings', logs.output)
 
-    def test_ceph_healthy_malformed_json(self):
-        """Test ceph_healthy when the ceph health command returns non-json."""
+    def test_check_ceph_health_malformed_json(self):
+        """Test check_ceph_health when the ceph health command returns non-json."""
         self.ceph_health_command.return_value = '{'
-        with self.assertLogs(level=logging.ERROR) as logs:
-            self.assertFalse(ceph_healthy())
+        with self.assertRaisesRegex(CephHealthCheckError, 'Received malformed response from Ceph'):
+            check_ceph_health()
         self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
-        self.assert_not_in_element('Ceph is healthy with warnings', logs.output)
 
-    def test_ceph_healthy_missing_key(self):
-        """Test ceph_healthy when the ceph health command returns incomplete data."""
+    def test_check_ceph_health_missing_key(self):
+        """Test check_ceph_health when the ceph health command returns incomplete data."""
         self.ceph_health_command.return_value = json.dumps({'health': {}})
-        with self.assertLogs(level=logging.ERROR) as logs:
-            self.assertFalse(ceph_healthy())
+        with self.assertRaisesRegex(CephHealthCheckError, 'Ceph JSON response is missing expected key'):
+            check_ceph_health()
         self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
-        self.assert_not_in_element('Ceph is healthy with warnings', logs.output)
