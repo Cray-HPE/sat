@@ -1,7 +1,7 @@
 """
 The main entry point for the setrev subcommand.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -22,11 +22,9 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
-import datetime
 import logging
 import os
 import sys
-from collections import namedtuple
 from urllib3.exceptions import InsecureRequestWarning
 import warnings
 
@@ -34,32 +32,12 @@ from boto3.exceptions import Boto3Error
 from botocore.exceptions import BotoCoreError, ClientError
 import yaml
 
+from sat.cli.setrev.site_fields import SITE_FIELDS
 from sat.config import get_config_value
 from sat.util import get_s3_resource, yaml_dump
 
 
 LOGGER = logging.getLogger(__name__)
-
-
-def is_valid_date(date_text):
-    """Check validity of date string.
-
-    Args:
-        date_text: The string to verify.
-
-    Returns:
-        True if date_text is a valid date (wrt this program),
-        False otherwise.
-    """
-
-    if date_text == '':
-        return True
-
-    try:
-        datetime.datetime.strptime(date_text, '%Y-%m-%d')
-        return True
-    except ValueError:
-        return False
 
 
 def get_site_data(sitefile):
@@ -86,6 +64,9 @@ def get_site_data(sitefile):
             s3.Object(s3_bucket, sitefile).download_file(sitefile)
     except (BotoCoreError, ClientError, Boto3Error) as err:
         # It is not an error if this file doesn't already exist
+        # TODO: it would be nice to differentiate between successfully connecting to S3
+        # and the file not existing versus failing to connect to S3, where the latter
+        # deserves at least a warning-level message.
         LOGGER.debug('Unable to download site info file %s from S3: %s', sitefile, err)
 
     try:
@@ -123,45 +104,10 @@ def input_site_data(data):
     Returns:
         None
     """
-
-    # Use two lists of field names and validators. Validators
-    # are functions that accept a single entry and return True or False.
-    Entry = namedtuple('Entry', 'name help validate')
-    fields = [
-        Entry(name='Serial number', help='', validate=lambda x: True),
-        Entry(name='Site name', help='', validate=lambda x: True),
-        Entry(name='System name', help='', validate=lambda x: True),
-        Entry(name='System install date', help='(YYYY-mm-dd, empty for today)',
-              validate=is_valid_date),
-        Entry(name='System type', help='', validate=lambda x: True),
-    ]
-
-    # input and validate entries. Give the user the option to keep
-    # current entries, and loop until valid input is entered.
-    for entry in fields:
-        isvalid = False
-
-        while not isvalid:
-            thisentry = None
-            if entry.name in data:
-                thisentry = data[entry.name]
-                help = '(press enter to keep current value of "{}")'.format(thisentry)
-                thisentry = input(' '.join([entry.name, help, ': ']))
-                if not thisentry:
-                    thisentry = data[entry.name]
-            else:
-                thisentry = input(' '.join([entry.name, entry.help, ': ']))
-
-            isvalid = entry.validate(thisentry)
-            if not isvalid:
-                print('"{}" is an invalid entry for "{}".'.format(thisentry, entry.name))
-            else:
-                data[entry.name] = thisentry
-
-    # if date was not entered, then set it to today
-    if not data['System install date']:
-        today = datetime.datetime.today().strftime('%Y-%m-%d')
-        data['System install date'] = today
+    for entry in SITE_FIELDS:
+        data[entry.name] = entry.prompt(data)
+        # print an empty line between prompts for fields
+        print()
 
 
 def write_site_data(sitefile, data):
@@ -206,8 +152,6 @@ def do_setrev(args):
             passed to this subcommand.
     """
 
-    data = {}
-
     # determine sitefile location from command line args or config file.
     sitefile = args.sitefile
     if not sitefile:
@@ -217,10 +161,10 @@ def do_setrev(args):
             sys.exit(1)
 
     # ensure our ability to create the file
-    dir = os.path.dirname(sitefile)
-    if dir and not os.path.exists(dir):
-        LOGGER.info('Creating directory(s) on sitefile path: {}.'.format(dir))
-        os.makedirs(dir)
+    site_dir = os.path.dirname(sitefile)
+    if site_dir and not os.path.exists(site_dir):
+        LOGGER.info('Creating directory(s) on sitefile path: {}.'.format(site_dir))
+        os.makedirs(site_dir)
 
     data = get_site_data(sitefile)
 

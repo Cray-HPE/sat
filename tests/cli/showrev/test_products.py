@@ -26,6 +26,7 @@ import logging
 import os
 import unittest
 from unittest.mock import patch
+from urllib3.exceptions import MaxRetryError
 from yaml import safe_dump
 
 from kubernetes.client.rest import ApiException
@@ -234,6 +235,17 @@ class TestGetProducts(ExtendedTestCase):
         with self.assertLogs(level=logging.ERROR) as logs:
             self.assertEqual(get_product_versions(), ([], []))
         self.assert_in_element('Error reading cray-product-catalog configuration map: Not Found', logs.output)
+
+    def test_get_product_versions_connection_refused(self):
+        """Test that the case when connecting to kubernetes fails is handled."""
+        # A urllib3.exceptions.MaxRetryError is raised when we can't connect to the k8s API.
+        self.mock_corev1_api.read_namespaced_config_map.side_effect = MaxRetryError(url='', pool=None)
+        with self.assertLogs(level=logging.ERROR) as logs:
+            self.assertEqual(get_product_versions(), ([], []))
+        self.assert_in_element(
+            'Unable to connect to Kubernetes to read cray-product-catalog configuration map',
+            logs.output
+        )
 
     def test_get_product_versions_config_exception(self):
         """Test that the case when loading the kubernetes configuration fails is handled."""

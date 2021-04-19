@@ -25,6 +25,7 @@ from collections import OrderedDict
 import logging
 import os
 import warnings
+from urllib3.exceptions import MaxRetryError
 from yaml import safe_load, YAMLLoadWarning
 
 from kubernetes.client import CoreV1Api
@@ -98,6 +99,9 @@ def get_product_versions():
     # Earlier versions: FileNotFoundError; later versions: ConfigException
     except (FileNotFoundError, ConfigException) as err:
         LOGGER.error('Unable to load kubernetes configuration: %s', err)
+        return [], []
+    except MaxRetryError as err:
+        LOGGER.error('Unable to connect to Kubernetes to read cray-product-catalog configuration map: %s', err)
         return [], []
     except ApiException as err:
         # The full string representation of ApiException is very long, so just log err.reason.

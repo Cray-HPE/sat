@@ -1,7 +1,7 @@
 """
 Functions for obtaining system-level version information.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -25,9 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 import logging
 import warnings
 import shlex
-import socket
 import subprocess
-from collections import OrderedDict
 from urllib3.exceptions import InsecureRequestWarning, MaxRetryError
 from collections import defaultdict
 
@@ -39,6 +37,7 @@ from kubernetes.client.rest import ApiException
 
 from sat.apiclient import APIError, HSMClient
 from sat.config import get_config_value
+from sat.cli.setrev.site_fields import SITE_FIELDS
 from sat.session import SATSession
 from sat.util import get_s3_resource
 
@@ -91,14 +90,6 @@ def get_site_data(sitefile):
     except yaml.parser.ParserError:
         LOGGER.error('Site file %s is not in yaml format.', sitefile)
         return default
-
-    # use hostname if site name isn't specified
-    if not data['System name']:
-        try:
-            data['System name'] = socket.gethostname()
-        except Exception:  # TODO: find specific exception
-            LOGGER.error('Site-file %s has no "System name", and gethostname query failed.', sitefile)
-            data['System name'] = 'ERROR'
 
     return data
 
@@ -186,6 +177,9 @@ def get_slurm_version():
     try:
         dump = kubernetes.client.CoreV1Api().list_namespaced_pod(ns, label_selector='app=slurmctld')
         pod = dump.items[0].metadata.name
+    except MaxRetryError as err:
+        LOGGER.error('Error connecting to Kubernetes to retrieve list of pods: %s', err)
+        return None
     except ApiException as err:
         LOGGER.error('Could not retrieve list of pods: {}'.format(err))
         return None
@@ -222,19 +216,18 @@ def get_system_version(sitefile):
 
     sitedata = get_site_data(sitefile)
 
-    # keep this list in ascii-value sorted order on the keys.
-    field_getters_by_name = OrderedDict([
-        ('Interconnect', lambda: ' '.join(get_interconnects())),
-        ('Serial number', lambda: sitedata['Serial number']),
-        ('Site name', lambda: sitedata['Site name']),
-        ('Slurm version', get_slurm_version),
-        ('System install date', lambda: sitedata['System install date']),
-        ('System name', lambda: sitedata['System name']),
-        ('System type', lambda: sitedata['System type']),
+    # Keep this list in the order specified in SITE_FIELDS
+    system_rows = [
+        (site_field.name, sitedata[site_field.name])
+        for site_field in SITE_FIELDS
+    ]
+
+    # Add the interconnect and Slurm versions
+    # TODO: consider removing these.
+    system_rows.extend([
+        ('Interconnect', ' '.join(get_interconnects())),
+        ('Slurm version', get_slurm_version())
     ])
 
-    version_rows = [[field_name, field_getter()]
-                    for field_name, field_getter in field_getters_by_name.items()]
-
-    # filter out null values
-    return [row for row in version_rows if row[1] is not None]
+    # Filter out null values
+    return [row for row in system_rows if row[1] is not None]
