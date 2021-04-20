@@ -104,6 +104,12 @@ def get_product_versions():
         LOGGER.error('Error reading cray-product-catalog configuration map: %s', err.reason)
         return [], []
     products = []
+
+    # This should only happen if the config map is in an unexpected state.
+    if config_map.data is None:
+        LOGGER.error('No product information found in cray-product-catalog configuration map.')
+        return [], []
+
     for product_name, product_data in config_map.data.items():
         # product_data is a multiline string in YAML format
         product_data = safe_load(product_data)
