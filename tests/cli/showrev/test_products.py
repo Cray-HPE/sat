@@ -242,6 +242,13 @@ class TestGetProducts(ExtendedTestCase):
             self.assertEqual(get_product_versions(), ([], []))
         self.assert_in_element('Unable to load kubernetes configuration: Bad config', logs.output)
 
+    def test_get_product_versions_null_data(self):
+        """Test that the case when the product catalog has a null value for .data is handled."""
+        self.mock_corev1_api.read_namespaced_config_map.return_value.data = None
+        with self.assertLogs(level=logging.ERROR) as logs:
+            self.assertEqual(get_product_versions(), ([], []))
+        self.assert_in_element('No product information found in cray-product-catalog configuration map', logs.output)
+
 
 class TestReleaseFiles(unittest.TestCase):
 
