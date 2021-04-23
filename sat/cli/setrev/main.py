@@ -27,6 +27,8 @@ import logging
 import os
 import sys
 from collections import namedtuple
+from urllib3.exceptions import InsecureRequestWarning
+import warnings
 
 from boto3.exceptions import Boto3Error
 from botocore.exceptions import BotoCoreError, ClientError
@@ -78,7 +80,10 @@ def get_site_data(sitefile):
 
     try:
         LOGGER.debug('Downloading %s from S3 (bucket: %s)', sitefile, s3_bucket)
-        s3.Object(s3_bucket, sitefile).download_file(sitefile)
+        # TODO(SAT-926): Start verifying HTTPS requests
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=InsecureRequestWarning)
+            s3.Object(s3_bucket, sitefile).download_file(sitefile)
     except (BotoCoreError, ClientError, Boto3Error) as err:
         # It is not an error if this file doesn't already exist
         LOGGER.debug('Unable to download site info file %s from S3: %s', sitefile, err)
@@ -183,7 +188,10 @@ def write_site_data(sitefile, data):
         with open(sitefile, 'w') as of:
             of.write(yaml_dump(data))
         LOGGER.debug('Uploading %s to S3 (bucket: %s)', sitefile, s3_bucket)
-        s3.Object(s3_bucket, sitefile).upload_file(sitefile)
+        # TODO(SAT-926): Start verifying HTTPS requests
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category=InsecureRequestWarning)
+            s3.Object(s3_bucket, sitefile).upload_file(sitefile)
     except OSError as err:
         LOGGER.error('Unable to write %s. Error: %s', sitefile, err)
     except (BotoCoreError, ClientError, Boto3Error) as err:

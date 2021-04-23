@@ -46,6 +46,7 @@ from prettytable import PrettyTable
 from sat.xname import XName
 from sat.config import get_config_value, read_config_value_file
 
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -486,6 +487,7 @@ def get_s3_resource():
     try:
         access_key = read_config_value_file('s3.access_key_file')
         secret_key = read_config_value_file('s3.secret_key_file')
+        # TODO(SAT-926): Start verifying HTTPS requests (remove verify=False)
         return boto3.resource(
                 's3',
                 endpoint_url=get_config_value('s3.endpoint'),
