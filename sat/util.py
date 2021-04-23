@@ -229,8 +229,8 @@ def get_pretty_table(rows, headings=None, sort_by=None):
     for x in pt.align:
         pt.align[x] = 'l'
 
-    for l in rows:
-        pt.add_row(l)
+    for row in rows:
+        pt.add_row(row)
 
     return pt
 
