@@ -7,7 +7,7 @@ Print version information about the system
 ------------------------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -155,17 +155,21 @@ Get system revision information:
   ################################################################################
   System Revision Information
   ################################################################################
-  +---------------------+---------------+
-  | component           | data          |
-  +---------------------+---------------+
-  | Interconnect        | Sling         |
-  | Serial number       | 123456        |
-  | Site name           | Cray          |
-  | Slurm version       | slurm 20.02.3 |
-  | System install date | 2020-11-30    |
-  | System name         | rocket        |
-  | System type         | Shasta        |
-  +---------------------+---------------+
+  +---------------------+----------------------+
+  | component           | data                 |
+  +---------------------+----------------------+
+  | Company name        | HPE                  |
+  | Country code        | US                   |
+  | Product number      | R4K98A               |
+  | Serial number       | 123456               |
+  | Site name           | HPE                  |
+  | System Description  | Internal test system |
+  | System install date | 2020-12-12           |
+  | System name         | rocket               |
+  | System type         | EX-1C                |
+  | Interconnect        | Sling                |
+  | Slurm version       | slurm 20.02.3        |
+  +---------------------+----------------------+
 
 Get product releases:
 
