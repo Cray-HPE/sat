@@ -634,7 +634,7 @@ class TelemetryAPIClient(APIGatewayClient):
         """
 
         try:
-            response = self.get('ping')
+            self.get('ping')
         except APIError as err:
             LOGGER.error(f'Failed to ping telemetry API endpoint: {err}')
             return False
@@ -644,8 +644,13 @@ class TelemetryAPIClient(APIGatewayClient):
     def stream(self, topic, timeout, params=None):
         """Create a GET stream connection to the telemetry API.
 
+        Args:
+            topic (str): The name of the Kafka telemetry topic.
+            timeout (int): The timeout in seconds to wait for a response.
+            params (dict): Parameters dictionary to pass through to requests.get.
+
         Returns:
-            True or False
+            The requests.models.Response object if the request was successful.
 
         Raises:
             ReadTimeout: if requests.get raises a ReadTimeout.

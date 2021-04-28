@@ -2,12 +2,12 @@
  SAT-SENSORS
 ============
 
--------------------------------
-Display Current Sensor Readings
--------------------------------
+-----------------------
+Display Sensor Readings
+-----------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2020 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -18,15 +18,13 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-The sensors subcommand obtains current sensor readings from
+The sensors subcommand obtains sensor readings from telemetry data for
 one or more BMCs.
 
 This subcommand allows use of the "--xname" options. The provided xnames
 must refer to BMCs, which may be of any BMC type: ChassisBMC, NodeBMC, and
 RouterBMC, or components that contain such BMCs (such as a chassis). If no
 xname is specified, all BMCs are targeted.
-
-A Redfish username and password is required.
 
 OPTIONS
 =======
@@ -41,6 +39,23 @@ These options must be specified after the subcommand.
         **NodeBMC**, and **RouterBMC**. This argument may be reused to select
         more than one type.
 
+**--topics**
+        Limit the telemetry topics queried to the topics listed.
+        The default is to query all topics.  Allowed topics are
+        **cray-telemetry-temperature**, **cray-telemetry-voltage**,
+        **cray-telemetry-power**, **cray-telemetry-energy**,
+        **cray-telemetry-fan**, and **cray-telemetry-pressure**.
+
+**-b, --batch-size** *BATCHSIZE*
+        Number of metrices in each message. Defaults to 16.
+
+**--timeout** *TIMEOUT*
+        Total timeout, in seconds, for receiving data from telemetry topics.
+        Defaults to 60.
+
+**-r, --recursive**
+        Include all BMCs for Chassis xnames specified by xXcC.
+
 .. include:: _sat-xname-opts.rst
 .. include:: _sat-format-opts.rst
 .. include:: _sat-redfish-opts.rst
@@ -49,43 +64,65 @@ These options must be specified after the subcommand.
 EXAMPLES
 ========
 
-Query all sensors of the node x0c0s11b0 (truncated to ten rows):
+Query cray-telemetry-voltage sensor data for the NodBMC x9000c3s0b0 (truncated to ten rows):
 
 ::
 
-  # sat sensors -x x0c0s11b0
-  +-----------+---------------+--------------------+------------------+------------------+---------------------+-------+-------------+---------+-------+
-  | bmc       | sensor number | electrical context | device context   | physical context | physical subcontext | index | sensor type | reading | units |
-  +-----------+---------------+--------------------+------------------+------------------+---------------------+-------+-------------+---------+-------+
-  | x0c0s11b0 | 208           | None               | BB +12.0V        | SystemBoard      | None                | None  | Voltage     | 12.157  | V     |
-  | x0c0s11b0 | 222           | None               | BB +3.3V Vbat    | SystemBoard      | None                | None  | Voltage     | 3.0745  | V     |
-  | x0c0s11b0 | 0             | None               | Power Supply Bay | None             | None                | None  | Voltage     | 176     | V     |
-  | x0c0s11b0 | 1             | None               | Power Supply Bay | None             | None                | None  | Voltage     | 8       | V     |
-  | x0c0s11b0 | 20            | None               | BB Lft Rear Temp | None             | None                | None  | Temperature | 30      | Cel   |
-  | x0c0s11b0 | 23            | None               | Riser 3 Temp     | None             | None                | None  | Temperature | 27      | Cel   |
-  | x0c0s11b0 | 32            | None               | BB P1 VR Temp    | None             | None                | None  | Temperature | 32      | Cel   |
-  | x0c0s11b0 | 33            | None               | Front Panel Temp | None             | None                | None  | Temperature | 22      | Cel   |
-  | x0c0s11b0 | 34            | None               | SSB Temp         | None             | None                | None  | Temperature | 41      | Cel   |
-  | x0c0s11b0 | 35            | None               | BB P2 VR Temp    | None             | None                | None  | Temperature | 31      | Cel   |
-  +-----------+---------------+--------------------+------------------+------------------+---------------------+-------+-------------+---------+-------+
+  # sat sensors -x x9000c3s0b0 --topics cray-telemetry-voltage
+  +-------------+---------+------------------------+--------------------------------+---------------+------------------+----------------+------------------+-------+---------------------+------------+
+  | xname       | Type    | Topic                  | Timestamp                      | Location      | Parental Context | Parental Index | Physical Context | Index | Physical Subcontext | Value      |
+  +-------------+---------+------------------------+--------------------------------+---------------+------------------+----------------+------------------+-------+---------------------+------------+
+  | x9000c3s0b0 | NodeBMC | cray-telemetry-voltage | 2021-04-28T18:18:44.422659252Z | x9000c3s0b0   | Chassis          | MISSING        | VoltageRegulator | 0     | Input               | 12.188     |
+  | x9000c3s0b0 | NodeBMC | cray-telemetry-voltage | 2021-04-28T18:18:44.686268094Z | x9000c3s0b0   | Chassis          | MISSING        | VoltageRegulator | 0     | Output              | 12.219     |
+  | x9000c3s0b0 | NodeBMC | cray-telemetry-voltage | 2021-04-28T18:18:44.422665411Z | x9000c3s0b0n0 | Chassis          | MISSING        | VoltageRegulator | 0     | Output              | 48.020     |
+  | x9000c3s0b0 | NodeBMC | cray-telemetry-voltage | 2021-04-28T18:18:44.526852747Z | x9000c3s0b0n0 | Chassis          | MISSING        | VoltageRegulator | 0     | Input               | 384.400000 |
+  | x9000c3s0b0 | NodeBMC | cray-telemetry-voltage | 2021-04-28T18:18:44.408473275Z | x9000c3s0b0n1 | Chassis          | MISSING        | VoltageRegulator | 0     | Output              | 48.100     |
+  | x9000c3s0b0 | NodeBMC | cray-telemetry-voltage | 2021-04-28T18:18:44.525601474Z | x9000c3s0b0n1 | Chassis          | MISSING        | VoltageRegulator | 0     | Input               | 385.300000 |
+  | x9000c3s0b0 | NodeBMC | cray-telemetry-voltage | 2021-04-28T18:18:45.394037018Z | x9000c3s0b0n0 | CPU              | 0              | VoltageRegulator | 4     | Output              | 1.098      |
+  | x9000c3s0b0 | NodeBMC | cray-telemetry-voltage | 2021-04-28T18:18:45.398475031Z | x9000c3s0b0n1 | CPU              | 0              | VoltageRegulator | 4     | Output              | 1.129      |
+  | x9000c3s0b0 | NodeBMC | cray-telemetry-voltage | 2021-04-28T18:18:44.295801008Z | x9000c3s0b0n0 | NetworkingDevice | 0              | VoltageRegulator | 0     | Input               | 11.875     |
+  | x9000c3s0b0 | NodeBMC | cray-telemetry-voltage | 2021-04-28T18:18:44.696714969Z | x9000c3s0b0n0 | NetworkingDevice | 0              | VoltageRegulator | 0     | Output              | 0.961      |
+  +-------------+---------+------------------------+--------------------------------+---------------+------------------+----------------+------------------+-------+---------------------+------------+
 
-Query specific sensors, from a selection of nodes:
+Query all sensor data for the ChassisBMC x9000c3b0 and sort by Timestamp (truncated to ten rows):
 
 ::
 
-  # sat sensors -x x3000c0s19b1,x3000c0s19b2,x3000c0s19b3,x3000c0s19b4 --filter "number=208 or number=222"
-  +--------------+---------------+--------------------+----------------+------------------+---------------------+-------+-------------+---------+-------+
-  | bmc          | sensor number | electrical context | device context | physical context | physical subcontext | index | sensor type | reading | units |
-  +--------------+---------------+--------------------+----------------+------------------+---------------------+-------+-------------+---------+-------+
-  | x3000c0s19b1 | 208           | None               | BB +12.0V      | SystemBoard      | None                | None  | Voltage     | 11.992  | V     |
-  | x3000c0s19b1 | 222           | None               | BB +3.3V Vbat  | SystemBoard      | None                | None  | Voltage     | 3.0095  | V     |
-  | x3000c0s19b2 | 208           | None               | BB +12.0V      | SystemBoard      | None                | None  | Voltage     | 12.102  | V     |
-  | x3000c0s19b2 | 222           | None               | BB +3.3V Vbat  | SystemBoard      | None                | None  | Voltage     | 2.9965  | V     |
-  | x3000c0s19b3 | 208           | None               | BB +12.0V      | SystemBoard      | None                | None  | Voltage     | 12.212  | V     |
-  | x3000c0s19b3 | 222           | None               | BB +3.3V Vbat  | SystemBoard      | None                | None  | Voltage     | 3.0225  | V     |
-  | x3000c0s19b4 | 208           | None               | BB +12.0V      | SystemBoard      | None                | None  | Voltage     | 12.157  | V     |
-  | x3000c0s19b4 | 222           | None               | BB +3.3V Vbat  | SystemBoard      | None                | None  | Voltage     | 3.0095  | V     |
-  +--------------+---------------+--------------------+----------------+------------------+---------------------+-------+-------------+---------+-------+
+  # sat sensors -x x9000c3b0 --sort-by Timestamp
+  +-----------+------------+----------------------------+--------------------------------+----------+------------------+------------------+-------+---------------------+-------------------------+--------+
+  | xname     | Type       | Topic                      | Timestamp                      | Location | Parental Context | Physical Context | Index | Physical Subcontext | Device Specific Context | Value  |
+  +-----------+------------+----------------------------+--------------------------------+----------+------------------+------------------+-------+---------------------+-------------------------+--------+
+  | x9000c3b0 | ChassisBMC | cray-telemetry-power       | 2021-04-28T18:28:55.900552558Z | x9000c3  | MISSING          | Rectifier        | 1     | Input               | Line1                   | 0.86   |
+  | x9000c3b0 | ChassisBMC | cray-telemetry-voltage     | 2021-04-28T18:28:55.948998743Z | x9000c3  | MISSING          | Rectifier        | 1     | Input               | Line2ToLine3            | 479.38 |
+  | x9000c3b0 | ChassisBMC | cray-telemetry-power       | 2021-04-28T18:28:55.972008719Z | x9000c3  | MISSING          | Rectifier        | 0     | Output              | MISSING                 | 0.42   |
+  | x9000c3b0 | ChassisBMC | cray-telemetry-pressure    | 2021-04-28T18:28:56.008416333Z | x9000c3  | Chassis          | LiquidInlet      | 0     | Input               | MISSING                 | 40.79  |
+  | x9000c3b0 | ChassisBMC | cray-telemetry-pressure    | 2021-04-28T18:28:56.016107803Z | x9000c3  | Chassis          | LiquidOutlet     | 0     | Output              | MISSING                 | 24.90  |
+  | x9000c3b0 | ChassisBMC | cray-telemetry-voltage     | 2021-04-28T18:28:56.020609014Z | x9000c3  | MISSING          | Rectifier        | 1     | Input               | Line1ToLine2            | 481.05 |
+  | x9000c3b0 | ChassisBMC | cray-telemetry-power       | 2021-04-28T18:28:56.044158912Z | x9000c3  | MISSING          | Rectifier        | 0     | Input               | Line3                   | 0.75   |
+  | x9000c3b0 | ChassisBMC | cray-telemetry-voltage     | 2021-04-28T18:28:56.067654295Z | x9000c3  | MISSING          | Rectifier        | 0     | Output              | MISSING                 | 385.08 |
+  | x9000c3b0 | ChassisBMC | cray-telemetry-power       | 2021-04-28T18:28:56.092433509Z | x9000c3  | MISSING          | Rectifier        | 0     | Input               | Line2                   | 0.73   |
+  | x9000c3b0 | ChassisBMC | cray-telemetry-voltage     | 2021-04-28T18:28:56.120402624Z | x9000c3  | MISSING          | Rectifier        | 0     | Input               | Line3ToLine1            | 481.96 |
+  +-----------+------------+----------------------------+--------------------------------+----------+------------------+------------------+-------+---------------------+-------------------------+--------+
+
+Query all sensor data for the Chassis x9000c3 recursively to include all BMCs and sort by Timestamp (truncated to ten rows):
+
+::
+
+  # sat sensors -x x9000c3 -r --sort-by Timestamp
+  +-------------+------------+----------------------------+--------------------------------+---------------+----------------------+----------------+------------------+---------+---------------------+-------------------------+------------+
+  | xname       | Type       | Topic                      | Timestamp                      | Location      | Parental Context     | Parental Index | Physical Context | Index   | Physical Subcontext | Device Specific Context | Value      |
+  +-------------+------------+----------------------------+--------------------------------+---------------+----------------------+----------------+------------------+---------+---------------------+-------------------------+------------+
+  | x9000c3b0   | ChassisBMC | cray-telemetry-voltage     | 2021-04-28T18:36:11.872311239Z | x9000c3       | MISSING              | MISSING        | Rectifier        | 1       | Input               | Line2ToLine3            | 481.86     |
+  | x9000c3b0   | ChassisBMC | cray-telemetry-voltage     | 2021-04-28T18:36:11.924254063Z | x9000c3       | MISSING              | MISSING        | Rectifier        | 1       | Input               | Line1ToLine2            | 483.58     |
+  | x9000c3s0b0 | NodeBMC    | cray-telemetry-power       | 2021-04-28T18:36:11.951742109Z | x9000c3s0b0n0 | Chassis              | MISSING        | VoltageRegulator | 0       | Output              | MISSING                 | 473.000    |
+  | x9000c3s0b0 | NodeBMC    | cray-telemetry-power       | 2021-04-28T18:36:11.952051048Z | x9000c3s0b0n1 | Chassis              | MISSING        | VoltageRegulator | 0       | Output              | MISSING                 | 564.000    |
+  | x9000c3b0   | ChassisBMC | cray-telemetry-voltage     | 2021-04-28T18:36:11.971646561Z | x9000c3       | MISSING              | MISSING        | Rectifier        | 0       | Output              | MISSING                 | 385.12     |
+  | x9000c3r7b0 | RouterBMC  | cray-telemetry-power       | 2021-04-28T18:36:12.005161185Z | x9000c3r7b0   | ASIC                 | MISSING        | VoltageRegulator | 7       | Output              | MISSING                 | 11.750     |
+  | x9000c3r7b0 | RouterBMC  | cray-telemetry-power       | 2021-04-28T18:36:12.007660739Z | x9000c3r7b0   | ASIC                 | MISSING        | VoltageRegulator | 5       | Output              | MISSING                 | 77.100     |
+  | x9000c3r7b0 | RouterBMC  | cray-telemetry-power       | 2021-04-28T18:36:12.009084804Z | x9000c3r7b0   | ASIC                 | MISSING        | VoltageRegulator | 5       | Input               | MISSING                 | 6.220      |
+  | x9000c3r7b0 | RouterBMC  | cray-telemetry-power       | 2021-04-28T18:36:12.013204650Z | x9000c3r7b0   | ASIC                 | MISSING        | VoltageRegulator | 4       | Output              | MISSING                 | 46.200     |
+  | x9000c3r7b0 | RouterBMC  | cray-telemetry-power       | 2021-04-28T18:36:12.014466967Z | x9000c3r7b0   | ASIC                 | MISSING        | VoltageRegulator | 4       | Input               | MISSING                 | 3.790      |
+  +-------------+------------+----------------------------+--------------------------------+---------------+----------------------+----------------+------------------+---------+---------------------+-------------------------+------------+
 
 
 SEE ALSO
