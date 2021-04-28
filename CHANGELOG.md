@@ -30,6 +30,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed a case where ``sat showrev`` fails when the Kubernetes configuration
   map ``cray-product-catalog`` is in an unexpected state.
+- Improved error handling in ``sat showrev`` when connecting to the Kubernetes
+  API fails.
+
+### Added
+- Added new fields to ``sat setrev`` and ``sat showrev``.
+    - System description
+    - Product number
+    - Company name
+    - Country code
+- Added additional description of all fields when running ``sat setrev``,
+  and added input validation for fields.
 
 ## [3.6.0] - 2021-04-16
 

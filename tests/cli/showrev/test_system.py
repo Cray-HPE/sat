@@ -1,7 +1,7 @@
 """
 Unit tests for the sat.sat.cli.showrev.system
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -22,13 +22,16 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
+import logging
 import os
 import subprocess
 import unittest
 from argparse import Namespace
 from unittest import mock
+from urllib3.exceptions import MaxRetryError
 
 from kubernetes.client.rest import ApiException
+from tests.test_util import ExtendedTestCase
 
 import sat.cli.showrev.system
 
@@ -36,7 +39,7 @@ import sat.cli.showrev.system
 samples = os.path.join(os.path.dirname(__file__), 'samples')
 
 
-class TestSystem(unittest.TestCase):
+class TestSystem(ExtendedTestCase):
 
     def tearDown(self):
         mock.patch.stopall()
@@ -126,6 +129,18 @@ class TestSystem(unittest.TestCase):
             side_effect=FileNotFoundError).start()
 
         self.assertIsNone(sat.cli.showrev.system.get_slurm_version())
+
+    def test_get_slurm_version_kubernetes_max_retry_error(self):
+        """get_slurm_version MaxRetryError when connecting to k8s.
+        """
+        mock.patch('sat.cli.showrev.system.kubernetes.config.load_kube_config').start()
+        mock.patch(
+            'sat.cli.showrev.system.kubernetes.client.CoreV1Api'
+        ).start().return_value.list_namespaced_pod.side_effect = MaxRetryError(url='', pool=None)
+
+        with self.assertLogs(level=logging.ERROR) as logs:
+            self.assertIsNone(sat.cli.showrev.system.get_slurm_version())
+        self.assert_in_element('Error connecting to Kubernetes to retrieve list of pods', logs.output)
 
     def test_get_site_data_from_s3(self):
         """Test get_site_data downloads from S3."""
