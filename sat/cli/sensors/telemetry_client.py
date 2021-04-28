@@ -194,7 +194,7 @@ class TelemetryClient(threading.Thread):
 
         return num_metrics
 
-    def is_run_done(self, topic):
+    def check_if_run_done(self, topic):
         """Checks if the thread run should stop.
 
         Args:
@@ -251,7 +251,7 @@ class TelemetryClient(threading.Thread):
 
         total_metrics = 0
         topic = self.results.get('Topic')
-        while not self.is_run_done(topic):
+        while not self.check_if_run_done(topic):
             try:
                 response = self.api_client.stream(topic, self.GET_TIMEOUT_SECS,
                                                   params={'count': 0, 'batchsize': self.batchsize})

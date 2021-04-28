@@ -47,7 +47,7 @@ These options must be specified after the subcommand.
         **cray-telemetry-fan**, and **cray-telemetry-pressure**.
 
 **-b, --batch-size** *BATCHSIZE*
-        Number of metrices in each message. Defaults to 16.
+        Number of metrics in each message. Defaults to 16.
 
 **--timeout** *TIMEOUT*
         Total timeout, in seconds, for receiving data from telemetry topics.
@@ -64,7 +64,7 @@ These options must be specified after the subcommand.
 EXAMPLES
 ========
 
-Query cray-telemetry-voltage sensor data for the NodBMC x9000c3s0b0 (truncated to ten rows):
+Query cray-telemetry-voltage sensor data for the NodeBMC x9000c3s0b0 (truncated to ten rows):
 
 ::
 
