@@ -58,7 +58,6 @@ These options must be specified after the subcommand.
 
 .. include:: _sat-xname-opts.rst
 .. include:: _sat-format-opts.rst
-.. include:: _sat-redfish-opts.rst
 .. include:: _sat-filter-opts.rst
 
 EXAMPLES
