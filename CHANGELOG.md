@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Removed Redfish username and password from configuration file.
+
 ### Fixed
 - Fixed a case where ``sat showrev`` fails when the Kubernetes configuration
   map ``cray-product-catalog`` is in an unexpected state.

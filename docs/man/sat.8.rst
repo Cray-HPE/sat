@@ -233,21 +233,6 @@ LOGGING
         SAT also prints log messages to stderr, and this parameter sets the
         minimum log severity that will cause a log to be printed to stderr.
 
-REDFISH
--------
-
-**username**
-        (optional) Default username to use when querying Cray services that are
-        dependent on Redfish. If not supplied, the user will be queried on the
-        command line to give a username when running diagnostics.
-
-**password**
-        (optional) Default password to use when querying Cray services that are
-        dependent on Redfish. Use caution, as the password is stored as
-        plain text within the SAT configuration file. If not supplied, the user
-        will be queried for a password on the command line when running
-        diagnostics.
-
 SEE ALSO
 ========
 

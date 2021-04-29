@@ -26,8 +26,6 @@ must refer to BMCs, which may be of any BMC type: ChassisBMC, NodeBMC, and
 RouterBMC, or components that contain such BMCs (such as a chassis). If no
 xname is specified, all BMCs are targeted.
 
-A Redfish username and password is required.
-
 OPTIONS
 =======
 
@@ -43,7 +41,6 @@ These options must be specified after the subcommand.
 
 .. include:: _sat-xname-opts.rst
 .. include:: _sat-format-opts.rst
-.. include:: _sat-redfish-opts.rst
 .. include:: _sat-filter-opts.rst
 
 EXAMPLES
