@@ -48,7 +48,7 @@ class TelemetryClient(threading.Thread):
     # Number of times to try to reconnect
     RECONNECT_RETRIES = 3
 
-    def __init__(self, stop_event, xnames_info, batchsize, topic, results, results_index):
+    def __init__(self, stop_event, xnames_info, batchsize, topic, all_results, results_index):
         """Create a thread to connect to streaming telemetry API.
 
         Args:
@@ -56,30 +56,31 @@ class TelemetryClient(threading.Thread):
             xnames_info ([dict]): A list of dictionaries with xname and Type.
             batchsize (int): The number of metrics to include in each message from API.
             topic (str): The name of the Kafka telemetry topic.
-            results ([dict]): A list of dictionaries with temeletry results for all topics.
+            all_results ([dict]): A list of dictionaries with temeletry results for all topics.
             results_index (int): The index into the results list for this thread.
         """
 
         super().__init__()
         self.stop_event = stop_event
         self.batchsize = batchsize
+        self.retries = 0
 
         # initialize the results for this thread
-        metrics = []
-        for xname_info in xnames_info:
-            metrics.append(
-                {'Context': xname_info['xname'],
-                 'Type': xname_info['Type'],
-                 'Count': 0,
-                 'Sensors': []}
-            )
-        results[results_index] = {
+        metrics = [
+            {
+                'Context': xname_info['xname'],
+                'Type': xname_info['Type'],
+                'Count': 0,
+                'Sensors': []
+            } for xname_info in xnames_info
+        ]
+        self.results = {
             'Topic': topic,
             'Done': False,
+            'APIError': False,
             'Metrics': metrics
         }
-        self.results = results
-        self.results_index = results_index
+        all_results[results_index] = self.results
         self.api_client = TelemetryAPIClient(SATSession())
 
     def get_topic(self):
@@ -89,7 +90,7 @@ class TelemetryClient(threading.Thread):
            A topic name string or None.
         """
 
-        return self.results[self.results_index].get('Topic')
+        return self.results.get('Topic')
 
     def stop(self):
         """Stop the execution of this thread at the next opportunity.
@@ -125,7 +126,7 @@ class TelemetryClient(threading.Thread):
            True if successful and otherwise False.
         """
 
-        metrics = self.results[self.results_index].get('Metrics')
+        metrics = self.results.get('Metrics')
         for metric in metrics:
             try:
                 if metric['Context'] == context:
@@ -133,7 +134,8 @@ class TelemetryClient(threading.Thread):
                     metric['Sensors'] = sensors
                     return True
             except KeyError as err:
-                LOGGER.error(f'Failed to parse telemetry results: {err}')
+                LOGGER.error(f'Failed to parse telemetry results due to missing key(s) in '
+                             f'Metrics: {err}')
                 raise
 
         return False
@@ -145,13 +147,13 @@ class TelemetryClient(threading.Thread):
            True if all done and otherwise False.
         """
 
-        metrics = self.results[self.results_index].get('Metrics')
+        metrics = self.results.get('Metrics')
         for metric in metrics:
             try:
                 if metric['Count'] == 0:
                     return False
             except KeyError as err:
-                LOGGER.error(f'Failed to parse telemetry results: {err}')
+                LOGGER.error(f"Failed to get metric count due to missing 'Count' key: {err}")
                 raise
 
         return True
@@ -164,11 +166,9 @@ class TelemetryClient(threading.Thread):
 
         Returns:
             num_metrics (int): The number of metrics received.
-            all_done (bool): True if data has been received for all xnames.
         """
 
         num_metrics = 0
-        all_done = False
         try:
             json_data = json.loads(messages)
         except ValueError:
@@ -186,13 +186,62 @@ class TelemetryClient(threading.Thread):
 
                 # break if got the data already
                 if self.am_i_done():
-                    all_done = True
                     break
         except KeyError as err:
-            LOGGER.error(f'Failed to parse metrics received from Telemetry API: {err}')
+            LOGGER.error(f'Failed to unpack messages received from sseclient due to missing key(s) '
+                         f'in messages: {err}')
             raise
 
-        return num_metrics, all_done
+        return num_metrics
+
+    def check_if_run_done(self, topic):
+        """Checks if the thread run should stop.
+
+        Args:
+            topic (str): The name of the Kafka telemetry topic.
+
+        Returns:
+           True if thread run should stop and otherwise False.
+        """
+
+        if self.stopped():
+            LOGGER.debug(f'The stop_event is set. Stopping thread for {topic}')
+            return True
+
+        done = self.results.get('Done')
+        if done:
+            return True
+
+        if self.am_i_done():
+            print(f'Telemetry data received from {topic} for all requested xnames.')
+            self.results['Done'] = True
+            return True
+
+        return False
+
+    def ping_and_sleep(self, topic):
+        """Ping the Telemetry API service until alive with sleep in between.
+
+        Args:
+            topic (str): The name of the Kafka telemetry topic.
+
+        Returns:
+           True or False if alive or not for RECONNECT_RETRIES.
+        """
+
+        alive = False
+        while not alive and not self.stopped() and self.retries < self.RECONNECT_RETRIES:
+            self.retries += 1
+            alive = self.endpoint_alive()
+            if not alive:
+                time.sleep(self.RECONNECT_DELAY_SECS)
+
+        if not alive and self.retries == self.RECONNECT_RETRIES:
+            self.results['APIError'] = True
+            LOGGER.error(f'Exceeded number of retries: '
+                         f'{self.RECONNECT_RETRIES} for {topic}')
+
+        return alive
 
     def run(self):
         """Create a Telemetry API message consumer and consume messages for a list of xnames.
@@ -201,59 +250,36 @@ class TelemetryClient(threading.Thread):
         LOGGER.debug(f'Thread starting at {datetime.datetime.now()}')
 
         total_metrics = 0
-        retries = 0
-        topic = self.results[self.results_index].get('Topic')
-        while True and topic and not self.stopped() and not self.results[self.results_index]['Done']:
+        topic = self.results.get('Topic')
+        while not self.check_if_run_done(topic):
             try:
                 response = self.api_client.stream(topic, self.GET_TIMEOUT_SECS,
                                                   params={'count': 0, 'batchsize': self.batchsize})
                 client = sseclient.SSEClient(response)
                 print(f'Waiting for metrics for all requested xnames from {topic}.')
                 for event in client.events():
-                    num_metrics, all_done = self.unpack_data(event.data)
+                    num_metrics = self.unpack_data(event.data)
                     total_metrics += num_metrics
                     LOGGER.info(f'Received {total_metrics} metrics from stream: {event.event}')
                     print(f'Receiving metrics from stream: {event.event}...')
-
-                    if all_done or self.stopped():
-                        if all_done:
-                            print(f'Telemetry data received from {topic} for all requested xnames.')
-                            self.results[self.results_index]['Done'] = True
-                        elif self.stopped():
-                            LOGGER.debug(f'The stop_event is set. Stopping thread for {topic}')
+                    if self.am_i_done() or self.stopped():
                         break
 
             except APIError as err:
+                self.results['APIError'] = True
                 LOGGER.error(f'Request to Telemetry API failed: {err}')
                 break
 
             except ReadTimeout:
                 print(f'Timed out getting any data from {topic}.')
-                self.results[self.results_index]['Done'] = True
+                self.results['Done'] = True
                 break
 
             except Exception as err:
                 LOGGER.error(f'Telemetry API exception: {err}')
-                if retries >= self.RECONNECT_RETRIES:
-                    LOGGER.debug(f'Exceeded number of retries: {self.RECONNECT_RETRIES} for {topic}')
+                if not self.ping_and_sleep(topic):
                     break
-
-                if not self.stopped():
-                    retries += 1
-                    alive = self.endpoint_alive()
-                    while not alive and not self.stopped() and retries < self.RECONNECT_RETRIES:
-                        time.sleep(self.RECONNECT_DELAY_SECS)
-                        alive = self.endpoint_alive()
-                        if not alive:
-                            retries += 1
-                    if self.stopped():
-                        break
-
-                    if alive:
-                        LOGGER.debug(f'Attempting Telemetry API reconnect for {topic}')
-                    else:
-                        LOGGER.debug(f'Exceeded number of retries: {self.RECONNECT_RETRIES} for {topic}')
-                        break
+                LOGGER.debug(f'Attempting Telemetry API reconnect for {topic}')
 
         msg_info = ''
         if self.stopped():

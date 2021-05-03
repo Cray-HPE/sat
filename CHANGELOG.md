@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Changed the ``sat sensors`` command to use the Telemetry API to get
+  sensor data instead of accessing Redfish directly.
+
 ### Fixed
 - Fixed a case where ``sat showrev`` fails when the Kubernetes configuration
   map ``cray-product-catalog`` is in an unexpected state.
