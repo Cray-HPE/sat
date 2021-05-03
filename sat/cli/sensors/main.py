@@ -28,6 +28,7 @@ import signal
 import threading
 import time
 import traceback
+from collections import OrderedDict
 
 import inflect
 
@@ -36,6 +37,7 @@ from sat.config import get_config_value
 from sat.constants import MISSING_VALUE
 from sat.report import Report
 from sat.session import SATSession
+from sat.xname import XName
 
 from sat.cli.sensors.telemetry_client import TelemetryClient
 
@@ -45,24 +47,36 @@ CHASSIS_XNAME_PREFIX_REGEX = re.compile(r'x\d+c\d')
 
 
 def sensor_getter(key):
+    """Return a function that extracts a key value from a sensor reading.
+
+    Args:
+        key (str): the key to extract from the sensor reading
+
+    Returns:
+        A function that takes three arguments of type dict, where the third
+        argument is the dict containing the sensor reading values. The function
+        returns the value of the key named `key` from that dict, defaulting to
+        `MISSING_VALUE` if the `key` is missing.
+    """
+
     return lambda topic, metric, sensor: sensor.get(key, MISSING_VALUE)
 
 
-FIELD_MAPPING = {
-    'xname': lambda topic, metric, sensor: metric.get('Context', MISSING_VALUE),
-    'Type': lambda topic, metric, sensor: metric.get('Type', MISSING_VALUE),
-    'Topic': lambda topic, metric, sensor: topic.get('Topic', MISSING_VALUE),
-    'Timestamp': sensor_getter('Timestamp'),
-    'Location': sensor_getter('Location'),
-    'Parental Context': sensor_getter('ParentalContext'),
-    'Parental Index': sensor_getter('ParentalIndex'),
-    'Physical Context': sensor_getter('PhysicalContext'),
-    'Index': sensor_getter('Index'),
-    'Physical Subcontext': sensor_getter('PhysicalSubContext'),
-    'Device Specific Context': sensor_getter('DeviceSpecificContext'),
-    'Subindex': sensor_getter('SubIndex'),
-    'Value': sensor_getter('Value')
-}
+FIELD_MAPPING = OrderedDict([
+    ('xname', lambda topic, metric, sensor: XName(metric.get('Context', MISSING_VALUE))),
+    ('Type', lambda topic, metric, sensor: metric.get('Type', MISSING_VALUE)),
+    ('Topic', lambda topic, metric, sensor: topic.get('Topic', MISSING_VALUE)),
+    ('Timestamp', sensor_getter('Timestamp')),
+    ('Location', sensor_getter('Location')),
+    ('Parental Context', sensor_getter('ParentalContext')),
+    ('Parental Index', sensor_getter('ParentalIndex')),
+    ('Physical Context', sensor_getter('PhysicalContext')),
+    ('Index', sensor_getter('Index')),
+    ('Physical Subcontext', sensor_getter('PhysicalSubContext')),
+    ('Device Specific Context', sensor_getter('DeviceSpecificContext')),
+    ('Subindex', sensor_getter('SubIndex')),
+    ('Value', sensor_getter('Value'))
+])
 
 inf = inflect.engine()
 LOGGER = logging.getLogger(__name__)
@@ -280,7 +294,7 @@ def wait_for_threads(telemetry_clients, stop_event, total_timeout):
         now = time.time()
 
     if not any_thread_alive(telemetry_clients):
-        LOGGER.info(f'All threads have completed')
+        LOGGER.info('All threads have completed')
     else:
         LOGGER.info(f'Timed out after {total_timeout} seconds')
         LOGGER.debug('Stopping all threads - setting stop_event')
@@ -377,10 +391,10 @@ def do_sensors(args):
                            for topic_result in all_topics_results if not topic_result['Done']
                            and not topic_result['APIError']]
         if topics_with_api_error:
-            print(f'Telemetry API error getting xnames data from '
+            print(f'Telemetry API error getting xnames data from topics '
                   f'{", ".join(t for t in topics_with_api_error)}.')
         if topics_not_done:
-            print(f'Timed out after {args.timeout} secs searching for xnames data from '
+            print(f'Timed out after {args.timeout} seconds searching for xnames data from topics '
                   f'{", ".join(t for t in topics_not_done)}.')
 
         report = Report(

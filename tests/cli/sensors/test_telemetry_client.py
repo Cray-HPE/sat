@@ -82,26 +82,7 @@ class TestTelemetryClient(unittest.TestCase):
                                 'MessageId': 'CrayTelemetry.Temperature',
                                 'Oem':
                                     {
-                                        'Sensors': [
-                                            {
-                                                'Timestamp': '2021-04-16T21:20:53Z',
-                                                'Location': 'x3000c0s17b3',
-                                                'ParentalContext': 'Chassis',
-                                                'PhysicalContext': 'Baseboard',
-                                                'Index': 0,
-                                                'DeviceSpecificContext': 'BB Inlet Temp',
-                                                'Value': '22'
-                                            },
-                                            {
-                                                'Timestamp': '2021-04-16T21:20:53Z',
-                                                'Location': 'x3000c0s17b3',
-                                                'ParentalContext': 'Chassis',
-                                                'PhysicalContext': 'Baseboard',
-                                                'Index': 0,
-                                                'DeviceSpecificContext': 'BB BMC Temp',
-                                                'Value': '26'
-                                            }
-                                        ],
+                                        'Sensors': self.temperature_sensors_results,
                                         'TelemetrySource': 'cC'
                                     }
                             }
@@ -117,7 +98,7 @@ class TestTelemetryClient(unittest.TestCase):
 
     def test_init(self):
         """Test creation of a TelemetryClient."""
-        all_topics_results = [None]
+        all_topics_results = [None, None]
         temperature_init_results = {
             'Topic': self.topic,
             'Done': False,
@@ -136,6 +117,7 @@ class TestTelemetryClient(unittest.TestCase):
         self.assertEqual(self.stop_event, telemetry_client.stop_event)
         self.assertEqual(self.batchsize, telemetry_client.batchsize)
         self.assertEqual(all_topics_results[0], temperature_init_results)
+        self.assertEqual(all_topics_results[1], None)
 
     def test_stop(self):
         """Test stop of a TelemetryClient."""
@@ -188,6 +170,7 @@ class TestTelemetryClient(unittest.TestCase):
 
         num_metrics = telemetry_client.unpack_data(json.dumps(self.event_data))
         self.assertEqual(num_metrics, 1)
+        self.assertFalse(telemetry_client.am_i_done())
         xname_results = all_topics_results[0]['Metrics'][1]
         self.assertEqual(xname_results['Context'], self.xname_with_data)
         self.assertEqual(xname_results['Type'], 'NodeBMC')

@@ -54,7 +54,9 @@ These options must be specified after the subcommand.
         Defaults to 60.
 
 **-r, --recursive**
-        Include all BMCs for Chassis xnames specified by xXcC.
+        For each Chassis identified by a provided xname of the form xXcC,
+        recursively include sensor readings from all ChassisBMC, RouterBMC,
+        and NodeBMC components within the chassis.
 
 .. include:: _sat-xname-opts.rst
 .. include:: _sat-format-opts.rst
@@ -122,6 +124,26 @@ Query all sensor data for the Chassis x9000c3 recursively to include all BMCs an
   | x9000c3r7b0 | RouterBMC  | cray-telemetry-power       | 2021-04-28T18:36:12.013204650Z | x9000c3r7b0   | ASIC                 | MISSING        | VoltageRegulator | 4       | Output              | MISSING                 | 46.200     |
   | x9000c3r7b0 | RouterBMC  | cray-telemetry-power       | 2021-04-28T18:36:12.014466967Z | x9000c3r7b0   | ASIC                 | MISSING        | VoltageRegulator | 4       | Input               | MISSING                 | 3.790      |
   +-------------+------------+----------------------------+--------------------------------+---------------+----------------------+----------------+------------------+---------+---------------------+-------------------------+------------+
+
+Query all sensor data for the Chassis x3000c0 recursively to include all NodeBMCs and sort by "Physical Context" using the 0-based column index (truncated to ten rows):
+
+::
+
+  # sat sensors -x x3000c0 --types NodeBMC --recursive --show-missing --sort-by 7
+  +--------------+---------+----------------------------+----------------------+--------------+------------------+----------------+------------------+---------+---------------------+-------------------------+----------+--------+
+  | xname        | Type    | Topic                      | Timestamp            | Location     | Parental Context | Parental Index | Physical Context | Index   | Physical Subcontext | Device Specific Context | Subindex | Value  |
+  +--------------+---------+----------------------------+----------------------+--------------+------------------+----------------+------------------+---------+---------------------+-------------------------+----------+--------+
+  | x3000c0s31b0 | NodeBMC | cray-telemetry-temperature | 2021-05-03T21:59:52Z | x3000c0s31b0 | MISSING          | MISSING        | Fan              | 0       | MISSING             | BPB_FAN_1A              | MISSING  | 6900   |
+  | x3000c0s31b0 | NodeBMC | cray-telemetry-temperature | 2021-05-03T21:59:52Z | x3000c0s31b0 | MISSING          | MISSING        | Fan              | 1       | MISSING             | BPB_FAN_2A              | MISSING  | 0      |
+  | x3000c0s31b0 | NodeBMC | cray-telemetry-temperature | 2021-05-03T21:59:52Z | x3000c0s31b0 | MISSING          | MISSING        | Fan              | 2       | MISSING             | BPB_FAN_3A              | MISSING  | 0      |
+  | x3000c0s31b0 | NodeBMC | cray-telemetry-temperature | 2021-05-03T21:59:52Z | x3000c0s31b0 | MISSING          | MISSING        | Fan              | 3       | MISSING             | BPB_FAN_4A              | MISSING  | 0      |
+  | x3000c0s25b0 | NodeBMC | cray-telemetry-temperature | 2021-05-03T21:59:52Z | x3000c0s25b0 | MISSING          | MISSING        | Fan              | 0       | MISSING             | BPB_FAN_1A              | MISSING  | 8250   |
+  | x3000c0s25b0 | NodeBMC | cray-telemetry-temperature | 2021-05-03T21:59:52Z | x3000c0s25b0 | MISSING          | MISSING        | Fan              | 1       | MISSING             | BPB_FAN_2A              | MISSING  | 8250   |
+  | x3000c0s25b0 | NodeBMC | cray-telemetry-temperature | 2021-05-03T21:59:52Z | x3000c0s25b0 | MISSING          | MISSING        | Fan              | 2       | MISSING             | BPB_FAN_3A              | MISSING  | 8250   |
+  | x3000c0s25b0 | NodeBMC | cray-telemetry-temperature | 2021-05-03T21:59:52Z | x3000c0s25b0 | MISSING          | MISSING        | Fan              | 3       | MISSING             | BPB_FAN_4A              | MISSING  | 8250   |
+  | x3000c0s33b0 | NodeBMC | cray-telemetry-temperature | 2021-05-03T21:59:52Z | x3000c0s33b0 | MISSING          | MISSING        | Fan              | 0       | MISSING             | BPB_FAN_1A              | MISSING  | 0      |
+  | x3000c0s33b0 | NodeBMC | cray-telemetry-temperature | 2021-05-03T21:59:52Z | x3000c0s33b0 | MISSING          | MISSING        | Fan              | 1       | MISSING             | BPB_FAN_2A              | MISSING  | 0      |
+  +--------------+---------+----------------------------+----------------------+--------------+------------------+----------------+------------------+---------+---------------------+-------------------------+----------+--------+
 
 
 SEE ALSO
