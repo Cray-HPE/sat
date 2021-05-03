@@ -24,9 +24,8 @@ OTHER DEALINGS IN THE SOFTWARE.
 import json
 import logging
 import unittest
-from unittest.mock import patch, Mock, call
+from unittest.mock import patch, call
 
-from paramiko import SSHException
 import subprocess
 from subprocess import CalledProcessError
 
@@ -34,92 +33,9 @@ from sat.cli.bootsys.ceph import (
     CephHealthWaiter,
     CephHealthCheckError,
     check_ceph_health,
-    restart_ceph_services,
     toggle_ceph_freeze_flags
 )
 from tests.common import ExtendedTestCase
-
-
-class TestRestartCephServices(ExtendedTestCase):
-    """Test restart_ceph_services()"""
-
-    def setUp(self):
-        self.mock_ssh_client_cls = patch('sat.cli.bootsys.ceph.SSHClient').start()
-        self.mock_ssh_client = self.mock_ssh_client_cls.return_value
-        self.mock_connect = self.mock_ssh_client.connect
-        self.mock_load_system_host_keys = self.mock_ssh_client.load_system_host_keys
-        self.mock_exec_command = self.mock_ssh_client.exec_command
-        self.mock_stdin, self.mock_stdout, self.mock_stderr = Mock(), Mock(), Mock()
-        self.mock_stdin.channel.recv_exit_status.return_value = 0
-        self.mock_stdout.channel.recv_exit_status.return_value = 0
-        self.mock_stderr.channel.recv_exit_status.return_value = 0
-        self.mock_exec_command.return_value = (self.mock_stdin, self.mock_stdout, self.mock_stderr)
-
-        self.mock_get_ncns = patch('sat.cli.bootsys.ceph.get_mgmt_ncn_hostnames').start()
-        self.hosts = ['ncn-s001', 'ncn-s002', 'ncn-s003']
-        self.mock_get_ncns.return_value = self.hosts
-
-        self.services_to_restart = ['ceph-mon.target', 'ceph-mgr.target', 'ceph-mds.target']
-
-    def tearDown(self):
-        patch.stopall()
-
-    def assert_client(self):
-        """Helper for test cases to assert that the SSH client was initialized correctly"""
-        self.mock_get_ncns.assert_called_once_with(['storage'])
-        self.mock_ssh_client_cls.assert_called_once()
-        self.mock_load_system_host_keys.assert_called_once()
-
-    def test_basic_restart(self):
-        """Test a basic invocation of restart_ceph_services"""
-        restart_ceph_services()
-        self.assert_client()
-        self.mock_connect.assert_has_calls([call(host) for host in self.hosts])
-        self.mock_exec_command.assert_has_calls([call(f'systemctl restart {service}')
-                                                 for service in self.services_to_restart] * len(self.hosts))
-
-    def test_connect_failed(self):
-        """Test when connecting to a host fails"""
-        self.mock_connect.side_effect = SSHException('the system is down')
-        with self.assertRaises(SystemExit):
-            with self.assertLogs(level=logging.ERROR) as cm:
-                restart_ceph_services()
-
-        self.assert_client()
-        self.mock_connect.assert_called_once_with(self.hosts[0])
-        self.assert_in_element(f'Connecting to {self.hosts[0]} failed.  Error: the system is down', cm.output)
-
-    def test_command_failed(self):
-        """Test when running a command fails"""
-        self.mock_exec_command.side_effect = SSHException('the system crashed')
-        with self.assertRaises(SystemExit):
-            with self.assertLogs(level=logging.ERROR) as cm:
-                restart_ceph_services()
-
-        self.assert_client()
-        self.mock_connect.assert_called_once_with(self.hosts[0])
-        self.mock_exec_command.assert_called_once_with(f'systemctl restart ceph-mon.target')
-        self.assert_in_element(f'Command "systemctl restart ceph-mon.target" failed.  Host: {self.hosts[0]}.  '
-                               f'Error: the system crashed', cm.output)
-
-    def test_command_exit_nonzero(self):
-        """Test when running a command completes but returns a nonzero exit code"""
-        self.mock_stdout.read.return_value = ''
-        self.mock_stderr.read.return_value = 'command failed!'
-        # stdin/stderr/stdout all have recv_exit_status() set on a nonzero return
-        self.mock_stdin.chanel.recv_exit_status.return_value = 1
-        self.mock_stdout.channel.recv_exit_status.return_value = 1
-        self.mock_stderr.channel.recv_exit_status.return_value = 1
-
-        with self.assertRaises(SystemExit):
-            with self.assertLogs(level=logging.ERROR) as cm:
-                restart_ceph_services()
-
-        self.assert_client()
-        self.mock_connect.assert_called_once_with(self.hosts[0])
-        self.mock_exec_command.assert_called_once_with('systemctl restart ceph-mon.target')
-        self.assert_in_element(f'Command "systemctl restart ceph-mon.target" failed.  Host: {self.hosts[0]}.  '
-                               f'Stderr: command failed!', cm.output)
 
 
 class TestCephWaiter(unittest.TestCase):
@@ -135,13 +51,13 @@ class TestCephWaiter(unittest.TestCase):
     def test_ceph_waiter_healthy(self):
         """Test that CephHealthWaiter is complete when Ceph is healthy."""
         self.assertTrue(self.waiter.has_completed())
-        self.mock_check_ceph_health.assert_called_once_with(expecting_osdmap_flags=False)
+        self.mock_check_ceph_health.assert_called_once_with(allow_osdmap_flags=False)
 
     def test_ceph_waiter_unhealthy(self):
         """Test that CephHealthWaiter is not complete when Ceph is unhealthy."""
         self.mock_check_ceph_health.side_effect = CephHealthCheckError
         self.assertFalse(self.waiter.has_completed())
-        self.mock_check_ceph_health.assert_called_once_with(expecting_osdmap_flags=False)
+        self.mock_check_ceph_health.assert_called_once_with(allow_osdmap_flags=False)
 
 
 class TestToggleCephFreezeFlags(ExtendedTestCase):
@@ -359,13 +275,13 @@ class TestCheckCephHealth(ExtendedTestCase):
         self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
         self.assert_in_element('Ceph is healthy with warnings: OSDMAP_FLAGS', logs.output)
 
-    def test_ceph_osd_flags_healthy_and_expected(self):
-        """Test check_ceph_health returns when OSD flags are acceptable and expected, but no warning is logged."""
+    def test_ceph_osd_flags_healthy_not_allowed(self):
+        """Test check_ceph_health raises an error when 'acceptable' OSD flags are set but not allowed."""
         self.ceph_health_command.return_value = self.HEALTH_WARN_OSDMAP_FLAGS_OK
-        with patch('sat.cli.bootsys.ceph.LOGGER') as logger:
-            check_ceph_health(expecting_osdmap_flags=True)
+        expected_error_regex = 'The OSDMAP_FLAGS check failed. OSD flags: noout,nobackfill,norecover'
+        with self.assertRaisesRegex(CephHealthCheckError, expected_error_regex):
+            check_ceph_health(allow_osdmap_flags=False)
         self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
-        logger.warning.assert_not_called()
 
     def test_ceph_osd_flags_unhealthy(self):
         """Test check_ceph_health raises CephHealthCheckError when ceph has OSD_FLAGS that are not acceptable"""
