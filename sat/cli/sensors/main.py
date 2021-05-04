@@ -27,6 +27,8 @@ import re
 import signal
 import threading
 import time
+import traceback
+from collections import OrderedDict
 
 import inflect
 
@@ -35,6 +37,7 @@ from sat.config import get_config_value
 from sat.constants import MISSING_VALUE
 from sat.report import Report
 from sat.session import SATSession
+from sat.xname import XName
 
 from sat.cli.sensors.telemetry_client import TelemetryClient
 
@@ -42,25 +45,38 @@ from sat.cli.sensors.telemetry_client import TelemetryClient
 CHASSIS_XNAME_REGEX = re.compile(r'x\d+c\d$')
 CHASSIS_XNAME_PREFIX_REGEX = re.compile(r'x\d+c\d')
 
-HEADERS = (
-    'xname',
-    'Type',
-    'Topic',
-    'Timestamp',
-    'Index',
-    'Location',
-    'Parental Context',
-    'Physical Context',
-    'Device Specific Context',
-    'Value')
-SENSOR_KEYS = (
-    'Timestamp',
-    'Index',
-    'Location',
-    'ParentalContext',
-    'PhysicalContext',
-    'DeviceSpecificContext',
-    'Value')
+
+def sensor_getter(key):
+    """Return a function that extracts a key value from a sensor reading.
+
+    Args:
+        key (str): the key to extract from the sensor reading
+
+    Returns:
+        A function that takes three arguments of type dict, where the third
+        argument is the dict containing the sensor reading values. The function
+        returns the value of the key named `key` from that dict, defaulting to
+        `MISSING_VALUE` if the `key` is missing.
+    """
+
+    return lambda topic, metric, sensor: sensor.get(key, MISSING_VALUE)
+
+
+FIELD_MAPPING = OrderedDict([
+    ('xname', lambda topic, metric, sensor: XName(metric.get('Context', MISSING_VALUE))),
+    ('Type', lambda topic, metric, sensor: metric.get('Type', MISSING_VALUE)),
+    ('Topic', lambda topic, metric, sensor: topic.get('Topic', MISSING_VALUE)),
+    ('Timestamp', sensor_getter('Timestamp')),
+    ('Location', sensor_getter('Location')),
+    ('Parental Context', sensor_getter('ParentalContext')),
+    ('Parental Index', sensor_getter('ParentalIndex')),
+    ('Physical Context', sensor_getter('PhysicalContext')),
+    ('Index', sensor_getter('Index')),
+    ('Physical Subcontext', sensor_getter('PhysicalSubContext')),
+    ('Device Specific Context', sensor_getter('DeviceSpecificContext')),
+    ('Subindex', sensor_getter('SubIndex')),
+    ('Value', sensor_getter('Value'))
+])
 
 inf = inflect.engine()
 LOGGER = logging.getLogger(__name__)
@@ -76,6 +92,7 @@ class ServiceExit(Exception):
 
 def service_shutdown(signum, frame):
     logging.warning('Caught signal %d', signum)
+    traceback.print_stack(frame)
     raise ServiceExit
 
 
@@ -83,61 +100,14 @@ signal.signal(signal.SIGINT, service_shutdown)
 signal.signal(signal.SIGTERM, service_shutdown)
 
 
-def get_chassis_bmcs(components, chassis_xname):
-    """Get the BMC xnames inside a Chassis.
+def get_hsm_components(types):
+    """Get components from HSM for the specified types.
 
     Args:
-        components([dict]): A list of dictionaries with BMC data returned from HSM.
-        chassis_xname (str): A Chassis xname that has the form xXcC, for example, x3000c0.
-
-    Returns:
-        chassis_xnames ([str]): A list of BMC xnames inside the Chassis.
-    """
-
-    chassis_xnames = []
-    for component in components:
-        cid = component.get('ID')
-        if not cid:
-            continue
-        if cid[:len(chassis_xname)] == chassis_xname:
-            chassis_xnames.append(cid)
-
-    return chassis_xnames
-
-
-def print_xnames_not_included(xnames, types, hsm_xnames_info):
-    """Print xnames not included in a list of dictionaries with xname and type.
-
-    Args:
-        xnames ([str]): A list of xnames.
-        xnames ([types]): A list of BMC types.
-        hsm_xnames_info ([dict]): A list of dictionaries with xname and type for each BMC.
-
-    Returns:
-        None
-    """
-
-    if xnames:
-        xnames_not_included = []
-        for xname in xnames:
-            if xname not in [dict.get('xname') for dict in hsm_xnames_info]:
-                xnames_not_included.append(xname)
-
-        if xnames_not_included:
-            print(f'BMC {inf.plural("xname", len(xnames_not_included))} '
-                  f'{xnames_not_included} not available from HSM API for {types}.')
-
-
-def expand_and_screen_xnames(xnames, types, recursive):
-    """Screen xnames by type and eliminate xnames not in HSM.
-
-    Args:
-        xnames ([str]): A list of xnames or None for all xnames.
         types ([str]): A list of BMC types.
-        recursive (bool): True if all BMCs in a Chassis should be included for ChassisBMC xnames.
 
     Returns:
-        hsm_xnames_info ([dict]): A list of dictionaries with xname and type for each BMC.
+        components ([dict]): A list of dictionaries with BMC data returned from HSM.
     """
 
     hsm_client = HSMClient(SATSession())
@@ -160,21 +130,98 @@ def expand_and_screen_xnames(xnames, types, recursive):
         LOGGER.error(f'Key not present in API response: {err}')
         raise SystemExit(1)
 
+    return components
+
+
+def get_chassis_bmcs(components, chassis_xname):
+    """Get the BMC xnames inside a Chassis.
+
+    Args:
+        components ([dict]): A list of dictionaries with BMC data returned from HSM.
+        chassis_xname (str): A Chassis xname that has the form xXcC, for example, x3000c0.
+
+    Returns:
+        chassis_xnames ([str]): A list of BMC xnames inside the Chassis.
+    """
+
+    chassis_xnames = []
+    for component in components:
+        cid = component.get('ID')
+        if not cid:
+            continue
+        if cid[:len(chassis_xname)] == chassis_xname:
+            chassis_xnames.append(cid)
+
+    return chassis_xnames
+
+
+def expand_xnames(components, xnames):
+    """Expand a list of xnames to include all BMC xnames inside each Chassis.
+
+    Args:
+        components ([dict]): A list of dictionaries with BMC data returned from HSM.
+        xnames ([str]): A list of xnames.
+
+    Returns:
+        expanded_xnames ([str]): A list of BMC xnames.
+    """
+
+    expanded_xnames = []
+    for xname in xnames:
+        # get BMCs for any Chassis in the list of xnames input
+        child_xnames = []
+        if CHASSIS_XNAME_REGEX.match(xname):
+            child_xnames = get_chassis_bmcs(components, xname)
+
+        if child_xnames:
+            expanded_xnames.extend(child_xnames)
+        else:
+            expanded_xnames.append(xname)
+
+    return expanded_xnames
+
+
+def print_xnames_not_included(xnames, types, hsm_xnames_info):
+    """Print xnames not included in a list of dictionaries with xname and type.
+
+    Args:
+        xnames ([str]): A list of xnames.
+        types ([str]): A list of BMC types.
+        hsm_xnames_info ([dict]): A list of dictionaries with xname and type for each BMC.
+
+    Returns:
+        None
+    """
+
+    if xnames:
+        xnames_not_included = []
+        for xname in xnames:
+            if xname not in [xname_info.get('xname') for xname_info in hsm_xnames_info]:
+                xnames_not_included.append(xname)
+
+        if xnames_not_included:
+            print(f'BMC {inf.plural("xname", len(xnames_not_included))} '
+                  f'{xnames_not_included} not available from HSM API for {types}.')
+
+
+def expand_and_screen_xnames(xnames, types, recursive):
+    """Screen xnames by type and eliminate xnames not in HSM.
+
+    Args:
+        xnames ([str]): A list of xnames or None for all xnames.
+        types ([str]): A list of BMC types.
+        recursive (bool): True if all BMCs in a Chassis should be included for ChassisBMC xnames.
+
+    Returns:
+        hsm_xnames_info ([dict]): A list of dictionaries with xname and type for each BMC.
+    """
+
     hsm_xnames_info = []
+    components = get_hsm_components(types)
 
     expanded_xnames = xnames
     if xnames and recursive:
-        expanded_xnames = []
-        for xname in xnames:
-            # get BMCs for any Chassis in the list of xnames input
-            child_xnames = []
-            if CHASSIS_XNAME_REGEX.match(xname):
-                child_xnames = get_chassis_bmcs(components, xname)
-
-            if child_xnames:
-                expanded_xnames.extend(child_xnames)
-            else:
-                expanded_xnames.append(xname)
+        expanded_xnames = expand_xnames(components, xnames)
 
     # screen all xnames using HSM data by name and type
     for component in components:
@@ -203,15 +250,10 @@ def make_raw_table(all_topics_results):
     raw_table = []
     try:
         for topic_result in all_topics_results:
-            topic = topic_result['Topic']
             for metric in topic_result['Metrics']:
-                context = metric['Context']
-                bmc_type = metric['Type']
                 for sensor in metric['Sensors']:
-                    row = [context, bmc_type, topic]
-                    for sensor_key in SENSOR_KEYS:
-                        row.append(sensor.get(sensor_key, MISSING_VALUE))
-                    raw_table.append(row)
+                    raw_table.append([extractor(topic_result, metric, sensor) for extractor
+                                      in FIELD_MAPPING.values()])
     except KeyError as err:
         LOGGER.error(f'Key not present in telemetry results: {err}')
         raise SystemExit(1)
@@ -219,37 +261,47 @@ def make_raw_table(all_topics_results):
     return raw_table
 
 
-def wait_for_threads(telemetry_clients, total_timeout):
+def any_thread_alive(telemetry_clients):
+    """Check if any threads are alive or not.
+
+    Args:
+        telemetry_clients (threading.Thread list):  A list of threads.
+
+    Returns:
+        True or False
+    """
+
+    return any(thread.is_alive() for thread in telemetry_clients)
+
+
+def wait_for_threads(telemetry_clients, stop_event, total_timeout):
     """Wait for threads started for each telemetry topic.
 
     Args:
         telemetry_clients (threading.Thread list):  A list of threads (one per telemetry topic).
+        stop_event (threading.Event): Event object used to stop all threads.
         total_timeout (int): The total timeout in seconds for all threads.
 
     Returns:
         None
     """
 
-    timeout = total_timeout
+    LOGGER.info(f'Waiting for threads using timeout of {total_timeout} seconds')
+    now = time.time()
+    end = now + total_timeout
+    while now <= end and any_thread_alive(telemetry_clients):
+        time.sleep(1)
+        now = time.time()
+
+    if not any_thread_alive(telemetry_clients):
+        LOGGER.info('All threads have completed')
+    else:
+        LOGGER.info(f'Timed out after {total_timeout} seconds')
+        LOGGER.debug('Stopping all threads - setting stop_event')
+        stop_event.set()
+
     for client_thread in telemetry_clients:
-        start = time.time()
-        LOGGER.debug(f'Waiting for thread: {client_thread.getName()}')
-        if timeout <= 0 and client_thread.is_alive():
-            LOGGER.debug('Setting stop_event.')
-            client_thread.stop()
-            client_thread.join()
-        elif timeout > 0:
-            LOGGER.debug(f'Calling join with timeout = {timeout}')
-            client_thread.join(timeout=timeout)
-            if client_thread.is_alive():
-                LOGGER.debug(f'Setting stop_event for running thread due to timeout for '
-                             f'{client_thread.get_topic()}')
-                client_thread.stop()
-                client_thread.join()
-                timeout = 0
-            else:
-                now = time.time()
-                timeout = timeout - int(now-start)
+        client_thread.join()
 
 
 def get_telemetry_metrics(topics, xnames_info, batchsize, total_timeout):
@@ -268,10 +320,10 @@ def get_telemetry_metrics(topics, xnames_info, batchsize, total_timeout):
     all_topics_results = [None] * len(topics)
     telemetry_clients = []
 
-    try:
-        # Event to share between threads to coordinate shutdown
-        stop_event = threading.Event()
+    # Event to share between threads to coordinate shutdown
+    stop_event = threading.Event()
 
+    try:
         for i, topic in enumerate(topics):
             LOGGER.info(f'Getting telemetry data from {topic}...')
             telemetry_client = TelemetryClient(stop_event, xnames_info,
@@ -286,12 +338,13 @@ def get_telemetry_metrics(topics, xnames_info, batchsize, total_timeout):
                 raise SystemExit(1)
 
         print('Please be patient...')
-        wait_for_threads(telemetry_clients, total_timeout)
+        wait_for_threads(telemetry_clients, stop_event, total_timeout)
 
     except ServiceExit:
         LOGGER.debug('Stopping all threads - setting stop_event')
         stop_event.set()
-        wait_for_threads(telemetry_clients, 0)
+        for client_thread in telemetry_clients:
+            client_thread.join()
         raise ServiceExit
 
     return all_topics_results
@@ -303,7 +356,7 @@ def do_sensors(args):
     The requested BMC xnames are verified using the HSM API.
     If a ChassisBMC xname is specified, the user can optionally include the
     BMCs in the Chassis.  All Kafka telemetry topics are included by default,
-    but the user can optionally limit the search to 1 or more speific topics.
+    but the user can optionally limit the search to 1 or more specific topics.
 
     The type of BMC can also be specified so that the BMCs are filtered by type.
 
@@ -320,23 +373,32 @@ def do_sensors(args):
 
     xnames_info = expand_and_screen_xnames(args.xnames, args.types, args.recursive)
     if not xnames_info:
-        print('No telemetry data being collected.')
+        LOGGER.error(f'No telemetry data being collected for '
+                     f'{inf.plural("xname", len(args.xnames))}: '
+                     f'{args.xnames} and {inf.plural("type", len(args.types))}: {args.types}')
         raise SystemExit(1)
 
-    print('Telemetry data being collected for', end=' ')
-    print(', '.join(x for x in [dict['xname'] for dict in xnames_info]))
+    print('Telemetry data being collected for '
+          f'{", ".join(xname_info["xname"] for xname_info in xnames_info)}')
 
     try:
         all_topics_results = get_telemetry_metrics(args.topics, xnames_info,
                                                    args.batchsize, int(args.timeout))
 
-        topics_not_done = [dict['Topic'] for dict in all_topics_results if not dict['Done']]
+        topics_with_api_error = [topic_result['Topic']
+                                 for topic_result in all_topics_results if topic_result['APIError']]
+        topics_not_done = [topic_result['Topic']
+                           for topic_result in all_topics_results if not topic_result['Done']
+                           and not topic_result['APIError']]
+        if topics_with_api_error:
+            print(f'Telemetry API error getting xnames data from topics '
+                  f'{", ".join(t for t in topics_with_api_error)}.')
         if topics_not_done:
-            print(f'Timed out after {args.timeout} secs searching for xnames data from', end=' ')
-            print(', '.join(x for x in topics_not_done), end='.\n')
+            print(f'Timed out after {args.timeout} seconds searching for xnames data from topics '
+                  f'{", ".join(t for t in topics_not_done)}.')
 
         report = Report(
-            HEADERS, None,
+            tuple(FIELD_MAPPING.keys()), None,
             args.sort_by, args.reverse,
             get_config_value('format.no_headings'),
             get_config_value('format.no_borders'),
@@ -350,8 +412,5 @@ def do_sensors(args):
         else:
             print(report)
 
-    except KeyError as err:
-        LOGGER.error(f'Key error: {err}')
-        raise SystemExit(1)
     except ServiceExit:
-        LOGGER.debug('Exiting due to ServiceExit')
+        print('Exiting due to SIGINT or SIGTERM.')

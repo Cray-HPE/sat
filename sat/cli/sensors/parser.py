@@ -81,7 +81,8 @@ def add_sensors_subparser(subparsers):
                                 help=f'Limit the telemetry topics queried to the topics listed. '
                                      f'The default is to query all topics: {TOPICS}.')
 
-    sensors_parser.add_argument('-b', '--batchsize',
+    sensors_parser.add_argument('-b', '--batch-size',
+                                dest='batchsize',
                                 default=BATCHSIZE,
                                 help=f'Number of metrics in each message. '
                                      f'Defaults to {BATCHSIZE}.')
