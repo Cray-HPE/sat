@@ -32,6 +32,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   they are no longer used by any subcommands.
 - Changed the ``sat sensors`` command to use the Telemetry API to get
   sensor data instead of accessing Redfish directly.
+- Changed the "unfreeze Ceph" step of the ``platform-services`` stage of
+  ``sat bootsys boot`` to behave as follows:
+  - Start any inactive Ceph services
+  - Unfreeze Ceph
+  - Wait for Ceph health
+- Changed the ``platform-services`` stage of ``sat bootsys boot`` to prompt
+  for confirmation of storage NCN hostnames in addition to Kubernetes managers
+  and workers.
 
 ### Fixed
 - Fixed a case where ``sat showrev`` fails when the Kubernetes configuration
@@ -48,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Country code
 - Added additional description of all fields when running ``sat setrev``,
   and added input validation for fields.
+
+### Removed
+- Removed the ``ceph-check`` stage of ``sat bootsys boot``.
 
 ## [3.6.0] - 2021-04-16
 

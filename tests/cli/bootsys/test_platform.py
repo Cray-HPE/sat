@@ -37,7 +37,6 @@ from sat.cli.bootsys.platform import (
     ContainerStopThread,
     do_ceph_freeze,
     do_ceph_unfreeze,
-    do_containerd_stop,
     do_etcd_snapshot,
     do_etcd_start,
     do_etcd_stop,
@@ -803,7 +802,7 @@ class TestDoCephFreeze(unittest.TestCase):
     def test_do_ceph_freeze_success(self):
         """Test do_ceph_freeze in the successful case."""
         do_ceph_freeze(self.ncn_groups)
-        self.check_ceph_health.assert_called_once_with(expecting_osdmap_flags=False)
+        self.check_ceph_health.assert_called_once_with()
         self.toggle_ceph_freeze_flags.assert_called_once_with(freeze=True)
 
     def test_do_ceph_freeze_unhealthy(self):
@@ -819,23 +818,52 @@ class TestDoCephUnfreeze(unittest.TestCase):
 
     def setUp(self):
         """Set up mocks."""
-        # NCN groups are not used by this step of starting platform services
-        self.ncn_groups = {}
-        self.check_ceph_health = mock.patch('sat.cli.bootsys.platform.check_ceph_health').start()
+        self.ncn_groups = {
+            'storage':  ['ncn-s001', 'ncn-s002']
+        }
+        self.ceph_services = [
+            'ceph-osd.target', 'ceph-radosgw.target', 'ceph-mon.target', 'ceph-mgr.target', 'ceph-mds.target'
+        ]
         self.toggle_ceph_freeze_flags = mock.patch('sat.cli.bootsys.platform.toggle_ceph_freeze_flags').start()
+        self.get_config_value = mock.patch('sat.cli.bootsys.platform.get_config_value').start()
+        self.ceph_waiter_cls = mock.patch('sat.cli.bootsys.platform.CephHealthWaiter').start()
+        self.ceph_waiter = self.ceph_waiter_cls.return_value
+        self.do_service_action_on_hosts = mock.patch('sat.cli.bootsys.platform.do_service_action_on_hosts').start()
 
     def test_do_ceph_unfreeze_success(self):
         """Test do_ceph_unfreeze in the successful case."""
         do_ceph_unfreeze(self.ncn_groups)
-        self.check_ceph_health.assert_called_once_with(expecting_osdmap_flags=True)
+        self.assertEqual(
+            self.do_service_action_on_hosts.mock_calls,
+            [mock.call(self.ncn_groups['storage'], service, 'active') for service in self.ceph_services]
+        )
         self.toggle_ceph_freeze_flags.assert_called_once_with(freeze=False)
+        self.get_config_value.assert_called_once_with('bootsys.ceph_timeout')
+        self.ceph_waiter_cls.assert_called_once_with(self.get_config_value.return_value)
+        self.ceph_waiter.wait_for_completion.assert_called_once_with()
 
     def test_do_ceph_unfreeze_unhealthy(self):
-        """When Ceph is not healthy, do not unfreeze Ceph."""
-        self.check_ceph_health.side_effect = CephHealthCheckError
+        """do_ceph_unfreeze should unfreeze Ceph and wait, raising an error if a healthy state is never reached."""
+        self.ceph_waiter.wait_for_completion.return_value = False
+        expected_error_regex = 'Ceph is not healthy. Please correct Ceph health and try again.'
+        with self.assertRaisesRegex(FatalPlatformError, expected_error_regex):
+            do_ceph_unfreeze(self.ncn_groups)
+        self.assertEqual(
+            self.do_service_action_on_hosts.mock_calls,
+            [mock.call(self.ncn_groups['storage'], service, 'active') for service in self.ceph_services]
+        )
+        self.toggle_ceph_freeze_flags.assert_called_once_with(freeze=False)
+        self.get_config_value.assert_called_once_with('bootsys.ceph_timeout')
+        self.ceph_waiter_cls.assert_called_once_with(self.get_config_value.return_value)
+        self.ceph_waiter.wait_for_completion.assert_called_once_with()
+
+    def test_do_ceph_unfreeze_failed_service_start(self):
+        """do_ceph_unfreeze should not unfreeze or wait for Ceph health if starting the service(s) failed."""
+        self.do_service_action_on_hosts.side_effect = FatalPlatformError
         with self.assertRaises(FatalPlatformError):
             do_ceph_unfreeze(self.ncn_groups)
         self.toggle_ceph_freeze_flags.assert_not_called()
+        self.ceph_waiter_cls.assert_not_called()
 
 
 class TestPromptForNCNVerification(unittest.TestCase):
@@ -847,6 +875,7 @@ class TestPromptForNCNVerification(unittest.TestCase):
 
         self.mock_managers = ['ncn-m001', 'ncn-m002', 'ncn-m003']
         self.mock_workers = ['ncn-w001', 'ncn-w002', 'ncn-w003']
+        self.mock_storage = ['ncn-s001', 'ncn-s002']
 
         def mock_get_hostnames(subroles):
             if subroles == ['managers']:
@@ -855,6 +884,8 @@ class TestPromptForNCNVerification(unittest.TestCase):
                 return set(self.mock_workers)
             elif subroles == ['managers', 'workers']:
                 return set(self.mock_managers + self.mock_workers)
+            elif subroles == ['storage']:
+                return set(self.mock_storage)
             else:
                 return set()
 
@@ -873,7 +904,8 @@ class TestPromptForNCNVerification(unittest.TestCase):
             mock.call('Identified the following Non-compute Node (NCN) groups as follows.'),
             mock.call(f'managers: {self.mock_managers}'),
             mock.call(f'workers: {self.mock_workers}'),
-            mock.call(f'kubernetes: {self.mock_managers + self.mock_workers}')
+            mock.call(f'kubernetes: {self.mock_managers + self.mock_workers}'),
+            mock.call(f'storage: {self.mock_storage}')
         ])
 
     @staticmethod
@@ -918,7 +950,8 @@ class TestPromptForNCNVerification(unittest.TestCase):
         expected_groups = {
             'managers': self.mock_managers,
             'workers': self.mock_workers,
-            'kubernetes': self.mock_managers + self.mock_workers
+            'kubernetes': self.mock_managers + self.mock_workers,
+            'storage': self.mock_storage
         }
         self.assertEqual(expected_groups, ncn_groups)
 
