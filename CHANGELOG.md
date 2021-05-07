@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   map ``cray-product-catalog`` is in an unexpected state.
 - Improved error handling in ``sat showrev`` when connecting to the Kubernetes
   API fails.
+- Added missing description of ``sat swap`` to output of ``sat --help``.
 
 ### Added
 - Added new fields to ``sat setrev`` and ``sat showrev``.
