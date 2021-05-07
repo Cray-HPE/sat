@@ -32,6 +32,8 @@ import sseclient
 from sat.apiclient import APIError, ReadTimeout, TelemetryAPIClient
 from sat.session import SATSession
 
+from sat.cli.sensors.sensor_fields import UNIQUE_SENSOR_FIELD_MAPPING
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -48,13 +50,15 @@ class TelemetryClient(threading.Thread):
     # Number of times to try to reconnect
     RECONNECT_RETRIES = 3
 
-    def __init__(self, stop_event, xnames_info, batchsize, topic, all_results, results_index):
+    def __init__(self, stop_event, xnames_info, batchsize, update_until_timeout,
+                 topic, all_results, results_index):
         """Create a thread to connect to streaming telemetry API.
 
         Args:
             stop_event (threading.Event): Event object used to stop all threads.
             xnames_info ([dict]): A list of dictionaries with xname and Type.
             batchsize (int): The number of metrics to include in each message from API.
+            update_until_timeout (bool): True if update sensor data for all xnames until timeout.
             topic (str): The name of the Kafka telemetry topic.
             all_results ([dict]): A list of dictionaries with temeletry results for all topics.
             results_index (int): The index into the results list for this thread.
@@ -63,6 +67,7 @@ class TelemetryClient(threading.Thread):
         super().__init__()
         self.stop_event = stop_event
         self.batchsize = batchsize
+        self.update_until_timeout = update_until_timeout
         self.retries = 0
 
         # initialize the results for this thread
@@ -115,6 +120,56 @@ class TelemetryClient(threading.Thread):
         """
         return self.api_client.ping()
 
+    def add_or_update_sensor(self, metric, sensor):
+        """Add or update data for a sensor in the results for a metric.
+
+        Args:
+            metric (dict): A dictionary with sensor data collected so far for the xname.
+            sensor (dict): A dictionary with new sensor data for the xname.
+        """
+
+        new_unique_sensor_data = [extractor(self.get_topic(), metric, sensor) for extractor
+                                  in UNIQUE_SENSOR_FIELD_MAPPING.values()]
+
+        # Search for the sensor in the existing results and update it if it exists
+        metric_sensors = metric['Sensors']
+        for metric_sensor in metric_sensors:
+            old_unique_sensor_data = [extractor(self.get_topic(), metric, metric_sensor)
+                                      for extractor in UNIQUE_SENSOR_FIELD_MAPPING.values()]
+            if old_unique_sensor_data == new_unique_sensor_data:
+                LOGGER.debug(f'Updating sensor for xname: {metric["Context"]} '
+                             f'and topic: {self.get_topic()}')
+                LOGGER.debug(f'{sensor}')
+                metric_sensor['Timestamp'] = sensor['Timestamp']
+                metric_sensor['Value'] = sensor['Value']
+                return
+
+        # Sensor doesn't exist in the results so add it
+        LOGGER.debug(f'Adding sensor for xname: {metric["Context"]} '
+                     f'and topic: {self.get_topic()}')
+        LOGGER.debug(f'{sensor}')
+        metric_sensors.append(sensor)
+
+    def update_metric_sensors(self, metric, sensors):
+        """Initialize or update the sensors data in the thread results for a metric.
+
+        Args:
+            metric (dict): A dictionary with sensor data collected so far for the xname.
+            sensors ([dict]): A list of dictionaries with new sensor data for the xname.
+        """
+
+        if not metric['Sensors']:
+            LOGGER.debug(f'Setting first set of sensors for xname: {metric["Context"]} '
+                         f'and topic: {self.get_topic()}')
+            for sensor in sensors:
+                LOGGER.debug(f'{sensor}')
+            metric['Sensors'] = sensors
+            return
+
+        # Sensor data has already been collected for the xname, so add or update it
+        for sensor in sensors:
+            self.add_or_update_sensor(metric, sensor)
+
     def set_sensors_for_context(self, context, sensors):
         """Set the sensors data in the thread results for a particular context.
 
@@ -131,7 +186,7 @@ class TelemetryClient(threading.Thread):
             try:
                 if metric['Context'] == context:
                     metric['Count'] += 1
-                    metric['Sensors'] = sensors
+                    self.update_metric_sensors(metric, sensors)
                     return True
             except KeyError as err:
                 LOGGER.error(f'Failed to parse telemetry results due to missing key(s) in '
@@ -146,6 +201,9 @@ class TelemetryClient(threading.Thread):
         Returns:
            True if all done and otherwise False.
         """
+
+        if self.update_until_timeout:
+            return False
 
         metrics = self.results.get('Metrics')
         for metric in metrics:

@@ -28,7 +28,6 @@ import signal
 import threading
 import time
 import traceback
-from collections import OrderedDict
 
 import inflect
 
@@ -37,46 +36,14 @@ from sat.config import get_config_value
 from sat.constants import MISSING_VALUE
 from sat.report import Report
 from sat.session import SATSession
-from sat.xname import XName
 
 from sat.cli.sensors.telemetry_client import TelemetryClient
+from sat.cli.sensors.sensor_fields import FIELD_MAPPING
 
 
 CHASSIS_XNAME_REGEX = re.compile(r'x\d+c\d$')
 CHASSIS_XNAME_PREFIX_REGEX = re.compile(r'x\d+c\d')
 
-
-def sensor_getter(key):
-    """Return a function that extracts a key value from a sensor reading.
-
-    Args:
-        key (str): the key to extract from the sensor reading
-
-    Returns:
-        A function that takes three arguments of type dict, where the third
-        argument is the dict containing the sensor reading values. The function
-        returns the value of the key named `key` from that dict, defaulting to
-        `MISSING_VALUE` if the `key` is missing.
-    """
-
-    return lambda topic, metric, sensor: sensor.get(key, MISSING_VALUE)
-
-
-FIELD_MAPPING = OrderedDict([
-    ('xname', lambda topic, metric, sensor: XName(metric.get('Context', MISSING_VALUE))),
-    ('Type', lambda topic, metric, sensor: metric.get('Type', MISSING_VALUE)),
-    ('Topic', lambda topic, metric, sensor: topic.get('Topic', MISSING_VALUE)),
-    ('Timestamp', sensor_getter('Timestamp')),
-    ('Location', sensor_getter('Location')),
-    ('Parental Context', sensor_getter('ParentalContext')),
-    ('Parental Index', sensor_getter('ParentalIndex')),
-    ('Physical Context', sensor_getter('PhysicalContext')),
-    ('Index', sensor_getter('Index')),
-    ('Physical Subcontext', sensor_getter('PhysicalSubContext')),
-    ('Device Specific Context', sensor_getter('DeviceSpecificContext')),
-    ('Subindex', sensor_getter('SubIndex')),
-    ('Value', sensor_getter('Value'))
-])
 
 inf = inflect.engine()
 LOGGER = logging.getLogger(__name__)
@@ -252,8 +219,8 @@ def make_raw_table(all_topics_results):
         for topic_result in all_topics_results:
             for metric in topic_result['Metrics']:
                 for sensor in metric['Sensors']:
-                    raw_table.append([extractor(topic_result, metric, sensor) for extractor
-                                      in FIELD_MAPPING.values()])
+                    raw_table.append([extractor(topic_result, metric, sensor)
+                                      for extractor in FIELD_MAPPING.values()])
     except KeyError as err:
         LOGGER.error(f'Key not present in telemetry results: {err}')
         raise SystemExit(1)
@@ -274,12 +241,13 @@ def any_thread_alive(telemetry_clients):
     return any(thread.is_alive() for thread in telemetry_clients)
 
 
-def wait_for_threads(telemetry_clients, stop_event, total_timeout):
+def wait_for_threads(telemetry_clients, stop_event, update_until_timeout, total_timeout):
     """Wait for threads started for each telemetry topic.
 
     Args:
         telemetry_clients (threading.Thread list):  A list of threads (one per telemetry topic).
         stop_event (threading.Event): Event object used to stop all threads.
+        update_until_timeout (bool): True if update sensor data for all xnames until timeout.
         total_timeout (int): The total timeout in seconds for all threads.
 
     Returns:
@@ -287,6 +255,11 @@ def wait_for_threads(telemetry_clients, stop_event, total_timeout):
     """
 
     LOGGER.info(f'Waiting for threads using timeout of {total_timeout} seconds')
+    if update_until_timeout:
+        LOGGER.info('Sensor data will continue to be updated for each xname until timeout occurs')
+    else:
+        LOGGER.info('Each thread will exit when sensor data is received for all xnames')
+
     now = time.time()
     end = now + total_timeout
     while now <= end and any_thread_alive(telemetry_clients):
@@ -304,13 +277,14 @@ def wait_for_threads(telemetry_clients, stop_event, total_timeout):
         client_thread.join()
 
 
-def get_telemetry_metrics(topics, xnames_info, batchsize, total_timeout):
+def get_telemetry_metrics(topics, xnames_info, batchsize, update_until_timeout, total_timeout):
     """Get sensor data from the Kafka topics for the specified xnames.
 
     Args:
         topics ([str]): A list of topics with telemetry data for sensors.
         xnames_info ([dict]): A list of dictionaries with xname and Type.
         batchsize (int): The number of metrics to include in each message from API.
+        update_until_timeout (bool): True if update sensor data for all xnames until timeout.
         total_timeout (int): The maximum timeout in seconds for collecting data from all topics.
 
     Returns:
@@ -327,7 +301,8 @@ def get_telemetry_metrics(topics, xnames_info, batchsize, total_timeout):
         for i, topic in enumerate(topics):
             LOGGER.info(f'Getting telemetry data from {topic}...')
             telemetry_client = TelemetryClient(stop_event, xnames_info,
-                                               batchsize, topic, all_topics_results, i)
+                                               batchsize, update_until_timeout,
+                                               topic, all_topics_results, i)
             LOGGER.debug(f'Starting thread: {telemetry_client.getName()}')
 
             if telemetry_client.endpoint_alive():
@@ -338,7 +313,7 @@ def get_telemetry_metrics(topics, xnames_info, batchsize, total_timeout):
                 raise SystemExit(1)
 
         print('Please be patient...')
-        wait_for_threads(telemetry_clients, stop_event, total_timeout)
+        wait_for_threads(telemetry_clients, stop_event, update_until_timeout, total_timeout)
 
     except ServiceExit:
         LOGGER.debug('Stopping all threads - setting stop_event')
@@ -383,7 +358,8 @@ def do_sensors(args):
 
     try:
         all_topics_results = get_telemetry_metrics(args.topics, xnames_info,
-                                                   args.batchsize, int(args.timeout))
+                                                   args.batchsize, args.update_until_timeout,
+                                                   int(args.timeout))
 
         topics_with_api_error = [topic_result['Topic']
                                  for topic_result in all_topics_results if topic_result['APIError']]

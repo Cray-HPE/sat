@@ -58,6 +58,13 @@ These options must be specified after the subcommand.
         recursively include sensor readings from all ChassisBMC, RouterBMC,
         and NodeBMC components within the chassis.
 
+**-u, --update-until-timeout**
+        Collect sensor data for each xname until timeout occurs.  As sensor
+        data is streamed from a telemetry topic, the sensor timestamp and reading
+        are updated if data for a sensor was already received in a previous stream.
+        If the stream contains sensor data for a new sensor, then it is added to
+        the results.
+
 .. include:: _sat-xname-opts.rst
 .. include:: _sat-format-opts.rst
 .. include:: _sat-filter-opts.rst

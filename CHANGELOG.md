@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   API fails.
 
 ### Added
+- Added a new ``--update-until-timeout`` command-line option to ``sat sensors``.
 - Added new fields to ``sat setrev`` and ``sat showrev``.
     - System description
     - Product number
