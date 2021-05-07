@@ -100,7 +100,7 @@ def add_swap_subparser(subparsers):
         None
     """
 
-    swap_parser = subparsers.add_parser('swap', help='')
+    swap_parser = subparsers.add_parser('swap', help='Disable/enable a component before/after replacement.')
 
     target_subparsers = swap_parser.add_subparsers(metavar='target', dest='target', help='The component to swap.')
 
