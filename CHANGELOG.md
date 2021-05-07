@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Removed Redfish username and password from configuration file since
+  they are no longer used by any subcommands.
 - Changed the ``sat sensors`` command to use the Telemetry API to get
   sensor data instead of accessing Redfish directly.
 

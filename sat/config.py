@@ -97,10 +97,6 @@ SAT_CONFIG_SPEC = {
         'file_level': OptionSpec(str, 'INFO', validate_log_level, 'loglevel'),
         'stderr_level': OptionSpec(str, 'WARNING', validate_log_level, 'loglevel'),
     },
-    'redfish': {
-        'username': OptionSpec(str, '', None, None),
-        'password': OptionSpec(str, '', None, None)
-    },
     's3': {
         'endpoint': OptionSpec(str, 'https://rgw-vip.nmn', None, None),
         'bucket': OptionSpec(str, 'sat', None, None),
