@@ -93,5 +93,12 @@ def add_sensors_subparser(subparsers):
                                      f'Defaults to {TIMEOUT}.')
 
     sensors_parser.add_argument('-r', '--recursive',
+                                default=False,
                                 action='store_true',
                                 help='Include all BMCs for Chassis xnames specified by xXcC.')
+
+    sensors_parser.add_argument('-u', '--update-until-timeout',
+                                dest='update_until_timeout',
+                                default=False,
+                                action='store_true',
+                                help='Update sensor data for each xname until timeout occurs.')
