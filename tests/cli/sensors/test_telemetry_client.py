@@ -234,8 +234,8 @@ class TestTelemetryClient(unittest.TestCase):
                                            all_topics_results, 0)
         self.assertFalse(telemetry_client.am_i_done())
 
-    def test_unpack_data(self):
-        """Test unpack_data of a TelemetryClient."""
+    def test_unpack_data_with_missing_sensor_readings_for_requested_xnames(self):
+        """Test unpack_data for 2 requested xnames where sensor data is received for 1 xname only."""
         all_topics_results = [None]
         telemetry_client = TelemetryClient(self.stop_event, self.xnames_info, self.batchsize,
                                            self.update_until_timeout, self.topic,
@@ -249,8 +249,8 @@ class TestTelemetryClient(unittest.TestCase):
         self.assertEqual(xname_results['Count'], 1)
         self.assertEqual(xname_results['Sensors'], self.temperature_sensors_results)
 
-    def test_unpack_complete_data(self):
-        """Test unpack_data with all sensors for 1 xname."""
+    def test_unpack_data_with_complete_sensor_readings_for_all_requested_xnames(self):
+        """Test unpack_data where sensor data is received for all xnames requested."""
         all_topics_results = [None]
         xnames_info = [{'xname': 'x3000c0s17b3', 'Type': 'NodeBMC'}]
         telemetry_client = TelemetryClient(self.stop_event, xnames_info, self.batchsize,
@@ -265,8 +265,8 @@ class TestTelemetryClient(unittest.TestCase):
         self.assertEqual(xname_results['Count'], 1)
         self.assertEqual(xname_results['Sensors'], self.temperature_sensors_results)
 
-    def test_unpack_complete_data_update_until_timeout(self):
-        """Test unpack_data with all sensors for 1 xname with update_until_timeout=True."""
+    def test_unpack_data_with_complete_sensor_readings_update_until_timeout(self):
+        """Test unpack_data with sensors received for 1 requested xname with update_until_timeout=True."""
         all_topics_results = [None]
         xnames_info = [{'xname': 'x3000c0s17b3', 'Type': 'NodeBMC'}]
         update_until_timeout = True

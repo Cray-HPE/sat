@@ -128,27 +128,21 @@ class TelemetryClient(threading.Thread):
             sensor (dict): A dictionary with new sensor data for the xname.
         """
 
-        new_unique_sensor_data = [extractor(self.get_topic(), metric, sensor) for extractor
-                                  in UNIQUE_SENSOR_FIELD_MAPPING.values()]
+        new_sensor_identity = [extractor(self.get_topic(), metric, sensor) for extractor
+                               in UNIQUE_SENSOR_FIELD_MAPPING.values()]
 
         # Search for the sensor in the existing results and update it if it exists
         metric_sensors = metric['Sensors']
         for metric_sensor in metric_sensors:
-            old_unique_sensor_data = [extractor(self.get_topic(), metric, metric_sensor)
-                                      for extractor in UNIQUE_SENSOR_FIELD_MAPPING.values()]
-            if old_unique_sensor_data == new_unique_sensor_data:
-                LOGGER.debug(f'Updating sensor for xname: {metric["Context"]} '
-                             f'and topic: {self.get_topic()}')
-                LOGGER.debug(f'{sensor}')
+            old_sensor_identity = [extractor(self.get_topic(), metric, metric_sensor)
+                                   for extractor in UNIQUE_SENSOR_FIELD_MAPPING.values()]
+            if old_sensor_identity == new_sensor_identity:
                 metric_sensor['Timestamp'] = sensor['Timestamp']
                 metric_sensor['Value'] = sensor['Value']
-                return
-
-        # Sensor doesn't exist in the results so add it
-        LOGGER.debug(f'Adding sensor for xname: {metric["Context"]} '
-                     f'and topic: {self.get_topic()}')
-        LOGGER.debug(f'{sensor}')
-        metric_sensors.append(sensor)
+                break
+        else:
+            # Sensor doesn't exist in the results so add it
+            metric_sensors.append(sensor)
 
     def update_metric_sensors(self, metric, sensors):
         """Initialize or update the sensors data in the thread results for a metric.
@@ -158,17 +152,16 @@ class TelemetryClient(threading.Thread):
             sensors ([dict]): A list of dictionaries with new sensor data for the xname.
         """
 
-        if not metric['Sensors']:
-            LOGGER.debug(f'Setting first set of sensors for xname: {metric["Context"]} '
+        if metric['Sensors']:
+            # Sensor data has already been collected for the xname, so add or update it
+            LOGGER.debug(f'Updating sensors for xname: {metric["Context"]} '
                          f'and topic: {self.get_topic()}')
             for sensor in sensors:
-                LOGGER.debug(f'{sensor}')
+                self.add_or_update_sensor(metric, sensor)
+        else:
+            LOGGER.debug(f'Setting sensors for xname: {metric["Context"]} '
+                         f'and topic: {self.get_topic()}')
             metric['Sensors'] = sensors
-            return
-
-        # Sensor data has already been collected for the xname, so add or update it
-        for sensor in sensors:
-            self.add_or_update_sensor(metric, sensor)
 
     def set_sensors_for_context(self, context, sensors):
         """Set the sensors data in the thread results for a particular context.

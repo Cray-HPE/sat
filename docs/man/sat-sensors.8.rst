@@ -63,7 +63,8 @@ These options must be specified after the subcommand.
         data is streamed from a telemetry topic, the sensor timestamp and reading
         are updated if data for a sensor was already received in a previous stream.
         If the stream contains sensor data for a new sensor, then it is added to
-        the results.
+        the results. When multiple xnames are requested, this option will result in
+        the most recent sensor data for all requested xnames during the timeout period.
 
 .. include:: _sat-xname-opts.rst
 .. include:: _sat-format-opts.rst
