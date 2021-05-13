@@ -8,6 +8,8 @@ WORKDIR /sat
 COPY CHANGELOG.md README.md /sat/
 COPY setup.cfg setup.py /sat/
 COPY requirements.lock.txt /sat/requirements.txt
+# This file is used to get the version of docutils needed
+COPY requirements-dev.lock.txt /sat/requirements-dev.lock.txt
 COPY docker_scripts/config-docker-sat.sh /sat/
 COPY sat /sat/sat
 COPY docs/man /sat/docs/man

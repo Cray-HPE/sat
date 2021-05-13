@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash -xe
 
 LOGDIR=/var/log/cray/sat
 
@@ -14,9 +14,13 @@ if [ ! -d "$LOGDIR" ]; then
     chmod 755 $LOGDIR
 fi
 
+# temporarily install docutils needed for man page builds
+pip install $(grep docutils /sat/requirements-dev.lock.txt)
 # make man pages
 cd /sat/docs/man
 make
+# remove docutils when done since it's not needed in final image
+pip uninstall -y docutils
 
 # install man pages
 cd /sat
