@@ -58,6 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Country code
 - Added additional description of all fields when running ``sat setrev``,
   and added input validation for fields.
+- Added a "Location Name" field to the listing of node accelerators output by
+  `sat hwinv --list-node-accels`.
 
 ### Removed
 - Removed the ``ceph-check`` stage of ``sat bootsys boot``.
