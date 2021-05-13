@@ -48,6 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   API fails.
 - Added missing description of ``sat swap`` to output of ``sat --help``.
 - Added back missing man pages to the container image.
+- Removed an old ``slingshot-tools`` dependency from the RPM spec file.
+  However, note that RPM installation has not been tested since the move to
+  running ``sat`` in a container and is not officially supported.
 
 ### Added
 - Added a new ``--update-until-timeout`` command-line option to ``sat sensors``.
