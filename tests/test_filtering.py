@@ -59,8 +59,8 @@ class TestSubsequenceMatching(unittest.TestCase):
     def test_is_subsequence(self):
         """Test subsequence matching."""
         test_str = 'spamneggs'
-        for l in range(len(test_str) + 1):
-            for subseq in itertools.combinations(test_str, l):
+        for str_len in range(len(test_str) + 1):
+            for subseq in itertools.combinations(test_str, str_len):
                 self.assertTrue(filtering.is_subsequence(''.join(subseq), test_str))
 
     def test_trivial_subsequence(self):

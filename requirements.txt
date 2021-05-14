@@ -29,6 +29,7 @@ prettytable >= 0.7.2, < 1.0
 pyyaml >= 5.4.1
 requests < 3.0
 requests-oauthlib
+sseclient-py >= 1.7
 toml == 0.10.0
 urllib3 >= 1.0, < 2.0
 croniter >= 0.3, < 1.0

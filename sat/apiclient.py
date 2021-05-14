@@ -38,6 +38,11 @@ class APIError(Exception):
     pass
 
 
+class ReadTimeout(Exception):
+    """An timeout occurred when making a request to the API."""
+    pass
+
+
 class APIGatewayClient:
     """A client to the API Gateway."""
 
@@ -76,12 +81,15 @@ class APIGatewayClient:
         self.cert_verify = cert_verify
         self.timeout = timeout
 
+    def set_timeout(self, timeout):
+        self.timeout = timeout
+
     def _make_req(self, *args, req_type='GET', req_param=None, json=None):
         """Perform HTTP request with type `req_type` to resource given in `args`.
         Args:
             *args: Variable length list of path components used to construct
                 the path to the resource.
-            req_type (str): Type of reqest (GET, POST, PUT, or DELETE).
+            req_type (str): Type of reqest (GET, STREAM, POST, PUT, or DELETE).
             req_param: Parameter(s) depending on request type.
             json (dict): The data dict to encode as JSON and pass as the body of
                 a POST request.
@@ -90,6 +98,7 @@ class APIGatewayClient:
             The requests.models.Response object if the request was successful.
 
         Raises:
+            ReadTimeout: if the req_type is STREAM and there is a ReadTimeout.
             APIError: if the status code of the response is >= 400 or request
                 raises a RequestException of any kind.
         """
@@ -106,6 +115,9 @@ class APIGatewayClient:
         try:
             if req_type == 'GET':
                 r = requester.get(url, params=req_param, verify=self.cert_verify, timeout=self.timeout)
+            elif req_type == 'STREAM':
+                r = requester.get(url, params=req_param, stream=True,
+                                  verify=self.cert_verify, timeout=self.timeout)
             elif req_type == 'POST':
                 r = requester.post(url, data=req_param, verify=self.cert_verify,
                                    json=json, timeout=self.timeout)
@@ -118,6 +130,11 @@ class APIGatewayClient:
             else:
                 # Internal error not expected to occur.
                 raise ValueError("Request type '{}' is invalid.".format(req_type))
+        except requests.exceptions.ReadTimeout as err:
+            if req_type == 'STREAM':
+                raise ReadTimeout("{} request to URL '{}' timeout: {}".format(req_type, url, err))
+            else:
+                raise APIError("{} request to URL '{}' failed: {}".format(req_type, url, err))
         except requests.exceptions.RequestException as err:
             raise APIError("{} request to URL '{}' failed: {}".format(req_type, url, err))
 
@@ -126,7 +143,7 @@ class APIGatewayClient:
                            "code {}: {}".format(req_type, url, r.status_code, r.reason))
 
         LOGGER.debug("Received response to %s request to URL '%s' "
-                     "with status code: '%s': %s", req_type, url, r.status_code, r.reason)
+                     "with status code: '%s': %s", req_type, r.url, r.status_code, r.reason)
 
         return r
 
@@ -147,6 +164,27 @@ class APIGatewayClient:
         """
 
         r = self._make_req(*args, req_type='GET', req_param=params)
+
+        return r
+
+    def stream(self, *args, params=None):
+        """Issue an HTTP GET stream request to resource given in `args`.
+
+        Args:
+            *args: Variable length list of path components used to construct
+                the path to the resource to GET.
+            params (dict): Parameters dictionary to pass through to request.get.
+
+        Returns:
+            The requests.models.Response object if the request was successful.
+
+        Raises:
+            ReadTimeout: if there is a ReadTimeout.
+            APIError: if the status code of the response is >= 400 or requests.get
+                raises a RequestException of any kind.
+        """
+
+        r = self._make_req(*args, req_type='STREAM', req_param=params)
 
         return r
 
@@ -583,3 +621,50 @@ class CAPMCClient(APIGatewayClient):
                              f'reported multiple power states: {", ".join(matching_states)}')
         else:
             return matching_states[0]
+
+
+class TelemetryAPIClient(APIGatewayClient):
+    base_resource_path = 'sma-telemetry-api/v1/'
+
+    def ping(self):
+        """Check if endpoint is alive.
+
+        Returns:
+            True or False
+        """
+
+        try:
+            self.get('ping')
+        except APIError as err:
+            LOGGER.error(f'Failed to ping telemetry API endpoint: {err}')
+            return False
+
+        return True
+
+    def stream(self, topic, timeout, params=None):
+        """Create a GET stream connection to the telemetry API.
+
+        Args:
+            topic (str): The name of the Kafka telemetry topic.
+            timeout (int): The timeout in seconds to wait for a response.
+            params (dict): Parameters dictionary to pass through to requests.get.
+
+        Returns:
+            The requests.models.Response object if the request was successful.
+
+        Raises:
+            ReadTimeout: if requests.get raises a ReadTimeout.
+            APIError: if the status code of the response is >= 400 or requests.get
+                raises a RequestException other than ReadTimeout.
+        """
+
+        self.set_timeout(timeout)
+        err_prefix = 'Failed to stream telemetry data'
+        try:
+            response = super().stream('stream', topic, params=params)
+        except ReadTimeout as err:
+            raise ReadTimeout(f'{err_prefix}: {err}')
+        except APIError as err:
+            raise APIError(f'{err_prefix}: {err}')
+
+        return response

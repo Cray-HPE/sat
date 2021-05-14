@@ -30,12 +30,11 @@ import sat.parsergroups
 def add_diag_subparser(subparsers):
 
     xname_opts = sat.parsergroups.create_xname_options()
-    redfish_opts = sat.parsergroups.create_redfish_options()
 
     diag_parser = subparsers.add_parser(
         'diag', help='Launch diagnostics for hardware controllers.',
         description='Launch diagnostics for hardware controllers.',
-        parents=[xname_opts, redfish_opts])
+        parents=[xname_opts])
 
     diag_parser.add_argument('-t', '--timeout', default=300, metavar='SECONDS', type=int,
                              help='Timeout for a diagnostic run on a switch')

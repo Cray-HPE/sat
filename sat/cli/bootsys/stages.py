@@ -67,7 +67,6 @@ STAGES_BY_ACTION = {
         ('ncn-power', ('mgmt_power', 'do_power_on_ncns')),
         ('platform-services', ('platform', 'do_platform_start')),
         ('k8s-check', ('k8s', 'do_k8s_check')),
-        ('ceph-check', ('ceph', 'do_ceph_check')),
         ('cabinet-power', ('cabinet_power', 'do_cabinets_power_on')),
         ('bos-operations', ('bos', 'do_bos_boots'))
     ])

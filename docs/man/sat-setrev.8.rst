@@ -7,7 +7,7 @@ Populate site-specific information about the system
 ----------------------------------------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -27,6 +27,10 @@ print the following fields:
     - System name
     - System install date
     - System type
+    - System description
+    - Product number
+    - Company name
+    - Country code
 
 This subcommand is required to be run if **sat showrev** is to display this
 information - as this information must be manually populated on the system.

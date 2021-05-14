@@ -29,7 +29,6 @@ Summary: System Admin Toolkit (SAT)
 Group: System/Management
 BuildRoot: %{_topdir}
 Vendor: Hewlett Packard Enterprise Company
-Requires: slingshot-tools
 Requires: python3-argcomplete
 Requires: python3-python-dateutil >= 2.7.3, python3-python-dateutil < 3.0
 Requires: python3-docker

@@ -25,6 +25,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.0] - 2021-05-13
+
+### Changed
+- Removed Redfish username and password from configuration file since
+  they are no longer used by any subcommands.
+- Changed the ``sat sensors`` command to use the Telemetry API to get
+  sensor data instead of accessing Redfish directly.
+- Changed the "unfreeze Ceph" step of the ``platform-services`` stage of
+  ``sat bootsys boot`` to behave as follows:
+  - Start any inactive Ceph services
+  - Unfreeze Ceph
+  - Wait for Ceph health
+- Changed the ``platform-services`` stage of ``sat bootsys boot`` to prompt
+  for confirmation of storage NCN hostnames in addition to Kubernetes managers
+  and workers.
+
+### Fixed
+- Fixed a case where ``sat showrev`` fails when the Kubernetes configuration
+  map ``cray-product-catalog`` is in an unexpected state.
+- Improved error handling in ``sat showrev`` when connecting to the Kubernetes
+  API fails.
+- Added missing description of ``sat swap`` to output of ``sat --help``.
+- Added back missing man pages to the container image.
+- Removed an old ``slingshot-tools`` dependency from the RPM spec file.
+  However, note that RPM installation has not been tested since the move to
+  running ``sat`` in a container and is not officially supported.
+
+### Added
+- Added a new ``--update-until-timeout`` command-line option to ``sat sensors``.
+- Added new fields to ``sat setrev`` and ``sat showrev``.
+    - System description
+    - Product number
+    - Company name
+    - Country code
+- Added additional description of all fields when running ``sat setrev``,
+  and added input validation for fields.
+- Added a "Location Name" field to the listing of node accelerators output by
+  `sat hwinv --list-node-accels`.
+
+### Removed
+- Removed the ``ceph-check`` stage of ``sat bootsys boot``.
+
 ## [3.6.0] - 2021-04-16
 
 ### Fixed

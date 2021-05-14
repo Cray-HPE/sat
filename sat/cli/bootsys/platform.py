@@ -29,11 +29,17 @@ from paramiko import SSHClient, SSHException, WarningPolicy
 from threading import Thread
 
 from sat.cached_property import cached_property
-from sat.cli.bootsys.ceph import check_ceph_health, toggle_ceph_freeze_flags, CephHealthCheckError
+from sat.config import get_config_value
+from sat.cli.bootsys.ceph import (
+    check_ceph_health,
+    toggle_ceph_freeze_flags,
+    CephHealthCheckError,
+    CephHealthWaiter
+)
 from sat.cli.bootsys.etcd import save_etcd_snapshot_on_host, EtcdInactiveFailure, EtcdSnapshotFailure
 from sat.cli.bootsys.util import get_mgmt_ncn_hostnames
 from sat.cli.bootsys.waiting import Waiter
-from sat.util import pester_choices
+from sat.util import BeginEndLogger, pester_choices
 
 LOGGER = logging.getLogger(__name__)
 
@@ -221,7 +227,8 @@ def prompt_for_ncn_verification():
     ncns_by_group = {
         'managers': sorted(get_mgmt_ncn_hostnames(['managers'])),
         'workers': sorted(get_mgmt_ncn_hostnames(['workers'])),
-        'kubernetes': sorted(get_mgmt_ncn_hostnames(['managers', 'workers']))
+        'kubernetes': sorted(get_mgmt_ncn_hostnames(['managers', 'workers'])),
+        'storage': sorted(get_mgmt_ncn_hostnames(['storage']))
     }
 
     print('Identified the following Non-compute Node (NCN) groups as follows.')
@@ -498,7 +505,7 @@ def do_ceph_freeze(ncn_groups):
         FatalPlatformError: if ceph is not healthy or if freezing ceph fails.
     """
     try:
-        check_ceph_health(expecting_osdmap_flags=False)
+        check_ceph_health()
     except CephHealthCheckError as err:
         raise FatalPlatformError(f'Ceph is not healthy. Please correct Ceph health and try again. Error: {err}')
     try:
@@ -508,19 +515,31 @@ def do_ceph_freeze(ncn_groups):
 
 
 def do_ceph_unfreeze(ncn_groups):
-    """Check ceph health and unfreeze if healthy.
+    """Start inactive Ceph services, unfreeze Ceph and wait for it to be healthy.
 
     Raises:
         FatalPlatformError: if ceph is not healthy or if unfreezing ceph fails.
     """
-    try:
-        check_ceph_health(expecting_osdmap_flags=True)
-    except CephHealthCheckError as err:
-        raise FatalPlatformError(f'Ceph is not healthy. Please correct Ceph health and try again. Error: {err}')
+    storage_hosts = ncn_groups['storage']
+    ceph_services = [
+        'ceph-osd.target', 'ceph-radosgw.target', 'ceph-mon.target', 'ceph-mgr.target', 'ceph-mds.target'
+    ]
+    for ceph_service in ceph_services:
+        do_service_action_on_hosts(storage_hosts, ceph_service, 'active')
+
     try:
         toggle_ceph_freeze_flags(freeze=False)
     except RuntimeError as err:
         raise FatalPlatformError(str(err))
+
+    with BeginEndLogger('wait for ceph health'):
+        ceph_timeout = get_config_value('bootsys.ceph_timeout')
+        print(f'Waiting up to {ceph_timeout} seconds for Ceph to become healthy after unfreeze')
+        ceph_waiter = CephHealthWaiter(ceph_timeout)
+        if not ceph_waiter.wait_for_completion():
+            raise FatalPlatformError(f'Ceph is not healthy. Please correct Ceph health and try again.')
+        else:
+            print('Ceph is healthy.')
 
 
 def do_etcd_snapshot(ncn_groups):
@@ -572,7 +591,8 @@ STEPS_BY_ACTION = {
                              do_containerd_start),
         PlatformServicesStep('Ensure etcd is running and enabled on all Kubernetes manager NCNs.',
                              do_etcd_start),
-        PlatformServicesStep('Check health of Ceph cluster and unfreeze state.', do_ceph_unfreeze),
+        PlatformServicesStep('Start inactive Ceph services, unfreeze Ceph cluster and wait for Ceph health.',
+                             do_ceph_unfreeze),
         PlatformServicesStep('Start and enable kubelet on all Kubernetes NCNs.', do_kubelet_start)
     ],
     # The ordered steps to stop platform services

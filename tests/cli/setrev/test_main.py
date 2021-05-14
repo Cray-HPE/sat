@@ -1,7 +1,7 @@
 """
-Unit tests for the sat.sat.cli.setrev.main functions.
+Unit tests for the sat.cli.setrev.main module.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -39,52 +39,16 @@ import sat.cli.setrev.main
 samples = os.path.join(os.path.dirname(__file__), 'samples')
 
 
-# Helpers for mock-decorations.
-
-class InputDict(dict):
-    """For help with mocking the input builtin.
-
-    When tests in this file mock input, they do it by replacing it with a
-    lambda that points to a global instance of InputDict, which finds a field
-    that is a substring of the prompt to input.
-    """
-    def __getitem__(self, super_):
-        """Find first value whose key is in super_.
-
-        Args:
-            super_: A string that should contain one of the keys as a
-                substring.
-
-        Returns:
-            Value if its key is a substring of super_.
-            Returns empty string if no match.
-        """
-
-        for key, val in self.items():
-            if key in super_:
-                return val
-
-        return ''
-
-
-full = InputDict({
+EXAMPLE_SITE_DATA = {
     'Serial number': '1234',
     'Site name': 'site name',
     'System name': 'system name',
     'System install date': '1993-05-07',
-    'System type': 'fire type'})
-
-empty_date = InputDict({
-    'Serial number': '1234',
-    'Site name': 'site name',
-    'System name': 'system name',
-    'System install date': '',
-    'System type': 'fire type'})
-
-empty_input = InputDict({})
+    'System type': 'EX-1C'
+}
 
 
-class TestSetrev(unittest.TestCase):
+class TestSetrevMain(unittest.TestCase):
 
     def setUp(self):
         """Sets up patches."""
@@ -93,30 +57,28 @@ class TestSetrev(unittest.TestCase):
         self.mock_get_config_value = mock.patch('sat.cli.setrev.main.get_config_value',
                                                 return_value=self.s3_bucket).start()
 
+        # Create a list of mock objects matching what SITE_FIELDS would look like
+        self.mock_site_fields = mock.patch(
+            'sat.cli.setrev.main.SITE_FIELDS',
+            [self._mock_with_name(fld) for fld in EXAMPLE_SITE_DATA]
+        ).start()
+
     def tearDown(self):
         """Stops all patches."""
         mock.patch.stopall()
 
+    @staticmethod
+    def _mock_with_name(name):
+        """Return a mock.Mock() with its 'name' attribute set"""
+        # you can't create a mock.Mock and specify its 'name' attribute in the constructor
+        mock_object = mock.Mock()
+        mock_object.name = name
+        return mock_object
+
     def set_up_mock_yaml_load(self):
         """Patch the yaml.safe_load method"""
         self.mock_yaml_load = mock.patch('sat.cli.setrev.main.yaml.safe_load',
-                                         return_value=full).start()
-
-    def test_is_valid_date_empty_string(self):
-        """is_valid_date should return True on empty string.
-        """
-        self.assertTrue(sat.cli.setrev.main.is_valid_date(''))
-
-    def test_is_valid_date_good_format(self):
-        """is_valid_date should return True if format matches YYYY-mm-dd.
-        """
-        self.assertTrue(sat.cli.setrev.main.is_valid_date('2019-08-10'))
-
-    def test_is_valid_date_bad_dates(self):
-        """is_valid_date should not accept invalid dates.
-        """
-        self.assertFalse(sat.cli.setrev.main.is_valid_date('2019-13-10'))
-        self.assertFalse(sat.cli.setrev.main.is_valid_date('2019-08-32'))
+                                         return_value=EXAMPLE_SITE_DATA).start()
 
     def test_get_site_data_good_file(self):
         """get_site_data should return a dict after reading valid yaml.
@@ -168,63 +130,33 @@ class TestSetrev(unittest.TestCase):
         d = sat.cli.setrev.main.get_site_data(path)
         self.assertEqual(d, {})
 
-    @mock.patch('sat.cli.setrev.main.input', lambda x: full[x])
-    def test_input_site_data_fresh(self):
-        """input_site_data should insert vals to an empty dict.
-        """
-        d1 = {}
-        sat.cli.setrev.main.input_site_data(d1)
-        self.assertEqual(d1, full)
+    def test_input_site_data(self):
+        """Test input_site_data modifies data in place."""
+        data_to_modify = {}
 
-    @mock.patch('sat.cli.setrev.main.input', lambda x: empty_date[x])
-    def test_input_site_data_empty_date(self):
-        """input_site_data should default to today for 'System install date'.
-        """
-        d1 = {}
-        d2 = {}
-        d2.update(empty_date)
-        d2['System install date'] = datetime.today().strftime('%Y-%m-%d')
-        sat.cli.setrev.main.input_site_data(d1)
-        self.assertEqual(d1, d2)
+        sat.cli.setrev.main.input_site_data(data_to_modify)
+        for mock_site_field in self.mock_site_fields:
+            mock_site_field.prompt.assert_called_once_with(data_to_modify)
 
-    @mock.patch('sat.cli.setrev.main.input', lambda x: empty_input[x])
-    def test_input_site_data_preservation(self):
-        """input_site_data should preserve non-empty entries of existing data.
-        """
-        d1 = {}
-        d2 = {}
-        d1.update(full)
-        d2.update(d1)
-        sat.cli.setrev.main.input_site_data(d1)
+        self.assertEqual(
+            data_to_modify,
+            {fld.name: fld.prompt.return_value for fld in self.mock_site_fields}
+        )
 
-        self.assertEqual(d1, d2)
-
-    @mock.patch('sat.cli.setrev.main.input', lambda x: full[x])
-    def test_input_site_data_overwrite(self):
-        """input_site_data should overwrite existing entries.
-        """
-        d1 = {}
-        d1.update(full)
-        d1['Serial number'] = 'new-serial-number'
-
-        sat.cli.setrev.main.input_site_data(d1)
-        self.assertEqual(d1, full)
-
-    @mock.patch('sat.cli.setrev.main.input', lambda x: empty_input[x])
-    def test_input_site_data_empty_input(self):
-        """input_site_data should allow completely empty input.
-        """
-        d1 = {}
-        expected = {
-            'Serial number': '',
-            'Site name': '',
-            'System name': '',
-            'System install date': datetime.today().strftime('%Y-%m-%d'),
-            'System type': '',
+    def test_input_site_data_with_existing_data(self):
+        """Test input_site_data replaces old data and adds new fields."""
+        data_to_modify = {
+            'Serial number': '567890'
         }
 
-        sat.cli.setrev.main.input_site_data(d1)
-        self.assertEqual(d1, expected)
+        sat.cli.setrev.main.input_site_data(data_to_modify)
+        for mock_site_field in self.mock_site_fields:
+            mock_site_field.prompt.assert_called_once_with(data_to_modify)
+
+        self.assertEqual(
+            data_to_modify,
+            {fld.name: fld.prompt.return_value for fld in self.mock_site_fields}
+        )
 
     def test_write_site_data_newfile(self):
         """write_site_data should create the file if it doesn't exist.
@@ -243,16 +175,15 @@ class TestSetrev(unittest.TestCase):
         """
         try:
             sitefile = '{}/sitefile1.yml'.format(samples)
-            d1 = dict(full)
 
             if os.path.exists(sitefile):
                 os.remove(sitefile)
 
             # test that data is read the same as it is written
-            sat.cli.setrev.main.write_site_data(sitefile, d1)
-            d2 = sat.cli.setrev.main.get_site_data(sitefile)
+            sat.cli.setrev.main.write_site_data(sitefile, EXAMPLE_SITE_DATA)
+            loaded_data = sat.cli.setrev.main.get_site_data(sitefile)
 
-            self.assertEqual(d1, d2)
+            self.assertEqual(EXAMPLE_SITE_DATA, loaded_data)
         finally:
             if os.path.exists(sitefile):
                 os.remove(sitefile)
@@ -263,8 +194,7 @@ class TestSetrev(unittest.TestCase):
 
         try:
             sitefile = '{}/sitefile1.yml'.format(samples)
-            d1 = dict(full)
-            sat.cli.setrev.main.write_site_data(sitefile, d1)
+            sat.cli.setrev.main.write_site_data(sitefile, EXAMPLE_SITE_DATA)
             sat.cli.setrev.main.write_site_data(sitefile, {})
 
             empty = {}
@@ -307,7 +237,7 @@ class TestSetrev(unittest.TestCase):
         self.set_up_mock_yaml_load()
         sitefile = '/opt/cray/etc/site_info.yml'
         with mock.patch('builtins.open') as mock_open:
-            sat.cli.setrev.main.write_site_data(sitefile, dict(full))
+            sat.cli.setrev.main.write_site_data(sitefile, EXAMPLE_SITE_DATA)
 
         mock_open.assert_called_once_with(sitefile, 'w')
         # Just assert file was written; assume the other tests test the writing behavior
@@ -322,7 +252,7 @@ class TestSetrev(unittest.TestCase):
         self.mock_s3.Object.return_value.upload_file.side_effect = Boto3Error
         with mock.patch('builtins.open') as mock_open:
             with self.assertLogs(level=logging.ERROR):
-                sat.cli.setrev.main.write_site_data(sitefile, dict(full))
+                sat.cli.setrev.main.write_site_data(sitefile, EXAMPLE_SITE_DATA)
 
         mock_open.assert_called_once_with(sitefile, 'w')
         # Just assert file was written; assume the other tests test the writing behavior

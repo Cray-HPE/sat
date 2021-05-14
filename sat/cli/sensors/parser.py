@@ -1,7 +1,7 @@
 """
 The parser for the sensors subcommand.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -24,8 +24,22 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import sat.parsergroups
 
-from sat.cli.sensors.capture import CAPTURE_NAME
-from sat.constants import BMC_TYPES
+
+BATCHSIZE = 16
+TIMEOUT = 60
+TYPES = [
+    'ChassisBMC',
+    'NodeBMC',
+    'RouterBMC'
+]
+TOPICS = [
+    'cray-telemetry-temperature',
+    'cray-telemetry-voltage',
+    'cray-telemetry-power',
+    'cray-telemetry-energy',
+    'cray-telemetry-fan',
+    'cray-telemetry-pressure'
+]
 
 
 def add_sensors_subparser(subparsers):
@@ -42,42 +56,49 @@ def add_sensors_subparser(subparsers):
     xname_options = sat.parsergroups.create_xname_options()
     format_options = sat.parsergroups.create_format_options()
     filter_options = sat.parsergroups.create_filter_options()
-    redfish_options = sat.parsergroups.create_redfish_options()
 
     sensors_parser = subparsers.add_parser(
         'sensors', help='Obtain sensor readings.',
         description='Obtain sensor readings from BMCs (any type).',
-        parents=[xname_options, format_options, filter_options, redfish_options]
+        parents=[xname_options, format_options, filter_options]
     )
 
     sensors_parser.add_argument('-t', '--types',
-                                nargs='*',
-                                choices=BMC_TYPES,
-                                default=BMC_TYPES,
-                                help='Limit the types of BMCs queried to the types listed. '
-                                     'The default is to query all types.')
+                                metavar='TYPE',
+                                dest='types',
+                                nargs='+',
+                                choices=TYPES,
+                                default=TYPES,
+                                help=f'Limit the types of BMCs queried to the types listed. '
+                                     f'The default is to query all types: {TYPES}.')
 
-    if CAPTURE_NAME is not None:
-        capture_group = sensors_parser.add_argument_group('capture')
+    sensors_parser.add_argument('--topics',
+                                metavar='TOPIC',
+                                dest='topics',
+                                nargs='+',
+                                choices=TOPICS,
+                                default=TOPICS,
+                                help=f'Limit the telemetry topics queried to the topics listed. '
+                                     f'The default is to query all topics: {TOPICS}.')
 
-        capture_group.add_argument(
-            '--capture-comm', action='store_true',
-            help='Capture successful network requests and responses.')
+    sensors_parser.add_argument('-b', '--batch-size',
+                                dest='batchsize',
+                                default=BATCHSIZE,
+                                help=f'Number of metrics in each message. '
+                                     f'Defaults to {BATCHSIZE}.')
 
-        capture_group.add_argument(
-            '--capture-logs', action='store_true',
-            help='Capture log messages.')
+    sensors_parser.add_argument('--timeout',
+                                default=TIMEOUT,
+                                help=f'Total time, in seconds, for receiving data from telemetry topics. '
+                                     f'Defaults to {TIMEOUT}.')
 
-        capture_group.add_argument(
-            '--capture-data', action='store_true',
-            help='Capture data.')
+    sensors_parser.add_argument('-r', '--recursive',
+                                default=False,
+                                action='store_true',
+                                help='Include all BMCs for Chassis xnames specified by xXcC.')
 
-        capture_group.add_argument(
-            '--capture-dir',
-            help='Destination directory. Defaults to the current directory.'
-        )
-
-        capture_group.add_argument(
-            '--no-zip', action='store_true',
-            help='Do not bundle the capture into a "tgz" file; retain temporary directory instead.'
-        )
+    sensors_parser.add_argument('-u', '--update-until-timeout',
+                                dest='update_until_timeout',
+                                default=False,
+                                action='store_true',
+                                help='Update sensor data for each xname until timeout occurs.')

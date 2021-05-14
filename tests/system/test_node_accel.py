@@ -26,15 +26,33 @@ import unittest
 from sat.system.node_accel import NodeAccel
 from tests.system.component_data import NODE_ACCEL_XNAME, get_component_raw_data
 
+LOCATION_NAME = 'NVIDIA HGX-3'
+
+
+def get_node_accel_raw_data(xname=NODE_ACCEL_XNAME, **kwargs):
+    component_data = get_component_raw_data(hsm_type='NodeAccel', xname=xname, **kwargs)
+    extra_location_info = {
+        'Name': LOCATION_NAME,
+    }
+    component_data['NodeAccelLocationInfo'].update(extra_location_info)
+    return component_data
+
 
 class TestNodeAccel(unittest.TestCase):
     """Test the NodeAccel class."""
 
+    def setUp(self):
+        """Create a NodeAccel object to use in the tests."""
+        self.raw_data = get_node_accel_raw_data()
+        self.node_accel = NodeAccel(self.raw_data)
+
     def test_init(self):
-        raw_data = get_component_raw_data(hsm_type='NodeAccel', xname=NODE_ACCEL_XNAME)
-        node_accel = NodeAccel(raw_data)
-        self.assertEqual(raw_data, node_accel.raw_data)
-        self.assertEqual(node_accel.children_by_type, {})
+        self.assertEqual(self.raw_data, self.node_accel.raw_data)
+        self.assertEqual(self.node_accel.children_by_type, {})
+
+    def test_location_name(self):
+        """Test the location_name property."""
+        self.assertEqual(self.node_accel.location_name, LOCATION_NAME)
 
 
 if __name__ == '__main__':

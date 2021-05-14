@@ -101,24 +101,6 @@ def create_filter_options():
     return parser
 
 
-def create_redfish_options():
-    """Generate arg options for Redfish queries.
-
-    Returns: an ArgumentParser object configured with options and help
-        text for redfish options.
-    """
-    parser = ArgumentParser(add_help=False)
-
-    group = parser.add_argument_group(
-        'redfish options', 'Options related to Redfish queries.')
-
-    group.add_argument(
-        '--redfish-username', default=None,
-        help='Override the Redfish username in sat.toml.')
-
-    return parser
-
-
 def create_xname_options():
     """Generate arg options for xname options.
 
