@@ -1,7 +1,7 @@
 """
 Powers on and off liquid-cooled compute cabinets.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -33,7 +33,55 @@ from sat.session import SATSession
 LOGGER = logging.getLogger(__name__)
 
 
-def do_cabinets_power_off(args):
+def do_air_cooled_cabinets_power_off(args):
+    """Power off the air-cooled cabinets without management nodes in the system.
+
+    Args:
+        args (argparse.Namespace): The parsed bootsys arguments.
+
+    Returns:
+        None
+    """
+    hsm_client = HSMClient(SATSession())
+    try:
+        river_nodes = hsm_client.get_component_xnames({'type': 'Node',
+                                                       'class': 'River'})
+    except APIError as err:
+        LOGGER.error(f'Failed to get the xnames of the air-cooled components: {err}')
+        raise SystemExit(1)
+
+    try:
+        river_mgmt_nodes = hsm_client.get_component_xnames({'type': 'Node',
+                                                            'role': 'Management',
+                                                            'class': 'River'})
+    except APIError as err:
+        LOGGER.error(f'Failed to get the xnames of the management nodes: {err}')
+        raise SystemExit(1)
+
+    node_xnames = list(set(river_nodes) - set(river_mgmt_nodes))
+    print(f'Powering off {len(node_xnames)} non-management nodes in air-cooled cabinets.')
+    capmc_client = CAPMCClient(SATSession())
+    try:
+        capmc_client.set_xnames_power_state(node_xnames, 'off', force=True)
+    except APIError as err:
+        LOGGER.warning(f'Failed to power off all air-cooled non-management nodes: {err}')
+
+    print(f'Waiting for {len(node_xnames)} non-management nodes in air-cooled cabinets '
+          f'to reach powered off state.')
+    capmc_waiter = CAPMCPowerWaiter(node_xnames, 'off',
+                                    get_config_value('bootsys.capmc_timeout'))
+    timed_out_xnames = capmc_waiter.wait_for_completion()
+
+    if timed_out_xnames:
+        LOGGER.error(f'The following non-management nodes failed to reach the powered off '
+                     f'state after powering off with CAPMC: {timed_out_xnames}')
+        raise SystemExit(1)
+
+    print(f'All {len(node_xnames)} non-management nodes in air-cooled cabinets '
+          f'reached powered off state according to CAPMC.')
+
+
+def do_liquid_cooled_cabinets_power_off(args):
     """Power off the liquid-cooled compute cabinets in the system.
 
     Args:
@@ -47,14 +95,6 @@ def do_cabinets_power_off(args):
         chassis_xnames = hsm_client.get_component_xnames({'type': 'Chassis', 'class': 'Mountain'})
     except APIError as err:
         LOGGER.error(f'Failed to get the xnames of the liquid-cooled chassis: {err}')
-        raise SystemExit(1)
-
-    print(f'Suspending {HMSDiscoveryCronJob.FULL_NAME} to ensure components '
-          f'remain powered off.')
-    try:
-        HMSDiscoveryCronJob().set_suspend_status(True)
-    except HMSDiscoveryError as err:
-        LOGGER.error(f'Failed to suspend discovery: {err}')
         raise SystemExit(1)
 
     print(f'Powering off all {len(chassis_xnames)} liquid-cooled chassis.')
@@ -77,6 +117,28 @@ def do_cabinets_power_off(args):
 
     print(f'All {len(chassis_xnames)} liquid-cooled chassis reached powered off '
           f'state according to CAPMC.')
+
+
+def do_cabinets_power_off(args):
+    """Power off the compute cabinets in the system.
+
+    Args:
+        args (argparse.Namespace): The parsed bootsys arguments.
+
+    Returns:
+        None
+    """
+
+    print(f'Suspending {HMSDiscoveryCronJob.FULL_NAME} to ensure components '
+          f'remain powered off.')
+    try:
+        HMSDiscoveryCronJob().set_suspend_status(True)
+    except HMSDiscoveryError as err:
+        LOGGER.error(f'Failed to suspend discovery: {err}')
+        raise SystemExit(1)
+
+    do_liquid_cooled_cabinets_power_off(args)
+    do_air_cooled_cabinets_power_off(args)
 
 
 def do_cabinets_power_on(args):
