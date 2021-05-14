@@ -21,8 +21,10 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+from sat.cached_property import cached_property
 from sat.system.component import NodeComponent
 from sat.system.constants import NODE_ACCEL_TYPE
+from sat.system.field import ComponentField
 
 
 class NodeAccel(NodeComponent):
@@ -33,4 +35,10 @@ class NodeAccel(NodeComponent):
     pretty_name = 'node accelerator'
 
     # Any fields needed specifically on a nodeAccel can be added here.
-    fields = NodeComponent.fields + []
+    fields = NodeComponent.fields + [
+        ComponentField("Location Name")
+    ]
+
+    @cached_property
+    def location_name(self):
+        return self.location_info['Name']
