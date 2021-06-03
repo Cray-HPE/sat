@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fixed a case where filtering specific columns with any ``--*-fields`` option
+  with ``sat hwinv`` failed when leading or trailing whitespace was present in
+  the field name.
+
 ### Added
 - Added power off of all non-management nodes in air-cooled cabinets
   to ``sat bootsys shutdown --stage cabinet-power``.
