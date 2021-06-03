@@ -342,6 +342,52 @@ class HSMClient(APIGatewayClient):
 
         return components
 
+    def get_all_hsm_components(self):
+        """Get all components from HSM.
+
+        Returns:
+            components ([dict]): A list of dictionaries from HSM.
+
+        Raises:
+            APIError: if there is a failure querying the HSM API or getting
+                the required information from the response.
+        """
+
+        err_prefix = 'Failed to get HSM components'
+        try:
+            components = self.get('State', 'Components').json()['Components']
+        except APIError as err:
+            raise APIError(f'{err_prefix}: {err}')
+        except ValueError as err:
+            raise APIError(f'{err_prefix} due to bad JSON in response: {err}')
+        except KeyError as err:
+            raise APIError(f'{err_prefix} due to missing {err} key in response.')
+
+        return components
+
+    def get_all_hsm_redfish_endpoints(self):
+        """Get all Redfish endpoints from HSM.
+
+        Returns:
+            redfish_endpoints ([dict]): A list of dictionaries from HSM.
+
+        Raises:
+            APIError: if there is a failure querying the HSM API or getting
+                the required information from the response.
+        """
+
+        err_prefix = 'Failed to get HSM Redfish endpoints'
+        try:
+            redfish_endpoints = self.get('Inventory', 'RedfishEndpoints').json()['RedfishEndpoints']
+        except APIError as err:
+            raise APIError(f'{err_prefix}: {err}')
+        except ValueError as err:
+            raise APIError(f'{err_prefix} due to bad JSON in response: {err}')
+        except KeyError as err:
+            raise APIError(f'{err_prefix} due to missing {err} key in response.')
+
+        return redfish_endpoints
+
 
 class FabricControllerClient(APIGatewayClient):
     base_resource_path = 'fabric-manager/'
@@ -668,3 +714,30 @@ class TelemetryAPIClient(APIGatewayClient):
             raise APIError(f'{err_prefix}: {err}')
 
         return response
+
+
+class SLSClient(APIGatewayClient):
+    base_resource_path = 'sls/v1/'
+
+    def get_sls_hardware(self):
+        """Get the SLS Hardware from the dumpstate.
+
+        Returns:
+            A list of dictionaries of hardware components from dumpstate.
+
+        Raises:
+            APIError: if there is a failure querying the SLS API or getting
+                the required information from the response.
+        """
+
+        err_prefix = 'Failed to get SLS hardware from dumpstate'
+        try:
+            hardware = self.get('dumpstate').json()['Hardware']
+        except APIError as err:
+            raise APIError(f'{err_prefix}: {err}')
+        except ValueError as err:
+            raise APIError(f'{err_prefix} due to bad JSON in response: {err}')
+        except KeyError as err:
+            raise APIError(f'{err_prefix} due to missing {err} key in response.')
+
+        return hardware
