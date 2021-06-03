@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added power off of all non-management nodes in air-cooled cabinets
   to ``sat bootsys shutdown --stage cabinet-power``.
+- Added a 'Subrole' column to the output of ``sat status``.
 
 ## [3.7.0] - 2021-05-13
 
