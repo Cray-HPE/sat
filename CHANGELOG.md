@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added power off of all non-management nodes in air-cooled cabinets
   to ``sat bootsys shutdown --stage cabinet-power``.
 
+### Fixed
+- Fixed the help text of `sat status` to list all available component types.
+
 ## [3.7.0] - 2021-05-13
 
 ### Changed
