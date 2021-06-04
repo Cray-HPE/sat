@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed the help text of `sat status` to list all available component types.
+- Improved an error message which could sometimes occur when FAS reported a
+  target with no xname. 
 
 ## [3.7.0] - 2021-05-13
 
