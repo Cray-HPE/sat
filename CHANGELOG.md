@@ -27,10 +27,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fixed a case where filtering specific columns with any ``--*-fields`` option
+  with ``sat hwinv`` failed when leading or trailing whitespace was present in
+  the field name.
+
 ### Added
 - Added power off of all non-management nodes in air-cooled cabinets
   to ``sat bootsys shutdown --stage cabinet-power``.
+- Added a 'Subrole' column to the output of ``sat status``.
 - Added ``sat slscheck`` subcommand to do a cross-check between SLS and HSM.
+
+### Fixed
+- Fixed the help text of `sat status` to list all available component types.
 
 ## [3.7.0] - 2021-05-13
 

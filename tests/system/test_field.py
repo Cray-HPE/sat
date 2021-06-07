@@ -119,6 +119,14 @@ class TestComponentFieldMatches(unittest.TestCase):
         """Tests that a subsequence of the canonicalized name matches."""
         self.assertTrue(self.cf.matches('snum'))
 
+    def test_matches_leading_whitespace(self):
+        """Tests that a name with leading whitespace matches."""
+        self.assertTrue(self.cf.matches('   Serial Number'))
+
+    def test_matches_trailing_whitespace(self):
+        """Tests that a name with leading whitespace matches."""
+        self.assertTrue(self.cf.matches('Serial Number   '))
+
     def test_does_not_match(self):
         """Tests value that should not match."""
         self.assertFalse(self.cf.matches('not a match'))
