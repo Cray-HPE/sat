@@ -1,7 +1,7 @@
 """
 Entry point for the status subcommand.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -21,19 +21,29 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+from collections import OrderedDict
 import logging
-import re
 
 from sat.apiclient import APIError, HSMClient
 from sat.config import get_config_value
+from sat.constants import MISSING_VALUE
 from sat.report import Report
 from sat.session import SATSession
-from sat.constants import MISSING_VALUE
 from sat.xname import XName
 
-
-API_KEYS = ('ID', 'Type', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Class', 'Role', 'NetType')
-HEADERS = ('xname', 'Type', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Class', 'Role', 'Net Type')
+API_KEYS_TO_HEADERS = OrderedDict([
+    ('ID', 'xname'),
+    ('Type', 'Type'),
+    ('NID', 'NID'),
+    ('State', 'State'),
+    ('Flag', 'Flag'),
+    ('Enabled', 'Enabled'),
+    ('Arch', 'Arch'),
+    ('Class', 'Class'),
+    ('Role', 'Role'),
+    ('SubRole', 'Subrole'),
+    ('NetType', 'Net Type')
+])
 
 LOGGER = logging.getLogger(__name__)
 
@@ -57,9 +67,13 @@ def make_raw_table(components):
         value = component.get(api_key, MISSING_VALUE)
         if api_key == 'ID' and value != MISSING_VALUE:
             value = XName(value)
+        elif all([api_key == 'SubRole', value == MISSING_VALUE, component.get('Role') == 'Compute']):
+            # For SubRole, some types of nodes (specifically Compute nodes) are expected to
+            # not have a SubRole, so 'None' looks a little more appropriate.
+            value = 'None'
         return value
 
-    return [[get_component_value(component, api_key) for api_key in API_KEYS]
+    return [[get_component_value(component, api_key) for api_key in API_KEYS_TO_HEADERS]
             for component in components]
 
 
@@ -105,7 +119,7 @@ def do_status(args):
 
     raw_table = make_raw_table(components)
     report = Report(
-        HEADERS, None,
+        list(API_KEYS_TO_HEADERS.values()), None,
         args.sort_by, args.reverse,
         get_config_value('format.no_headings'),
         get_config_value('format.no_borders'),
