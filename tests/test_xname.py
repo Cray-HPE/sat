@@ -98,6 +98,27 @@ class TestXName(unittest.TestCase):
         self.assertEqual(XName(cabinet_xname_str),
                          XName(node_xname_str).get_cabinet())
 
+    def test_node_get_chassis(self):
+        """Test getting the chassis xname of a node xname."""
+        node_xname_str = 'x3000c0s17b0n0'
+        chassis_xname_str = node_xname_str[:7]
+        self.assertEqual(XName(chassis_xname_str),
+                         XName(node_xname_str).get_chassis())
+
+    def test_bmc_get_cabinet(self):
+        """Test getting the cabinet xname of a BMC xname."""
+        bmc_xname_str = 'x3000c0s17b0'
+        cabinet_xname_str = bmc_xname_str[:5]
+        self.assertEqual(XName(cabinet_xname_str),
+                         XName(bmc_xname_str).get_cabinet())
+
+    def test_bmc_get_chassis(self):
+        """Test getting the chassis xname of a BMC xname."""
+        bmc_xname_str = 'x3000c0s17b0'
+        chassis_xname_str = bmc_xname_str[:7]
+        self.assertEqual(XName(chassis_xname_str),
+                         XName(bmc_xname_str).get_chassis())
+
 
 class TestXNameContainsComponent(unittest.TestCase):
     """Tests for whether xname for a component contains another."""

@@ -27,6 +27,7 @@ import requests
 from urllib.parse import urlunparse
 
 from sat.config import get_config_value
+from sat.constants import BMC_TYPES
 from sat.util import get_val_by_path
 
 
@@ -272,6 +273,111 @@ class APIGatewayClient:
 class HSMClient(APIGatewayClient):
     base_resource_path = 'smd/hsm/v1/'
 
+    def get_bmcs_by_type(self, bmc_type=None):
+        """Get a list of BMCs, optionally of a single type.
+
+        Args:
+            bmc_type (string): Any HSM BMC type: NodeBMC, RouterBMC or ChassisBMC.
+
+        Returns:
+            A list of dictionaries where each dictionary describes a BMC.
+
+        Raises:
+            APIError: if the API query failed or returned an invalid response.
+        """
+        try:
+            response = self.get(
+                'Inventory', 'RedfishEndpoints', params={'type': bmc_type} if bmc_type else {}
+            )
+        except APIError as err:
+            raise APIError(f'Failed to get BMCs from HSM API: {err}')
+
+        try:
+            redfish_endpoints = response.json()['RedfishEndpoints']
+        except ValueError as err:
+            raise APIError(f'API response could not be parsed as JSON: {err}')
+        except KeyError as err:
+            raise APIError(f'API response missing expected key: {err}')
+
+        # Check that the returned data has expected keys, and exclude data without it.
+        invalid_redfish_endpoint_xnames = [
+            endpoint.get('ID') for endpoint in redfish_endpoints
+            if any(required_key not in endpoint for required_key in ['ID', 'Enabled', 'DiscoveryInfo'])
+            or 'LastDiscoveryStatus' not in endpoint['DiscoveryInfo']
+        ]
+        if invalid_redfish_endpoint_xnames:
+            LOGGER.warning(
+                'The following xnames were excluded due to incomplete information from HSM: %s',
+                ', '.join(invalid_redfish_endpoint_xnames)
+            )
+
+        return [
+            endpoint for endpoint in redfish_endpoints
+            if endpoint.get('ID') not in invalid_redfish_endpoint_xnames
+        ]
+
+    def get_and_filter_bmcs(self, bmc_types=BMC_TYPES, include_disabled=False, include_failed_discovery=False,
+                            xnames=None):
+        """Get all BMCs of a given type, optionally filtering against a list of xnames.
+
+        Args:
+            bmc_types (tuple): Any combination of ('NodeBMC', 'RouterBMC', 'ChassisBMC')
+            include_disabled (bool): if True, include disabled nodes.
+            include_failed_discovery (bool): if True, include nodes which had discovery errors.
+            xnames (list): A list of xnames to filter against the data from HSM.
+
+        Returns:
+            A set of xnames.
+
+        Raises:
+            APIError: if an API query failed or returned an invalid response.
+        """
+        if set(bmc_types) == set(BMC_TYPES):
+            bmcs = self.get_bmcs_by_type()
+        else:
+            bmcs = []
+            for bmc_type in bmc_types:
+                bmcs.extend(self.get_bmcs_by_type(bmc_type))
+
+        # Filter given xnames by type
+        hsm_xnames = set(bmc['ID'] for bmc in bmcs)
+        if xnames:
+            type_excluded_xnames = set(xnames) - hsm_xnames
+            xnames = set(xnames).intersection(hsm_xnames)
+            if type_excluded_xnames:
+                LOGGER.warning(
+                    'The following xnames will be excluded as they are not type(s) %s: %s',
+                    ', '.join(bmc_types), ', '.join(type_excluded_xnames)
+                )
+        else:
+            xnames = hsm_xnames
+
+        # Filter out disabled components
+        if not include_disabled:
+            disabled_xnames = set(bmc['ID'] for bmc in bmcs if not bmc['Enabled'])
+            disabled_xnames_to_report = set(xnames).intersection(disabled_xnames)
+            if disabled_xnames_to_report:
+                LOGGER.warning(
+                    'Excluding the following xnames which are disabled: %s',
+                    ', '.join(disabled_xnames_to_report)
+                )
+            xnames = xnames - disabled_xnames
+
+        # Filter out components for which discovery failed
+        if not include_failed_discovery:
+            failed_discovery_xnames = set(
+                bmc['ID'] for bmc in bmcs if bmc['DiscoveryInfo']['LastDiscoveryStatus'] != 'DiscoverOK'
+            )
+            failed_discovery_xnames_to_report = set(xnames).intersection(failed_discovery_xnames)
+            if failed_discovery_xnames_to_report:
+                LOGGER.warning(
+                    'Excluding the following xnames which have a LastDiscoveryStatus other than "DiscoverOK": %s',
+                    ', '.join(failed_discovery_xnames_to_report)
+                )
+            xnames = xnames - failed_discovery_xnames
+
+        return xnames
+
     def get_component_xnames(self, params=None, omit_empty=True):
         """Get the xnames of components matching the given criteria.
 
@@ -469,6 +575,10 @@ class CRUSClient(APIGatewayClient):
 
 class NMDClient(APIGatewayClient):
     base_resource_path = 'v2/nmd/'
+
+
+class SCSDClient(APIGatewayClient):
+    base_resource_path = 'scsd/v1/'
 
 
 class CAPMCError(APIError):
