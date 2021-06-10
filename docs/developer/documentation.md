@@ -53,6 +53,7 @@ Each man page should have the following sections in this order:
 
 * ``SYNOPSIS``
 * ``DESCRIPTION``
+* ``OPTIONS``
 * ``FILES`` (optional)
 * ``EXAMPLES`` (optional but recommended)
 * ``SEE ALSO``

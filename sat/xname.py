@@ -136,6 +136,14 @@ class XName:
         """
         return XName.get_xname_from_tokens(self.tokens[:2])
 
+    def get_chassis(self):
+        """Get the chassis of this xname.
+
+        Returns:
+            An XName object that is the cabinet.
+        """
+        return XName.get_xname_from_tokens(self.tokens[:4])
+
     def __lt__(self, other):
         return self.tokens < other.tokens
 
