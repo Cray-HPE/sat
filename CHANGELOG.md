@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a case where filtering specific columns with any ``--*-fields`` option
   with ``sat hwinv`` failed when leading or trailing whitespace was present in
   the field name.
+- Fixed filtering so that the exact match of a column name used in the
+  ``--filter`` query is always used instead of matching subsequences.
+- Fixed filtering so that if there are multiple matches of column names
+  using the ``--filter``query, a WARNING is printed and the first match
+  is used. This is consistent with ``--sort-by`` usage.
+- Fixed filtering to handle spaces in column names by requiring them to
+  be enclosed in double quotes.
 
 ### Added
 - Added power off of all non-management nodes in air-cooled cabinets

@@ -177,19 +177,26 @@ def _match_query_key(query_key, headings):
     Raises:
         KeyError: if zero or multiple headings are matched
     """
+
+    # Return the first exact match if there is one
+    for key in headings:
+        if key.lower() == query_key.lower():
+            return key
+
     # We want to be able to match on just the subsequence of
     # query_key, since keys can be somewhat long or have extraneous
     # info (e.g. units etc.) that we don't want the user to worry
     # about.
     matching_keys = [key for key in headings
                      if is_subsequence(query_key.lower(), key.lower())]
+    if not matching_keys:
+        raise KeyError(f"Query key '{query_key}' is invalid because it does not exist.")
+
     if len(matching_keys) != 1:
-        raise KeyError("Query key '{}' is invalid because it {}"
-                       .format(query_key,
-                               ('does not exist.' if not matching_keys
-                                else 'is ambiguous. (could be one of: {})'
-                                .format(', '.join(matching_keys)))))
-    return matching_keys.pop()
+        LOGGER.warning(f"Query key '{query_key}' is ambiguous. "
+                       f"Using first match: '{matching_keys[0]}' from {tuple(matching_keys)}.")
+
+    return matching_keys[0]
 
 
 def _str_eq_cmpr(name, pattern):
@@ -370,7 +377,7 @@ def parse_query_string(query_string):
         # comparisons (e.g., only allow comparisons to numbers for
         # greater-than or less-than), but if this doesn't turn out to
         # be an issue, it probably isn't all that necessary.
-        query_key = yield tok_lhs
+        query_key = yield (tok_lhs ^ tok_quoted_str)
         comparator = yield tok_cmpr
         cmpr_val = yield (tok_rhs ^ tok_quoted_str)
 

@@ -147,12 +147,11 @@ class TestFilterQueryStrings(unittest.TestCase):
         with self.assertRaises(KeyError):
             filter_fn({'baz': 'quux'})
 
-    @with_filter('foo = bar')
+    @with_filter('foo = spam')
     def test_ambiguous_key(self, filter_fn):
-        """Test KeyError thrown when filtering ambiguous key."""
-        with self.assertRaises(KeyError):
-            # 'foo' is a subsequence of both 'food' and 'frobnicator'.
-            filter_fn({'food': 'spam', 'frobnicator': 'quuxify'})
+        """Test first column match when filtering ambiguous key."""
+        # 'foo' is a subsequence of both 'food' and 'frobnicator'.
+        self.assertTrue(filter_fn({'food': 'spam', 'frobnicator': 'quuxify'}))
 
     @with_filter('foo > 20')
     def test_cant_compare_numbers_and_strings(self, filter_fn):

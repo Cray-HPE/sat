@@ -91,7 +91,7 @@ class Report:
 
         # find the heading to sort on
         if sort_by is not None:
-            warn_str = 'Element %s is not in %s. Output will be unsorted.'
+            warn_str = "Element '%s' is not in %s. Output will be unsorted."
             try:
                 self.sort_by = int(self.sort_by)
                 self.sort_by = self.headings[self.sort_by]
@@ -101,12 +101,21 @@ class Report:
                 self.sort_by = None
             except ValueError:
                 # sort_by is not an int.
-                up = self.sort_by.upper()
+                low = self.sort_by.lower()
                 self.sort_by = None
-                for h in headings:
-                    if is_subsequence(up, h.upper()):
-                        self.sort_by = h
+                # use first exact match if there is one
+                for key in headings:
+                    if key.lower() == low:
+                        self.sort_by = key
                         break
+                if not self.sort_by:
+                    matching_keys = [key for key in headings if is_subsequence(low, key.lower())]
+                    if len(matching_keys) > 0:
+                        self.sort_by = matching_keys[0]
+                        if len(matching_keys) > 1:
+                            LOGGER.warning(f"Element '{sort_by}' is ambiguous. "
+                                           f"Using first match: '{self.sort_by}' "
+                                           f"from {tuple(matching_keys)}.")
 
                 if not self.sort_by:
                     LOGGER.warning(warn_str, sort_by, self.headings)
