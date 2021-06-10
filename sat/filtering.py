@@ -483,16 +483,11 @@ def filter_list(dicts, query_strings):
     if any(d.keys() != fkeys for d in rest):
         raise ValueError('All input dicts must have same keys.')
 
-    all_filter_fns = [parse_query_string(query_string)
-                      for query_string in query_strings]
-    combined_filters = FilterFunction.from_combined_filters(all, *all_filter_fns)
-
-    def filter_fn(x): return _dont_care_call(TypeError, combined_filters, x)
-
+    filter_fn = parse_multiple_query_strings(query_strings)
     return list(filter(filter_fn, dicts))
 
 
-def remove_constant_values(dicts, constant_value):
+def remove_constant_values(dicts, constant_value, protect=None):
     """Filters the keys in each dict to remove keys that have a constant value
 
     Takes a list of dictionaries, which are all assumed to have the same keys,
@@ -503,6 +498,8 @@ def remove_constant_values(dicts, constant_value):
         dicts (list): A list of dicts.
         constant_value: A value which must match the constant value of a key for
             that key to be removed from the dictionaries.
+        protect: a set of column keys which may not have their contents removed
+            if every row is the constant_value.
 
     Returns:
         A list of dicts with keys removed from all dicts if that key has the
@@ -513,16 +510,25 @@ def remove_constant_values(dicts, constant_value):
 
     # All dicts are assumed to have the same keys and type
     keys = dicts[0].keys()
+
     # This is to preserve OrderedDict if given.
     dict_type = type(dicts[0])
+
+    if protect is None:
+        protect = set()
 
     keys_to_keep = []
     for key in keys:
         if all(d[key] == constant_value for d in dicts):
-            LOGGER.info("All values for '%s' are '%s', omitting key.",
-                        key, constant_value)
-        else:
-            keys_to_keep.append(key)
+            if key in protect:
+                LOGGER.debug("All values for '%s' are '%s', but '%s' is a protected "
+                             "key. Not discarding.", key, constant_value, key)
+            else:
+                LOGGER.info("All values for '%s' are '%s', omitting key.",
+                            key, constant_value)
+                continue
+
+        keys_to_keep.append(key)
 
     return [dict_type([(key, d[key]) for key in keys_to_keep])
             for d in dicts]
