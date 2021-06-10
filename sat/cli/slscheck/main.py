@@ -23,6 +23,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import logging
+import re
 
 from sat.apiclient import APIError, HSMClient, SLSClient
 from sat.config import get_config_value
@@ -47,9 +48,8 @@ ERR_SLS_API_FAILED = 1
 ERR_HSM_API_FAILED = 2
 
 
-def add_to_hw_dict(xname, hw_type, hw_class, hw_role, hw_subrole, hw_dict):
-    """Add hardware component data to a dictionary with xname as the key and a
-           component dictionary as a value.
+def create_hw_component_dict(xname, hw_type, hw_class, hw_role, hw_subrole):
+    """Creates a dictionary for a hardware component.
 
     Args:
         xname (str): The component xname.
@@ -57,15 +57,14 @@ def add_to_hw_dict(xname, hw_type, hw_class, hw_role, hw_subrole, hw_dict):
         hw_class (str): The component class or None.
         hw_role (str): The component role or None.
         hw_subrole (str): The component subrole or None.
-        hw_dict(dict): A dictionary of dictionaries of component data indexed by xname.
 
     Returns:
-        True if added
+        hw_info (dict): A dictionary of component data for an xname.
     """
 
     hw_info = {}
     if not xname:
-        return False
+        return hw_info
 
     hw_info['Xname'] = XName(xname)
     if hw_type:
@@ -76,24 +75,77 @@ def add_to_hw_dict(xname, hw_type, hw_class, hw_role, hw_subrole, hw_dict):
         hw_info['Role'] = hw_role
     if hw_subrole:
         hw_info['SubRole'] = hw_subrole
-    hw_dict[xname] = hw_info
 
-    return True
+    return hw_info
 
 
-def create_sls_hw_to_check(include_types, sls_hardware):
-    """Create a dictionary of SLS components matching include_types from
-           the dictionary of sls_hardware.
+def create_sls_hw_component_dicts(hardware, include_types):
+    """Creates dictionaries for SLS hardware for an xname and optionally for the parent.
 
     Args:
+        hardware (dict): A dictionary describing an SLS hardware component from the SLS API.
         include_types ([str]): A list of SLS types to include.
+
+    Returns:
+        hw_info (dict): A dictionary of component data for an xname.
+        parent_hw_info (dict): A dictionary of component data for a parent xname.
+    """
+
+    hw_info = {}
+    parent_hw_info = {}
+    xname = hardware.get('Xname')
+    sls_type = hardware.get('TypeString')
+    if not xname or not sls_type:
+        return hw_info, parent_hw_info
+
+    # Use MISSING_VALUE for missing strings so that this data is displayed correctly
+    sls_class = hardware.get('Class', MISSING_VALUE)
+    if sls_type in include_types:
+        # Add b0 to xname if the ChassisBMC xname does not end in b followed by a digit
+        if sls_type == 'ChassisBMC' and not re.match(r'^.*b\d+$', xname):
+            xname = xname + 'b0'
+        extra = hardware.get('ExtraProperties', {})
+        sls_role = extra.get('Role', MISSING_VALUE)
+        sls_subrole = extra.get('SubRole', MISSING_VALUE)
+        hw_info = create_hw_component_dict(
+            xname,
+            sls_type,
+            sls_class,
+            sls_role,
+            sls_subrole)
+
+    # In SLS, there is no NodeBMC value for TypeString
+    # The NodeBMC data is created from the SLS data returned for TypeString="Node"
+    # The xname of the NodeBMC is the Parent of the Node in SLS
+    # For Node, add parent xname as a NodeBMC
+    if sls_type == 'Node' and 'NodeBMC' in include_types:
+        xname = hardware.get('Parent')
+        if xname:
+            sls_type = 'NodeBMC'
+            sls_role = MISSING_VALUE
+            sls_subrole = MISSING_VALUE
+            parent_hw_info = create_hw_component_dict(
+                xname,
+                sls_type,
+                sls_class,
+                sls_role,
+                sls_subrole)
+
+    return hw_info, parent_hw_info
+
+
+def create_sls_hw_to_check(sls_hardware, include_types):
+    """Creates a dictionary of SLS components from the dictionary of sls_hardware.
+
+    Args:
         sls_hardware (dict): A dictionary of hardware components from the SLS API.
+        include_types ([str]): A list of SLS types to include.
 
     Returns:
         sls_hw_to_check (dict): A dictionary with SLS component data with xnames as the keys and
            component dictionary as values.
            An example of a key/value pair: {
-               'x30x3000c0s21b0n0': {
+               'x3000c0s21b0n0': {
                    'Xname': x3000c0s21b0n0,
                    'Type': 'Node',
                    'Class': 'River',
@@ -105,39 +157,21 @@ def create_sls_hw_to_check(include_types, sls_hardware):
 
     sls_hw_to_check = {}
     for hardware in sls_hardware.values():
-        xname = hardware.get('Xname')
-        sls_type = hardware.get('TypeString')
-        if not xname or not sls_type:
-            continue
-        # Use MISSING_VALUE for missing strings so that this data is displayed correctly
-        sls_class = hardware.get('Class', MISSING_VALUE)
-        if sls_type in include_types:
-            if sls_type == 'ChassisBMC' and not (xname.endswith('b0') or xname.endswith('b999')):
-                xname = xname + 'b0'
-            sls_role = MISSING_VALUE
-            sls_subrole = MISSING_VALUE
-            extra = hardware.get('ExtraProperties')
-            if extra:
-                sls_role = extra.get('Role', MISSING_VALUE)
-                sls_subrole = extra.get('SubRole', MISSING_VALUE)
-            add_to_hw_dict(xname, sls_type, sls_class, sls_role, sls_subrole, sls_hw_to_check)
-
-        # For Node, add parent xname as a NodeBMC
-        if sls_type == 'Node' and 'NodeBMC' in include_types:
+        hw_info, parent_hw_info = create_sls_hw_component_dicts(hardware, include_types)
+        if hw_info:
+            xname = hardware.get('Xname')
+            if xname:
+                sls_hw_to_check[xname] = hw_info
+        if parent_hw_info:
             xname = hardware.get('Parent')
-            if not xname:
-                continue
-            sls_type = 'NodeBMC'
-            sls_role = MISSING_VALUE
-            sls_subrole = MISSING_VALUE
-            add_to_hw_dict(xname, sls_type, sls_class, sls_role, sls_subrole, sls_hw_to_check)
+            if xname:
+                sls_hw_to_check[xname] = parent_hw_info
 
     return sls_hw_to_check
 
 
 def create_hsm_hw_to_crosscheck(hsm_hw_list):
-    """Create a dictionary of HSM components or Redfish endpoints from
-            a list of dictionaries from HSM.
+    """Creates a dictionary of HSM components or Redfish endpoints from a list of dictionaries.
 
     Args:
         hsm_hw_list ([dict]): A list of dictionaries of hardware components or Redfish endpoints
@@ -153,20 +187,21 @@ def create_hsm_hw_to_crosscheck(hsm_hw_list):
         cid = hsm_hw.get('ID')
         if not cid:
             continue
-        add_to_hw_dict(
+        hw_info = create_hw_component_dict(
             cid,
             hsm_hw.get('Type'),
             hsm_hw.get('Class'),
             hsm_hw.get('Role'),
-            hsm_hw.get('SubRole'),
-            hsm_hw_to_crosscheck
+            hsm_hw.get('SubRole')
         )
+        if hw_info:
+            hsm_hw_to_crosscheck[cid] = hw_info
 
     return hsm_hw_to_crosscheck
 
 
 def add_results(sls_hw, comparison_results, crosscheck_results):
-    """Add the results from comparing an SLS component with HSM to a table of cross-check results.
+    """Adds the results from comparing an SLS component with HSM to a table of cross-check results.
 
     Args:
         sls_hw (dict): A dictionary with SLS component data that has been cross-checked.
@@ -185,10 +220,10 @@ def add_results(sls_hw, comparison_results, crosscheck_results):
 
 
 def create_components_crosscheck_results(include_consistent, checks, xname, sls_hw, hsm_components):
-    """Create a list of results from comparing an SLS component with HSM components.
+    """Creates a list of results from comparing an SLS component with HSM components.
 
     Args:
-        include_consistent (bool): True if include results for SLS components that are
+        include_consistent (bool): If True include results for SLS components that are
             consistent with HSM.
         checks ([str]): A list of checks to perform.
         xname (xname): The xname of the component.
@@ -212,31 +247,22 @@ def create_components_crosscheck_results(include_consistent, checks, xname, sls_
             comparison_results.append('SLS component missing in HSM Components')
         return comparison_results
 
-    sls_type = sls_hw.get('Type', MISSING_VALUE)
-    sls_class = sls_hw.get('Class', MISSING_VALUE)
-    sls_role = sls_hw.get('Role', MISSING_VALUE)
-    sls_subrole = sls_hw.get('SubRole', MISSING_VALUE)
+    checks_to_keys = {
+        'Component': ['Type'],
+        'Class': ['Class'],
+        'Role': ['Role', 'SubRole']
+    }
 
-    hsm_type = hsm_component.get('Type', MISSING_VALUE)
-    hsm_class = hsm_component.get('Class', MISSING_VALUE)
-    hsm_role = hsm_component.get('Role', MISSING_VALUE)
-    hsm_subrole = hsm_component.get('SubRole', MISSING_VALUE)
+    for check, fields in checks_to_keys.items():
+        if check not in checks:
+            continue
+        for field in fields:
+            sls_value = sls_hw.get(field, MISSING_VALUE)
+            hsm_value = hsm_component.get(field, MISSING_VALUE)
+            if sls_value != hsm_value:
+                comparison_results.append(f'{field} mismatch: SLS:{sls_value},HSM:{hsm_value}')
 
-    consistent = True
-    if 'Component' in checks and sls_type != hsm_type:
-        consistent = False
-        comparison_results.append(f'Type mismatch: SLS:{sls_type},HSM:{hsm_type}')
-    if 'Class' in checks and sls_class != hsm_class:
-        consistent = False
-        comparison_results.append(f'Class mismatch: SLS:{sls_class},HSM:{hsm_class}')
-    if 'Role' in checks and sls_role != hsm_role:
-        consistent = False
-        comparison_results.append(f'Role mismatch: SLS:{sls_role},HSM:{hsm_role}')
-    if 'Role' in checks and sls_subrole != hsm_subrole:
-        consistent = False
-        comparison_results.append(f'Subrole mismatch: SLS:{sls_subrole},HSM:{hsm_subrole}')
-
-    if include_consistent and consistent:
+    if include_consistent and not comparison_results:
         comparison_results.append('SLS component consistent with HSM Component')
 
     return comparison_results
@@ -244,10 +270,10 @@ def create_components_crosscheck_results(include_consistent, checks, xname, sls_
 
 def create_redfish_endpoints_crosscheck_results(include_consistent, xname, sls_hw,
                                                 hsm_redfish_endpoints):
-    """Create a list of results from comparing an SLS component with HSM Redfish endpoints.
+    """Creates a list of results from comparing an SLS component with HSM Redfish endpoints.
 
     Args:
-        include_consistent (bool): True if include results for SLS components that are
+        include_consistent (bool): If True include results for SLS components that are
             consistent with HSM.
         xname (xname): The xname of the component.
         sls_hw (dict): A dictionary with SLS component data to cross-check.
@@ -277,10 +303,10 @@ def create_redfish_endpoints_crosscheck_results(include_consistent, xname, sls_h
 
 def create_crosscheck_results(include_consistent, checks, sls_hw_to_check,
                               hsm_components, hsm_redfish_endpoints):
-    """Create a table of results of a cross-check between SLS and HSM.
+    """Creates a table of results of a cross-check between SLS and HSM.
 
     Args:
-        include_consistent (bool): True if include results for SLS components that are
+        include_consistent (bool): If True include results for SLS components that are
             consistent with HSM.
         checks ([str]): A list of checks to perform.
         sls_hw_to_check (dict): A dictionary with SLS component data to cross-check.
@@ -288,10 +314,11 @@ def create_crosscheck_results(include_consistent, checks, sls_hw_to_check,
             dictionary values.
         hsm_components (dict): A dictionary with HSM component data.
             The dictionary has xnames as the keys and associated component data as
-            dictionary values.
+            dictionary values. If None, then the checks against HSM components are skipped.
         hsm_redfish_endpoints (dict): A dictionary with HSM Redfish endpoint data for BMCs.
             The dictionary has xnames as the keys and associated component data as
-            dictionary values.
+            dictionary values. If None, then the checks against HSM Redfish endpoints are
+            skipped.
 
     Returns:
         crossscheck_results ([list]): A list of lists containing results of a cross-check
@@ -346,9 +373,12 @@ def do_slscheck(args):
         SystemExit(2): if request to HSM API fails.
     """
 
-    sls_client = SLSClient(SATSession())
+    # Use same session for both SLSClient and HSMClient
+    session = SATSession()
+
+    sls_client = SLSClient(session)
     try:
-        sls_hardware = sls_client.get_sls_hardware()
+        sls_hardware = sls_client.get_hardware()
     except APIError as err:
         LOGGER.error('Request to SLS API failed: %s', err)
         raise SystemExit(ERR_SLS_API_FAILED)
@@ -356,20 +386,21 @@ def do_slscheck(args):
     hsm_components = None
     hsm_redfish_endpoints = None
 
-    hsm_client = HSMClient(SATSession())
+    hsm_client = HSMClient(session)
     try:
         if any(check in args.checks for check in ['Component', 'Class', 'Role']):
-            hsm_components = create_hsm_hw_to_crosscheck(hsm_client.get_all_hsm_components())
+            hsm_components = create_hsm_hw_to_crosscheck(hsm_client.get_all_components())
 
         if 'RFEndpoint' in args.checks:
-            hsm_redfish_endpoints = create_hsm_hw_to_crosscheck(hsm_client.get_all_hsm_redfish_endpoints())
+            hsm_redfish_endpoints = create_hsm_hw_to_crosscheck(
+                hsm_client.get_bmcs_by_type(check_keys=False))
     except APIError as err:
         LOGGER.error('Request to HSM API failed: %s', err)
         raise SystemExit(ERR_HSM_API_FAILED)
 
     sls_hw_to_check = create_sls_hw_to_check(
-        args.types,
-        sls_hardware
+        sls_hardware,
+        args.types
     )
 
     crosscheck_results = create_crosscheck_results(

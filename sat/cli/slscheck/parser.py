@@ -57,7 +57,6 @@ def add_slscheck_subparser(subparsers):
 
     slscheck_parser.add_argument('-c', '--checks',
                                  metavar='CHECK',
-                                 dest='checks',
                                  nargs='+',
                                  choices=CHECKS,
                                  default=CHECKS,
@@ -67,7 +66,6 @@ def add_slscheck_subparser(subparsers):
 
     slscheck_parser.add_argument('-t', '--types',
                                  metavar='TYPE',
-                                 dest='types',
                                  nargs='+',
                                  choices=TYPES,
                                  default=TYPES,

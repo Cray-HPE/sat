@@ -129,7 +129,7 @@ class TestDoSlscheck(unittest.TestCase):
         }
         self.mock_sls_client = mock.patch('sat.cli.slscheck.main.SLSClient',
                                           autospec=True).start().return_value
-        self.mock_sls_client.get_sls_hardware.return_value = self.sls_hw_dumpstate
+        self.mock_sls_client.get_hardware.return_value = self.sls_hw_dumpstate
 
         self.all_hsm_components = [
             {'ID': 'x3000m0',
@@ -197,8 +197,8 @@ class TestDoSlscheck(unittest.TestCase):
         ]
         self.mock_hsm_client = mock.patch('sat.cli.slscheck.main.HSMClient',
                                           autospec=True).start().return_value
-        self.mock_hsm_client.get_all_hsm_components.return_value = self.all_hsm_components
-        self.mock_hsm_client.get_all_hsm_redfish_endpoints.return_value = self.all_hsm_redfish_endpoints
+        self.mock_hsm_client.get_all_components.return_value = self.all_hsm_components
+        self.mock_hsm_client.get_bmcs_by_type.return_value = self.all_hsm_redfish_endpoints
 
         self.mock_sat_session = mock.patch('sat.cli.nid2xname.main.SATSession').start()
         self.mock_print = mock.patch('builtins.print', autospec=True).start()
@@ -348,42 +348,42 @@ class TestDoSlscheck(unittest.TestCase):
     def test_create_sls_hw_to_check(self):
         """Test create_sls_hw_to_check for all types."""
         expected_output = self.build_expected_output_of_create_sls_hw_to_check()
-        sls_hw_to_check = create_sls_hw_to_check(self.fake_args.types, self.sls_hw_dumpstate)
+        sls_hw_to_check = create_sls_hw_to_check(self.sls_hw_dumpstate, self.fake_args.types)
         self.assertEqual(sls_hw_to_check, expected_output)
 
     def test_create_sls_hw_to_check_for_type_router_bmc(self):
         """Test create_sls_hw_to_check for RouterBMC."""
         self.fake_args.types = ['RouterBMC']
         expected_output = self.build_expected_output_of_create_sls_hw_to_check(self.fake_args.types)
-        sls_hw_to_check = create_sls_hw_to_check(self.fake_args.types, self.sls_hw_dumpstate)
+        sls_hw_to_check = create_sls_hw_to_check(self.sls_hw_dumpstate, self.fake_args.types)
         self.assertEqual(sls_hw_to_check, expected_output)
 
     def test_create_sls_hw_to_check_for_type_chassis_bmc(self):
         """Test create_sls_hw_to_check for ChassisBMC."""
         self.fake_args.types = ['ChassisBMC']
         expected_output = self.build_expected_output_of_create_sls_hw_to_check(self.fake_args.types)
-        sls_hw_to_check = create_sls_hw_to_check(self.fake_args.types, self.sls_hw_dumpstate)
+        sls_hw_to_check = create_sls_hw_to_check(self.sls_hw_dumpstate, self.fake_args.types)
         self.assertEqual(sls_hw_to_check, expected_output)
 
     def test_create_sls_hw_to_check_for_type_node_bmc(self):
         """Test create_sls_hw_to_check for NodeBMC."""
         self.fake_args.types = ['NodeBMC']
         expected_output = self.build_expected_output_of_create_sls_hw_to_check(self.fake_args.types)
-        sls_hw_to_check = create_sls_hw_to_check(self.fake_args.types, self.sls_hw_dumpstate)
+        sls_hw_to_check = create_sls_hw_to_check(self.sls_hw_dumpstate, self.fake_args.types)
         self.assertEqual(sls_hw_to_check, expected_output)
 
     def test_create_sls_hw_to_check_for_type_node(self):
         """Test create_sls_hw_to_check for Node."""
         self.fake_args.types = ['Node']
         expected_output = self.build_expected_output_of_create_sls_hw_to_check(self.fake_args.types)
-        sls_hw_to_check = create_sls_hw_to_check(self.fake_args.types, self.sls_hw_dumpstate)
+        sls_hw_to_check = create_sls_hw_to_check(self.sls_hw_dumpstate, self.fake_args.types)
         self.assertEqual(sls_hw_to_check, expected_output)
 
     def test_create_sls_hw_to_check_for_type_cabinet_pdu_controller(self):
         """Test create_sls_hw_to_check for CabinetPDUController."""
         self.fake_args.types = ['CabinetPDUController']
         expected_output = self.build_expected_output_of_create_sls_hw_to_check(self.fake_args.types)
-        sls_hw_to_check = create_sls_hw_to_check(self.fake_args.types, self.sls_hw_dumpstate)
+        sls_hw_to_check = create_sls_hw_to_check(self.sls_hw_dumpstate, self.fake_args.types)
         self.assertEqual(sls_hw_to_check, expected_output)
 
     @staticmethod
@@ -401,7 +401,7 @@ class TestDoSlscheck(unittest.TestCase):
              'River',
              'Management',
              'Storage',
-             'Subrole mismatch: SLS:Storage,HSM:Worker'],
+             'SubRole mismatch: SLS:Storage,HSM:Worker'],
             [XName('x3000c0s17b999'),
              'ChassisBMC',
              'River',
@@ -439,7 +439,7 @@ class TestDoSlscheck(unittest.TestCase):
     def test_create_crosscheck_results(self):
         """Test create_crosscheck_results for all types and all checks."""
         expected_output = self.build_expected_output_of_create_crosscheck_results()
-        sls_hw_to_check = create_sls_hw_to_check(self.fake_args.types, self.sls_hw_dumpstate)
+        sls_hw_to_check = create_sls_hw_to_check(self.sls_hw_dumpstate, self.fake_args.types)
         hsm_components = create_hsm_hw_to_crosscheck(self.all_hsm_components)
         hsm_redfish_endpoints = create_hsm_hw_to_crosscheck(self.all_hsm_redfish_endpoints)
         crosscheck_results = create_crosscheck_results(
@@ -455,7 +455,7 @@ class TestDoSlscheck(unittest.TestCase):
         self.fake_args.types = ['ChassisBMC']
         expected_output = self.build_expected_output_of_create_crosscheck_results(
             self.fake_args.types)
-        sls_hw_to_check = create_sls_hw_to_check(self.fake_args.types, self.sls_hw_dumpstate)
+        sls_hw_to_check = create_sls_hw_to_check(self.sls_hw_dumpstate, self.fake_args.types)
         hsm_components = create_hsm_hw_to_crosscheck(self.all_hsm_components)
         hsm_redfish_endpoints = create_hsm_hw_to_crosscheck(self.all_hsm_redfish_endpoints)
         crosscheck_results = create_crosscheck_results(
@@ -471,7 +471,7 @@ class TestDoSlscheck(unittest.TestCase):
         self.fake_args.types = ['NodeBMC']
         expected_output = self.build_expected_output_of_create_crosscheck_results(
             self.fake_args.types)
-        sls_hw_to_check = create_sls_hw_to_check(self.fake_args.types, self.sls_hw_dumpstate)
+        sls_hw_to_check = create_sls_hw_to_check(self.sls_hw_dumpstate, self.fake_args.types)
         hsm_components = create_hsm_hw_to_crosscheck(self.all_hsm_components)
         hsm_redfish_endpoints = create_hsm_hw_to_crosscheck(self.all_hsm_redfish_endpoints)
         crosscheck_results = create_crosscheck_results(
@@ -487,7 +487,7 @@ class TestDoSlscheck(unittest.TestCase):
         self.fake_args.types = ['Node']
         expected_output = self.build_expected_output_of_create_crosscheck_results(
             self.fake_args.types)
-        sls_hw_to_check = create_sls_hw_to_check(self.fake_args.types, self.sls_hw_dumpstate)
+        sls_hw_to_check = create_sls_hw_to_check(self.sls_hw_dumpstate, self.fake_args.types)
         hsm_components = create_hsm_hw_to_crosscheck(self.all_hsm_components)
         hsm_redfish_endpoints = create_hsm_hw_to_crosscheck(self.all_hsm_redfish_endpoints)
         crosscheck_results = create_crosscheck_results(
@@ -515,7 +515,7 @@ class TestDoSlscheck(unittest.TestCase):
              'UAN',
              'Class mismatch: SLS:River,HSM:Mountain']
         ]
-        sls_hw_to_check = create_sls_hw_to_check(self.fake_args.types, self.sls_hw_dumpstate)
+        sls_hw_to_check = create_sls_hw_to_check(self.sls_hw_dumpstate, self.fake_args.types)
         hsm_components = create_hsm_hw_to_crosscheck(self.all_hsm_components)
         crosscheck_results = create_crosscheck_results(
             False,
@@ -534,9 +534,9 @@ class TestDoSlscheck(unittest.TestCase):
              'River',
              'Management',
              'Storage',
-             'Subrole mismatch: SLS:Storage,HSM:Worker']
+             'SubRole mismatch: SLS:Storage,HSM:Worker']
         ]
-        sls_hw_to_check = create_sls_hw_to_check(self.fake_args.types, self.sls_hw_dumpstate)
+        sls_hw_to_check = create_sls_hw_to_check(self.sls_hw_dumpstate, self.fake_args.types)
         hsm_components = create_hsm_hw_to_crosscheck(self.all_hsm_components)
         crosscheck_results = create_crosscheck_results(
             False,

@@ -1,6 +1,6 @@
-=============
+==============
  SAT-SLSCHECK
-=============
+==============
 
 -----------------------------------------
 Perform a Cross-Check Between SLS and HSM
@@ -22,7 +22,7 @@ The slscheck subcommand performs a cross-check between the
 System Layout Service (SLS) and the Hardware State Manager (HSM) to verify
 that the components in SLS were actually discovered and are present in HSM.
 
-If no optons are specified, the subcommand will report all items which
+If no options are specified, the subcommand will report all items which
 are in SLS and not in HSM components or HSM Redfish endpoints.
 It will also report component class, role, and subrole mismatches.
 

@@ -12,6 +12,7 @@ all: \
 	sat-sensors.8 \
 	sat-setrev.8 \
 	sat-showrev.8 \
+	sat-slscheck.8 \
 	sat-status.8 \
 	sat-swap.8 \
 	sat-switch.8 \
