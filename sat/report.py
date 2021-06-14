@@ -29,8 +29,16 @@ from prettytable import PrettyTable
 
 from sat.config import get_config_value
 from sat.constants import EMPTY_VALUE, MISSING_VALUE
-from sat.filtering import filter_list, is_subsequence, ParseError, remove_constant_values
-from sat.util import yaml_dump, get_rst_header
+from sat.filtering import (
+    filter_list,
+    ParseError,
+    remove_constant_values
+)
+from sat.util import (
+    get_rst_header,
+    match_query_key,
+    yaml_dump
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -101,22 +109,7 @@ class Report:
                 self.sort_by = None
             except ValueError:
                 # sort_by is not an int.
-                low = self.sort_by.lower()
-                self.sort_by = None
-                # use first exact match if there is one
-                for key in headings:
-                    if key.lower() == low:
-                        self.sort_by = key
-                        break
-                if not self.sort_by:
-                    matching_keys = [key for key in headings if is_subsequence(low, key.lower())]
-                    if len(matching_keys) > 0:
-                        self.sort_by = matching_keys[0]
-                        if len(matching_keys) > 1:
-                            LOGGER.warning(f"Element '{sort_by}' is ambiguous. "
-                                           f"Using first match: '{self.sort_by}' "
-                                           f"from {tuple(matching_keys)}.")
-
+                self.sort_by = match_query_key(self.sort_by, headings)
                 if not self.sort_by:
                     LOGGER.warning(warn_str, sort_by, self.headings)
 

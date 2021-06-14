@@ -23,7 +23,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 import re
 
-from sat.filtering import is_subsequence
+from sat.util import is_subsequence
 
 
 class ComponentField:

@@ -32,5 +32,5 @@ be specified as 'citrus', 'fruit', or 'cit_fr'. If an output table has columns
 'citrus_fruit' and 'tropical_fruit', a query with 'fruit' is ambiguous,
 whereas 'citrus' and 'tropical' are not.
 
-If a column is an exact match, the column will be used. If a subsequence matches
+If a column is an exact match, that column will be used. If a subsequence matches
 more than one column, a WARNING will be printed and the first match will be used.

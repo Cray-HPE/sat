@@ -542,3 +542,79 @@ class BeginEndLogger:
         duration_seconds = time.monotonic() - self.start_time
         duration = timedelta(seconds=duration_seconds)
         self.logger.log(self.level, 'END: %s. Duration: %s', self.msg, duration)
+
+
+def is_subsequence(needle, haystack):
+    """Checks if needle is a subsequence of haystack.
+
+    Informally, needle is a subsequence of haystack if needle can be
+    obtained by deleting zero or more characters from haystack.
+
+    Formally, let haystack be some sequence of characters h_1, h_2,
+    ..., h_k, where k = len(haystack), and let s be some strictly
+    increasing sequence of length l, where 0 <= l <= k, and for any i
+    in s, 1 <= i <= k. Then needle is the sequence of characters
+    h_(s_1), h_(s_2), ..., h_(s_l).
+
+    Args:
+        needle: the subsequence to look for
+        haystack: the string in which to search for the subsequence
+
+    Returns:
+        True if needle is a subsequence of haystack, and False
+        otherwise.
+    """
+    if needle and haystack:
+        try:
+            first, rest = needle[0], needle[1:]
+            hpos = haystack.index(first)
+            return is_subsequence(rest, haystack[(hpos + 1):])
+
+        except ValueError:
+            # Letter from needle not found in haystack, so there's no
+            # way it's a subsequence.
+            return False
+
+    else:
+        return not needle
+
+
+def match_query_key(query_key, headings):
+    """Computes the underlying key from some user-supplied query.
+
+    If query_key is an exact match or a subsequence of exactly one
+    heading in headings, then that heading is returned.
+    If query_key is the subsequence of multiple headings, then the
+    first heading is returned and a WARNING is printed.
+    Otherwise, a KeyError is raised.
+
+    Args:
+        query_key: a string containing some key we want to match
+        headings: an iterable containing various headings
+
+    Returns:
+        The unique key matching query_key.
+
+    Raises:
+        KeyError: if zero headings are matched
+    """
+
+    # Return the first exact match if there is one
+    for key in headings:
+        if key.lower() == query_key.lower():
+            return key
+
+    # We want to be able to match on just the subsequence of
+    # query_key, since keys can be somewhat long or have extraneous
+    # info (e.g. units etc.) that we don't want the user to worry
+    # about.
+    matching_keys = [key for key in headings
+                     if is_subsequence(query_key.lower(), key.lower())]
+    if not matching_keys:
+        return None
+
+    if len(matching_keys) != 1:
+        LOGGER.warning(f"Query key '{query_key}' is ambiguous. "
+                       f"Using first match: '{matching_keys[0]}' from {tuple(matching_keys)}.")
+
+    return matching_keys[0]
