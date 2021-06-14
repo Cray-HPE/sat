@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added power off of all non-management nodes in air-cooled cabinets
   to ``sat bootsys shutdown --stage cabinet-power``.
 - Added a 'Subrole' column to the output of ``sat status``.
+- Added ``sat bmccreds`` subcommand to provide a simple interface
+  for setting BMC Redfish access credentials.
 
 ### Fixed
 - Fixed the help text of `sat status` to list all available component types.

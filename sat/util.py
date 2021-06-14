@@ -25,7 +25,7 @@ import sys
 from collections import OrderedDict
 from datetime import timedelta
 from functools import partial
-import getpass
+from getpass import getpass
 import logging
 import math
 import os
@@ -139,7 +139,8 @@ def prompt_continue(action_msg):
 
 
 def get_username_and_password_interactively(username=None, username_prompt='Username',
-                                            password=None, password_prompt='Password'):
+                                            password=None, password_prompt='Password',
+                                            confirm_password=False):
     """Interactively query the user for username and password.
 
     If either username or password are given, then the user will not
@@ -151,18 +152,25 @@ def get_username_and_password_interactively(username=None, username_prompt='User
         username_prompt (str): a prompt for querying the username.
         password (str): a password that is already known.
         password_prompt (str): a prompt for querying the password.
+        confirm_password (bool): if True, prompt for the password
+            twice and verify that they match.
 
     Returns:
         (str, str) the username and password.
 
     """
-    if username and not password:
-        return (username, getpass.getpass(password_prompt + ": "))
-    elif username and password:
-        return (username, password)
-    else:
-        return (input(username_prompt + ": "),
-                getpass.getpass(password_prompt + ": "))
+    if not username:
+        username = input(f'{username_prompt}: ')
+    if not password:
+        while confirm_password:
+            password = getpass(f'{password_prompt}: ')
+            if password == getpass(f'Confirm {password_prompt}: '):
+                break
+            LOGGER.error('Passwords do not match')
+        else:
+            password = getpass(f'{password_prompt}: ')
+
+    return username, password
 
 
 def get_pretty_printed_dict(d, min_len=0):
@@ -291,6 +299,23 @@ def get_rst_header(header, header_level=1, min_len=80):
         return '\n'.join([header_chars, header, header_chars]) + '\n'
     else:
         return '\n'.join([header, header_chars]) + '\n'
+
+
+def format_long_list(items, max_length):
+    """Formats a long list by only displaying some of the items.
+
+    Args:
+        items (list): A list of items to display
+        max_length (int): The maximum number of items to display.
+
+    Returns:
+        str: A string representation of the list
+    """
+    if len(items) > max_length:
+        items_to_display = items[:max_length]
+        overflow = len(items) - max_length
+        return f'{", ".join(items_to_display)} ... and {overflow} more'
+    return f'{", ".join(items)}'
 
 
 def format_as_dense_list(items, margin_width=0, spacing=4, max_width=80):
