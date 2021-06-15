@@ -44,6 +44,7 @@ def set_options(namespace):
     namespace.reverse = False
     namespace.filter_strs = None
     namespace.format = None
+    namespace.fields = None
 
 
 class TestDoSlscheck(unittest.TestCase):
