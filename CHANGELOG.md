@@ -31,13 +31,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a case where filtering specific columns with any ``--*-fields`` option
   with ``sat hwinv`` failed when leading or trailing whitespace was present in
   the field name.
+- Fixed the help text of `sat status` to list all available component types.
+- Improved an error message which could sometimes occur when FAS reported a
 - Fixed filtering so that the exact match of a column name used in the
   ``--filter`` query is always used instead of matching subsequences.
 - Fixed filtering so that if there are multiple matches of column names
-  using the ``--filter``query, a WARNING is printed and the first match
+  using the ``--filter`` query, a WARNING is printed and the first match
   is used. This is consistent with ``--sort-by`` usage.
 - Fixed filtering to handle spaces in column names by requiring them to
   be enclosed in double quotes.
+  target with no xname. 
 
 ### Added
 - Added power off of all non-management nodes in air-cooled cabinets
@@ -45,9 +48,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a 'Subrole' column to the output of ``sat status``.
 - Added ``sat bmccreds`` subcommand to provide a simple interface
   for setting BMC Redfish access credentials.
-
-### Fixed
-- Fixed the help text of `sat status` to list all available component types.
 
 ## [3.7.0] - 2021-05-13
 
