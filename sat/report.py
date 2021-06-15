@@ -25,13 +25,13 @@ OTHER DEALINGS IN THE SOFTWARE.
 import logging
 from collections import OrderedDict
 
+from parsec import ParseError
 from prettytable import PrettyTable
 
 from sat.config import get_config_value
 from sat.constants import EMPTY_VALUE, MISSING_VALUE
 from sat.filtering import (
     filter_list,
-    ParseError,
     remove_constant_values
 )
 from sat.util import (

@@ -26,14 +26,9 @@ import fnmatch
 import logging
 import operator
 
-from parsec import ParseError
 import parsec
 
-from sat.util import (
-    get_rst_header,
-    match_query_key,
-    yaml_dump
-)
+from sat.util import match_query_key
 
 LOGGER = logging.getLogger(__name__)
 

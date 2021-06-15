@@ -611,17 +611,14 @@ def match_query_key(query_key, headings):
     heading in headings, then that heading is returned.
     If query_key is the subsequence of multiple headings, then the
     first heading is returned and a WARNING is printed.
-    Otherwise, a KeyError is raised.
+    Otherwise, None is returned.
 
     Args:
         query_key: a string containing some key we want to match
         headings: an iterable containing various headings
 
     Returns:
-        The unique key matching query_key.
-
-    Raises:
-        KeyError: if zero headings are matched
+        The unique key matching query_key or None.
     """
 
     # Return the first exact match if there is one
@@ -639,7 +636,7 @@ def match_query_key(query_key, headings):
         return None
 
     if len(matching_keys) != 1:
-        LOGGER.warning(f"Query key '{query_key}' is ambiguous. "
+        LOGGER.warning(f"Heading '{query_key}' is ambiguous. "
                        f"Using first match: '{matching_keys[0]}' from {tuple(matching_keys)}.")
 
     return matching_keys[0]

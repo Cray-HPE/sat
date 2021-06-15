@@ -23,6 +23,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 
 from collections import OrderedDict
+from parsec import ParseError
 import copy
 from functools import wraps
 import os
@@ -114,7 +115,7 @@ class TestFilterQueryStrings(unittest.TestCase):
     def test_bad_query_string(self):
         """Test giving a bad query string will throw ParseError."""
         for bad_query in ['foo =', 'foo = bar or', 'and', 'foo <> bar']:
-            with self.assertRaises(filtering.ParseError):
+            with self.assertRaises(ParseError):
                 filtering.parse_query_string(bad_query)
 
     @with_filter('foo = bar')
