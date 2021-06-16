@@ -25,12 +25,20 @@ OTHER DEALINGS IN THE SOFTWARE.
 import logging
 from collections import OrderedDict
 
+from parsec import ParseError
 from prettytable import PrettyTable
 
 from sat.config import get_config_value
 from sat.constants import EMPTY_VALUE, MISSING_VALUE
-from sat.filtering import filter_list, is_subsequence, ParseError, remove_constant_values
-from sat.util import yaml_dump, get_rst_header
+from sat.filtering import (
+    filter_list,
+    remove_constant_values
+)
+from sat.util import (
+    get_rst_header,
+    match_query_key,
+    yaml_dump
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -91,7 +99,7 @@ class Report:
 
         # find the heading to sort on
         if sort_by is not None:
-            warn_str = 'Element %s is not in %s. Output will be unsorted.'
+            warn_str = "Element '%s' is not in %s. Output will be unsorted."
             try:
                 self.sort_by = int(self.sort_by)
                 self.sort_by = self.headings[self.sort_by]
@@ -101,13 +109,7 @@ class Report:
                 self.sort_by = None
             except ValueError:
                 # sort_by is not an int.
-                up = self.sort_by.upper()
-                self.sort_by = None
-                for h in headings:
-                    if is_subsequence(up, h.upper()):
-                        self.sort_by = h
-                        break
-
+                self.sort_by = match_query_key(self.sort_by, headings)
                 if not self.sort_by:
                     LOGGER.warning(warn_str, sort_by, self.headings)
 

@@ -33,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the field name.
 - Fixed the help text of `sat status` to list all available component types.
 - Improved an error message which could sometimes occur when FAS reported a
+- Fixed filtering so that the exact match of a column name used in the
+  ``--filter`` query is always used instead of matching subsequences.
+- Fixed filtering so that if there are multiple matches of column names
+  using the ``--filter`` query, a WARNING is printed and the first match
+  is used. This is consistent with ``--sort-by`` usage.
+- Fixed filtering to handle spaces in column names by requiring them to
+  be enclosed in double quotes.
   target with no xname. 
 
 ### Added

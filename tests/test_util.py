@@ -22,7 +22,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 from collections import OrderedDict
-from itertools import product
+from itertools import combinations, product
 import logging
 import os
 from textwrap import dedent
@@ -588,6 +588,32 @@ class TestGetUsernameAndPasswordInteractively(ExtendedTestCase):
         self.assertEqual(username, self.mock_input.return_value)
         self.assertEqual(password, 'PasswordA')
         self.assert_in_element('Passwords do not match', logs.output)
+
+
+class TestSubsequenceMatching(unittest.TestCase):
+    """Tests for helper functions for filtering and matching."""
+    def test_is_subsequence(self):
+        """Test subsequence matching."""
+        test_str = 'spamneggs'
+        for str_len in range(len(test_str) + 1):
+            for subseq in combinations(test_str, str_len):
+                self.assertTrue(util.is_subsequence(''.join(subseq), test_str))
+
+    def test_trivial_subsequence(self):
+        """Test empty string is a subsequence."""
+        self.assertTrue(util.is_subsequence('', 'foo'))
+
+    def test_subseq_of_empty(self):
+        """Test subsequences of the empty string."""
+        self.assertFalse(util.is_subsequence('foo', ''))
+        self.assertTrue(util.is_subsequence('', ''))
+
+    def test_is_not_subsequence(self):
+        """Test subsequence misses."""
+        haystack = 'foobarbaz'
+        for needle in ['zabraboof', 'nothing', 'ofoarbazb',
+                       'foobarbax', 'bff', 'egads']:
+            self.assertFalse(util.is_subsequence(needle, haystack))
 
 
 if __name__ == '__main__':

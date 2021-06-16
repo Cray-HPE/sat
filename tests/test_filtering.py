@@ -23,9 +23,9 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 
 from collections import OrderedDict
+from parsec import ParseError
 import copy
 from functools import wraps
-import itertools
 import os
 import random
 import time
@@ -54,31 +54,8 @@ def with_filter(query_string):
     return decorator
 
 
-class TestSubsequenceMatching(unittest.TestCase):
+class TestFilterMatching(unittest.TestCase):
     """Tests for helper functions for filtering and matching."""
-    def test_is_subsequence(self):
-        """Test subsequence matching."""
-        test_str = 'spamneggs'
-        for str_len in range(len(test_str) + 1):
-            for subseq in itertools.combinations(test_str, str_len):
-                self.assertTrue(filtering.is_subsequence(''.join(subseq), test_str))
-
-    def test_trivial_subsequence(self):
-        """Test empty string is a subsequence."""
-        self.assertTrue(filtering.is_subsequence('', 'foo'))
-
-    def test_subseq_of_empty(self):
-        """Test subsequences of the empty string."""
-        self.assertFalse(filtering.is_subsequence('foo', ''))
-        self.assertTrue(filtering.is_subsequence('', ''))
-
-    def test_is_not_subsequence(self):
-        """Test subsequence misses."""
-        haystack = 'foobarbaz'
-        for needle in ['zabraboof', 'nothing', 'ofoarbazb',
-                       'foobarbax', 'bff', 'egads']:
-            self.assertFalse(filtering.is_subsequence(needle, haystack))
-
     def test_combine_filter_fns(self):
         """Test composing filtering functions with boolean combinators."""
         always_true = mock.MagicMock(return_value=True)
@@ -138,7 +115,7 @@ class TestFilterQueryStrings(unittest.TestCase):
     def test_bad_query_string(self):
         """Test giving a bad query string will throw ParseError."""
         for bad_query in ['foo =', 'foo = bar or', 'and', 'foo <> bar']:
-            with self.assertRaises(filtering.ParseError):
+            with self.assertRaises(ParseError):
                 filtering.parse_query_string(bad_query)
 
     @with_filter('foo = bar')
@@ -147,12 +124,11 @@ class TestFilterQueryStrings(unittest.TestCase):
         with self.assertRaises(KeyError):
             filter_fn({'baz': 'quux'})
 
-    @with_filter('foo = bar')
+    @with_filter('foo = spam')
     def test_ambiguous_key(self, filter_fn):
-        """Test KeyError thrown when filtering ambiguous key."""
-        with self.assertRaises(KeyError):
-            # 'foo' is a subsequence of both 'food' and 'frobnicator'.
-            filter_fn({'food': 'spam', 'frobnicator': 'quuxify'})
+        """Test first column match when filtering ambiguous key."""
+        # 'foo' is a subsequence of both 'food' and 'frobnicator'.
+        self.assertTrue(filter_fn({'food': 'spam', 'frobnicator': 'quuxify'}))
 
     @with_filter('foo > 20')
     def test_cant_compare_numbers_and_strings(self, filter_fn):
