@@ -273,11 +273,12 @@ class APIGatewayClient:
 class HSMClient(APIGatewayClient):
     base_resource_path = 'smd/hsm/v1/'
 
-    def get_bmcs_by_type(self, bmc_type=None):
+    def get_bmcs_by_type(self, bmc_type=None, check_keys=True):
         """Get a list of BMCs, optionally of a single type.
 
         Args:
             bmc_type (string): Any HSM BMC type: NodeBMC, RouterBMC or ChassisBMC.
+            check_keys (bool): Whether or not to filter data based on missing keys.
 
         Returns:
             A list of dictionaries where each dictionary describes a BMC.
@@ -300,11 +301,13 @@ class HSMClient(APIGatewayClient):
             raise APIError(f'API response missing expected key: {err}')
 
         # Check that the returned data has expected keys, and exclude data without it.
-        invalid_redfish_endpoint_xnames = [
-            endpoint.get('ID') for endpoint in redfish_endpoints
-            if any(required_key not in endpoint for required_key in ['ID', 'Enabled', 'DiscoveryInfo'])
-            or 'LastDiscoveryStatus' not in endpoint['DiscoveryInfo']
-        ]
+        invalid_redfish_endpoint_xnames = []
+        if check_keys:
+            invalid_redfish_endpoint_xnames = [
+                endpoint.get('ID') for endpoint in redfish_endpoints
+                if any(required_key not in endpoint for required_key in ['ID', 'Enabled', 'DiscoveryInfo'])
+                or 'LastDiscoveryStatus' not in endpoint['DiscoveryInfo']
+            ]
         if invalid_redfish_endpoint_xnames:
             LOGGER.warning(
                 'The following xnames were excluded due to incomplete information from HSM: %s',
@@ -439,6 +442,29 @@ class HSMClient(APIGatewayClient):
         err_prefix = 'Failed to get Node components'
         try:
             components = self.get('State', 'Components', params={'type': 'Node'}).json()['Components']
+        except APIError as err:
+            raise APIError(f'{err_prefix}: {err}')
+        except ValueError as err:
+            raise APIError(f'{err_prefix} due to bad JSON in response: {err}')
+        except KeyError as err:
+            raise APIError(f'{err_prefix} due to missing {err} key in response.')
+
+        return components
+
+    def get_all_components(self):
+        """Get all components from HSM.
+
+        Returns:
+            components ([dict]): A list of dictionaries from HSM.
+
+        Raises:
+            APIError: if there is a failure querying the HSM API or getting
+                the required information from the response.
+        """
+
+        err_prefix = 'Failed to get HSM components'
+        try:
+            components = self.get('State', 'Components').json()['Components']
         except APIError as err:
             raise APIError(f'{err_prefix}: {err}')
         except ValueError as err:
@@ -778,3 +804,30 @@ class TelemetryAPIClient(APIGatewayClient):
             raise APIError(f'{err_prefix}: {err}')
 
         return response
+
+
+class SLSClient(APIGatewayClient):
+    base_resource_path = 'sls/v1/'
+
+    def get_hardware(self):
+        """Get the SLS Hardware from the dumpstate.
+
+        Returns:
+            A list of dictionaries of hardware components from dumpstate.
+
+        Raises:
+            APIError: if there is a failure querying the SLS API or getting
+                the required information from the response.
+        """
+
+        err_prefix = 'Failed to get SLS hardware from dumpstate'
+        try:
+            hardware = self.get('dumpstate').json()['Hardware']
+        except APIError as err:
+            raise APIError(f'{err_prefix}: {err}')
+        except ValueError as err:
+            raise APIError(f'{err_prefix} due to bad JSON in response: {err}')
+        except KeyError as err:
+            raise APIError(f'{err_prefix} due to missing {err} key in response.')
+
+        return hardware

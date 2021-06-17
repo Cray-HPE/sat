@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a 'Subrole' column to the output of ``sat status``.
 - Added ``sat bmccreds`` subcommand to provide a simple interface
   for setting BMC Redfish access credentials.
+- Added ``sat slscheck`` subcommand to do a cross-check between SLS and HSM.
 
 ## [3.7.0] - 2021-05-13
 
