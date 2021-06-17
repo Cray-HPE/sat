@@ -54,30 +54,6 @@ def with_filter(query_string):
     return decorator
 
 
-class TestFilterMatching(unittest.TestCase):
-    """Tests for helper functions for filtering and matching."""
-    def test_combine_filter_fns(self):
-        """Test composing filtering functions with boolean combinators."""
-        always_true = mock.MagicMock(return_value=True)
-        always_false = mock.MagicMock(return_value=False)
-        fns = (always_true, always_false)
-        true_fns = (always_true, always_true)
-        false_fns = (always_false, always_false)
-        val = mock.MagicMock()
-
-        self.assertFalse(filtering.combine_filter_fns(fns)(val))
-        self.assertTrue(filtering.combine_filter_fns(true_fns)(val))
-        self.assertFalse(filtering.combine_filter_fns(false_fns)(val))
-        self.assertTrue(filtering.combine_filter_fns(fns, combine_fn=any)(val))
-        self.assertTrue(filtering.combine_filter_fns(true_fns, combine_fn=any)(val))
-        self.assertFalse(filtering.combine_filter_fns(false_fns, combine_fn=any)(val))
-
-    def test_get_cmpr_fn_value_error(self):
-        """Test _get_cmpr_fn raises a ValueError for a non-comparator."""
-        with self.assertRaises(ValueError):
-            filtering._get_cmpr_fn('not a comparator')
-
-
 class TestFilterQueryStrings(unittest.TestCase):
     """Tests for ensuring query strings mark matches as expected."""
 
@@ -164,6 +140,29 @@ class TestFilterQueryStrings(unittest.TestCase):
                                    'flower': 'rose', 'vases': '3'}))
         self.assertFalse(filter_fn({'fruit': 'apple', 'baskets': '1',
                                     'flower': 'rose', 'vases': '2'}))
+
+    def test_combined_filters(self):
+        """Test composing filtering functions with boolean combinators."""
+        always_true = filtering.FilterFunction.from_function(mock.MagicMock(return_value=True))
+        always_false = filtering.FilterFunction.from_function(mock.MagicMock(return_value=False))
+
+        fns = (always_true, always_false)
+        true_fns = (always_true, always_true)
+        false_fns = (always_false, always_false)
+        val = mock.MagicMock()
+
+        self.assertFalse(filtering.FilterFunction.from_combined_filters(all, *fns)(val))
+        self.assertTrue(filtering.FilterFunction.from_combined_filters(all, *true_fns)(val))
+        self.assertFalse(filtering.FilterFunction.from_combined_filters(all, *false_fns)(val))
+
+        self.assertTrue(filtering.FilterFunction.from_combined_filters(any, *fns)(val))
+        self.assertTrue(filtering.FilterFunction.from_combined_filters(any, *true_fns)(val))
+        self.assertFalse(filtering.FilterFunction.from_combined_filters(any, *false_fns)(val))
+
+    def test_get_cmpr_fn_value_error(self):
+        """Test _get_cmpr_fn raises a ValueError for a non-comparator."""
+        with self.assertRaises(ValueError):
+            filtering._get_cmpr_fn('not a comparator')
 
 
 class TestFilterList(unittest.TestCase):

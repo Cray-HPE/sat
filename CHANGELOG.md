@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- When explicitly specifying a field using any ``--*-fields`` option with ``sat
+  hwinv``, or when filtering against a field in any ``sat`` subcommand, those
+  columns will now always be shown, even if all rows contain ``EMPTY`` or
+  ``MISSING`` values.
+
 ### Fixed
 - Fixed a case where filtering specific columns with any ``--*-fields`` option
   with ``sat hwinv`` failed when leading or trailing whitespace was present in

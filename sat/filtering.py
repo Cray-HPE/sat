@@ -25,6 +25,9 @@ OTHER DEALINGS IN THE SOFTWARE.
 import fnmatch
 import logging
 import operator
+import types
+
+from sat.cached_property import cached_property
 
 import parsec
 
@@ -52,22 +55,114 @@ class FilterFunction:
     headings (i.e. keys) are identical for each dictionary in the
     iterable being filtered.
     """
+    def __init__(self, inner_fn, query_key=None, children=None):
+        """Constructor for the FilterFunction class.
 
-    def __init__(self, query_key, comparator, cmpr_val):
-        """Creates a new FilterFunction.
+        It is not recommended to call this constructor manually. Instead, the
+        following class methods should be used:
+          - FilterFunction.from_comparator()
+          - FilterFunction.from_combined_filter()
+          - FilterFunction.from_function()
+
+        Args:
+            inner_fn (FilterFunction -> dict -> bool): a function, which given
+                some row, returns a boolean. Note that this function is bound
+                to the constructed object as a method (i.e. its first argument
+                is the calling FilterFunction instance this constructor creates)
+            query_key (str): for single comparisons, the key against which the
+                function will filter
+            children ([FilterFunction]): for compound filters, the sub-filters
+                which are called when the filter is evaluated.
+        """
+
+        self.inner_fn = types.MethodType(inner_fn, self)
+
+        if query_key is not None:
+            self._raw_query_key = query_key
+
+        self.children = set(children) if children is not None else set()
+
+    @cached_property
+    def is_single_comparison(self):
+        """Checks whether this filter is a single comparison.
+
+        "Single comparison filters" perform only one comparison against one
+        field (e.g. "foo > 1"). Compound filters are composed of multiple
+        filters combined with some boolean condition (e.g. "foo > 1 and bar = 2").
+
+        Returns:
+            True if this filter is composed of multiple smaller filters,
+            and False if this filter is a single comparison."""
+
+        return hasattr(self, '_raw_query_key')
+
+    @classmethod
+    def from_comparator(cls, query_key, comparator, cmpr_val):
+        """Creates a new FilterFunction which compares a single field to a value.
 
         Args:
             query_key: a subsequence of some key to filter against.
             comparator: a comparator string (i.e. =, !=, >, <, >=,
                 or <=)
             cmpr_val: a string or number which defines the filter.
-        """
-        self._cmpr_fn = _get_cmpr_fn(comparator, is_number=isinstance(cmpr_val, float))
-        self._cmpr_val = cmpr_val
 
-        # The true key will be computed on the first run, so just
-        # store whatever we're given here for now.
-        self._raw_query_key = query_key
+        Returns:
+            A FilterFunction which compares the input's key against
+            the given value, and returns a boolean indicating whether
+            the input may pass through the filter.
+        """
+        cmpr_fn = _get_cmpr_fn(comparator, is_number=isinstance(cmpr_val, float))
+
+        def inner(self, row):
+            try:
+                return cmpr_fn(row[self.query_key], cmpr_val)
+            except TypeError as err:
+                raise TypeError("Cannot filter value of type '{}' with value "
+                                "of type '{}'.".format(type(row[self.query_key]).__name__,
+                                                       type(cmpr_val).__name__)) from err
+
+        return cls(inner, query_key=query_key)
+
+    @classmethod
+    def from_combined_filters(cls, combinator, *filter_fns):
+        """Combines multiple filters into one filter.
+
+        Args:
+            combinator ([bool] -> bool): a function which takes a
+                sequence of boolean values and returns a boolean value.
+                Typically, this is `all` or `any`.
+            filter_fns (*FilterFunction): any number of FilterFunctions
+                which should be combined.
+
+        Returns:
+            A FilterFunction which runs the constituent filters
+            on an input and combines the results using the given
+            combinator.
+        """
+        def inner(self, row):
+            return combinator(filter_fn(row) for filter_fn in filter_fns)
+
+        return cls(inner, children=filter_fns)
+
+    @classmethod
+    def from_function(cls, fn, children=None):
+        """Creates a simple filter function from some other function.
+
+        This is used in testing in order to wrap arbitrary functions within
+        the FilterFunction class.
+
+        Args:
+            fn (dict -> bool): a function, which given some row, returns a
+                boolean.
+            children ([FilterFunction]): Any FilterFunctions that are children
+                of this filter.
+
+        Returns:
+            A FilterFunction which runs fn on its input and returns the result.
+        """
+        def inner(self, row):
+            return fn(row)
+        return cls(inner, children=children)
 
     def __call__(self, row):
         """Checks whether the given row matches the filter.
@@ -91,41 +186,17 @@ class FilterFunction:
             TypeError: if the value for the query key in the row can't be
                 compared to the given value with the given comparison.
         """
-        if not hasattr(self, '_computed_query_key'):
-            self._computed_query_key = \
-                match_query_key(self._raw_query_key, row.keys())
-            if not self._computed_query_key:
-                raise KeyError(f"Query key '{self._raw_query_key}' is invalid because it does not exist.")
+        if self.is_single_comparison and not hasattr(self, 'query_key'):
+            self.query_key = match_query_key(self._raw_query_key, row.keys())
 
-        try:
-            return self._cmpr_fn(row[self._computed_query_key],
-                                 self._cmpr_val)
+        return self.inner_fn(row)
 
-        except TypeError as err:
-            raise TypeError("Cannot filter value of type '{}' with value "
-                            "of type '{}'.".format(type(row[self._computed_query_key]).__name__,
-                                                   type(self._cmpr_val).__name__)) from err
+    def get_filtered_fields(self, fields):
+        """Returns a set of fields which this filter utilizes."""
+        if self.is_single_comparison:
+            return {match_query_key(self._raw_query_key, fields)}
 
-
-def combine_filter_fns(fns, combine_fn=all):
-    """Creates a function which is the logical combination of input functions.
-
-    Args:
-        fns: iterable of functions which take a single argument
-            and return a bool.
-        combine_fn: a function which takes an iterable of booleans and
-            returns a boolean. By default, this is `all`. (i.e., the
-            logical 'and' of the input functions. For a logical 'or'
-            behavior, `any` can be passed instead.
-
-    Returns:
-        a function which takes a single argument and returns
-        the logical combination of all argument functions according to
-        combine_fn.
-    """
-    def inner(x):
-        return combine_fn(fn(x) for fn in list(fns))
-    return inner
+        return set.union(*(child.get_filtered_fields(fields) for child in self.children))
 
 
 def _str_eq_cmpr(name, pattern):
@@ -310,7 +381,7 @@ def parse_query_string(query_string):
         comparator = yield tok_cmpr
         cmpr_val = yield (tok_rhs ^ tok_quoted_str)
 
-        return FilterFunction(query_key, comparator, cmpr_val)
+        return FilterFunction.from_comparator(query_key, comparator, cmpr_val)
 
     @parsec.generate
     def bool_and_expr():
@@ -322,7 +393,7 @@ def parse_query_string(query_string):
         lhs = yield comparison
         yield tok_and
         rhs = yield (bool_and_expr ^ comparison)
-        return combine_filter_fns([lhs, rhs], combine_fn=all)
+        return FilterFunction.from_combined_filters(all, lhs, rhs)
 
     @parsec.generate
     def bool_expr():
@@ -334,16 +405,24 @@ def parse_query_string(query_string):
         lhs = yield (bool_and_expr ^ comparison)
         oper = yield (tok_or | tok_and | tok_end)
         if oper not in ['and', 'or']:
-            return combine_filter_fns([lhs], combine_fn=all)
+            return FilterFunction.from_combined_filters(all, lhs)
         rhs = yield (bool_expr ^ comparison)
-        return combine_filter_fns([lhs, rhs],
-                                  combine_fn=all if oper == 'and' else any)
+        return FilterFunction.from_combined_filters(all if oper == 'and' else any, lhs, rhs)
 
     # Expressions can either be a boolean expression composing >= 2
     # comparisons, or just a single comparison.
     expr = bool_expr ^ comparison
 
     return expr.parse_strict(query_string)
+
+
+def parse_multiple_query_strings(query_strings):
+    all_filter_fns = [parse_query_string(query_string)
+                      for query_string in query_strings]
+    combined_filters = FilterFunction.from_combined_filters(all, *all_filter_fns)
+
+    def filter_fn(x): return _dont_care_call(TypeError, combined_filters, x)
+    return FilterFunction.from_function(filter_fn, children=[combined_filters])
 
 
 def _dont_care_call(excepts, fn, *args):
@@ -404,16 +483,11 @@ def filter_list(dicts, query_strings):
     if any(d.keys() != fkeys for d in rest):
         raise ValueError('All input dicts must have same keys.')
 
-    all_filter_fns = [parse_query_string(query_string)
-                      for query_string in query_strings]
-    combined_filters = combine_filter_fns(all_filter_fns)
-
-    def filter_fn(x): return _dont_care_call(TypeError, combined_filters, x)
-
+    filter_fn = parse_multiple_query_strings(query_strings)
     return list(filter(filter_fn, dicts))
 
 
-def remove_constant_values(dicts, constant_value):
+def remove_constant_values(dicts, constant_value, protect=None):
     """Filters the keys in each dict to remove keys that have a constant value
 
     Takes a list of dictionaries, which are all assumed to have the same keys,
@@ -424,6 +498,8 @@ def remove_constant_values(dicts, constant_value):
         dicts (list): A list of dicts.
         constant_value: A value which must match the constant value of a key for
             that key to be removed from the dictionaries.
+        protect: a set of column keys which may not have their contents removed
+            if every row is the constant_value.
 
     Returns:
         A list of dicts with keys removed from all dicts if that key has the
@@ -434,16 +510,25 @@ def remove_constant_values(dicts, constant_value):
 
     # All dicts are assumed to have the same keys and type
     keys = dicts[0].keys()
+
     # This is to preserve OrderedDict if given.
     dict_type = type(dicts[0])
+
+    if protect is None:
+        protect = set()
 
     keys_to_keep = []
     for key in keys:
         if all(d[key] == constant_value for d in dicts):
-            LOGGER.info("All values for '%s' are '%s', omitting key.",
-                        key, constant_value)
-        else:
-            keys_to_keep.append(key)
+            if key in protect:
+                LOGGER.debug("All values for '%s' are '%s', but '%s' is a protected "
+                             "key. Not discarding.", key, constant_value, key)
+            else:
+                LOGGER.info("All values for '%s' are '%s', omitting key.",
+                            key, constant_value)
+                continue
+
+        keys_to_keep.append(key)
 
     return [dict_type([(key, d[key]) for key in keys_to_keep])
             for d in dicts]
