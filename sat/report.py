@@ -273,8 +273,8 @@ class Report:
         try:
             rows_to_print = filter_list(self.data, self.filter_strs)
         except (KeyError, ParseError, TypeError, ValueError) as err:
-            LOGGER.warning("An error occurred while filtering; "
-                           "returning no output. (%s)", err)
+            LOGGER.error("An error occurred while filtering; "
+                         "returning no output. (%s)", err)
             return None
 
         headings, rows_to_print = self.remove_empty_and_missing(rows_to_print)
@@ -304,8 +304,8 @@ class Report:
             rows_to_print = filter_list(self.data, self.filter_strs)
 
         except (KeyError, ParseError, TypeError, ValueError) as err:
-            LOGGER.warning("An error occurred while filtering; "
-                           "returning no output. (%s)", err)
+            LOGGER.error("An error occurred while filtering; "
+                         "returning no output. (%s)", err)
             return ''
 
         _, rows_to_print = self.remove_empty_and_missing(rows_to_print)
