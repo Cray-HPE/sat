@@ -25,7 +25,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.8.0] - 2021-06-23
 
 ### Changed
 - When explicitly specifying a field using any ``--*-fields`` option with ``sat
@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the field name.
 - Fixed the help text of `sat status` to list all available component types.
 - Improved an error message which could sometimes occur when FAS reported a
+  target with no xname. 
 - Fixed filtering so that the exact match of a column name used in the
   ``--filter`` query is always used instead of matching subsequences.
 - Fixed filtering so that if there are multiple matches of column names
@@ -46,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is used. This is consistent with ``--sort-by`` usage.
 - Fixed filtering to handle spaces in column names by requiring them to
   be enclosed in double quotes.
-  target with no xname. 
+- Changed warning message when filter returns no output to an error.
 
 ### Added
 - Added power off of all non-management nodes in air-cooled cabinets
@@ -55,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added ``sat bmccreds`` subcommand to provide a simple interface
   for setting BMC Redfish access credentials.
 - Added ``sat slscheck`` subcommand to do a cross-check between SLS and HSM.
+- Added confirmation message when ``sat setrev`` writes site info file to S3.
 
 ## [3.7.0] - 2021-05-13
 
