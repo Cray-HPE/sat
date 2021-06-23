@@ -51,6 +51,8 @@ def add_status_subparser(subparsers):
         'RouterModule',
     ]
 
+    default_type = 'Node'
+
     status_parser = subparsers.add_parser(
         'status', help='Report node status.',
         description='Report node status.',
@@ -58,5 +60,6 @@ def add_status_subparser(subparsers):
 
     status_parser.add_argument(
         '--types', metavar='TYPE', dest='types', nargs='+',
-        help="Specify which components should be queried.",
-        choices=types, default=['Node'])
+        choices=types, default=[default_type],
+        help=f"Specify which components should be queried. "
+        f"The default is \"{default_type}\". All types are: {', '.join(types)}")

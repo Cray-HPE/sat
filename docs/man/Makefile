@@ -1,5 +1,6 @@
 all: \
 	sat-auth.8 \
+	sat-bmccreds.8 \
 	sat-bootsys.8 \
 	sat-diag.8 \
 	sat-firmware.8 \
@@ -11,6 +12,7 @@ all: \
 	sat-sensors.8 \
 	sat-setrev.8 \
 	sat-showrev.8 \
+	sat-slscheck.8 \
 	sat-status.8 \
 	sat-swap.8 \
 	sat-switch.8 \

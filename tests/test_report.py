@@ -502,12 +502,13 @@ class TestReportEmptyMissingRemoval(unittest.TestCase):
         """Test remove_empty_and_missing with show_empty=show_missing=False"""
         self.mock_report.show_empty = False
         self.mock_report.show_missing = False
+        self.mock_report.force_columns = set()
 
         headings, out_data = self.mock_report.remove_empty_and_missing(self.sample_data)
 
         self.mock_remove_func.assert_has_calls([
-            call(self.sample_data, EMPTY_VALUE),
-            call(self.mock_remove_func.return_value, MISSING_VALUE)
+            call(self.sample_data, EMPTY_VALUE, protect=set()),
+            call(self.mock_remove_func.return_value, MISSING_VALUE, protect=set())
         ])
         self.assertEqual(['xname'], headings)
         self.assertEqual(self.mock_remove_func.return_value, out_data)
@@ -516,11 +517,12 @@ class TestReportEmptyMissingRemoval(unittest.TestCase):
         """Test remove_empty_and_missing with show_empty=True, show_missing=False"""
         self.mock_report.show_empty = True
         self.mock_report.show_missing = False
+        self.mock_report.force_columns = set()
 
         headings, out_data = self.mock_report.remove_empty_and_missing(self.sample_data)
 
         self.mock_remove_func.assert_has_calls([
-            call(self.sample_data, MISSING_VALUE)
+            call(self.sample_data, MISSING_VALUE, protect=set())
         ])
         self.assertEqual(['xname'], headings)
         self.assertEqual(self.mock_remove_func.return_value, out_data)
@@ -529,6 +531,7 @@ class TestReportEmptyMissingRemoval(unittest.TestCase):
         """Test remove_empty_and_missing with show_empty=show_missing=True"""
         self.mock_report.show_empty = True
         self.mock_report.show_missing = True
+        self.mock_report.force_columns = set()
 
         headings, out_data = self.mock_report.remove_empty_and_missing(self.sample_data)
 

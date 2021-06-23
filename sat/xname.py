@@ -1,7 +1,7 @@
 """
 Class for representing an xname.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -127,6 +127,22 @@ class XName:
             return XName(match.group(0))
         else:
             return None
+
+    def get_cabinet(self):
+        """Get the cabinet of this xname.
+
+        Returns:
+            An XName object that is the cabinet.
+        """
+        return XName.get_xname_from_tokens(self.tokens[:2])
+
+    def get_chassis(self):
+        """Get the chassis of this xname.
+
+        Returns:
+            An XName object that is the cabinet.
+        """
+        return XName.get_xname_from_tokens(self.tokens[:4])
 
     def __lt__(self, other):
         return self.tokens < other.tokens

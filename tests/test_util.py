@@ -22,7 +22,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 from collections import OrderedDict
-from itertools import product
+from itertools import combinations, product
 import logging
 import os
 from textwrap import dedent
@@ -147,6 +147,16 @@ class TestMiscFormatters(unittest.TestCase):
 
             self.assertIn(char * MIN_LEN, lines)
             self.assertIn(HEADER, lines)
+
+    def test_format_long_list(self):
+        """Test the formatting of format_long_list."""
+        max_len = 2
+        short_list = ['hello', 'goodbye']
+        long_list = ['hello'] * 20
+        expected_short_list = f'{", ".join(short_list)}'
+        expected_long_list = f'hello, hello ... and 18 more'
+        self.assertEqual(util.format_long_list(short_list, max_len), expected_short_list)
+        self.assertEqual(util.format_long_list(long_list, max_len), expected_long_list)
 
     def test_format_as_dense_list(self):
         """Test the formatting of format_as_dense_list."""
@@ -505,6 +515,105 @@ class TestBeginEndLogger(ExtendedTestCase):
                 pass  # NOSONAR
 
         self.assertEqual(2, len(cm.output))
+
+
+class TestGetUsernameAndPasswordInteractively(ExtendedTestCase):
+    def setUp(self):
+        """Set up some mocks."""
+        self.mock_input = mock.patch('sat.util.input').start()
+        self.mock_getpass = mock.patch('sat.util.getpass').start()
+
+    def tearDown(self):
+        """Stop mock patching."""
+        mock.patch.stopall()
+
+    def test_get_username_and_password_default(self):
+        """Test get_username_and_password_interactively prompts for username and password when needed."""
+        username, password = util.get_username_and_password_interactively()
+        self.mock_input.assert_called_once_with('Username: ')
+        self.mock_getpass.assert_called_once_with('Password: ')
+        self.assertEqual(username, self.mock_input.return_value)
+        self.assertEqual(password, self.mock_getpass.return_value)
+
+    def test_get_username_and_password_with_custom_prompts(self):
+        """Test get_username_and_password_interactively prompts using custom prompts."""
+        username, password = util.get_username_and_password_interactively(
+            username_prompt='Admin Username', password_prompt='Admin Password'
+        )
+        self.mock_input.assert_called_once_with('Admin Username: ')
+        self.mock_getpass.assert_called_once_with('Admin Password: ')
+        self.assertEqual(username, self.mock_input.return_value)
+        self.assertEqual(password, self.mock_getpass.return_value)
+
+    def test_get_username_and_password_with_username(self):
+        """Test get_username_and_password_interactively prompts only for password when a username is given."""
+        username, password = util.get_username_and_password_interactively(username='crayadmin')
+        self.mock_input.assert_not_called()
+        self.mock_getpass.assert_called_once_with('Password: ')
+        self.assertEqual(username, 'crayadmin')
+        self.assertEqual(password, self.mock_getpass.return_value)
+
+    def test_get_username_and_password_with_password(self):
+        """Test get_username_and_password_interactively prompts only for username when a password is given."""
+        username, password = util.get_username_and_password_interactively(password='crayadmin')
+        self.mock_input.assert_called_once_with('Username: ')
+        self.mock_getpass.assert_not_called()
+        self.assertEqual(username, self.mock_input.return_value)
+        self.assertEqual(password, 'crayadmin')
+
+    def test_get_username_and_password_confirm_match(self):
+        """Test get_username_and_password_interactively confirms password when requested and returns when they match."""
+        self.mock_getpass.side_effect = ('PasswordA', 'PasswordA')
+        username, password = util.get_username_and_password_interactively(confirm_password=True)
+        self.mock_input.assert_called_once_with('Username: ')
+        self.assertListEqual(
+            [mock.call('Password: '), mock.call('Confirm Password: ')],
+            self.mock_getpass.mock_calls
+        )
+        self.assertEqual(username, self.mock_input.return_value)
+        self.assertEqual(password, 'PasswordA')
+
+    def test_get_username_and_password_confirm_mismatch(self):
+        """Test get_username_and_password_interactively confirms password and logs an error on a mismatch."""
+        # Mock a situation in which the first attempt is a mismatch but the second attempt works.
+        self.mock_getpass.side_effect = ('PasswordA', 'PasswordB', 'PasswordA', 'PasswordA')
+        with self.assertLogs(level=logging.ERROR) as logs:
+            username, password = util.get_username_and_password_interactively(confirm_password=True)
+        self.mock_input.assert_called_once_with('Username: ')
+        self.assertListEqual(
+            [mock.call('Password: '), mock.call('Confirm Password: '),
+             mock.call('Password: '), mock.call('Confirm Password: ')],
+            self.mock_getpass.mock_calls
+        )
+        self.assertEqual(username, self.mock_input.return_value)
+        self.assertEqual(password, 'PasswordA')
+        self.assert_in_element('Passwords do not match', logs.output)
+
+
+class TestSubsequenceMatching(unittest.TestCase):
+    """Tests for helper functions for filtering and matching."""
+    def test_is_subsequence(self):
+        """Test subsequence matching."""
+        test_str = 'spamneggs'
+        for str_len in range(len(test_str) + 1):
+            for subseq in combinations(test_str, str_len):
+                self.assertTrue(util.is_subsequence(''.join(subseq), test_str))
+
+    def test_trivial_subsequence(self):
+        """Test empty string is a subsequence."""
+        self.assertTrue(util.is_subsequence('', 'foo'))
+
+    def test_subseq_of_empty(self):
+        """Test subsequences of the empty string."""
+        self.assertFalse(util.is_subsequence('foo', ''))
+        self.assertTrue(util.is_subsequence('', ''))
+
+    def test_is_not_subsequence(self):
+        """Test subsequence misses."""
+        haystack = 'foobarbaz'
+        for needle in ['zabraboof', 'nothing', 'ofoarbazb',
+                       'foobarbax', 'bff', 'egads']:
+            self.assertFalse(util.is_subsequence(needle, haystack))
 
 
 if __name__ == '__main__':

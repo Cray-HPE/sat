@@ -185,7 +185,9 @@ def get_all_lists(system, args):
             sort_by=args.sort_by, reverse=args.reverse,
             no_headings=get_config_value('format.no_headings'),
             no_borders=get_config_value('format.no_borders'),
-            filter_strs=args.filter_strs
+            filter_strs=args.filter_strs,
+            show_empty=field_filters or args.show_empty,
+            show_missing=field_filters or args.show_missing
         )
         component_report.add_rows(component_dicts)
 

@@ -25,6 +25,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.0] - 2021-06-23
+
+### Changed
+- When explicitly specifying a field using any ``--*-fields`` option with ``sat
+  hwinv``, or when filtering against a field in any ``sat`` subcommand, those
+  columns will now always be shown, even if all rows contain ``EMPTY`` or
+  ``MISSING`` values.
+
+### Fixed
+- Fixed a case where filtering specific columns with any ``--*-fields`` option
+  with ``sat hwinv`` failed when leading or trailing whitespace was present in
+  the field name.
+- Fixed the help text of `sat status` to list all available component types.
+- Improved an error message which could sometimes occur when FAS reported a
+  target with no xname. 
+- Fixed filtering so that the exact match of a column name used in the
+  ``--filter`` query is always used instead of matching subsequences.
+- Fixed filtering so that if there are multiple matches of column names
+  using the ``--filter`` query, a WARNING is printed and the first match
+  is used. This is consistent with ``--sort-by`` usage.
+- Fixed filtering to handle spaces in column names by requiring them to
+  be enclosed in double quotes.
+- Changed warning message when filter returns no output to an error.
+
+### Added
+- Added power off of all non-management nodes in air-cooled cabinets
+  to ``sat bootsys shutdown --stage cabinet-power``.
+- Added a 'Subrole' column to the output of ``sat status``.
+- Added ``sat bmccreds`` subcommand to provide a simple interface
+  for setting BMC Redfish access credentials.
+- Added ``sat slscheck`` subcommand to do a cross-check between SLS and HSM.
+- Added confirmation message when ``sat setrev`` writes site info file to S3.
+
 ## [3.7.0] - 2021-05-13
 
 ### Changed

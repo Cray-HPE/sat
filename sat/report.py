@@ -25,12 +25,21 @@ OTHER DEALINGS IN THE SOFTWARE.
 import logging
 from collections import OrderedDict
 
+from parsec import ParseError
 from prettytable import PrettyTable
 
 from sat.config import get_config_value
 from sat.constants import EMPTY_VALUE, MISSING_VALUE
-from sat.filtering import filter_list, is_subsequence, ParseError, remove_constant_values
-from sat.util import yaml_dump, get_rst_header
+from sat.filtering import (
+    filter_list,
+    parse_multiple_query_strings,
+    remove_constant_values
+)
+from sat.util import (
+    get_rst_header,
+    match_query_key,
+    yaml_dump
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -43,7 +52,8 @@ class Report:
                  sort_by=None, reverse=False,
                  no_headings=None, no_borders=None,
                  align='l', filter_strs=None,
-                 show_empty=None, show_missing=None):
+                 show_empty=None, show_missing=None,
+                 force_columns=None):
         """Create a new Report instance.
 
         Args:
@@ -64,6 +74,9 @@ class Report:
                 row has the value EMPTY_VALUE.
             show_missing: If True, then show values for columns for which every
                 row has the value MISSING_VALUE.
+            force_columns: a set of column names whose columns must always be present
+                in the output, even if all their rows are EMPTY_VALUE or MISSING_VALUE.
+                If None, then default to the normal behavior of show_empty and show_missing.
         """
         self.headings = headings
         self.title = title
@@ -89,9 +102,24 @@ class Report:
         self.align = align
         self.filter_strs = filter_strs or []
 
+        self.force_columns = set(force_columns if force_columns is not None else [])
+
+        # TODO: We're parsing the filter strings twice with this approach,
+        # though it involves fewer code changes. This should be consolidated in
+        # the future.
+        if self.filter_strs:
+            try:
+                filter_fn = parse_multiple_query_strings(self.filter_strs)
+                self.force_columns |= filter_fn.get_filtered_fields(self.headings)
+            except ParseError:
+                # If there is a parsing error in the filters, we can ignore it
+                # for now. When the filters are re-parsed when filtering
+                # occurs, the parse error will be logged as normal.
+                pass
+
         # find the heading to sort on
         if sort_by is not None:
-            warn_str = 'Element %s is not in %s. Output will be unsorted.'
+            warn_str = "Element '%s' is not in %s. Output will be unsorted."
             try:
                 self.sort_by = int(self.sort_by)
                 self.sort_by = self.headings[self.sort_by]
@@ -101,13 +129,7 @@ class Report:
                 self.sort_by = None
             except ValueError:
                 # sort_by is not an int.
-                up = self.sort_by.upper()
-                self.sort_by = None
-                for h in headings:
-                    if is_subsequence(up, h.upper()):
-                        self.sort_by = h
-                        break
-
+                self.sort_by = match_query_key(self.sort_by, headings)
                 if not self.sort_by:
                     LOGGER.warning(warn_str, sort_by, self.headings)
 
@@ -229,9 +251,9 @@ class Report:
             return self.headings, data_rows
 
         if not self.show_empty:
-            data_rows = remove_constant_values(data_rows, EMPTY_VALUE)
+            data_rows = remove_constant_values(data_rows, EMPTY_VALUE, protect=self.force_columns)
         if not self.show_missing:
-            data_rows = remove_constant_values(data_rows, MISSING_VALUE)
+            data_rows = remove_constant_values(data_rows, MISSING_VALUE, protect=self.force_columns)
 
         # We could just take data_rows[0].keys(), but for extra assurance that
         # order is maintained, take from self.headings.
@@ -251,8 +273,8 @@ class Report:
         try:
             rows_to_print = filter_list(self.data, self.filter_strs)
         except (KeyError, ParseError, TypeError, ValueError) as err:
-            LOGGER.warning("An error occurred while filtering; "
-                           "returning no output. (%s)", err)
+            LOGGER.error("An error occurred while filtering; "
+                         "returning no output. (%s)", err)
             return None
 
         headings, rows_to_print = self.remove_empty_and_missing(rows_to_print)
@@ -282,8 +304,8 @@ class Report:
             rows_to_print = filter_list(self.data, self.filter_strs)
 
         except (KeyError, ParseError, TypeError, ValueError) as err:
-            LOGGER.warning("An error occurred while filtering; "
-                           "returning no output. (%s)", err)
+            LOGGER.error("An error occurred while filtering; "
+                         "returning no output. (%s)", err)
             return ''
 
         _, rows_to_print = self.remove_empty_and_missing(rows_to_print)

@@ -1,7 +1,7 @@
 """
 Class to define a field on a component.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 import re
 
-from sat.filtering import is_subsequence
+from sat.util import is_subsequence
 
 
 class ComponentField:
@@ -68,12 +68,13 @@ class ComponentField:
     def canonicalize(name):
         """Canonicalize the given name by converting to lowercase and replacing chars.
 
-        Replaces '-' and ' ' with '_'. Removes parentheses.
+        Replaces '-' and ' ' with '_'. Removes parentheses. Removes leading and
+        trailing whitespace.
 
         Returns:
             The canonical form of the given name.
         """
-        return re.sub(r'[- ]', '_', re.sub(r'[()]', '', name.lower()))
+        return re.sub(r'[- ]', '_', re.sub(r'[()]', '', name.strip().lower()))
 
     def __eq__(self, other):
         return (self.pretty_name, self.listable, self.summarizable, self.property_name) == \

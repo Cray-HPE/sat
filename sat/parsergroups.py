@@ -61,7 +61,8 @@ def create_format_options():
     group.add_argument(
         '--sort-by', metavar='FIELD', default=0,
         help=('Select which column to sort by. Can accept a column name '
-              'or a 0-based index.'))
+              'or a 0-based index. Enclose the column name in double quotes '
+              'if it contains a space.'))
 
     group.add_argument(
         '--show-empty',

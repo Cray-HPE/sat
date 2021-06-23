@@ -1,7 +1,7 @@
 """
 Tests for the XName utility class.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -90,6 +90,34 @@ class TestXName(unittest.TestCase):
         chassis_xname_str = 'x1000c3'
         # A chassis should not find a parent node
         self.assertEqual(None, XName(chassis_xname_str).get_parent_node())
+
+    def test_node_get_cabinet(self):
+        """Test getting the cabinet xname of a node xname."""
+        node_xname_str = 'x3000c0s17b0n0'
+        cabinet_xname_str = node_xname_str[:5]
+        self.assertEqual(XName(cabinet_xname_str),
+                         XName(node_xname_str).get_cabinet())
+
+    def test_node_get_chassis(self):
+        """Test getting the chassis xname of a node xname."""
+        node_xname_str = 'x3000c0s17b0n0'
+        chassis_xname_str = node_xname_str[:7]
+        self.assertEqual(XName(chassis_xname_str),
+                         XName(node_xname_str).get_chassis())
+
+    def test_bmc_get_cabinet(self):
+        """Test getting the cabinet xname of a BMC xname."""
+        bmc_xname_str = 'x3000c0s17b0'
+        cabinet_xname_str = bmc_xname_str[:5]
+        self.assertEqual(XName(cabinet_xname_str),
+                         XName(bmc_xname_str).get_cabinet())
+
+    def test_bmc_get_chassis(self):
+        """Test getting the chassis xname of a BMC xname."""
+        bmc_xname_str = 'x3000c0s17b0'
+        chassis_xname_str = bmc_xname_str[:7]
+        self.assertEqual(XName(chassis_xname_str),
+                         XName(bmc_xname_str).get_chassis())
 
 
 class TestXNameContainsComponent(unittest.TestCase):

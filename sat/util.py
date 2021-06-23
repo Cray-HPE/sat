@@ -25,7 +25,7 @@ import sys
 from collections import OrderedDict
 from datetime import timedelta
 from functools import partial
-import getpass
+from getpass import getpass
 import logging
 import math
 import os
@@ -139,7 +139,8 @@ def prompt_continue(action_msg):
 
 
 def get_username_and_password_interactively(username=None, username_prompt='Username',
-                                            password=None, password_prompt='Password'):
+                                            password=None, password_prompt='Password',
+                                            confirm_password=False):
     """Interactively query the user for username and password.
 
     If either username or password are given, then the user will not
@@ -151,18 +152,25 @@ def get_username_and_password_interactively(username=None, username_prompt='User
         username_prompt (str): a prompt for querying the username.
         password (str): a password that is already known.
         password_prompt (str): a prompt for querying the password.
+        confirm_password (bool): if True, prompt for the password
+            twice and verify that they match.
 
     Returns:
         (str, str) the username and password.
 
     """
-    if username and not password:
-        return (username, getpass.getpass(password_prompt + ": "))
-    elif username and password:
-        return (username, password)
-    else:
-        return (input(username_prompt + ": "),
-                getpass.getpass(password_prompt + ": "))
+    if not username:
+        username = input(f'{username_prompt}: ')
+    if not password:
+        while confirm_password:
+            password = getpass(f'{password_prompt}: ')
+            if password == getpass(f'Confirm {password_prompt}: '):
+                break
+            LOGGER.error('Passwords do not match')
+        else:
+            password = getpass(f'{password_prompt}: ')
+
+    return username, password
 
 
 def get_pretty_printed_dict(d, min_len=0):
@@ -291,6 +299,23 @@ def get_rst_header(header, header_level=1, min_len=80):
         return '\n'.join([header_chars, header, header_chars]) + '\n'
     else:
         return '\n'.join([header, header_chars]) + '\n'
+
+
+def format_long_list(items, max_length):
+    """Formats a long list by only displaying some of the items.
+
+    Args:
+        items (list): A list of items to display
+        max_length (int): The maximum number of items to display.
+
+    Returns:
+        str: A string representation of the list
+    """
+    if len(items) > max_length:
+        items_to_display = items[:max_length]
+        overflow = len(items) - max_length
+        return f'{", ".join(items_to_display)} ... and {overflow} more'
+    return f'{", ".join(items)}'
 
 
 def format_as_dense_list(items, margin_width=0, spacing=4, max_width=80):
@@ -542,3 +567,76 @@ class BeginEndLogger:
         duration_seconds = time.monotonic() - self.start_time
         duration = timedelta(seconds=duration_seconds)
         self.logger.log(self.level, 'END: %s. Duration: %s', self.msg, duration)
+
+
+def is_subsequence(needle, haystack):
+    """Checks if needle is a subsequence of haystack.
+
+    Informally, needle is a subsequence of haystack if needle can be
+    obtained by deleting zero or more characters from haystack.
+
+    Formally, let haystack be some sequence of characters h_1, h_2,
+    ..., h_k, where k = len(haystack), and let s be some strictly
+    increasing sequence of length l, where 0 <= l <= k, and for any i
+    in s, 1 <= i <= k. Then needle is the sequence of characters
+    h_(s_1), h_(s_2), ..., h_(s_l).
+
+    Args:
+        needle: the subsequence to look for
+        haystack: the string in which to search for the subsequence
+
+    Returns:
+        True if needle is a subsequence of haystack, and False
+        otherwise.
+    """
+    if needle and haystack:
+        try:
+            first, rest = needle[0], needle[1:]
+            hpos = haystack.index(first)
+            return is_subsequence(rest, haystack[(hpos + 1):])
+
+        except ValueError:
+            # Letter from needle not found in haystack, so there's no
+            # way it's a subsequence.
+            return False
+
+    else:
+        return not needle
+
+
+def match_query_key(query_key, headings):
+    """Computes the underlying key from some user-supplied query.
+
+    If query_key is an exact match or a subsequence of exactly one
+    heading in headings, then that heading is returned.
+    If query_key is the subsequence of multiple headings, then the
+    first heading is returned and a WARNING is printed.
+    Otherwise, None is returned.
+
+    Args:
+        query_key: a string containing some key we want to match
+        headings: an iterable containing various headings
+
+    Returns:
+        The unique key matching query_key or None.
+    """
+
+    # Return the first exact match if there is one
+    for key in headings:
+        if key.lower() == query_key.lower():
+            return key
+
+    # We want to be able to match on just the subsequence of
+    # query_key, since keys can be somewhat long or have extraneous
+    # info (e.g. units etc.) that we don't want the user to worry
+    # about.
+    matching_keys = [key for key in headings
+                     if is_subsequence(query_key.lower(), key.lower())]
+    if not matching_keys:
+        return None
+
+    if len(matching_keys) != 1:
+        LOGGER.warning(f"Heading '{query_key}' is ambiguous. "
+                       f"Using first match: '{matching_keys[0]}' from {tuple(matching_keys)}.")
+
+    return matching_keys[0]
