@@ -416,7 +416,8 @@ def do_slscheck(args):
         args.sort_by, args.reverse,
         get_config_value('format.no_headings'),
         get_config_value('format.no_borders'),
-        filter_strs=args.filter_strs
+        filter_strs=args.filter_strs,
+        display_headings=args.fields
     )
     report.add_rows(crosscheck_results)
 

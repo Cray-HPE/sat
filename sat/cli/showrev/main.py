@@ -90,7 +90,7 @@ def do_showrev(args):
         else:
             reports.append(Report(
                 headings, title, sort_by, reverse, no_headings, no_borders,
-                filter_strs=args.filter_strs))
+                filter_strs=args.filter_strs, display_headings=args.fields))
             reports[-1].add_rows(data)
 
     assign_default_args(args)

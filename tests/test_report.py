@@ -23,6 +23,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 from collections import defaultdict
 from copy import deepcopy
+from itertools import permutations
 import unittest
 from unittest.mock import call, Mock, patch
 
@@ -458,6 +459,56 @@ class TestReportFormatting(unittest.TestCase):
         for expected, actual in zip(str_entries, pt_s):
             self.assertEqual(expected, actual)
 
+    def test_showing_single_column(self):
+        """Test showing only a single column of the output."""
+        for index, heading in enumerate(self.headings):
+            report = Report(self.headings, display_headings=[heading])
+            report.add_rows(self.entries)
+            pt_s = get_report_printed_list(report)
+
+            expected_rows = [[row[index]] for row in self.entries]
+            for expected, actual in zip(expected_rows, pt_s):
+                self.assertEqual(expected, actual)
+
+    def test_show_multiple_columns(self):
+        """Test showing multiple columns of the output in different orders."""
+        for length in range(1, len(self.headings) + 1):
+            for display_headings in permutations(enumerate(self.headings), length):
+                # turn [(index_0, heading_0), (index_1, heading_1)...] into
+                # ([index_0, index_1, ...], [heading_0, heading_1...])
+                indices, headings = zip(*display_headings)
+
+                report = Report(self.headings, display_headings=headings)
+                report.add_rows(self.entries)
+                pt_s = get_report_printed_list(report)
+
+                expected_rows = [[row[index] for index in indices]
+                                 for row in self.entries]
+                for expected, actual in zip(expected_rows, pt_s):
+                    self.assertEqual(expected, actual)
+
+    def test_show_invalid_column(self):
+        """Test invalid columns passed to --fields are ignored."""
+        report = Report(self.headings, display_headings=['name', 'not_a_valid_heading'])
+        report.add_rows(self.entries)
+
+        pt_s = get_report_printed_list(report)
+
+        expected_rows = [[row[0]] for row in self.entries]
+        for expected, actual in zip(expected_rows, pt_s):
+            self.assertEqual(expected, actual)
+
+    def test_do_not_show_duplicate_columns(self):
+        """Test that duplicates passed to --fields are only printed once."""
+        report = Report(self.headings, display_headings=['name', 'name'])
+        report.add_rows(self.entries)
+
+        pt_s = get_report_printed_list(report)
+
+        expected_rows = [[row[0]] for row in self.entries]
+        for expected, actual in zip(expected_rows, pt_s):
+            self.assertEqual(expected, actual)
+
 
 class TestReportEmptyMissingRemoval(unittest.TestCase):
     """Test the remove_empty_and_missing method."""
@@ -469,6 +520,7 @@ class TestReportEmptyMissingRemoval(unittest.TestCase):
         self.headings = ['xname', 'serial_number', 'manufacturer']
         # Make a copy to ensure `self.headings` isn't modified
         mock_report.headings = deepcopy(self.headings)
+        mock_report.display_headings = mock_report.headings
         self.mock_report = mock_report
 
         # Note that the actual values don't matter here since we're mocking

@@ -91,7 +91,7 @@ class TestFirmware(ExtendedTestCase):
             self.fake_config['format.no_borders']
         ]
         self.mock_get_config_value.assert_has_calls([mock.call('format.no_headings'), mock.call('format.no_borders')])
-        report_kwargs = {'filter_strs': args.filter_strs}
+        report_kwargs = {'filter_strs': args.filter_strs, 'display_headings': args.fields}
         self.mock_report.assert_any_call(*report_args, **report_kwargs)
 
         # Test that the rows were added to the Report

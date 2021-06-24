@@ -112,7 +112,7 @@ def get_current_firmware(client, xnames):
     return {None: client.make_fw_table(device_firmwares)}
 
 
-def print_reports_from_tables(fw_tables, sort_by, reverse, filter_strs, output_format):
+def print_reports_from_tables(fw_tables, sort_by, reverse, filter_strs, output_format, display_headings):
     """Print a report given one or more firmware tables.
 
     Args:
@@ -123,6 +123,7 @@ def print_reports_from_tables(fw_tables, sort_by, reverse, filter_strs, output_f
         reverse (bool): Whether output should be reversed.
         filter_strs (list): Specify options to filter output.
         output_format (str): Specify how to format output.
+        display_headings (list): a list of columns to show in the output.
     """
     for title, table in sorted(fw_tables.items()):
         report = Report(
@@ -130,7 +131,8 @@ def print_reports_from_tables(fw_tables, sort_by, reverse, filter_strs, output_f
             sort_by, reverse,
             get_config_value('format.no_headings'),
             get_config_value('format.no_borders'),
-            filter_strs=filter_strs
+            filter_strs=filter_strs,
+            display_headings=display_headings
         )
         report.add_rows(table)
 
@@ -175,5 +177,5 @@ def do_firmware(args):
         firmware_tables = get_current_firmware(client, args.xnames)
 
     print_reports_from_tables(
-        firmware_tables, args.sort_by, args.reverse, args.filter_strs, args.format
+        firmware_tables, args.sort_by, args.reverse, args.filter_strs, args.format, args.fields
     )
