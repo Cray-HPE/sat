@@ -28,8 +28,9 @@ RUN apk update && \
 
 RUN /sat/config-docker-sat.sh
 
-# All files have been installed so remove from WORKDIR
-RUN rm -rf /sat/*
+# All files have been installed so remove /sat
+WORKDIR /
+RUN rm -rf /sat
 
 # certs should be mounted from host
 # --mount type=bind,src=/etc/pki/trust/anchors,target=/usr/local/share/ca-certificates,ro=true
