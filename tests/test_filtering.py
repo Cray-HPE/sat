@@ -1,7 +1,7 @@
 """
 Tests for output filtering mechanisms.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -35,14 +35,14 @@ import unittest
 from sat import filtering
 
 
-def with_filter(query_string):
+def with_filter(query_string, fields):
     """Decorator which passes a compiled query to a test case.
 
     Args:
        query_string: a query string which is to be compiled into a
            filter function.
     """
-    filter_fn = filtering.parse_query_string(query_string)
+    filter_fn = filtering.parse_query_string(query_string, fields)
 
     def decorator(fn):
         @wraps(fn)
@@ -57,12 +57,12 @@ def with_filter(query_string):
 class TestFilterQueryStrings(unittest.TestCase):
     """Tests for ensuring query strings mark matches as expected."""
 
-    @with_filter('foo = bar')
+    @with_filter('foo = bar', ['foo'])
     def test_simple_query(self, filter_fn):
         """Test a simple equality query."""
         self.assertTrue(filter_fn({'foo': 'bar'}))
 
-    @with_filter('foo = b*')
+    @with_filter('foo = b*', ['foo'])
     def test_query_with_wildcard(self, filter_fn):
         """Test a query with a wildcard."""
         for b in ['bar', 'b', 'baz', 'bxx', 'boooooo']:
@@ -70,7 +70,7 @@ class TestFilterQueryStrings(unittest.TestCase):
 
         self.assertFalse(filter_fn({'foo': 'nothing'}))
 
-    @with_filter('mem_cap = 192')
+    @with_filter('mem_cap = 192', ['memory_capacity'])
     def test_query_subseq_key(self, filter_fn):
         """Test querying against key subsequencing."""
         self.assertTrue(filter_fn({'memory_capacity': 192}))
@@ -79,12 +79,12 @@ class TestFilterQueryStrings(unittest.TestCase):
         """Test querying against a numerical value."""
         capacities = [2 ** x for x in range(8, 15)]  # 256 through 16384
         for comp_char in ['<', '<=']:
-            filter_fn = filtering.parse_query_string('memory {} 192'.format(comp_char))
+            filter_fn = filtering.parse_query_string('memory {} 192'.format(comp_char), ['memory'])
             for cap in capacities:
                 self.assertFalse(filter_fn({'memory': cap}))
 
         for comp_char in ['>', '>=']:
-            filter_fn = filtering.parse_query_string('memory {} 192'.format(comp_char))
+            filter_fn = filtering.parse_query_string('memory {} 192'.format(comp_char), ['memory'])
             for cap in capacities:
                 self.assertTrue(filter_fn({'memory': cap}))
 
@@ -92,47 +92,48 @@ class TestFilterQueryStrings(unittest.TestCase):
         """Test giving a bad query string will throw ParseError."""
         for bad_query in ['foo =', 'foo = bar or', 'and', 'foo <> bar']:
             with self.assertRaises(ParseError):
-                filtering.parse_query_string(bad_query)
+                filtering.parse_query_string(bad_query, ['foo'])
 
-    @with_filter('foo = bar')
-    def test_missing_key(self, filter_fn):
+    def test_missing_key(self):
         """Test KeyError thrown when filtering non-existent key."""
+        filter_fn = filtering.parse_query_string('foo=bar', ['baz'])
         with self.assertRaises(KeyError):
             filter_fn({'baz': 'quux'})
 
-    @with_filter('foo = spam')
+    @with_filter('foo = spam', ['food', 'frobnicator'])
     def test_ambiguous_key(self, filter_fn):
         """Test first column match when filtering ambiguous key."""
         # 'foo' is a subsequence of both 'food' and 'frobnicator'.
         self.assertTrue(filter_fn({'food': 'spam', 'frobnicator': 'quuxify'}))
 
-    @with_filter('foo > 20')
+    @with_filter('foo > 20', ['foo'])
     def test_cant_compare_numbers_and_strings(self, filter_fn):
         """Test comparing numbers and strings will give an error."""
         with self.assertRaises(TypeError):
             filter_fn({'foo': 'bar'})
 
-    @with_filter('foo = 20')
+    @with_filter('foo = 20', ['foo'])
     def test_equality_with_numbers_and_strings(self, filter_fn):
         """Test comparing equality between numbers and strings works."""
         self.assertTrue(filter_fn({'foo': 20}))
         self.assertFalse(filter_fn({'foo': 'bar'}))
 
-    @with_filter('foo = bar and baz = quu*')
+    @with_filter('foo = bar and baz = quu*', ['foo', 'baz'])
     def test_boolean_expression(self, filter_fn):
         self.assertTrue(filter_fn({'foo': 'bar', 'baz': 'quux'}))
 
-    @with_filter('sernum = 2020*')
+    @with_filter('sernum = 2020*', ['name', 'serial_number'])
     def test_numerical_prefix_wildcard(self, filter_fn):
         self.assertTrue(filter_fn({'name': 'roy batty', 'serial_number': '2020m'}))
         self.assertTrue(filter_fn({'name': 'irmgard batty', 'serial_number': '2020f'}))
 
-    @with_filter('sernum = "1999"')
+    @with_filter('sernum = "1999"', ['name', 'serial_number'])
     def test_numerical_string_equality(self, filter_fn):
         self.assertTrue(filter_fn({'name': 'prince rogers', 'serial_number': '1999'}))
         self.assertFalse(filter_fn({'name': 'rush', 'serial_number': '2112'}))
 
-    @with_filter('fruit = "apple" and baskets = "2" or flower = "rose" and vases = "3"')
+    @with_filter('fruit = "apple" and baskets = "2" or flower = "rose" and vases = "3"',
+                 ['fruit', 'baskets', 'flower', 'vases'])
     def test_boolean_precedence(self, filter_fn):
         self.assertTrue(filter_fn({'fruit': 'apple', 'baskets': '2',
                                    'flower': 'petunia', 'vases': '1'}))
@@ -143,21 +144,21 @@ class TestFilterQueryStrings(unittest.TestCase):
 
     def test_combined_filters(self):
         """Test composing filtering functions with boolean combinators."""
-        always_true = filtering.FilterFunction.from_function(mock.MagicMock(return_value=True))
-        always_false = filtering.FilterFunction.from_function(mock.MagicMock(return_value=False))
+        always_true = filtering.CustomFilter(mock.MagicMock(return_value=True))
+        always_false = filtering.CustomFilter(mock.MagicMock(return_value=False))
 
         fns = (always_true, always_false)
         true_fns = (always_true, always_true)
         false_fns = (always_false, always_false)
         val = mock.MagicMock()
 
-        self.assertFalse(filtering.FilterFunction.from_combined_filters(all, *fns)(val))
-        self.assertTrue(filtering.FilterFunction.from_combined_filters(all, *true_fns)(val))
-        self.assertFalse(filtering.FilterFunction.from_combined_filters(all, *false_fns)(val))
+        self.assertFalse(filtering.CombinedFilter(all, *fns)(val))
+        self.assertTrue(filtering.CombinedFilter(all, *true_fns)(val))
+        self.assertFalse(filtering.CombinedFilter(all, *false_fns)(val))
 
-        self.assertTrue(filtering.FilterFunction.from_combined_filters(any, *fns)(val))
-        self.assertTrue(filtering.FilterFunction.from_combined_filters(any, *true_fns)(val))
-        self.assertFalse(filtering.FilterFunction.from_combined_filters(any, *false_fns)(val))
+        self.assertTrue(filtering.CombinedFilter(any, *fns)(val))
+        self.assertTrue(filtering.CombinedFilter(any, *true_fns)(val))
+        self.assertFalse(filtering.CombinedFilter(any, *false_fns)(val))
 
     def test_get_cmpr_fn_value_error(self):
         """Test _get_cmpr_fn raises a ValueError for a non-comparator."""
@@ -165,51 +166,24 @@ class TestFilterQueryStrings(unittest.TestCase):
             filtering._get_cmpr_fn('not a comparator')
 
 
-class TestFilterList(unittest.TestCase):
-    """Tests for filtering lists of dicts."""
-    def setUp(self):
-        self.query_strings = ['foo=bar']
+class TestGetFilteredFields(unittest.TestCase):
+    def test_get_filtered_fields_single_value(self):
+        """Test FilterFunction.get_filtered_fields() with a single field."""
+        fields = ['foo']
+        filter_fn = filtering.parse_query_string('foo = bar', fields)
+        self.assertEqual(filter_fn.get_filtered_fields(), set(fields))
 
-    def test_filter_list(self):
-        """Test basic list filtering."""
-        items = [{'foo': 'bar'}, {'foo': 'baz'}, {'foo': 'quux'}]
-        first, rest = items[0], items[1:]
-        filtered = filtering.filter_list(items, self.query_strings)
-        self.assertIn(first, filtered)
-        self.assertTrue(all(item not in filtered for item in rest))
+    def test_get_filtered_fields_multiple_values(self):
+        """Test FilterFunction.get_filtered_fields() with multiple fields."""
+        fields = ['name', 'hometown', 'occupation']
+        filter_fn = filtering.parse_query_string('name = "Laura" and hometown = "Twin Peaks"', fields)
+        self.assertEqual(filter_fn.get_filtered_fields(), {"name", "hometown"})
 
-    def test_filtering_empty_list(self):
-        """Test filtering an empty list."""
-        self.assertEqual(filtering.filter_list([], self.query_strings),
-                         [])
-
-    def test_filtering_with_no_filters(self):
-        """Test filtering against an empty set of filters."""
-        items = [{'name': 'garfield'}, {'name': 'odie'},
-                 {'name': 'jon arbuckle'}]
-        self.assertEqual(filtering.filter_list(items, []),
-                         items)
-
-    def test_invalid_input_list(self):
-        """Test filtering a list with inconsistent headings (i.e. keys)."""
-        with self.assertRaises(ValueError):
-            filtering.filter_list([{'foo': 'bar'}, {'baz': 'quux'}],
-                                  self.query_strings)
-
-    def test_mixed_values(self):
-        """Nonsensical comparisons should be omitted."""
-        items = [
-            {'speed': 'Not found'},
-            {'speed': None},
-            {'speed': 10},
-            {'speed': 11},
-            {'speed': 12},
-        ]
-
-        filtered = filtering.filter_list(items, ['speed<12'])
-        self.assertEqual(2, len(filtered))
-        self.assertEqual({'speed': 10}, filtered[0])
-        self.assertEqual({'speed': 11}, filtered[1])
+    def test_get_filtered_fields_on_keyerror(self):
+        """Test FilterFunction.get_filtered_fields() on a bad field."""
+        fields = ['foo', 'bar']
+        filter_fn = filtering.parse_query_string('baz = quux', fields)
+        self.assertEqual(filter_fn.get_filtered_fields(), set())
 
 
 class TestRemoveConstantValues(unittest.TestCase):

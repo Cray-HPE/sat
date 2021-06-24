@@ -1,7 +1,7 @@
 """
 Generic output filtering utilities for SAT.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -22,16 +22,16 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
+import abc
 import fnmatch
 import logging
 import operator
-import types
-
-from sat.cached_property import cached_property
 
 import parsec
 
+from sat.cached_property import cached_property
 from sat.util import match_query_key
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ LOGGER = logging.getLogger(__name__)
 COMPARATOR_RE = r'(>=|<=|<|>|!=|=)'
 
 
-class FilterFunction:
+class BaseFilterFunction(abc.ABC):
     """A callable object which implements a filtering function.
 
     This function essentially emulates a closure which uses the
@@ -48,83 +48,73 @@ class FilterFunction:
     an input dictionary. A value can be a number (int or float)
     or a string.
 
-    The 'query_key' argument passed to the constructor can be any
-    subsequence of the desired key to filter against. The actual
-    underlying dictionary key is computed the first time the function
-    is called. This optimization is made since it is assumed that
-    headings (i.e. keys) are identical for each dictionary in the
-    iterable being filtered.
     """
-    def __init__(self, inner_fn, query_key=None, children=None):
-        """Constructor for the FilterFunction class.
+    @abc.abstractmethod
+    def __call__(self, row):
+        """Checks whether a row should be included in output.
 
-        It is not recommended to call this constructor manually. Instead, the
-        following class methods should be used:
-          - FilterFunction.from_comparator()
-          - FilterFunction.from_combined_filter()
-          - FilterFunction.from_function()
-
-        Args:
-            inner_fn (FilterFunction -> dict -> bool): a function, which given
-                some row, returns a boolean. Note that this function is bound
-                to the constructed object as a method (i.e. its first argument
-                is the calling FilterFunction instance this constructor creates)
-            query_key (str): for single comparisons, the key against which the
-                function will filter
-            children ([FilterFunction]): for compound filters, the sub-filters
-                which are called when the filter is evaluated.
+        Implementations may raise the following exceptions:
+            KeyError: if the key filtered against is not present 
+                in the row
+            TypeError: if the filter comparison has two inputs of 
+                incompatible types
         """
 
-        self.inner_fn = types.MethodType(inner_fn, self)
+    @abc.abstractmethod
+    def get_filtered_fields(self):
+        """Gets a set of fields this function filters on.
 
-        if query_key is not None:
-            self._raw_query_key = query_key
+        This is implemented in different ways in subclasses. Complex filters
+        require a recursive implementation.
+        """
 
-        self.children = set(children) if children is not None else set()
+
+class ComparisonFilter(BaseFilterFunction):
+    def __init__(self, query_key, fields, comparator, cmpr_val):
+        """A simple filter composed of a single comparison.
+
+        Args:
+            query_key (str): a subsequence of any of the field headings
+            fields ([str]): the field headings of each column
+            comparator (str): the comparison symbol (see COMPARATOR_RE above)
+            cmpr_val (str|float): the value against which each column entry is
+                compared
+        """
+        self._raw_query_key = query_key
+        self.fields = fields
+        self.comparator = comparator
+        self.cmpr_val = cmpr_val
 
     @cached_property
-    def is_single_comparison(self):
-        """Checks whether this filter is a single comparison.
+    def query_key(self):
+        """The key against each row will be filtered.
 
-        "Single comparison filters" perform only one comparison against one
-        field (e.g. "foo > 1"). Compound filters are composed of multiple
-        filters combined with some boolean condition (e.g. "foo > 1 and bar = 2").
-
-        Returns:
-            True if this filter is composed of multiple smaller filters,
-            and False if this filter is a single comparison."""
-
-        return hasattr(self, '_raw_query_key')
-
-    @classmethod
-    def from_comparator(cls, query_key, comparator, cmpr_val):
-        """Creates a new FilterFunction which compares a single field to a value.
-
-        Args:
-            query_key: a subsequence of some key to filter against.
-            comparator: a comparator string (i.e. =, !=, >, <, >=,
-                or <=)
-            cmpr_val: a string or number which defines the filter.
-
-        Returns:
-            A FilterFunction which compares the input's key against
-            the given value, and returns a boolean indicating whether
-            the input may pass through the filter.
+        The key can be any subsequence of the desired key to filter against.
         """
-        cmpr_fn = _get_cmpr_fn(comparator, is_number=isinstance(cmpr_val, float))
+        return match_query_key(self._raw_query_key, self.fields)
 
-        def inner(self, row):
-            try:
-                return cmpr_fn(row[self.query_key], cmpr_val)
-            except TypeError as err:
-                raise TypeError("Cannot filter value of type '{}' with value "
-                                "of type '{}'.".format(type(row[self.query_key]).__name__,
-                                                       type(cmpr_val).__name__)) from err
+    @cached_property
+    def cmpr_fn(self):
+        """The function used to compare the column value against the comparison value."""
+        return _get_cmpr_fn(self.comparator, is_number=isinstance(self.cmpr_val, float))
 
-        return cls(inner, query_key=query_key)
+    def __call__(self, row):
+        if self.query_key is None:
+            raise KeyError(self._raw_query_key)
 
-    @classmethod
-    def from_combined_filters(cls, combinator, *filter_fns):
+        try:
+            return self.cmpr_fn(row[self.query_key], self.cmpr_val)
+        except TypeError as err:
+            raise TypeError("Cannot filter value of type '{}' with value "
+                            "of type '{}'.".format(type(row[self.query_key]).__name__,
+                                                   type(self.cmpr_val).__name__)) from err
+
+    def get_filtered_fields(self):
+        return set() if self.query_key is None else {self.query_key}
+
+
+class CombinedFilter(BaseFilterFunction):
+    def __init__(self, combinator, *filter_fns):
         """Combines multiple filters into one filter.
 
         Args:
@@ -139,20 +129,25 @@ class FilterFunction:
             on an input and combines the results using the given
             combinator.
         """
-        def inner(self, row):
-            return combinator(filter_fn(row) for filter_fn in filter_fns)
+        self.combinator = combinator
+        self.filter_fns = list(filter_fns)
 
-        return cls(inner, children=filter_fns)
+    def __call__(self, row):
+        return self.combinator(filter_fn(row) for filter_fn in self.filter_fns)
 
-    @classmethod
-    def from_function(cls, fn, children=None):
+    def get_filtered_fields(self):
+        return set.union(*(child.get_filtered_fields() for child in self.filter_fns))
+
+
+class CustomFilter(BaseFilterFunction):
+    def __init__(self, filter_fn, children=None):
         """Creates a simple filter function from some other function.
 
         This is used in testing in order to wrap arbitrary functions within
         the FilterFunction class.
 
         Args:
-            fn (dict -> bool): a function, which given some row, returns a
+            filter_fn (dict -> bool): a function, which given some row, returns a
                 boolean.
             children ([FilterFunction]): Any FilterFunctions that are children
                 of this filter.
@@ -160,43 +155,14 @@ class FilterFunction:
         Returns:
             A FilterFunction which runs fn on its input and returns the result.
         """
-        def inner(self, row):
-            return fn(row)
-        return cls(inner, children=children)
+        self.filter_fn = filter_fn
+        self.children = children or []
 
     def __call__(self, row):
-        """Checks whether the given row matches the filter.
+        return self.filter_fn(row)
 
-        Note that this function has side-effects; the query_key passed
-        to the constructor can be a subsequence of the actual
-        dictionary key to be filtered against, thus the underlying
-        dictionary key will be computed based on the keys present in
-        the first dictionary being filtered. This key will be stored
-        and used in future comparisons. Care should be used if the
-        same filter is applied to multiple lists with differing
-        headers.
-
-        Args:
-            row: a dictionary which is to be filtered.
-
-        Returns:
-            True if row matches the filter, False otherwise.
-
-        Raises:
-            TypeError: if the value for the query key in the row can't be
-                compared to the given value with the given comparison.
-        """
-        if self.is_single_comparison and not hasattr(self, 'query_key'):
-            self.query_key = match_query_key(self._raw_query_key, row.keys())
-
-        return self.inner_fn(row)
-
-    def get_filtered_fields(self, fields):
-        """Returns a set of fields which this filter utilizes."""
-        if self.is_single_comparison:
-            return {match_query_key(self._raw_query_key, fields)}
-
-        return set.union(*(child.get_filtered_fields(fields) for child in self.children))
+    def get_filtered_fields(self):
+        return set.union(*(child.get_filtered_fields() for child in self.children))
 
 
 def _str_eq_cmpr(name, pattern):
@@ -256,7 +222,7 @@ def _get_cmpr_fn(fn_sym, is_number=False):
     return fns.get(fn_sym)
 
 
-def parse_query_string(query_string):
+def parse_query_string(query_string, fields):
     """Compiles a query string into a function for filtering rows.
 
     If query_string is invalid, ParseError is raised.
@@ -264,6 +230,8 @@ def parse_query_string(query_string):
     Args:
         query_string: a string against which the rows should be
             filtered
+        fields: a list of strings indicating which fields this
+            filter may filter against
 
     Returns:
         a function which returns True if a given row matches
@@ -381,7 +349,7 @@ def parse_query_string(query_string):
         comparator = yield tok_cmpr
         cmpr_val = yield (tok_rhs ^ tok_quoted_str)
 
-        return FilterFunction.from_comparator(query_key, comparator, cmpr_val)
+        return ComparisonFilter(query_key, fields, comparator, cmpr_val)
 
     @parsec.generate
     def bool_and_expr():
@@ -393,7 +361,7 @@ def parse_query_string(query_string):
         lhs = yield comparison
         yield tok_and
         rhs = yield (bool_and_expr ^ comparison)
-        return FilterFunction.from_combined_filters(all, lhs, rhs)
+        return CombinedFilter(all, lhs, rhs)
 
     @parsec.generate
     def bool_expr():
@@ -405,9 +373,9 @@ def parse_query_string(query_string):
         lhs = yield (bool_and_expr ^ comparison)
         oper = yield (tok_or | tok_and | tok_end)
         if oper not in ['and', 'or']:
-            return FilterFunction.from_combined_filters(all, lhs)
+            return CombinedFilter(all, lhs)
         rhs = yield (bool_expr ^ comparison)
-        return FilterFunction.from_combined_filters(all if oper == 'and' else any, lhs, rhs)
+        return CombinedFilter(all if oper == 'and' else any, lhs, rhs)
 
     # Expressions can either be a boolean expression composing >= 2
     # comparisons, or just a single comparison.
@@ -416,75 +384,10 @@ def parse_query_string(query_string):
     return expr.parse_strict(query_string)
 
 
-def parse_multiple_query_strings(query_strings):
-    all_filter_fns = [parse_query_string(query_string)
+def parse_multiple_query_strings(query_strings, fields):
+    all_filter_fns = [parse_query_string(query_string, fields)
                       for query_string in query_strings]
-    combined_filters = FilterFunction.from_combined_filters(all, *all_filter_fns)
-
-    def filter_fn(x): return _dont_care_call(TypeError, combined_filters, x)
-    return FilterFunction.from_function(filter_fn, children=[combined_filters])
-
-
-def _dont_care_call(excepts, fn, *args):
-    """Use to wrap exception handling around a function.
-
-    This is useful when you need to add exception handling to a function
-    before passing that function around.
-
-        eg. newfun = lambda x, y: _dont_care_call((TypeError), fun, x, y)
-
-    Args:
-        excepts: Exception or tuple of exceptions which should be caught.
-        fn: A function that accepts args.
-        args: Args to fn.
-
-    Returns:
-        The return value of fn(x). None will be returned if one of the
-        exceptions in excepts was caught.
-    """
-    try:
-        return fn(*args)
-    except excepts:
-        return None
-
-
-def filter_list(dicts, query_strings):
-    """Filters a list of dicts according to some query strings.
-
-    If the filter string is invalid, then dicts will be returned as a
-    list, contents unchanged. It is assumed that every dict in dicts
-    will have identical keys. If not, ValueError will be raised.
-
-    Args:
-        dicts: a list or iterable of OrderedDicts which is to be
-            filtered.
-        query_strings: an iterable of some query strings against
-            which to filter the input list.
-
-    Returns:
-        A list of dicts filtered according to query_string.
-
-    Raises:
-        ValueError: if keys in dicts are inconsistent.
-        ParseError: if any of query_strings is invalid.
-        KeyError: if attempting to filter against an invalid key.
-        TypeError: if a value for the query key can't be compared to the given
-            comparison value.
-    """
-    if not dicts:
-        return []
-
-    if not query_strings:
-        return dicts
-
-    # Assume the first row's headings are the "right ones."
-    first, rest = dicts[0], dicts[1:]
-    fkeys = first.keys()
-    if any(d.keys() != fkeys for d in rest):
-        raise ValueError('All input dicts must have same keys.')
-
-    filter_fn = parse_multiple_query_strings(query_strings)
-    return list(filter(filter_fn, dicts))
+    return CombinedFilter(all, *all_filter_fns)
 
 
 def remove_constant_values(dicts, constant_value, protect=None):
