@@ -233,7 +233,7 @@ def do_nid2xname(args):
 
     any_missing_xnames = False
     xnames = []
-    for arg in args.nids:
+    for arg in (n.strip() for n in args.nids):
         # Each arg is a list of nids and nid ranges separated by commas.
         # A nid is either an integer or a string of the form: nid123456,
         # that is “nid” and a number.
