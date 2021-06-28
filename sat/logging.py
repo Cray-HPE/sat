@@ -101,12 +101,14 @@ def configure_logging():
 
     _add_console_handler(sat_logger, log_stderr_level)
 
+    # Create log directories if needed
     log_dir = os.path.dirname(log_file_name)
-    try:
-        os.makedirs(log_dir, exist_ok=True)
-    except OSError as err:
-        LOGGER.error("Unable to create log directory '%s': %s", log_dir, err)
-        return
+    if log_dir:
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+        except OSError as err:
+            LOGGER.error("Unable to create log directory '%s': %s", log_dir, err)
+            return
 
     file_handler = logging.FileHandler(filename=log_file_name)
     file_handler.setLevel(log_file_level)
