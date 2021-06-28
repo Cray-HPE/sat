@@ -98,7 +98,7 @@ def do_xname2nid(args):
     any_missing_nids = False
     nids = []
     for arg in args.xnames:
-        for xname in [x for x in arg.split(',') if x]:
+        for xname in [x for x in (x.strip() for x in arg.split(',')) if x]:
             xname_nids, missing_nids = get_nids_using_xname(xname, components)
             if missing_nids:
                 any_missing_nids = True
