@@ -139,7 +139,10 @@ def create_parent_parser():
 
     parser.add_argument(
         '--logfile',
-        help='Set location of logs for this run. Overrides value set in config file.')
+        help='Set location of logs for this run. '
+             'The path is either an absolute or relative path of a file '
+             'in or below the home or current directory. '
+             'Overrides value set in config file.')
 
     parser.add_argument(
         '--loglevel',

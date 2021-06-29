@@ -32,8 +32,9 @@ OPTIONS
 These global options must be specified before the subcommand.
 
 **--logfile** *file*
-        Set the location of logs for this run. This overrides the value in
-        the configuration file.
+        Set the location of logs for this run. The location is either an absolute
+        or relative path of a file in or below the home or current directory.
+        This overrides the value in the configuration file.
 
 **--loglevel** *level*
         Set the minimum log severity to report. This overrides the values in

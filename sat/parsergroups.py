@@ -180,7 +180,9 @@ def create_xname_options():
     group.add_argument(
         '-f', '--xname-file', metavar='PATH',
         dest='xnames', action=XnameFileReader,
-        help='Path to a newline-delimited file of xnames.')
+        help='Path to a newline-delimited file of xnames. '
+             'The path is either an absolute or relative path of a file '
+             'in or below the home or current directory.')
 
     group.add_argument(
         '-x', '--xname', '--xnames', metavar='XNAME',

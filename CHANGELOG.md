@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Remove the working directory ``/sat`` after the Docker container is built.
 
+### Added
+- Added help and man page documention on files that are absolute or relative
+  paths in or below the home or current directory.
+
 ## [3.8.0] - 2021-06-23
 
 ### Changed

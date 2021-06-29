@@ -8,4 +8,5 @@ XNAME OPTIONS
 
 **-f** *PATH*, **--xname-file** *PATH*
         Specify a path to a newline-delimited file containing a list
-        of xnames on which to operate.
+        of xnames on which to operate. The path is either an absolute or
+        relative path of a file in or below the home or current directory.
