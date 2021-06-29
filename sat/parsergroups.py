@@ -103,7 +103,9 @@ def create_filter_options():
     group.add_argument(
         '--filter', metavar='QUERY', dest='filter_strs',
         action='append', default=[],
-        help='Filter rows of the output.')
+        help='Filter rows of the output based on the query provided. '
+             'Refer to the man page for this subcommand for more details '
+             'regarding filter query syntax.')
 
     return parser
 

@@ -116,6 +116,7 @@ class Report:
                 self.filter_fn = None
         except ParseError as err:
             LOGGER.error("The given filter has invalid syntax; returning no output. (%s)", err)
+            LOGGER.warning("See the man page for this subcommand for further details on filter syntax.")
             sys.exit(1)
 
         # find the heading to sort on
