@@ -29,7 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed a case where `sat xname2nid` and `sat nid2xname` failed when the input had
-  extraneous whitespace
+  extraneous whitespace.
+- Fixed `--logfile` to accept a file name without leading directories.
 
 ### Added
 - Added a ``--fields`` option to allow displaying only specific fields
