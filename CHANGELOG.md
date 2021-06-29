@@ -25,14 +25,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## Unreleased
+
+### Fixed
+- Fixed a case where `sat xname2nid` and `sat nid2xname` failed when the input had
+  extraneous whitespace.
+- Fixed `--logfile` to accept a file name without leading directories.
+
+### Added
+- Added a ``--fields`` option to allow displaying only specific fields
+  in subcommands which display a report.
+- Added help and man page documention on files that are absolute or relative
+  paths in or below the home or current directory.
 
 ### Changed
 - Remove the working directory ``/sat`` after the Docker container is built.
-
-### Added
-- Added help and man page documention on files that are absolute or relative
-  paths in or below the home or current directory.
 
 ## [3.8.0] - 2021-06-23
 

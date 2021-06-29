@@ -156,7 +156,7 @@ def do_hwmatch(args):
         TABLE_HEADINGS, sort_by=args.sort_by, reverse=args.reverse,
         no_headings=get_config_value('format.no_headings'),
         no_borders=get_config_value('format.no_borders'),
-        filter_strs=args.filter_strs
+        filter_strs=args.filter_strs, display_headings=args.fields
     )
     report.add_rows(rows)
     if not rows and args.format == 'pretty':

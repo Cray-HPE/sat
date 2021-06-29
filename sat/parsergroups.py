@@ -80,6 +80,12 @@ def create_format_options():
         action='store_true'
     )
 
+    group.add_argument(
+        '--fields',
+        type=lambda v: v.split(','),
+        help="Display only the given comma-separated list of fields."
+    )
+
     return parser
 
 
