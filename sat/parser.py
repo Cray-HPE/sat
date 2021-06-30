@@ -134,8 +134,10 @@ def create_parent_parser():
 
     parser.add_argument(
         '--token-file',
-        help='Token file to use for authentication. Overrides value derived '
-             'from other settings, or set in config file.')
+        help='Token file to use for authentication. '
+             'The path is either an absolute or relative path of a file '
+             'in or below the home or current directory. '
+             'Overrides value derived from other settings, or set in config file.')
 
     parser.add_argument(
         '--logfile',

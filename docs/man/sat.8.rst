@@ -46,8 +46,9 @@ These global options must be specified before the subcommand.
         tokens. Overrides value set in config file.
 
 **--token-file** *token-file*
-        Token file to use for authentication. Overrides value derived from other
-        settings, or set in config file.
+        Token file to use for authentication. The location is either an absolute
+        or relative path of a file in or below the home or current directory.
+        Overrides value derived from other settings, or set in config file.
 
 **-h, --help**
         Print the help message for sat.
