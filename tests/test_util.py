@@ -34,7 +34,7 @@ from tests.common import ExtendedTestCase
 
 PT_BORDERS_ON = False
 PT_ALIGN = 'l'
-PT_L_PAD_WIDTH = 0
+PT_L_PAD_WIDTH = 1
 SORT_BY = 1
 
 

@@ -27,10 +27,12 @@ import re
 import sys
 
 import inflect
+from parsec import ParseError
 
 from sat.apiclient import APIError, HSMClient
 from sat.cli.hwinv.summary import ComponentSummary
 from sat.config import get_config_value
+from sat.filtering import parse_multiple_query_strings
 from sat.report import Report
 from sat.session import SATSession
 from sat.system.system import System
@@ -102,6 +104,12 @@ def report_unused_options(args):
                       'show_{component}_xnames']
     }
 
+    op_to_ignored_args = {
+        'list': [],
+        'summarize': ['sort_by', 'no_borders', 'no_headings',
+                      'show_empty', 'show_missing']
+    }
+
     messages = []
     message_template = (
         "The option '{option}' has no effect because it was specified without "
@@ -144,6 +152,15 @@ def report_unused_options(args):
                             component=plural_component.replace('_', '-')
                         )
                     )
+
+    for operation, ignored_args in op_to_ignored_args.items():
+        op_requested = any([operation in arg and getattr(args, arg)]
+                           for arg in vars(args))
+        if op_requested:
+            for ignored_arg in ignored_args:
+                if getattr(args, ignored_arg):
+                    messages.append(f"The option --{ignored_arg.replace('_', '-')} "
+                                    f"is ignored for {operation} operations.")
 
     return messages
 
@@ -223,14 +240,46 @@ def get_all_summaries(system, args):
             continue
 
         if args.summarize_all or getattr(args, summarize_arg_name):
-            field_filters = getattr(args, fields_arg_name)
-            fields = object_type.get_summary_fields(field_filters)
+
+            # Determining which fields to display is done as follows. If
+            # present, the value of the --*--summary-fields option
+            # corresponding to a given summary is always used. If --fields is
+            # present, its value is used if the --*-summary-fields option is
+            # not present. If neither is present, all fields are used.
+
+            specific_fields = getattr(args, fields_arg_name)
+            if not args.fields:
+                display_fields = object_type.get_summary_fields(specific_fields)
+            elif specific_fields:
+                LOGGER.warning("Using the %s %s specified by "
+                               "--%s-summary-fields in '%s' summary.",
+                               inflector.join([f"'{field}'" for field in specific_fields]),
+                               inflector.plural_noun('field', len(specific_fields)),
+                               object_type.arg_name,
+                               object_type.pretty_name)
+                display_fields = object_type.get_summary_fields(specific_fields)
+            else:
+                display_fields = object_type.get_summary_fields(args.fields)
+
+            all_fields = object_type.get_summary_fields([])
+
+            try:
+                filter_fn = (parse_multiple_query_strings(
+                    args.filter_strs,
+                    [field.canonical_name for field in all_fields]
+                ) if args.filter_strs else None)
+            except ParseError as err:
+                LOGGER.error("The given filter has invalid syntax; returning no output. (%s)", err)
+                sys.exit(1)
 
             include_xnames = getattr(args, xnames_arg_name)
 
             components = comp_dict.values()
-            all_summaries.append(ComponentSummary(object_type, fields,
-                                                  components, include_xnames))
+            all_summaries.append(ComponentSummary(object_type, all_fields,
+                                                  components, include_xnames,
+                                                  filter_fn=filter_fn,
+                                                  display_fields=display_fields,
+                                                  reverse=args.reverse))
 
     return all_summaries
 

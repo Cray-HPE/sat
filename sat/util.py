@@ -218,7 +218,7 @@ def get_pretty_table(rows, headings=None, sort_by=None):
     """
     pt = PrettyTable()
     pt.border = False
-    pt.left_padding_width = 0
+    pt.left_padding_width = 1
 
     if headings:
         pt.field_names = headings
