@@ -164,5 +164,6 @@ class TestLogging(unittest.TestCase):
         configure_logging()
         mock_makedirs.assert_not_called()
 
+
 if __name__ == '__main__':
     unittest.main()

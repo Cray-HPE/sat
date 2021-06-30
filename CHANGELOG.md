@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+- The ``--loglevel`` option is now an alias for the new ``--loglevel-stderr``.
+
 ### Fixed
 - Fixed a case where `sat xname2nid` and `sat nid2xname` failed when the input had
   extraneous whitespace.
@@ -35,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added a ``--fields`` option to allow displaying only specific fields
   in subcommands which display a report.
+- Added ``--loglevel-stderr`` and ``--loglevel-file`` to set logging level for 
+  stderr and log file separately.
 
 ## [3.8.0] - 2021-06-23
 
