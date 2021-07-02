@@ -147,10 +147,15 @@ def create_parent_parser():
              'Overrides value set in config file.')
 
     parser.add_argument(
-        '--loglevel',
-        help='Set minimum log severity to report for this run. This level applies to '
-             'messages logged to stderr and to the log file. Overrides values set in '
-             'config file.',
+        '--loglevel-stderr', '--loglevel',
+        help='Set minimum log severity for messages output to stderr on this run. '
+             'Overrides value set in config file.',
+        choices=['debug', 'info', 'warning', 'error', 'critical'])
+
+    parser.add_argument(
+        '--loglevel-file',
+        help='Set minimum log severity for messages reported to log file on this run. '
+             'Overrides values set in config file.',
         choices=['debug', 'info', 'warning', 'error', 'critical'])
 
     subparsers = parser.add_subparsers(metavar='command', dest='command')

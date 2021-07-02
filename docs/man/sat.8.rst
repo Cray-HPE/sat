@@ -36,10 +36,16 @@ These global options must be specified before the subcommand.
         or relative path of a file in or below the home or current directory.
         This overrides the value in the configuration file.
 
+**--loglevel-stderr** *level*
+        Set the minimum log severity to output to stderr. This overrides the
+        value in the configuration file.
+
 **--loglevel** *level*
-        Set the minimum log severity to report. This overrides the values in
-        the configuration file for both stderr and log file (the configuration
-        options "logging.file_level" and "logging.stderr_level").
+        An alias for --loglevel-stderr.
+
+**--loglevel-file** *level*
+        Set the minimum log severity to report to log file. This overrides the
+        value in the configuration file.
 
 **--username** *username*
         Username to use when loading or fetching authentication
@@ -229,11 +235,12 @@ LOGGING
 
 **file_level**
         Indicates the minimum log severity that will cause a log to be entered
-        into the file.
+        into the file. Defaults to "INFO".
 
 **stderr_level**
         SAT also prints log messages to stderr, and this parameter sets the
         minimum log severity that will cause a log to be printed to stderr.
+        Defaults to "WARNING".
 
 SEE ALSO
 ========

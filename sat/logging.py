@@ -78,10 +78,6 @@ def configure_logging():
     log message, and it will inherit the configuration from the root logger
     set up here.
 
-    Args:
-        args: The argparse.Namespace object containing the parsed arguments for
-            this program.
-
     Returns:
         None
     """
