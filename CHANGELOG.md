@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - The ``--loglevel`` option is now an alias for the new ``--loglevel-stderr``.
+- Remove the working directory ``/sat`` after the Docker container is built.
 
 ### Fixed
 - Fixed a case where `sat xname2nid` and `sat nid2xname` failed when the input had
@@ -40,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in subcommands which display a report.
 - Added ``--loglevel-stderr`` and ``--loglevel-file`` to set logging level for 
   stderr and log file separately.
+- Added help and man page documention on files that are absolute or relative
+  paths in or below the home or current directory.
 
 ## [3.8.0] - 2021-06-23
 

@@ -186,7 +186,13 @@ def create_xname_options():
     group.add_argument(
         '-f', '--xname-file', metavar='PATH',
         dest='xnames', action=XnameFileReader,
-        help='Path to a newline-delimited file of xnames.')
+        help='Path to a newline-delimited file of xnames. '
+             'In order to share the path between the host and container '
+             'when sat is run in a container environment, '
+             'the path should be either an absolute or relative path of a file '
+             'in or below the home or current directory. '
+             'Overrides value set in config file.')
+
 
     group.add_argument(
         '-x', '--xname', '--xnames', metavar='XNAME',

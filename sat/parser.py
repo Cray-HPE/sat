@@ -134,12 +134,21 @@ def create_parent_parser():
 
     parser.add_argument(
         '--token-file',
-        help='Token file to use for authentication. Overrides value derived '
-             'from other settings, or set in config file.')
+        help='Token file to use for authentication. '
+             'In order to share the token file between the host and container '
+             'when sat is run in a container environment, '
+             'the path should be either an absolute or relative path of a file '
+             'in or below the home or current directory. '
+             'Overrides value derived from other settings, or set in config file.')
 
     parser.add_argument(
         '--logfile',
-        help='Set location of logs for this run. Overrides value set in config file.')
+        help='Set location of logs for this run. '
+             'In order to share the location between the host and container '
+             'when sat is run in a container environment, '
+             'the path should be either an absolute or relative path of a file '
+             'in or below the home or current directory. '
+             'Overrides value set in config file.')
 
     parser.add_argument(
         '--loglevel-stderr', '--loglevel',
