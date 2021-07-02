@@ -59,13 +59,14 @@ def pester(message,
     Queries user on stdin for some value until the user provides an input
     that matches `valid_answer`.
 
-    By default, this asks for a yes or no answer.
+    By default, this asks for a yes or no answer, returning True for yes and
+    False for no.
 
     Args:
         message: a string with a prompt to be printed before asking the user.
-        valid_answer: a regex string for which if message matches,
-            return some value based on the input. If falsy, then the first
-            response is used for the return value.
+        valid_answer: a regex string to verify the user's response before
+            returning some value based on it. If it is falsy, no validation
+            occurs and the original user response is returned.
         human_readable_valid: a human-readable version of valid_answer.
             This is displayed at the prompt. If either it or valid_answer is
             falsy (e.g., None or empty string), then no guidance is given.
