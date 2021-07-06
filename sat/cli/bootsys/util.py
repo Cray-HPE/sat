@@ -26,6 +26,10 @@ from collections import defaultdict
 import logging
 import re
 
+import yaml
+
+from sat.util import pester_choices
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -35,6 +39,11 @@ MGMT_NCN_HOSTNAME_PREFIXES = {
     'workers': 'ncn-w',
     'storage': 'ncn-s'
 }
+
+
+class FatalBootsysError(Exception):
+    """A fatal error has occurred during bootsys."""
+    pass
 
 
 def get_mgmt_ncn_hostnames(subroles):
@@ -109,3 +118,94 @@ def k8s_pods_to_status_dict(v1_pod_list):
         pods_dict[pod.metadata.namespace][pod.metadata.name] = pod.status.phase
 
     return pods_dict
+
+
+def get_mgmt_ncn_groups(excluded_ncns=None):
+    """Get included and excluded management NCNs grouped by subrole.
+
+    Args:
+        excluded_ncns (set of str): A set of NCN hostnames to exclude, or None
+            if no NCNs should be excluded.
+
+    Returns:
+        included, excluded: A tuple of dictionaries for included and excluded
+            management NCNs, each of which is a mapping from NCN subrole to
+            sorted lists of the included or excluded nodes with that subrole.
+
+    Raises:
+        FatalBootsysError: if unable to identify members of any subrole
+    """
+    excluded_ncns = set() if excluded_ncns is None else excluded_ncns
+    ncns_by_subrole = {
+        subrole: sorted(get_mgmt_ncn_hostnames([subrole]))
+        for subrole in MGMT_NCN_HOSTNAME_PREFIXES.keys()
+    }
+    incl_ncns_by_subrole = {}
+    excl_ncns_by_subrole = {}
+    for subrole, members in ncns_by_subrole.items():
+        incl_ncns_by_subrole[subrole] = [m for m in members if m not in excluded_ncns]
+        excl_ncns_by_subrole[subrole] = [m for m in members if m in excluded_ncns]
+
+    empty_subroles = [subrole for subrole, members in ncns_by_subrole.items()
+                      if not members]
+    if empty_subroles:
+        raise FatalBootsysError(f'Failed to identify members of the following '
+                                f'NCN subrole(s): {empty_subroles}')
+
+    return incl_ncns_by_subrole, excl_ncns_by_subrole
+
+
+def prompt_for_ncn_verification(incl_ncns_by_subrole, excl_ncns_by_subrole):
+    """Prompt the user for verification of the included and excluded NCNs.
+
+    Args:
+        incl_ncns_by_subrole (dict): A dict mapping from NCN subrole to sorted
+            lists of NCNs to include in the operation.
+        excl_ncns_by_subrole (dict): A dict mapping from NCN subrole to sorted
+            lists of NCNs to exclude from the operation.
+
+    Returns:
+        None
+
+    Raises:
+        FatalBootsysError: if unable to identify members of any group or user
+            answers prompt by saying NCN subroles are incorrect.
+    """
+    print('The following Non-compute Nodes (NCNs) will be included in this operation:')
+    print(yaml.dump(incl_ncns_by_subrole))
+
+    exclusions_exist = any(members for members in excl_ncns_by_subrole.values())
+    if exclusions_exist:
+        print('The following Non-compute Nodes (NCNs) will be excluded from this operation:')
+        print(yaml.dump(excl_ncns_by_subrole))
+
+    prompt = f'Are the above NCN groupings {"and exclusions " if exclusions_exist else ""}correct?'
+    if pester_choices(prompt, ('yes', 'no')) == 'no':
+        raise FatalBootsysError('User indicated NCN groups are incorrect.')
+
+
+def get_and_verify_ncn_groups(excluded_ncns=None):
+    """Get NCNs by group with possible exclusions and prompt user for confirmation of correctness.
+
+    Args:
+        excluded_ncns (set of str): A set of NCN hostnames to exclude, or None
+            if no NCNs should be excluded.
+
+    Returns:
+        A dictionary mapping from NCN group name to sorted lists of the included
+        nodes in group.
+
+    Raises:
+        FatalBootsysError: if unable to identify members of any group or if
+            unable to identify members of any group or user answers prompt by
+            saying NCN groups are incorrect.
+    """
+    incl_ncns_by_subrole, excl_ncns_by_subrole = get_mgmt_ncn_groups(excluded_ncns)
+    prompt_for_ncn_verification(incl_ncns_by_subrole, excl_ncns_by_subrole)
+
+    # The 'kubernetes' grouping is just shorthand for 'managers' and 'workers'.
+    # It is used by the platform-services stage for convenience.
+    incl_ncns_by_subrole['kubernetes'] = sorted(incl_ncns_by_subrole['managers'] +
+                                                incl_ncns_by_subrole['workers'])
+
+    return incl_ncns_by_subrole
