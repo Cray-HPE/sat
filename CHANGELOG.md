@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stderr and log file separately.
 - Added help and man page documention on files that are absolute or relative
   paths in or below the home or current directory.
+- Added prompt for whether user would like to continue when ``sat auth`` would
+  overwrite an existing token.
 
 ## [3.8.0] - 2021-06-23
 
