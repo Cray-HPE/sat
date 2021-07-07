@@ -172,7 +172,6 @@ class Report:
         else:
             self.display_headings = self.headings
 
-
     def __str__(self):
         """Return this report as a pretty-looking table.
 
