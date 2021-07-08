@@ -21,6 +21,7 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+from json.encoder import JSONEncoder
 import sys
 from collections import OrderedDict
 from datetime import timedelta
@@ -40,6 +41,7 @@ except ImportError:
     from yaml import SafeDumper
 from yaml.resolver import BaseResolver
 from yaml import dump
+from json import dumps
 import boto3
 from prettytable import PrettyTable
 
@@ -390,6 +392,26 @@ SATDumper.add_representer(XName, _xname_representer)
 
 # A function to dump YAML to be used by all SAT code.
 yaml_dump = partial(dump, Dumper=SATDumper, **YAML_FORMAT_PARAMS)
+
+JSON_FORMAT_PARAMS = {'indent': 4}
+
+
+class SATEncoder(JSONEncoder):
+    """"A JSONEncoder that will properly format xnames when printing to JSON."""
+    def default(self, o):
+        """
+        Inform encoder how to encode XName objects.
+
+        Overrides JSONEncoder.default(), which is called by the encoder when
+        it encounters an object it does not know how to encode.
+        """
+        if isinstance(o, XName):
+            return str(o)
+        return JSONEncoder.default(self, o)
+
+
+# A function to dump json to be used by all SAT code.
+json_dump = partial(dumps, cls=SATEncoder, **JSON_FORMAT_PARAMS)
 
 
 def get_resource_filename(name, section='.'):

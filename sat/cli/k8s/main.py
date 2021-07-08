@@ -110,5 +110,7 @@ def do_k8s(args):
 
         if args.format == 'yaml':
             print(report.get_yaml())
+        elif args.format == 'json':
+            print(report.get_json())
         else:
             print(report)

@@ -2,7 +2,7 @@ FORMAT OPTIONS
 --------------
 These options govern the format of the output.
 
-**--format** {**pretty**, **yaml**}
+**--format** {**pretty**, **yaml**, **json**}
         Select output format - defaults to pretty.
 
 **--no-borders**

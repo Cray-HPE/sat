@@ -138,6 +138,8 @@ def print_reports_from_tables(fw_tables, sort_by, reverse, filter_strs, output_f
 
         if output_format == 'yaml':
             print(report.get_yaml())
+        elif output_format == 'json':
+            print(report.get_json())
         else:
             print(report)
 

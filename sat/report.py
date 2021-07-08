@@ -39,7 +39,8 @@ from sat.filtering import (
 from sat.util import (
     get_rst_header,
     match_query_key,
-    yaml_dump
+    yaml_dump,
+    json_dump
 )
 
 
@@ -370,3 +371,19 @@ class Report:
             if not rows_to_print:
                 return ''
             return yaml_dump(rows_to_print)
+
+    def get_json(self):
+        """Retrieve the report's json representation.
+
+        Returns:
+            The data of the report formatted as a string in json format.
+        """
+        try:
+            _, rows_to_print = self.get_rows_to_print()
+        except (KeyError, ParseError, TypeError, ValueError):
+            return ''
+
+        if not self.no_headings and self.title:
+            return json_dump({self.title: rows_to_print})
+        else:
+            return json_dump(rows_to_print)

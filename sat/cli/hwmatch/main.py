@@ -162,4 +162,9 @@ def do_hwmatch(args):
     if not rows and args.format == 'pretty':
         print('No mismatches found')
     else:
-        print(report.get_yaml() if args.format == 'yaml' else report)
+        if args.format == 'yaml':
+            print(report.get_yaml())
+        elif args.format == 'json':
+            print(report.get_json())
+        else:
+            print(report)

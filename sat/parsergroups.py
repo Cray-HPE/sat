@@ -40,7 +40,7 @@ def create_format_options():
     group.add_argument(
         '--format',
         help="Display information in the given format. Defaults to 'pretty'.",
-        choices=['pretty', 'yaml'],
+        choices=['pretty', 'yaml', 'json'],
         default='pretty')
 
     group.add_argument(

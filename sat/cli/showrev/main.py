@@ -132,6 +132,9 @@ def do_showrev(args):
     if args.format == 'yaml':
         for report in reports:
             print(report.get_yaml())
+    elif args.format == 'json':
+        for report in reports:
+            print(report.get_json())
     else:
         for report in reports:
             print(str(report) + '\n\n')

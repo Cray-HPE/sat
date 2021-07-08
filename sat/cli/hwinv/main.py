@@ -34,7 +34,7 @@ from sat.config import get_config_value
 from sat.report import Report
 from sat.session import SATSession
 from sat.system.system import System
-from sat.util import yaml_dump
+from sat.util import yaml_dump, json_dump
 
 LOGGER = logging.getLogger(__name__)
 
@@ -258,17 +258,19 @@ def get_pretty_output(summaries, lists):
     return full_summary_string + full_list_string
 
 
-def get_yaml_output(summaries, lists):
-    """Gets the complete output formatted as YAML.
+def get_custom_output(summaries, lists, dump_format):
+    """Gets the complete output formatted as JSON or YAML.
 
     Args:
         summaries (Iterable): The `ComponentSummary` objects returned by
             `get_all_summaries`.
         lists (Iterable): The `Report` objects returned by `get_all_lists`.
+        dump_format (string): The format to output the report in, expected
+        to be 'json' or 'yaml'
 
     Returns:
         A string containing the complete output requested by the args in
-        YAML format.
+        JSON or YAML format.
     """
     # The way we are constructing a top-level dictionary by joining together
     # YAML representations of dictionaries is not optimal, but it works for now.
@@ -281,10 +283,16 @@ def get_yaml_output(summaries, lists):
         for key, val in summary_dict.items():
             summary_dicts[key] = val
 
-    if summary_dicts:
-        summary_str += yaml_dump(summary_dicts)
+    if dump_format == 'yaml':
+        dump_fn, get_fn = yaml_dump, 'get_yaml'
+    elif dump_format == 'json':
+        dump_fn, get_fn = json_dump, 'get_json'
+    else:
+        raise ValueError('Unexpected dump format received')
 
-    return summary_str + ''.join(report.get_yaml() for report in lists)
+    summary_str += dump_fn(summary_dicts) if summary_dicts else ''
+
+    return summary_str + ''.join(getattr(report, get_fn)() for report in lists)
 
 
 def get_all_output(system, args):
@@ -296,10 +304,10 @@ def get_all_output(system, args):
     summaries = get_all_summaries(system, args)
     lists = get_all_lists(system, args)
 
-    if args.format == 'yaml':
-        return get_yaml_output(summaries, lists)
-    elif args.format == 'pretty':
+    if args.format == 'pretty':
         return get_pretty_output(summaries, lists)
+    else:
+        return get_custom_output(summaries, lists, args.format)
 
 
 def do_hwinv(args):

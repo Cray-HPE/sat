@@ -1,5 +1,5 @@
 """
-Unit tests for sat/util.py.
+Unit tests for sat/report.py.
 
 (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
@@ -29,9 +29,11 @@ from unittest.mock import call, Mock, patch
 
 from parsec import ParseError
 import yaml
+import json
 
 from sat.report import Report
 from sat.constants import EMPTY_VALUE, MISSING_VALUE
+from sat.xname import XName
 
 
 def get_report_printed_list(report):
@@ -298,6 +300,33 @@ class TestReport(unittest.TestCase):
         with self.assertRaises(SystemExit):
             report = Report(self.headings, filter_strs=['some bad filter'])
 
+    def test_json_dump(self):
+        """Verify that json dumps can be read by json library.
+        """
+        report = Report(self.headings)
+        report.add_rows(self.entries)
+
+        json_s = report.get_json()
+
+        data = json.loads(json_s)
+        for expected, actual in zip(self.entries, data):
+            self.assertEquals(expected, list(actual.values()))
+
+    def test_json_dump_xnames(self):
+        """Verify that json dumps can properly represent xname datatypes
+        as strings.
+        """
+        header_s = 'xname'
+        xname_s = 'x0000c0s00b0n0'
+
+        report = Report([header_s])
+        report.add_row([XName(xname_s)])
+
+        json_s = report.get_json()
+        data = json.loads(json_s)
+
+        self.assertEquals(xname_s, data[0][header_s])
+
 
 class TestReportFormatting(unittest.TestCase):
     """Begin test the Report class's tabular formatting.
@@ -359,6 +388,16 @@ class TestReportFormatting(unittest.TestCase):
 
         loaded_yaml = yaml.safe_load(report.get_yaml())
         self.assertEqual(self.entries_as_dict, loaded_yaml)
+
+    def test_sorted_json(self):
+        """The json output should be sorted also.
+        """
+        report = Report(self.headings, sort_by=0)
+
+        report.add_rows(self.out_of_order)
+
+        loaded_json = json.loads(report.get_json())
+        self.assertEqual(self.entries_as_dict, loaded_json)
 
     def test_reverse_sorting(self):
         """The internal PT should reverse its order if report.reverse.
