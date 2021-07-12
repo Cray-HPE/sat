@@ -50,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   NCNs from the platform-services and ncn-power stages in case they are
   inaccessible.
 - Added support for ``--format json`` to print reports in JSON.
+- Added support for the ``--filter``, ``--fields``, and ``--reverse`` options
+  for summaries created by ``sat hwinv``.
 
 ## [3.8.0] - 2021-06-23
 
