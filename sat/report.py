@@ -1,7 +1,7 @@
 """
 Class to aid with unified formatting and printing of data.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import logging
 from collections import OrderedDict
+import sys
 
 import inflect
 from parsec import ParseError
@@ -32,7 +33,6 @@ from prettytable import PrettyTable
 from sat.config import get_config_value
 from sat.constants import EMPTY_VALUE, MISSING_VALUE
 from sat.filtering import (
-    filter_list,
     parse_multiple_query_strings,
     remove_constant_values
 )
@@ -105,22 +105,18 @@ class Report:
         self.sort_by = sort_by
         self.reverse = reverse
         self.align = align
-        self.filter_strs = filter_strs or []
 
         self.force_columns = set(force_columns if force_columns is not None else [])
 
-        # TODO: We're parsing the filter strings twice with this approach,
-        # though it involves fewer code changes. This should be consolidated in
-        # the future.
-        if self.filter_strs:
-            try:
-                filter_fn = parse_multiple_query_strings(self.filter_strs)
-                self.force_columns |= filter_fn.get_filtered_fields(self.headings)
-            except ParseError:
-                # If there is a parsing error in the filters, we can ignore it
-                # for now. When the filters are re-parsed when filtering
-                # occurs, the parse error will be logged as normal.
-                pass
+        try:
+            if filter_strs:
+                self.filter_fn = parse_multiple_query_strings(filter_strs, self.headings)
+                self.force_columns |= self.filter_fn.get_filtered_fields()
+            else:
+                self.filter_fn = None
+        except ParseError as err:
+            LOGGER.error("The given filter has invalid syntax; returning no output. (%s)", err)
+            sys.exit(1)
 
         # find the heading to sort on
         if sort_by is not None:
@@ -171,7 +167,6 @@ class Report:
 
         else:
             self.display_headings = self.headings
-
 
     def __str__(self):
         """Return this report as a pretty-looking table.
@@ -316,23 +311,26 @@ class Report:
 
         self.sort_data()
         try:
-            rows_to_print = filter_list(self.data, self.filter_strs)
+            selected = [OrderedDict(zip(self.display_headings, [row[column] for column in self.display_headings]))
+                        for row in filter(self.filter_fn, self.data)]
+        except KeyError as err:
+            LOGGER.error('The query key "%s" does not match '
+                         'any fields in the input; returning no output.',
+                         err.args[0])
+            LOGGER.info('Available field headings: %s', ', '.join(self.headings))
+        except TypeError as err:
+            LOGGER.error('%s', err.args[0])
+        else:
+            headings, culled = self.remove_empty_and_missing(selected)
 
-        except (KeyError, ParseError, TypeError, ValueError) as err:
-            LOGGER.error("An error occurred while filtering; "
-                         "returning no output. (%s)", err)
-            raise
+            # If every row is empty, don't return any rows at all.
+            if not any(culled):
+                return headings, []
 
-        selected = [OrderedDict(zip(self.display_headings, [row[column] for column in self.display_headings]))
-                    for row in rows_to_print]
+            return headings, culled
 
-        headings, culled = self.remove_empty_and_missing(selected)
-
-        # If every row is empty, don't return any rows at all.
-        if not any(culled):
-            return headings, []
-
-        return headings, culled
+        # This is returned in the error case.
+        return [], []
 
     def get_pretty_table(self):
         """Return a PrettyTable instance created from the data and format opts.
@@ -341,10 +339,9 @@ class Report:
             A prettytable.PrettyTable reference. Returns None if an error
             occurred.
         """
-        try:
-            headings, rows_to_print = self.get_rows_to_print()
-        except (KeyError, ParseError, TypeError, ValueError):
-            return None
+        headings, rows_to_print = self.get_rows_to_print()
+        if not rows_to_print:
+            return ''
 
         pt = PrettyTable()
         pt.field_names = headings
@@ -365,12 +362,11 @@ class Report:
         Returns:
             The data of the report formatted as a string in yaml format.
         """
-        try:
-            _, rows_to_print = self.get_rows_to_print()
-        except (KeyError, ParseError, TypeError, ValueError):
-            return ''
+        _, rows_to_print = self.get_rows_to_print()
 
         if not self.no_headings and self.title:
             return yaml_dump({self.title: rows_to_print})
         else:
+            if not rows_to_print:
+                return ''
             return yaml_dump(rows_to_print)

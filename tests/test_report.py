@@ -1,7 +1,7 @@
 """
-Unit tests for sat/util.py .
+Unit tests for sat/util.py.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -23,10 +23,11 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 from collections import defaultdict
 from copy import deepcopy
-from itertools import permutations
+from itertools import repeat, permutations
 import unittest
 from unittest.mock import call, Mock, patch
 
+from parsec import ParseError
 import yaml
 
 from sat.report import Report
@@ -261,6 +262,41 @@ class TestReport(unittest.TestCase):
         for expected, actual in zip(self.entries, data):
             # yaml.safe_load sorts keys
             self.assertEqual(sorted(expected), sorted(actual.values()))
+
+    def test_getting_rows_to_print(self):
+        """Test getting rows to print with no filters or fields"""
+        report = Report(self.headings)
+        report.add_rows(self.entries)
+        headings, rows = report.get_rows_to_print()
+
+        self.assertEqual(headings, self.headings)
+        for rendered_row, given_row in zip(rows, self.entries):
+            for rendered_column_entry, given_column_entry in zip(rendered_row.values(), given_row):
+                self.assertEqual(rendered_column_entry, given_column_entry)
+
+    def test_getting_rows_to_print_invalid_filter_key(self):
+        """Test no rows are returned when the filter key is invalid."""
+        report = Report(self.headings, filter_strs=['foo=bar'])
+        report.add_rows(self.entries)
+        self.assertEqual(report.get_rows_to_print(), ([], []))
+
+    def test_getting_rows_to_print_invalid_comparison(self):
+        """Test type errors in filter result in no rows returned."""
+        report = Report(self.headings, filter_strs=['name >= 2'])
+        report.add_rows(self.entries)
+        self.assertEqual(report.get_rows_to_print(), ([], []))
+
+    def test_getting_all_empty_rows_returns_no_rows(self):
+        """If all columns in Report were culled by remove_missing_or_empty, return an empty table."""
+        report = Report(self.headings)
+        report.add_rows(repeat([EMPTY_VALUE] * 3, 10))
+        self.assertEqual(report.get_rows_to_print(), ([], []))
+
+    @patch('sat.filtering.parse_multiple_query_strings', side_effect=ParseError)
+    def test_constructing_report_with_invalid_filter_syntax(self, _):
+        """Test creating a Report with invalid filter syntax causes SAT to exit."""
+        with self.assertRaises(SystemExit):
+            report = Report(self.headings, filter_strs=['some bad filter'])
 
 
 class TestReportFormatting(unittest.TestCase):
