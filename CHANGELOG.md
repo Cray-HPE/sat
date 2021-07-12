@@ -46,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   paths in or below the home or current directory.
 - Added prompt for whether user would like to continue when ``sat auth`` would
   overwrite an existing token.
+- Added ``--excluded-ncns`` option to ``sat bootsys`` that can be used to omit
+  NCNs from the platform-services and ncn-power stages in case they are
+  inaccessible.
 
 ## [3.8.0] - 2021-06-23
 

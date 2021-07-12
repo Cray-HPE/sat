@@ -193,7 +193,6 @@ def create_xname_options():
              'in or below the home or current directory. '
              'Overrides value set in config file.')
 
-
     group.add_argument(
         '-x', '--xname', '--xnames', metavar='XNAME',
         dest='xnames', action=XnameCsvParser,

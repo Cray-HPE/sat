@@ -261,9 +261,9 @@ class TestRemoveConstantValues(unittest.TestCase):
         last_names = ['Morrison', 'Joplin', 'Cobain']
         hidden = 'HIDDEN'
 
-        # This is how many DIMMs we would have in a 50-cabinet system
-        # 16 DIMMs/node * 4 nodes/slot * 8 slots/chassis * 8 chassis/cab * 50 cabs
-        num_people = 204800
+        # This is how many DIMMs we would have in a 10-cabinet system
+        # 16 DIMMs/node * 4 nodes/slot * 8 slots/chassis * 8 chassis/cab * 10 cabs
+        num_people = 40960
 
         people = []
         expected_result = []
@@ -272,7 +272,6 @@ class TestRemoveConstantValues(unittest.TestCase):
                 'first': first_names[i % len(first_names)],
                 'last': last_names[i % len(last_names)],
                 'ssn': hidden,
-                'age': random.randint(0, 100),
                 'bank_account_number': hidden,
             }
             expected_person = copy.deepcopy(person)
@@ -287,9 +286,9 @@ class TestRemoveConstantValues(unittest.TestCase):
         duration = end_time - start_time
 
         # A reasonable expected duration
-        expected_duration = 3
+        expected_duration = 0.2
         self.assertLessEqual(duration, expected_duration,
-                             "remove_constant_values took longer than {:d} seconds "
+                             "remove_constant_values took longer than {:0.2f} seconds "
                              "({:0.2f} seconds) for {:d} values".format(expected_duration,
                                                                         duration, num_people))
         self.assertEqual(expected_result, const_removed)
