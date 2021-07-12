@@ -58,7 +58,7 @@ class BMCCredsManager:
             API request. If True, SCSD will not query HSM to check
             BMC state.
         report_format (str): The format to print the report. Expected to
-            be 'pretty' or 'yaml'.
+            be 'pretty', 'yaml', or 'json'.
     """
     NODE_BMC_XNAME_REGEX = re.compile(r'x\d+c\d+s\d+b\d+$')
     CHASSIS_BMC_XNAME_REGEX = re.compile(r'x\d+c\d+b\d+$')
@@ -172,7 +172,7 @@ class BMCCredsManager:
             password_domain (str): The domain of the password that was set, e.g.
                 'chassis', 'cabinet', 'bmc' or 'system'.
             report_format (str): The format to print the report. Expected to
-                be 'pretty' or 'yaml'.
+                be 'pretty', 'yaml', or 'json'.
 
         Returns:
             None
@@ -201,7 +201,12 @@ class BMCCredsManager:
             except KeyError as err:
                 LOGGER.error('Missing expected key from target (%s): %s', target, err)
 
-        print(report.get_yaml() if report_format == 'yaml' else report)
+        if report_format == 'yaml':
+            print(report.get_yaml())
+        elif report_format == 'json':
+            print(report.get_json())
+        else:
+            print(report)
 
     def set_bmc_passwords(self, session):
         """Send a request to the SCSD API to set BMC passwords.

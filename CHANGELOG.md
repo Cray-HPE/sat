@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added a ``--fields`` option to allow displaying only specific fields
   in subcommands which display a report.
-- Added ``--loglevel-stderr`` and ``--loglevel-file`` to set logging level for 
+- Added ``--loglevel-stderr`` and ``--loglevel-file`` to set logging level for
   stderr and log file separately.
 - Added help and man page documention on files that are absolute or relative
   paths in or below the home or current directory.
@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added ``--excluded-ncns`` option to ``sat bootsys`` that can be used to omit
   NCNs from the platform-services and ncn-power stages in case they are
   inaccessible.
+- Added support for ``--format json`` to print reports in JSON.
 
 ## [3.8.0] - 2021-06-23
 
@@ -64,7 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the field name.
 - Fixed the help text of `sat status` to list all available component types.
 - Improved an error message which could sometimes occur when FAS reported a
-  target with no xname. 
+  target with no xname.
 - Fixed filtering so that the exact match of a column name used in the
   ``--filter`` query is always used instead of matching subsequences.
 - Fixed filtering so that if there are multiple matches of column names
@@ -363,7 +364,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed ``Jenkinsfile`` to ``Jenkinsfile.rpm`` to differentiate from the newly
   added ``Jenkinsfile.docker`` that builds the Docker image.
 - Moved sat from the shasta-standard and shasta-premium product streams to the
-  sat product stream. 
+  sat product stream.
 
 ### Fixed
 - Updated Vendor tag in RPM spec file to HPE.
