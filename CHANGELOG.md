@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed issues with filter error messages being printed twice or not being printed.
 - Improved error messages when invalid filter syntax was supplied to
   refer to documentation of the syntax specification.
+- Fixed an issue with specific field options not overriding `--fields` when listing
+  components with `sat hwinv`.
 
 ### Added
 - Added a ``--fields`` option to allow displaying only specific fields
