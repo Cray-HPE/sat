@@ -1,7 +1,7 @@
 """
 The main entry point for the hwinv subcommand.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -205,7 +205,8 @@ def get_all_lists(system, args):
             filter_strs=args.filter_strs,
             show_empty=field_filters or args.show_empty,
             show_missing=field_filters or args.show_missing,
-            display_headings=args.fields
+            display_headings=args.fields,
+            print_format=args.format
         )
         component_report.add_rows(component_dicts)
 
@@ -307,7 +308,7 @@ def get_pretty_output(summaries, lists):
     return full_summary_string + full_list_string
 
 
-def get_custom_output(summaries, lists, dump_format):
+def get_formatted_output(summaries, lists, dump_format):
     """Gets the complete output formatted as JSON or YAML.
 
     Args:
@@ -323,6 +324,7 @@ def get_custom_output(summaries, lists, dump_format):
     """
     # The way we are constructing a top-level dictionary by joining together
     # YAML representations of dictionaries is not optimal, but it works for now.
+    # TODO: This creates valid YAML, but not JSON. See CRAYSAT-1046.
     summary_str = ''
     summary_dicts = OrderedDict()
 
@@ -333,15 +335,15 @@ def get_custom_output(summaries, lists, dump_format):
             summary_dicts[key] = val
 
     if dump_format == 'yaml':
-        dump_fn, get_fn = yaml_dump, 'get_yaml'
+        dump_fn = yaml_dump
     elif dump_format == 'json':
-        dump_fn, get_fn = json_dump, 'get_json'
+        dump_fn = json_dump
     else:
-        raise ValueError('Unexpected dump format received')
+        raise ValueError('Unexpected dump format received.')
 
     summary_str += dump_fn(summary_dicts) if summary_dicts else ''
 
-    return summary_str + ''.join(getattr(report, get_fn)() for report in lists)
+    return summary_str + ''.join(str(report) for report in lists)
 
 
 def get_all_output(system, args):
@@ -356,7 +358,7 @@ def get_all_output(system, args):
     if args.format == 'pretty':
         return get_pretty_output(summaries, lists)
     else:
-        return get_custom_output(summaries, lists, args.format)
+        return get_formatted_output(summaries, lists, args.format)
 
 
 def do_hwinv(args):

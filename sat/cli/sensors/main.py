@@ -379,17 +379,13 @@ def do_sensors(args):
             get_config_value('format.no_headings'),
             get_config_value('format.no_borders'),
             filter_strs=args.filter_strs,
-            display_headings=args.fields)
+            display_headings=args.fields,
+            print_format=args.format)
 
         raw_table = make_raw_table(all_topics_results)
         report.add_rows(raw_table)
 
-        if args.format == 'yaml':
-            print(report.get_yaml())
-        elif args.format == 'json':
-            print(report.get_json())
-        else:
-            print(report)
+        print(report)
 
     except ServiceExit:
         print('Exiting due to SIGINT or SIGTERM.')

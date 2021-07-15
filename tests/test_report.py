@@ -252,19 +252,6 @@ class TestReport(unittest.TestCase):
             act_types = [type(x) for x in actual.values()]
             self.assertEqual(exp_types, act_types)
 
-    def test_yaml_dump(self):
-        """Verify that yaml dumps can be read by python3-yaml.
-        """
-        report = Report(self.headings)
-        report.add_rows(self.entries)
-
-        yaml_s = report.get_yaml()
-
-        data = yaml.safe_load(yaml_s)
-        for expected, actual in zip(self.entries, data):
-            # yaml.safe_load sorts keys
-            self.assertEqual(sorted(expected), sorted(actual.values()))
-
     def test_getting_rows_to_print(self):
         """Test getting rows to print with no filters or fields"""
         report = Report(self.headings)
@@ -300,21 +287,33 @@ class TestReport(unittest.TestCase):
         with self.assertRaises(SystemExit):
             report = Report(self.headings, filter_strs=['some bad filter'])
 
-    def test_json_dump(self):
-        """Verify that json dumps can be read by json library.
+    def test_get_formatted_report_yaml(self):
+        """Verify that yaml reports can be read by python3-yaml.
         """
         report = Report(self.headings)
         report.add_rows(self.entries)
 
-        json_s = report.get_json()
+        yaml_s = report.get_formatted_report('yaml')
+
+        data = yaml.safe_load(yaml_s)
+        for expected, actual in zip(self.entries, data):
+            # yaml.safe_load sorts keys
+            self.assertEqual(sorted(expected), sorted(actual.values()))
+
+    def test_get_formatted_report_json(self):
+        """Verify that json reports can be read by json library.
+        """
+        report = Report(self.headings)
+        report.add_rows(self.entries)
+
+        json_s = report.get_formatted_report('json')
 
         data = json.loads(json_s)
         for expected, actual in zip(self.entries, data):
             self.assertEquals(expected, list(actual.values()))
 
-    def test_json_dump_xnames(self):
-        """Verify that json dumps can properly represent xname datatypes
-        as strings.
+    def test_get_formatted_report_json_with_xnames(self):
+        """Json dumps should encode XName datatypes as strings.
         """
         header_s = 'xname'
         xname_s = 'x0000c0s00b0n0'
@@ -322,10 +321,19 @@ class TestReport(unittest.TestCase):
         report = Report([header_s])
         report.add_row([XName(xname_s)])
 
-        json_s = report.get_json()
+        json_s = report.get_formatted_report('json')
         data = json.loads(json_s)
-
         self.assertEquals(xname_s, data[0][header_s])
+
+    def test_print_report(self):
+        """str(report) should depend on the format instance variable.
+        """
+        report = Report(self.headings)
+        report.add_rows(self.entries)
+
+        for format in ['pretty', 'json', 'yaml']:
+            report.print_format = format
+            self.assertEqual(report.get_formatted_report(format), str(report))
 
 
 class TestReportFormatting(unittest.TestCase):
@@ -382,21 +390,21 @@ class TestReportFormatting(unittest.TestCase):
     def test_sorted_yaml(self):
         """The YAML output list should be sorted as well.
         """
-        report = Report(self.headings, sort_by=0)
+        report = Report(self.headings, sort_by=0, print_format='yaml')
 
         report.add_rows(self.out_of_order)
 
-        loaded_yaml = yaml.safe_load(report.get_yaml())
+        loaded_yaml = yaml.safe_load(str(report))
         self.assertEqual(self.entries_as_dict, loaded_yaml)
 
     def test_sorted_json(self):
         """The json output should be sorted also.
         """
-        report = Report(self.headings, sort_by=0)
+        report = Report(self.headings, sort_by=0, print_format='json')
 
         report.add_rows(self.out_of_order)
 
-        loaded_json = json.loads(report.get_json())
+        loaded_json = json.loads(str(report))
         self.assertEqual(self.entries_as_dict, loaded_json)
 
     def test_reverse_sorting(self):

@@ -57,7 +57,8 @@ class Report:
                  align='l', filter_strs=None,
                  show_empty=None, show_missing=None,
                  force_columns=None,
-                 display_headings=None):
+                 display_headings=None,
+                 print_format='pretty'):
         """Create a new Report instance.
 
         Args:
@@ -83,6 +84,9 @@ class Report:
                 If None, then default to the normal behavior of show_empty and show_missing.
             display_headings: a list of headings which should be included in the
                 output. This list should be a subset of headings.
+            print_format: (str) The format to to return the report. Expected to be 'pretty',
+                'json', or 'yaml'.
+
         """
         self.headings = headings
         self.title = title
@@ -106,6 +110,7 @@ class Report:
         self.sort_by = sort_by
         self.reverse = reverse
         self.align = align
+        self.print_format = print_format
 
         self.force_columns = set(force_columns if force_columns is not None else [])
 
@@ -171,23 +176,12 @@ class Report:
             self.display_headings = self.headings
 
     def __str__(self):
-        """Return this report as a pretty-looking table.
+        """Return this report according to its format.
 
         Returns:
-            This report as a pretty-looking table.
+            The report formatted as a string.
         """
-        heading = ''
-        if not self.no_headings and self.title:
-            heading += get_rst_header(self.title, min_len=80)
-
-        if not self.data:
-            return heading
-
-        pt = self.get_pretty_table()
-        if pt is not None:
-            return heading + str(pt)
-        else:
-            return ''
+        return self.get_formatted_report(self.print_format)
 
     def convert_row(self, row):
         """Returns a row as it should appear as an entry in the report.
@@ -358,33 +352,42 @@ class Report:
 
         return pt
 
-    def get_yaml(self):
-        """Retrieve the report's yaml representation.
+    def get_formatted_report(self, report_format):
+        """Retrieve the report's data according to the given format.
 
-        Returns:
-            The data of the report formatted as a string in yaml format.
+            Args:
+                report_format (str): The format to print the report in. Expected
+                to be 'pretty', 'yaml', or 'json'.
+
+            Returns:
+                The report formatted as a string.
         """
+        if report_format == 'pretty':
+            heading = ''
+            if not self.no_headings and self.title:
+                heading += get_rst_header(self.title, min_len=80)
+
+            if not self.data:
+                return heading
+
+            pt = self.get_pretty_table()
+            if pt is not None:
+                return heading + str(pt)
+            else:
+                return ''
+        elif report_format == 'yaml':
+            dump_fn = yaml_dump
+        elif report_format == 'json':
+            dump_fn = json_dump
+        else:
+            # This case theoretically shouldn't happen.
+            raise ValueError('Invalid report format.')
+
         _, rows_to_print = self.get_rows_to_print()
 
         if not self.no_headings and self.title:
-            return yaml_dump({self.title: rows_to_print})
+            return dump_fn({self.title: rows_to_print})
         else:
             if not rows_to_print:
                 return ''
-            return yaml_dump(rows_to_print)
-
-    def get_json(self):
-        """Retrieve the report's json representation.
-
-        Returns:
-            The data of the report formatted as a string in json format.
-        """
-        try:
-            _, rows_to_print = self.get_rows_to_print()
-        except (KeyError, ParseError, TypeError, ValueError):
-            return ''
-
-        if not self.no_headings and self.title:
-            return json_dump({self.title: rows_to_print})
-        else:
-            return json_dump(rows_to_print)
+            return dump_fn(rows_to_print)
