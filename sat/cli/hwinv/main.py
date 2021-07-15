@@ -1,7 +1,7 @@
 """
 The main entry point for the hwinv subcommand.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -106,8 +106,7 @@ def report_unused_options(args):
 
     op_to_ignored_args = {
         'list': [],
-        'summarize': ['sort_by', 'no_borders', 'no_headings',
-                      'show_empty', 'show_missing']
+        'summarize': ['sort_by', 'show_empty', 'show_missing']
     }
 
     messages = []

@@ -38,25 +38,6 @@ PT_L_PAD_WIDTH = 1
 SORT_BY = 1
 
 
-class TestPrettyPrinters(unittest.TestCase):
-    """Tests for functions that do pretty printing."""
-
-    def test_get_pretty_printed_dict(self):
-        """Test a plain dict is output properly."""
-        test_dict = {
-            'fox': 'quick, brown',
-            'dog': 'lazy',
-            'action': 'jump',
-            'fox_speed': 100
-        }
-        pretty_printed = util.get_pretty_printed_dict(test_dict)
-        self.assertEqual(pretty_printed, dedent("""\
-                         fox:       quick, brown
-                         dog:       lazy
-                         action:    jump
-                         fox_speed: 100"""))
-
-
 class TestPrettyTables(unittest.TestCase):
     def setUp(self):
         self.headings = ['ingredient', 'amount']
@@ -126,13 +107,6 @@ class TestPrettyTables(unittest.TestCase):
 
         self.add_row_mock.assert_has_calls(mock.call(row) for row in self.rows)
         self.assertTrue(all(pt.align[x] == PT_ALIGN for x in pt.align))
-
-    @mock.patch('sat.util.get_pretty_table')
-    def test_pretty_print_list(self, mock_get_pretty_table):
-        """Test the pretty-printed result is always equal to what we expect."""
-        for args in product((self.rows,), (None, self.headings), range(len(self.headings))):
-            self.assertEqual(util.get_pretty_printed_list(*args),
-                             str(mock_get_pretty_table.return_value))
 
 
 class TestMiscFormatters(unittest.TestCase):

@@ -1,7 +1,7 @@
 """
 Classes to define summaries of components by various fields.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -24,7 +24,8 @@ OTHER DEALINGS IN THE SOFTWARE.
 from collections import defaultdict
 import logging
 
-from sat.util import format_as_dense_list, get_rst_header, get_pretty_printed_list
+from sat.report import Report
+from sat.util import format_as_dense_list, get_rst_header
 
 LOGGER = logging.getLogger(__name__)
 
@@ -228,7 +229,9 @@ class FieldSummary:
         table_heading = [self.field.pretty_name, 'Count']
         table_rows = [[attr_value, val_members['count']]
                       for attr_value, val_members in self.prepare_summary()]
-        return get_pretty_printed_list(table_rows, table_heading) + '\n'
+        report = Report(headings=table_heading, show_missing=True, show_empty=True)
+        report.add_rows(table_rows)
+        return str(report) + '\n'
 
     def get_listings_string(self):
         """Gets a string representation of the elements in this summary.

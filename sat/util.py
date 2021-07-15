@@ -176,32 +176,6 @@ def get_username_and_password_interactively(username=None, username_prompt='User
     return username, password
 
 
-def get_pretty_printed_dict(d, min_len=0):
-    """Get the pretty-printed string representation of a dict.
-
-    Args:
-        d (dict): The dictionary to pretty-print
-        min_len (int): The minimum length of the keys column to enforce.
-
-    Returns:
-        A nicely formatted string representation of a dict.
-    """
-    # Add 1 to length of keys for the colon
-    key_field_width = max(max(len(str(k)) for k in d) + 1, min_len)
-    return '\n'.join('{:<{width}} {}'.format('{}:'.format(key), value,
-                                             width=key_field_width)
-                     for key, value in d.items())
-
-
-def pretty_print_dict(d, min_len=0):
-    """Pretty-print a simple dictionary.
-
-    Args:
-        See `get_pretty_printed_dict`.
-    """
-    print(get_pretty_printed_dict(d, min_len))
-
-
 def get_pretty_table(rows, headings=None, sort_by=None):
     """Gets a PrettyTable instance with the given rows and headings.
 
@@ -245,25 +219,6 @@ def get_pretty_table(rows, headings=None, sort_by=None):
         pt.add_row(row)
 
     return pt
-
-
-def get_pretty_printed_list(rows, headings=None, sort_by=None):
-    """Gets the pretty-printed table representation of a list of lists.
-
-    Args: See `get_pretty_table`.
-
-    Returns:
-        A string containing a pretty-printed table.
-    """
-    return str(get_pretty_table(rows, headings, sort_by))
-
-
-def pretty_print_list(rows, headings=None, sort_by=None):
-    """Pretty prints a list of lists.
-
-    Args: See `get_pretty_table`.
-    """
-    print(get_pretty_printed_list(rows, headings, sort_by))
 
 
 def get_rst_header(header, header_level=1, min_len=80):
