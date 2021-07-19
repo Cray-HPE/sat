@@ -159,9 +159,10 @@ class TelemetryClient(threading.Thread):
             for sensor in sensors:
                 self.add_or_update_sensor(metric, sensor)
         else:
-            LOGGER.debug(f'Setting sensors for xname: {metric["Context"]} '
-                         f'and topic: {self.get_topic()}')
-            metric['Sensors'] = sensors
+            if sensors is not None:
+                LOGGER.debug(f'Setting sensors for xname: {metric["Context"]} '
+                             f'and topic: {self.get_topic()}')
+                metric['Sensors'] = sensors
 
     def set_sensors_for_context(self, context, sensors):
         """Set the sensors data in the thread results for a particular context.
