@@ -165,6 +165,51 @@ def report_unused_options(args):
     return messages
 
 
+def get_display_fields(args, object_type, operation):
+    """Gets a list of fields which should be displayed in the output.
+
+    Determining which fields to display is done as follows. If present, the
+    value of the --*-fields or --*-summary-fields option corresponding to a
+    given list or summary is always used, where appropriate. If --fields is
+    present, its value is used if the --*-fields or --*-summary-fields option
+    is not present. If neither is present, all fields are used.
+
+    Args:
+        args (argparse.Namespace): the commandline arguments parsed by
+            argparse
+        object_type (BaseComponent): the component being listed or summarized
+        operation (str): either 'list' or 'summarize'
+
+    Returns:
+        A list of ComponentField objects corresponding to the fields to be
+        present in the displayed report.
+    """
+
+    inflector = inflect.engine()
+
+    if operation != 'list':
+        specific_fields_arg_name = f'{object_type.arg_name}_{operation}_fields'
+        field_getter = getattr(object_type, f'get_{operation}_fields')
+    else:
+        specific_fields_arg_name = f'{object_type.arg_name}_fields'
+        field_getter = object_type.get_listable_fields
+
+    specific_fields = getattr(args, specific_fields_arg_name)
+
+    if specific_fields:
+        if args.fields:
+            arg_name = f"--{specific_fields_arg_name.replace('_', '-')}"
+            LOGGER.warning("Using the %s %s specified by "
+                           "%s in '%s' %s.",
+                           inflector.join([f"'{field}'" for field in specific_fields]),
+                           inflector.plural_noun('field', len(specific_fields)),
+                           arg_name,
+                           object_type.pretty_name,
+                           operation)
+        return field_getter(specific_fields)
+    else:
+        return field_getter(args.fields)
+
 def get_all_lists(system, args):
     """Gets a list containing Reports listing each type of component.
 
@@ -182,19 +227,23 @@ def get_all_lists(system, args):
 
     for object_type, comp_dict in system.components_by_type.items():
         list_arg_name = 'list_{}'.format(inflector.plural(object_type.arg_name))
-        fields_arg_name = '{}_fields'.format(object_type.arg_name)
 
         # Continue if list of this component type was not requested
         if not (args.list_all or getattr(args, list_arg_name)):
             continue
 
-        field_filters = getattr(args, fields_arg_name)
-        fields = object_type.get_listable_fields(field_filters)
+        display_fields = get_display_fields(args, object_type, 'list')
+        all_fields = object_type.get_listable_fields()
+        if set(display_fields) != set(all_fields):
+            display_fields = [field.pretty_name for field in display_fields]
+        else:
+            display_fields = None
+
         field_key_attr = 'pretty_name' if args.format == 'pretty' else 'canonical_name'
-        headings = [getattr(field, field_key_attr) for field in fields]
+        headings = [getattr(field, field_key_attr) for field in all_fields]
         list_title = object_type.get_list_title(args.format)
 
-        component_dicts = [component.get_dict(fields, field_key_attr)
+        component_dicts = [component.get_dict(all_fields, field_key_attr)
                            for component in comp_dict.values()]
 
         component_report = Report(
@@ -203,8 +252,8 @@ def get_all_lists(system, args):
             no_headings=get_config_value('format.no_headings'),
             no_borders=get_config_value('format.no_borders'),
             filter_strs=args.filter_strs,
-            show_empty=field_filters or args.show_empty,
-            show_missing=field_filters or args.show_missing,
+            show_empty=args.show_empty,
+            show_missing=args.show_missing,
             display_headings=args.fields,
             print_format=args.format
         )
@@ -233,7 +282,6 @@ def get_all_summaries(system, args):
 
     for object_type, comp_dict in system.components_by_type.items():
         summarize_arg_name = 'summarize_{}'.format(inflector.plural(object_type.arg_name))
-        fields_arg_name = '{}_summary_fields'.format(object_type.arg_name)
         xnames_arg_name = 'show_{}_xnames'.format(object_type.arg_name)
 
         if not hasattr(args, summarize_arg_name):
@@ -241,29 +289,8 @@ def get_all_summaries(system, args):
             continue
 
         if args.summarize_all or getattr(args, summarize_arg_name):
-
-            # Determining which fields to display is done as follows. If
-            # present, the value of the --*--summary-fields option
-            # corresponding to a given summary is always used. If --fields is
-            # present, its value is used if the --*-summary-fields option is
-            # not present. If neither is present, all fields are used.
-
-            specific_fields = getattr(args, fields_arg_name)
-            if not args.fields:
-                display_fields = object_type.get_summary_fields(specific_fields)
-            elif specific_fields:
-                LOGGER.warning("Using the %s %s specified by "
-                               "--%s-summary-fields in '%s' summary.",
-                               inflector.join([f"'{field}'" for field in specific_fields]),
-                               inflector.plural_noun('field', len(specific_fields)),
-                               object_type.arg_name,
-                               object_type.pretty_name)
-                display_fields = object_type.get_summary_fields(specific_fields)
-            else:
-                display_fields = object_type.get_summary_fields(args.fields)
-
-            all_fields = object_type.get_summary_fields([])
-
+            display_fields = get_display_fields(args, object_type, 'summary')
+            all_fields = object_type.get_summary_fields()
             try:
                 filter_fn = (parse_multiple_query_strings(
                     args.filter_strs,
