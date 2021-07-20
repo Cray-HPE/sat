@@ -109,4 +109,4 @@ def do_k8s(args):
 
         report.add_rows(rows)
 
-    print(report)
+        print(report)
