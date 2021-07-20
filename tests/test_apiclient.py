@@ -1,7 +1,7 @@
 """
 Unit tests for sat.apiclient
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -61,6 +61,20 @@ class TestAPIGatewayClient(unittest.TestCase):
         api_gw_host = 'my-api-gw'
         client = sat.apiclient.APIGatewayClient(host=api_gw_host)
         self.assertEqual(client.host, api_gw_host)
+
+    def test_configured_timeout(self):
+        """Make sure the API client timeout is configurable by the config file."""
+        with mock.patch('sat.apiclient.get_config_value') as mock_config:
+            for configured_timeout in range(10, 60, 10):
+                mock_config.return_value = configured_timeout
+                client = sat.apiclient.APIGatewayClient()
+                self.assertEqual(client.timeout, configured_timeout)
+
+    def test_setting_timeout_with_constructor(self):
+        """Test setting the API client timeout with the constructor argument."""
+        with mock.patch('sat.apiclient.get_config_value', return_value=120):
+            client = sat.apiclient.APIGatewayClient(timeout=60)
+            self.assertEqual(client.timeout, 60)
 
     @mock.patch('requests.get')
     def test_get_no_params(self, mock_requests_get):

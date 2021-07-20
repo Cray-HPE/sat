@@ -60,6 +60,10 @@ These global options must be specified before the subcommand.
         in or below the home or current directory.
         Overrides value derived from other settings, or set in config file.
 
+**--api-timeout** *timeout*
+        The amount of time, in seconds, allowed to wait for calls to any HTTP API
+        to return before considering them failed. Overrides value set in config file.
+
 **-h, --help**
         Print the help message for sat.
 
@@ -105,6 +109,14 @@ API_GATEWAY
         Store the login token between sessions with the api-gateway. If this
         value isn't provided, then SAT will use the default location as
         specified in sat-auth(8).
+
+
+**api_timeout**
+        This is the timeout for all calls to HTTP REST APIs, in seconds. This
+        is the amount of time allowed to wait for calls to any HTTP API to
+        return before considering them failed. Overrides value set in config
+        file.
+
 
 BOOTSYS
 -------
