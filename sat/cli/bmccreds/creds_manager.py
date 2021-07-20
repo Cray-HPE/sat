@@ -188,7 +188,8 @@ class BMCCredsManager:
                 f'Missing expected key from API response: {err}'
             )
 
-        report = Report(['xname', 'Type', 'Password Type', 'Status Code', 'Status Message'])
+        report = Report(['xname', 'Type', 'Password Type', 'Status Code', 'Status Message'],
+                        print_format=report_format)
         for target in response_targets:
             try:
                 report.add_row([
@@ -201,12 +202,7 @@ class BMCCredsManager:
             except KeyError as err:
                 LOGGER.error('Missing expected key from target (%s): %s', target, err)
 
-        if report_format == 'yaml':
-            print(report.get_yaml())
-        elif report_format == 'json':
-            print(report.get_json())
-        else:
-            print(report)
+        print(report)
 
     def set_bmc_passwords(self, session):
         """Send a request to the SCSD API to set BMC passwords.

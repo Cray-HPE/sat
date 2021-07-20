@@ -302,16 +302,14 @@ class TestBMCCredsManagerPrintReport(ExtendedTestCase):
     def assert_report(self, rows, report_format):
         """Assert that a Report was created and printed with the right content and format."""
         self.mock_report_cls.assert_called_once_with(
-            ['xname', 'Type', 'Password Type', 'Status Code', 'Status Message']
+            ['xname', 'Type', 'Password Type', 'Status Code', 'Status Message'],
+            print_format=report_format
         )
         self.assertEqual(
             [call(row) for row in rows],
             self.mock_report.add_row.mock_calls
         )
-        if report_format == 'yaml':
-            self.mock_print.assert_called_once_with(self.mock_report.get_yaml.return_value)
-        else:
-            self.mock_print.assert_called_once_with(self.mock_report)
+        self.mock_print.assert_called_once_with(self.mock_report)
 
     def test_print_default_report(self):
         """Test printing a default report."""

@@ -132,16 +132,12 @@ def print_reports_from_tables(fw_tables, sort_by, reverse, filter_strs, output_f
             get_config_value('format.no_headings'),
             get_config_value('format.no_borders'),
             filter_strs=filter_strs,
-            display_headings=display_headings
+            display_headings=display_headings,
+            print_format=output_format
         )
         report.add_rows(table)
 
-        if output_format == 'yaml':
-            print(report.get_yaml())
-        elif output_format == 'json':
-            print(report.get_json())
-        else:
-            print(report)
+        print(report)
 
 
 def do_firmware(args):

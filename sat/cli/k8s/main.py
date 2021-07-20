@@ -1,7 +1,7 @@
 """
 The main entry point for the k8s subcommand.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -104,13 +104,9 @@ def do_k8s(args):
             get_config_value('format.no_headings'),
             get_config_value('format.no_borders'),
             filter_strs=args.filter_strs,
-            display_headings=args.fields)
+            display_headings=args.fields,
+            print_format=args.format)
 
         report.add_rows(rows)
 
-        if args.format == 'yaml':
-            print(report.get_yaml())
-        elif args.format == 'json':
-            print(report.get_json())
-        else:
-            print(report)
+    print(report)
