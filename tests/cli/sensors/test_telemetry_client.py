@@ -198,6 +198,35 @@ class TestTelemetryClient(unittest.TestCase):
         self.assertEqual(xname_results['Count'], 2)
         self.assertEqual(xname_results['Sensors'], temperature_sensors_results_2)
 
+    def test_set_sensors_for_context_empty_sensors(self):
+        """Test that topic results are set correctly if sensor data returns a null value."""
+        bad_event_data = {
+            'metrics': {
+                'messages': [
+                    {
+                        'Context': 'x3000c0s17b3',
+                        'Events': [
+                            {
+                                'EventTimestamp': '2021-04-16T21:20:53Z',
+                                'MessageId': 'CrayTelemetry.Temperature',
+                                'Oem': {
+                                    'Sensors': None,
+                                    'TelemetrySource': 'cC'
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+
+        all_topics_results = [None]
+        telemetry_client = TelemetryClient(self.stop_event, self.xnames_info, self.batchsize,
+                                           self.update_until_timeout, self.topic,
+                                           all_topics_results, 0)
+        telemetry_client.unpack_data(json.dumps(bad_event_data))
+        self.assertIsNotNone(all_topics_results[0]['Metrics'][-1]['Sensors'])
+
     def test_set_sensors_for_context_add_to_existing(self):
         """Test set_sensors_for_context where new sensors are added to existing sensors."""
         all_topics_results = [None]
