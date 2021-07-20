@@ -106,8 +106,7 @@ def report_unused_options(args):
 
     op_to_ignored_args = {
         'list': [],
-        'summarize': ['sort_by', 'no_borders', 'no_headings',
-                      'show_empty', 'show_missing']
+        'summarize': ['sort_by', 'show_empty', 'show_missing']
     }
 
     messages = []
