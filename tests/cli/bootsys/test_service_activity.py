@@ -25,14 +25,18 @@ from collections import OrderedDict
 from kubernetes.config.config_exception import ConfigException
 from kubernetes.client.rest import ApiException
 import logging
+import socket
 import unittest
-from unittest.mock import call, Mock, patch
+from unittest.mock import call, MagicMock, Mock, patch
+
+from paramiko.ssh_exception import BadHostKeyException, AuthenticationException, SSHException
 
 from tests.common import ExtendedTestCase
 from sat.apiclient import APIError
 from sat.cli.bootsys.service_activity import (
     ServiceActivityChecker,
     ServiceCheckError,
+    SDUActivityChecker,
     BOSActivityChecker,
     CFSActivityChecker,
     CRUSActivityChecker,
@@ -91,6 +95,95 @@ class TestServiceActivityChecker(unittest.TestCase):
         err = checker.get_err('utter failure')
         self.assertEqual('Unable to get active SVC sessions: utter failure',
                          str(err))
+
+
+class TestSDUActivityChecker(ExtendedTestCase):
+    """Test the SDUActivityChecker class."""
+    def setUp(self):
+        self.mock_channel = MagicMock()
+        self.mock_channel.recv_exit_status.side_effect = [1, 1, 1]
+
+        self.mock_transport = MagicMock()
+        self.mock_transport.open_session.return_value = self.mock_channel
+
+        self.mock_ssh_client_instance = MagicMock()
+        self.mock_ssh_client_instance.get_transport.return_value = self.mock_transport
+
+        self.mock_ssh_client = patch('sat.cli.bootsys.service_activity.get_ssh_client').start()
+        self.mock_ssh_client.return_value = self.mock_ssh_client_instance
+
+        self.mock_get_mgmt_ncn_groups = patch('sat.cli.bootsys.service_activity.get_mgmt_ncn_groups').start()
+        self.mock_get_mgmt_ncn_groups.return_value = ({'managers': ['ncn-m001', 'ncn-m002', 'ncn-m003']}, {})
+
+    def tearDown(self):
+        patch.stopall()
+
+    def assert_ssh_client_set_up(self):
+        self.mock_ssh_client_instance.connect.assert_called()
+        self.mock_ssh_client_instance.close.assert_called()
+
+    def test_getting_sdu_sessions_none_running(self):
+        """Test no active SDU sessions returned when no dumps are occurring."""
+        s = SDUActivityChecker()
+
+        self.assertEqual(s.get_active_sessions(), [])
+        self.assert_ssh_client_set_up()
+
+    def test_getting_sdu_sessions_one_running(self):
+        """Test active SDU sessions are returned when remote dumps are occurring."""
+        s = SDUActivityChecker()
+        self.mock_channel.recv_exit_status.side_effect = [1, 0, 1]
+
+        self.assertEqual(s.get_active_sessions(), [OrderedDict([('ncn', 'ncn-m002')])])
+        self.assert_ssh_client_set_up()
+
+    def test_exception_thrown_on_ssh_error(self):
+        """Test an exception is thrown when SSH error occurs when checking SDU sessions."""
+        mock_bad_host_key_exception = BadHostKeyException('ncn-m002', MagicMock(), MagicMock())
+        for err_type in [mock_bad_host_key_exception, AuthenticationException,
+                         SSHException, socket.error]:
+            s = SDUActivityChecker()
+            self.mock_ssh_client_instance.connect.side_effect = err_type
+            with self.assertRaises(ServiceCheckError):
+                self.assertEqual(s.get_active_sessions(), [])
+        self.assert_ssh_client_set_up()
+
+    def test_exception_thrown_on_open_session_error(self):
+        """Test an exception is thrown when there is a problem opening the SSH channel."""
+        self.mock_transport.open_session.side_effect = SSHException
+        with self.assertRaises(ServiceCheckError):
+            SDUActivityChecker().get_active_sessions()
+        self.assert_ssh_client_set_up()
+
+    def test_exception_thrown_on_exec_command_error(self):
+        """Test an exception is thrown when there is a problem executing remote commands."""
+        self.mock_channel.exec_command.side_effect = SSHException
+        with self.assertRaises(ServiceCheckError):
+            SDUActivityChecker().get_active_sessions()
+        self.assert_ssh_client_set_up()
+
+    def test_exception_thrown_on_remote_pgrep_error(self):
+        """Test that exceptions are thrown when error return codes are given from remote pgrep."""
+        self.mock_channel.recv_exit_status.side_effect = None
+
+        for returncode in [2, 3, 5]:
+            self.mock_channel.recv_exit_status.return_value = returncode
+            s = SDUActivityChecker()
+            with self.assertRaises(ServiceCheckError):
+                s.get_active_sessions()
+
+    def test_exception_not_thrown_when_sdu_not_installed_or_configured(self):
+        """Test that exceptions are not thrown when SDU cannot be accessed."""
+        self.mock_channel.recv_exit_status.side_effect = None
+
+        for returncode in [125, 127]:
+            self.mock_channel.recv_exit_status.return_value = returncode
+            s = SDUActivityChecker()
+            try:
+                s.get_active_sessions()
+            except ServiceCheckError:
+                self.fail(f"ServiceCheckError was thrown on SDU return code "
+                          f"{returncode}")
 
 
 class TestBOSActivityChecker(ExtendedTestCase):
@@ -779,7 +872,8 @@ class TestReportActiveSessions(ExtendedTestCase):
                 num_sessions=2, service_name='FOO',
                 active_sessions_desc='active FOO sessions',
                 report_title='Active FOO Sessions',
-                cray_cli_command='cray foo'
+                cray_cli_command='cray foo',
+                more_details='For more details, execute \'cray foo\'.',
             ),
             self.get_mock_service_checker(
                 svc_check_err=ServiceCheckError(bos_err_msg),
@@ -790,7 +884,8 @@ class TestReportActiveSessions(ExtendedTestCase):
                 num_sessions=1, service_name='BAR',
                 active_sessions_desc='active BAR sessions',
                 report_title='Active BAR Sessions',
-                cray_cli_command='cray bar'
+                cray_cli_command='cray bar',
+                more_details='For more details, execute \'cray bar\'.',
             ),
         ]
 
@@ -840,11 +935,12 @@ class TestReportActiveSessions(ExtendedTestCase):
         checkers = [
             self.get_mock_service_checker(
                 num_sessions=0, service_name='CFS',
-                active_sessions_desc='active CFS sessions'
+                active_sessions_desc='active CFS sessions',
             ),
             self.get_mock_service_checker(
                 num_sessions=0, service_name='FOO',
                 active_sessions_desc='active FOO sessions',
+                more_details='For more details, execute \'cray foo\'',
             )
         ]
 
@@ -875,7 +971,7 @@ class TestDoServiceActivityCheck(ExtendedTestCase):
 
     def setUp(self):
         """Set up some mocks."""
-        checkers_to_patch = ['BOS', 'CFS', 'CRUS', 'Firmware', 'NMD']
+        checkers_to_patch = ['BOS', 'CFS', 'CRUS', 'Firmware', 'NMD', 'SDU']
         self.checkers = []
         for checker in checkers_to_patch:
             path = 'sat.cli.bootsys.service_activity.{}ActivityChecker'.format(

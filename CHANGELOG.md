@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ``sat diag`` will now query HSM to verify that the components targeted for 
   diagnostics are Rosetta switches.
 
+### Added
+- Added a check for running SDU sessions to the ``session-checks`` stage of a
+  ``shutdown`` action in ``sat bootsys``.
+
 ## [3.9.0] - 2021-08-04
 
 ### Changed
