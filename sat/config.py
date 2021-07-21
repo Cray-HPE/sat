@@ -95,7 +95,7 @@ SAT_CONFIG_SPEC = {
     'logging': {
         'file_name': OptionSpec(str, '/var/log/cray/sat/sat.log', None, 'logfile'),
         'file_level': OptionSpec(str, 'INFO', validate_log_level, 'loglevel_file'),
-        'stderr_level': OptionSpec(str, 'WARNING', validate_log_level, 'loglevel_stderr'),
+        'stderr_level': OptionSpec(str, 'INFO', validate_log_level, 'loglevel_stderr'),
     },
     's3': {
         'endpoint': OptionSpec(str, 'https://rgw-vip.nmn', None, None),

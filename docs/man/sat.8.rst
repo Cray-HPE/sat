@@ -244,7 +244,7 @@ LOGGING
 **stderr_level**
         SAT also prints log messages to stderr, and this parameter sets the
         minimum log severity that will cause a log to be printed to stderr.
-        Defaults to "WARNING".
+        Defaults to "INFO".
 
 SEE ALSO
 ========

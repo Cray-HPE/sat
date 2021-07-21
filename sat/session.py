@@ -1,7 +1,7 @@
 """
 OAuth2 authentication support.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -100,7 +100,7 @@ class SATSession:
         try:
             with open(self.token_filename, 'r') as f:
                 token = json.load(f)
-                LOGGER.info('Loaded auth token from %s.', self.token_filename)
+                LOGGER.debug('Loaded auth token from %s.', self.token_filename)
 
         except json.JSONDecodeError as err:
             LOGGER.error('Unable to parse token: %s.', err)

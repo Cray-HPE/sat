@@ -265,7 +265,7 @@ class TelemetryClient(threading.Thread):
             return True
 
         if self.am_i_done():
-            print(f'Telemetry data received from {topic} for all requested xnames.')
+            LOGGER.info(f'Telemetry data received from {topic} for all requested xnames.')
             self.results['Done'] = True
             return True
 
@@ -308,12 +308,11 @@ class TelemetryClient(threading.Thread):
                 response = self.api_client.stream(topic, self.GET_TIMEOUT_SECS,
                                                   params={'count': 0, 'batchsize': self.batchsize})
                 client = sseclient.SSEClient(response)
-                print(f'Waiting for metrics for all requested xnames from {topic}.')
+                LOGGER.info(f'Waiting for metrics for all requested xnames from {topic}.')
                 for event in client.events():
                     num_metrics = self.unpack_data(event.data)
                     total_metrics += num_metrics
                     LOGGER.info(f'Received {total_metrics} metrics from stream: {event.event}')
-                    print(f'Receiving metrics from stream: {event.event}...')
                     if self.am_i_done() or self.stopped():
                         break
 
@@ -323,7 +322,7 @@ class TelemetryClient(threading.Thread):
                 break
 
             except ReadTimeout:
-                print(f'Timed out getting any data from {topic}.')
+                LOGGER.error(f'Timed out getting any data from {topic}.')
                 self.results['Done'] = True
                 break
 
