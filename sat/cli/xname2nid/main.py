@@ -58,7 +58,7 @@ def get_nids_using_xname(xname, components):
             nid = component.get('NID')
             if nid:
                 nids.append('nid' + str(nid).zfill(NUM_NID_DIGITS))
-                LOGGER.info(f'xname: {cid}, nid: {nid}')
+                LOGGER.debug(f'xname: {cid}, nid: {nid}')
             else:
                 missing_nids = True
                 LOGGER.error(f'HSM API has no NID for valid ID: {cid}')

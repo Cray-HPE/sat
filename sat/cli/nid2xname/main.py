@@ -54,7 +54,7 @@ def get_xname_using_nid(nid, components):
         if str(cnid) == nid:
             xname = component.get('ID')
             if xname:
-                LOGGER.info(f'xname: {xname}, nid: {nid}')
+                LOGGER.debug(f'xname: {xname}, nid: {nid}')
             else:
                 LOGGER.error(f'HSM API has no ID for valid NID: {cnid}')
             break

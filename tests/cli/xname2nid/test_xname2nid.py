@@ -76,7 +76,7 @@ class TestDoXname2nid(ExtendedTestCase):
 
     def test_one_node_xname_exists(self):
         """Test do_xname2nid with one valid node xname."""
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_xname2nid(self.fake_args)
         self.assert_in_element(f'xname: {self.node_data[0]["ID"]}, nid: {self.node_data[0]["NID"]}',
                                logs.output)
@@ -86,7 +86,7 @@ class TestDoXname2nid(ExtendedTestCase):
     def test_one_node_bmc_xname_exists(self):
         """Test do_xname2nid with one valid node BMC xname."""
         self.fake_args.xnames = ['x1000c2s2b0']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_xname2nid(self.fake_args)
         for node in self.node_data[2:3]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -107,7 +107,7 @@ class TestDoXname2nid(ExtendedTestCase):
     def test_two_node_xnames_exist(self):
         """Test do_xname2nid with two valid node xnames."""
         self.fake_args.xnames = ['x1000c2s1b0n0', 'x1000c2s2b0n0']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_xname2nid(self.fake_args)
         for node in self.node_data[1:2]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -117,7 +117,7 @@ class TestDoXname2nid(ExtendedTestCase):
     def test_two_comma_separated_node_xnames_exist(self):
         """Test do_xname2nid with two valid comma separated node xnames."""
         self.fake_args.xnames = ['x1000c2s1b0n0,x1000c2s2b0n0']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_xname2nid(self.fake_args)
         for node in self.node_data[1:2]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -127,7 +127,7 @@ class TestDoXname2nid(ExtendedTestCase):
     def test_two_node_and_bmc_xnames_exist(self):
         """Test do_xname2nid with two valid node and BMC xnames."""
         self.fake_args.xnames = ['x1000c2s1b0n0', 'x1000c2s2b0']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_xname2nid(self.fake_args)
         for node in self.node_data[1:3]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -137,7 +137,7 @@ class TestDoXname2nid(ExtendedTestCase):
     def test_two_comma_separated_node_and_bmc_xnames_exist(self):
         """Test do_xname2nid with two valid comma separated node and BMC xnames."""
         self.fake_args.xnames = ['x1000c2s1b0n0,x1000c2s2b0']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_xname2nid(self.fake_args)
         for node in self.node_data[1:3]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -147,7 +147,7 @@ class TestDoXname2nid(ExtendedTestCase):
     def test_two_comma_separated_node_xnames_with_space_exist(self):
         """Test do_xname2nid with two valid comma separated node xnames with space."""
         self.fake_args.xnames = ['x1000c2s1b0n0,', 'x1000c2s2b0n0']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_xname2nid(self.fake_args)
         for node in self.node_data[1:2]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -157,7 +157,7 @@ class TestDoXname2nid(ExtendedTestCase):
     def test_three_node_xnames_one_invalid(self):
         """Test do_xname2nid with two valid node xnames and one invalid string."""
         self.fake_args.xnames = ['x1000c2s1b0n0', 'not-an-xname', 'x1000c2s2b0n0']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             with self.assertRaises(SystemExit) as cm:
                 do_xname2nid(self.fake_args)
         self.assertEqual(cm.exception.code, ERR_MISSING_NAMES)
@@ -170,7 +170,7 @@ class TestDoXname2nid(ExtendedTestCase):
     def test_three_node_and_bmc_xnames_one_invalid(self):
         """Test do_xname2nid with two valid node and BMC xnames and one invalid string."""
         self.fake_args.xnames = ['x1000c2s1b0n0', 'not-an-xname', 'x1000c2s2b0']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             with self.assertRaises(SystemExit) as cm:
                 do_xname2nid(self.fake_args)
         self.assertEqual(cm.exception.code, ERR_MISSING_NAMES)

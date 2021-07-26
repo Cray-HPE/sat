@@ -1,7 +1,7 @@
 """
 Unit tests for the service_activity module.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -794,7 +794,7 @@ class TestReportActiveSessions(ExtendedTestCase):
             ),
         ]
 
-        with self.assertLogs(level=logging.ERROR) as cm:
+        with self.assertLogs(level=logging.INFO) as cm:
             active, failed = _report_active_sessions(checkers)
 
         self.assert_in_element(bos_err_msg, cm.output)
@@ -806,18 +806,21 @@ class TestReportActiveSessions(ExtendedTestCase):
         # Two reports should have been created.
         self.assertEqual(len(self.mock_report_objects), 2)
 
+        expected_logs = ['Checking for active CFS sessions.',
+                         'Found no active CFS sessions.',
+                         'Checking for active FOO sessions.',
+                         "Found 2 active FOO sessions. Details shown below. For more "
+                         "details, execute 'cray foo'.",
+                         'Checking for active CFS sessions.',
+                         'Checking for active BOS sessions.',
+                         'Checking for active BAR sessions.',
+                         "Found 1 active BAR session. Details shown below. For more "
+                         "details, execute 'cray bar'."]
+        for msg in expected_logs:
+            self.assert_in_element(msg, cm.output)
+
         self.mock_print.assert_has_calls([
-            call('Checking for active CFS sessions.'),
-            call('Found no active CFS sessions.'),
-            call('Checking for active FOO sessions.'),
-            call("Found 2 active FOO sessions. Details shown below. For more "
-                 "details, execute 'cray foo'."),
             call(self.mock_report_objects[0]),
-            call('Checking for active BOS sessions.'),
-            # BOS failure is logged as an error, not printed.
-            call('Checking for active BAR sessions.'),
-            call("Found 1 active BAR session. Details shown below. For more "
-                 "details, execute 'cray bar'."),
             call(self.mock_report_objects[1])
         ])
 
@@ -845,7 +848,8 @@ class TestReportActiveSessions(ExtendedTestCase):
             )
         ]
 
-        active, failed = _report_active_sessions(checkers)
+        with self.assertLogs(level=logging.INFO) as cm:
+            active, failed = _report_active_sessions(checkers)
 
         # There should be neither active nor failed services
         self.assertFalse([], active)
@@ -854,12 +858,14 @@ class TestReportActiveSessions(ExtendedTestCase):
         # No reports should have been created.
         self.assertEqual(len(self.mock_report_objects), 0)
 
-        self.mock_print.assert_has_calls([
-            call('Checking for active CFS sessions.'),
-            call('Found no active CFS sessions.'),
-            call('Checking for active FOO sessions.'),
-            call('Found no active FOO sessions.'),
-        ])
+        expected_logs = ['Checking for active CFS sessions.',
+                         'Found no active CFS sessions.',
+                         'Checking for active FOO sessions.',
+                         'Found no active FOO sessions.']
+
+        for msg in expected_logs:
+            self.assert_in_element(msg, cm.output)
+
         self.mock_report_cls.assert_not_called()
 
 

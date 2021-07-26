@@ -380,7 +380,7 @@ def _report_active_sessions(service_activity_checkers):
     failed_services = []
 
     for checker in service_activity_checkers:
-        print('Checking for {}.'.format(checker.active_sessions_desc))
+        LOGGER.info('Checking for {}.'.format(checker.active_sessions_desc))
         try:
             sessions = checker.get_active_sessions()
         except ServiceCheckError as err:
@@ -393,11 +393,11 @@ def _report_active_sessions(service_activity_checkers):
             headings = list(sessions[0].keys())
         except IndexError:
             # no active sessions, so continue
-            print("Found no {}.".format(checker.active_sessions_desc))
+            LOGGER.info("Found no {}.".format(checker.active_sessions_desc))
             continue
 
         active_services.append(checker.service_name)
-        print(
+        LOGGER.info(
             "Found {} {}. Details shown below. For more details, "
             "execute '{}'.".format(
                 len(sessions),
