@@ -30,6 +30,7 @@ from sat.cli.bootsys.util import (
     get_mgmt_ncn_hostnames,
     get_and_verify_ncn_groups,
     get_mgmt_ncn_groups,
+    get_ssh_client,
     prompt_for_ncn_verification,
     FatalBootsysError
 )
@@ -346,3 +347,26 @@ class TestGetAndVerifyNCNs(unittest.TestCase):
         self.assertEqual(result['kubernetes'],
                          self.mock_get_ncn_groups.return_value[0]['managers'] +
                          self.mock_get_ncn_groups.return_value[0]['workers'])
+
+
+class TestGetSSHClient(unittest.TestCase):
+    """Tests for get_ssh_client function."""
+
+    def setUp(self):
+        """Set up mocks of paramiko SSHClient and WarningPolicy."""
+        self.mock_ssh_client_cls = patch('sat.cli.bootsys.util.SSHClient').start()
+        self.mock_ssh_client = self.mock_ssh_client_cls.return_value
+        self.mock_warning_policy = patch('sat.cli.bootsys.util.WarningPolicy').start()
+
+    def tearDown(self):
+        patch.stopall()
+
+    def test_get_ssh_client(self):
+        """Test get_ssh_client function."""
+        ssh_client = get_ssh_client()
+
+        self.mock_ssh_client_cls.assert_called_once_with()
+        self.mock_ssh_client.load_system_host_keys.assert_called_once_with()
+        self.mock_ssh_client.set_missing_host_key_policy.assert_called_once_with(
+            self.mock_warning_policy
+        )

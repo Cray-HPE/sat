@@ -26,6 +26,7 @@ from collections import defaultdict
 import logging
 import re
 
+from paramiko import SSHClient, WarningPolicy
 import yaml
 
 from sat.util import pester_choices
@@ -209,3 +210,17 @@ def get_and_verify_ncn_groups(excluded_ncns=None):
                                                 incl_ncns_by_subrole['workers'])
 
     return incl_ncns_by_subrole
+
+
+def get_ssh_client():
+    """Get a paramiko SSH client.
+
+    Returns:
+        A paramiko.SSHClient instance with host keys loaded and the policy for
+        missing host keys set to warn rather than fail.
+    """
+    ssh_client = SSHClient()
+    ssh_client.load_system_host_keys()
+    ssh_client.set_missing_host_key_policy(WarningPolicy)
+
+    return ssh_client

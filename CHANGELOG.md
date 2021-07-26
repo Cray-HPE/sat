@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   NCNs from the platform-services and ncn-power stages in case they are
   inaccessible.
 
+### Changed
+- Warn instead of rejecting on missing host keys in `sat bootsys` commands which
+  use ssh to connect to other management NCNs.
+
 ## [3.7.0] - 2021-05-13
 
 ### Changed
