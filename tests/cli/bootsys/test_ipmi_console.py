@@ -46,8 +46,8 @@ class TestIPMIConsoleLogger(unittest.TestCase):
         self.username = 'root'
         self.password = 'hunter2'
 
-        self.mock_ssh_client_cls = patch('sat.cli.bootsys.ipmi_console.SSHClient').start()
-        self.mock_ssh_client = self.mock_ssh_client_cls.return_value
+        self.mock_get_ssh_client = patch('sat.cli.bootsys.ipmi_console.get_ssh_client').start()
+        self.mock_ssh_client = self.mock_get_ssh_client.return_value
 
         self.console_logger = IPMIConsoleLogger(self.hosts, self.username, self.password)
 
@@ -77,8 +77,7 @@ class TestIPMIConsoleLogger(unittest.TestCase):
     def test_ssh_client(self):
         """Test the ssh_client property."""
         ssh_client = self.console_logger.ssh_client
-        self.mock_ssh_client_cls.assert_called_once_with()
-        self.mock_ssh_client.load_system_host_keys.assert_called_once_with()
+        self.mock_get_ssh_client.assert_called_once_with()
         self.mock_ssh_client.connect.assert_called_once_with(IPMIConsoleLogger.CONSOLE_MONITORING_HOST)
         self.assertEqual(self.mock_ssh_client, ssh_client)
 

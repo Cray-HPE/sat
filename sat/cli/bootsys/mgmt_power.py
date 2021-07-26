@@ -28,11 +28,10 @@ import subprocess
 import sys
 
 import inflect
-from paramiko.client import SSHClient
 from paramiko.ssh_exception import BadHostKeyException, AuthenticationException, SSHException
 
 from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger, ConsoleLoggingError
-from sat.cli.bootsys.util import get_and_verify_ncn_groups, FatalBootsysError
+from sat.cli.bootsys.util import get_and_verify_ncn_groups, get_ssh_client, FatalBootsysError
 from sat.cli.bootsys.waiting import GroupWaiter
 from sat.config import get_config_value
 from sat.util import BeginEndLogger, get_username_and_password_interactively, prompt_continue
@@ -143,8 +142,7 @@ class SSHAvailableWaiter(GroupWaiter):
     """
 
     def __init__(self, members, timeout, poll_interval=1):
-        self.ssh_client = SSHClient()
-        self.ssh_client.load_system_host_keys()
+        self.ssh_client = get_ssh_client()
 
         super().__init__(members, timeout, poll_interval=poll_interval)
 
@@ -176,7 +174,7 @@ def start_shutdown(hosts, ssh_client):
 
     Args:
         hosts ([str]): a list of hostnames to shut down.
-        ssh_client (SSHClient): a paramiko client object.
+        ssh_client (paramiko.SSHClient): a paramiko client object.
     """
 
     REMOTE_CMD = 'shutdown -h now'
@@ -239,7 +237,7 @@ def do_mgmt_shutdown_power(ssh_client, username, password, excluded_ncns, ncn_sh
     """Power off NCNs.
 
     Args:
-        ssh_client (SSHClient): a paramiko client object.
+        ssh_client (paramiko.SSHClient): a paramiko client object.
         username (str): IPMI username to use.
         password (str): IPMI password to use.
         excluded_ncns (set of str): The set of ncn hostnames to exclude, in
@@ -287,8 +285,7 @@ def do_power_off_ncns(args):
     prompt_continue(action_msg)
     username, password = get_username_and_password_interactively(username_prompt='IPMI username',
                                                                  password_prompt='IPMI password')
-    ssh_client = SSHClient()
-    ssh_client.load_system_host_keys()
+    ssh_client = get_ssh_client()
 
     with BeginEndLogger(action_msg):
         do_mgmt_shutdown_power(ssh_client, username, password, args.excluded_ncns,

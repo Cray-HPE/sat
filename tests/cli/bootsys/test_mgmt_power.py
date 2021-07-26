@@ -1,7 +1,7 @@
 """
 Tests for the sat.cli.bootsys.mgmt_power module.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -32,7 +32,8 @@ from sat.cli.bootsys.mgmt_power import SSHAvailableWaiter, IPMIPowerStateWaiter
 class TestSSHAvailableWaiter(unittest.TestCase):
     """Tests for the sat.cli.bootsys.mgmt_power.SSHAvailableWaiter class"""
     def setUp(self):
-        self.mock_ssh_client = patch('sat.cli.bootsys.mgmt_power.SSHClient').start()
+        self.mock_get_ssh_client = patch('sat.cli.bootsys.mgmt_power.get_ssh_client').start()
+        self.mock_ssh_client = self.mock_get_ssh_client.return_value
         self.members = ['ncn-w002', 'ncn-s001']
         self.timeout = 1
 
@@ -40,9 +41,9 @@ class TestSSHAvailableWaiter(unittest.TestCase):
         patch.stopall()
 
     def test_pre_wait_action_loads_keys(self):
-        """Test the SSH waiter loads system host keys"""
+        """Test the SSH waiter loads system host keys through get_ssh_client."""
         SSHAvailableWaiter(self.members, self.timeout).pre_wait_action()
-        self.mock_ssh_client.return_value.load_system_host_keys.assert_called_once()
+        self.mock_get_ssh_client.assert_called_once_with()
 
     def test_ssh_available(self):
         """Test the SSH waiter detects available nodes"""
@@ -52,13 +53,13 @@ class TestSSHAvailableWaiter(unittest.TestCase):
     def test_ssh_not_available(self):
         """Test the SSH waiter detects node isn't available due to SSHException"""
         waiter = SSHAvailableWaiter(self.members, self.timeout)
-        self.mock_ssh_client.return_value.connect.side_effect = SSHException("SSH doesn't work")
+        self.mock_ssh_client.connect.side_effect = SSHException("SSH doesn't work")
         self.assertFalse(waiter.member_has_completed(self.members[0]))
 
     def test_ssh_not_available_no_valid_connection(self):
         """Test the SSH waiter detects node isn't available due to no valid connection"""
         waiter = SSHAvailableWaiter(self.members, self.timeout)
-        self.mock_ssh_client.return_value.connect.side_effect = NoValidConnectionsError(
+        self.mock_ssh_client.connect.side_effect = NoValidConnectionsError(
             {('127.0.0.1', '22'): 'Something happened'})
         self.assertFalse(waiter.member_has_completed(self.members[0]))
 

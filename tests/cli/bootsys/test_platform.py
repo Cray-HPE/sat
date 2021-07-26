@@ -60,8 +60,8 @@ class TestContainerStopThread(unittest.TestCase):
     def setUp(self):
         """Set up some mocks and a ContainerStopThread"""
         self.host = 'ncn-w001'
-        self.ssh_client_class = mock.patch('sat.cli.bootsys.platform.SSHClient').start()
-        self.ssh_client = self.ssh_client_class.return_value
+        self.get_ssh_client = mock.patch('sat.cli.bootsys.platform.get_ssh_client').start()
+        self.ssh_client = self.get_ssh_client.return_value
 
         self.cst = ContainerStopThread(self.host)
 
@@ -70,9 +70,7 @@ class TestContainerStopThread(unittest.TestCase):
 
     def assert_ssh_connected(self):
         """Assert the SSHClient is created and connected."""
-        self.ssh_client_class.assert_called_once_with()
-        self.ssh_client.load_system_host_keys.assert_called_once_with()
-        self.ssh_client.set_missing_host_key_policy.assert_called_once_with(WarningPolicy)
+        self.get_ssh_client.assert_called_once_with()
         self.ssh_client.connect.assert_called_once_with(self.host)
 
     @contextmanager
@@ -396,8 +394,8 @@ class TestRemoteServiceWaiter(unittest.TestCase):
         # set self.systemctl_works to False to mimic cases when running the command does not
         # change the service's status
         self.systemctl_works = True
-        self.ssh_client_class = mock.patch('sat.cli.bootsys.platform.SSHClient').start()
-        self.ssh_client = self.ssh_client_class.return_value
+        self.get_ssh_client = mock.patch('sat.cli.bootsys.platform.get_ssh_client').start()
+        self.ssh_client = self.get_ssh_client.return_value
         self.ssh_client.exec_command.side_effect = self._fake_ssh_command
         self.ssh_return_values = mock.Mock(), mock.Mock(), mock.Mock()
         self.ssh_return_values[1].channel.recv_exit_status.return_value = 0
@@ -422,9 +420,7 @@ class TestRemoteServiceWaiter(unittest.TestCase):
 
     def assert_ssh_connected(self):
         """Assert the SSH client connected to the host."""
-        self.ssh_client_class.assert_called_once_with()
-        self.ssh_client.load_system_host_keys.assert_called_once_with()
-        self.ssh_client.set_missing_host_key_policy.assert_called_once_with(WarningPolicy)
+        self.get_ssh_client.assert_called_once_with()
         self.ssh_client.connect.assert_called_once_with(self.host)
 
     def test_init(self):
