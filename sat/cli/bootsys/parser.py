@@ -148,6 +148,26 @@ def _add_stage_options(subparser, action):
     )
 
 
+def _add_excluded_ncns_option(subparser):
+    """Add the --excluded-ncns option to the subparser.
+
+    Args:
+        subparser: The argparse.ArgumentParser object for the bootsys action
+
+    Returns:
+        None
+    """
+    subparser.add_argument(
+        '--excluded-ncns',
+        help='Comma-separated list of NCN hostnames to exclude from ncn-power '
+             'and platform-services stages. Only use this option to exclude '
+             'inaccessible NCNs that are already outside of the Kubernetes '
+             'cluster.',
+        type=lambda x: {item.strip() for item in x.split(',')},
+        default=set()
+    )
+
+
 def _add_bootsys_action_subparser(subparsers, action):
     """Add the shutdown subparser to the parent bootsys parser.
 
@@ -166,6 +186,7 @@ def _add_bootsys_action_subparser(subparsers, action):
     _add_stage_options(action_parser, action)
     _add_bos_template_options(action_parser, action)
     _add_timeout_options(action_parser, action)
+    _add_excluded_ncns_option(action_parser)
 
 
 def _add_bootsys_shutdown_subparser(subparsers):

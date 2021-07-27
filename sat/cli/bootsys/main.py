@@ -1,7 +1,7 @@
 """
 Entry point for the bootsys subcommand.
 
-(C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -79,6 +79,10 @@ def do_bootsys(args):
     # for `sat bootsys shutdown --stage session-checks`.
     if args.action == 'shutdown' and args.stage is None:
         args.stage = 'session-checks'
+
+    if args.excluded_ncns and args.stage not in ('ncn-power', 'platform-services'):
+        LOGGER.warning('Ignoring --excluded-ncns option. It only applies to '
+                       'ncn-power and platform-services stages.')
 
     try:
         submodule, stage_func_name = STAGES_BY_ACTION[args.action][args.stage]

@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 from collections import namedtuple
 import logging
 import socket
-from paramiko import SSHClient, SSHException, WarningPolicy
+from paramiko import SSHException
 from threading import Thread
 
 from sat.cached_property import cached_property
@@ -37,7 +37,7 @@ from sat.cli.bootsys.ceph import (
     CephHealthWaiter
 )
 from sat.cli.bootsys.etcd import save_etcd_snapshot_on_host, EtcdInactiveFailure, EtcdSnapshotFailure
-from sat.cli.bootsys.util import get_mgmt_ncn_hostnames
+from sat.cli.bootsys.util import get_and_verify_ncn_groups, get_ssh_client, FatalBootsysError
 from sat.cli.bootsys.waiting import Waiter
 from sat.util import BeginEndLogger, pester_choices
 
@@ -107,7 +107,7 @@ class RemoteServiceWaiter(Waiter):
         self.service_name = service_name
         self.target_state = target_state
         self.target_enabled = target_enabled
-        self.ssh_client = SSHClient()
+        self.ssh_client = get_ssh_client()
 
     def _run_remote_command(self, command, nonzero_error=True):
         """Run the given command on the remote host.
@@ -160,8 +160,6 @@ class RemoteServiceWaiter(Waiter):
             RuntimeError, SSHException: from _run_remote_command.
         """
         systemctl_action = ('stop', 'start')[self.target_state == 'active']
-        self.ssh_client.load_system_host_keys()
-        self.ssh_client.set_missing_host_key_policy(WarningPolicy)
         self.ssh_client.connect(self.host)
         if self.has_completed():
             self.completed = True
@@ -214,39 +212,6 @@ class RemoteServiceWaiter(Waiter):
         return current_state == self.target_state
 
 
-def prompt_for_ncn_verification():
-    """Get NCNs by group and prompt user for confirmation of correctness.
-
-    Returns:
-        A dictionary mapping from NCN group name to sorted lists of nodes in group.
-
-    Raises:
-        FatalPlatformError: if admin answers prompt by saying NCN groups are
-            incorrect.
-    """
-    ncns_by_group = {
-        'managers': sorted(get_mgmt_ncn_hostnames(['managers'])),
-        'workers': sorted(get_mgmt_ncn_hostnames(['workers'])),
-        'kubernetes': sorted(get_mgmt_ncn_hostnames(['managers', 'workers'])),
-        'storage': sorted(get_mgmt_ncn_hostnames(['storage']))
-    }
-
-    print('Identified the following Non-compute Node (NCN) groups as follows.')
-    for name, members in ncns_by_group.items():
-        print(f'{name}: {members}')
-
-    empty_groups = [name for name, members in ncns_by_group.items()
-                    if not members]
-    if empty_groups:
-        raise FatalPlatformError(f'Failed to identify members of the following '
-                                 f'NCN group(s): {empty_groups}')
-
-    if pester_choices('Are the above NCN groupings correct?', ('yes', 'no')) == 'no':
-        raise FatalPlatformError('User indicated NCN groups are incorrect.')
-
-    return ncns_by_group
-
-
 class ContainerStopThread(Thread):
     """A thread that will stop containers on hosts."""
     def __init__(self, host):
@@ -267,9 +232,7 @@ class ContainerStopThread(Thread):
             SystemExit(1): if there is a failure to connect to `self.host`.
         """
         try:
-            ssh_client = SSHClient()
-            ssh_client.load_system_host_keys()
-            ssh_client.set_missing_host_key_policy(WarningPolicy)
+            ssh_client = get_ssh_client()
             ssh_client.connect(self.host)
             return ssh_client
         except (socket.error, SSHException) as err:
@@ -608,10 +571,12 @@ STEPS_BY_ACTION = {
 }
 
 
-def do_platform_action(action):
+def do_platform_action(args, action):
     """Do a platform action with the given ordered steps.
 
     Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this stage.
         action (str): The action to take. Must be a key in STEPS_BY_ACTION.
 
     Returns:
@@ -627,8 +592,8 @@ def do_platform_action(action):
         raise SystemExit(1)
 
     try:
-        ncn_groups = prompt_for_ncn_verification()
-    except FatalPlatformError as err:
+        ncn_groups = get_and_verify_ncn_groups(args.excluded_ncns)
+    except FatalBootsysError as err:
         LOGGER.error(f'Not proceeding with platform {action}: {err}')
         raise SystemExit(1)
 
@@ -667,7 +632,7 @@ def do_platform_stop(args):
     Returns:
         None
     """
-    do_platform_action('stop')
+    do_platform_action(args, 'stop')
 
 
 def do_platform_start(args):
@@ -676,5 +641,8 @@ def do_platform_start(args):
     Args:
         args: The argparse.Namespace object containing the parsed arguments
             passed to this stage.
+
+    Returns:
+        None
     """
-    do_platform_action('start')
+    do_platform_action(args, 'start')

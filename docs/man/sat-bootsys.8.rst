@@ -120,6 +120,23 @@ These options apply to both the ``shutdown`` and ``boot`` actions.
         (above). If ``--bos-templates`` or its configuration-file equivalent is
         specified, then this option will be ignored.
 
+**--excluded-ncns** *EXCLUDED_NCNS*
+        A comma-separated list of NCN hostnames that should be excluded from the
+        shutdown and boot operations. This option only applies to the ncn-power
+        and platform-services stages. This option should only be used to exclude
+        NCNs if they are inaccessible and already outside of the Kubernetes
+        cluster. Using this option in other circumstances will cause serious
+        problems when cleanly shutting down or booting the system.
+
+        Note that ncn-m001 will always be excluded from the ncn-power stage
+        because ncn-m001 is the node on which you are assumed to be running the
+        command.
+
+        The ncn-power and platform-services stages will both prompt the user to
+        ensure that the correct list of NCNs are being targeted. NCN hostnames
+        specified here that do not match any of the recognized NCN hostnames on
+        the system are silently ignored.
+
 SHUTDOWN TIMEOUT OPTIONS
 ------------------------
 

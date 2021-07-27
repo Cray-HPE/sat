@@ -26,8 +26,9 @@ import os
 import socket
 from time import sleep
 
-from paramiko import SSHClient, SSHException
+from paramiko import SSHException
 
+from sat.cli.bootsys.util import get_ssh_client
 from sat.cached_property import cached_property
 
 LOGGER = logging.getLogger(__name__)
@@ -103,8 +104,7 @@ class IPMIConsoleLogger:
         Raises:
             ConsoleLoggingError: if there is a failure to connect to the remote monitoring host.
         """
-        ssh_client = SSHClient()
-        ssh_client.load_system_host_keys()
+        ssh_client = get_ssh_client()
         try:
             ssh_client.connect(self.CONSOLE_MONITORING_HOST)
         except (SSHException, socket.error) as err:

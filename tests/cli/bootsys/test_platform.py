@@ -48,10 +48,10 @@ from sat.cli.bootsys.platform import (
     FatalPlatformError,
     NonFatalPlatformError,
     PlatformServicesStep,
-    prompt_for_ncn_verification,
     RemoteServiceWaiter,
     SERVICE_ACTION_TIMEOUT,
 )
+from sat.cli.bootsys.util import FatalBootsysError
 
 
 class TestContainerStopThread(unittest.TestCase):
@@ -60,8 +60,8 @@ class TestContainerStopThread(unittest.TestCase):
     def setUp(self):
         """Set up some mocks and a ContainerStopThread"""
         self.host = 'ncn-w001'
-        self.ssh_client_class = mock.patch('sat.cli.bootsys.platform.SSHClient').start()
-        self.ssh_client = self.ssh_client_class.return_value
+        self.get_ssh_client = mock.patch('sat.cli.bootsys.platform.get_ssh_client').start()
+        self.ssh_client = self.get_ssh_client.return_value
 
         self.cst = ContainerStopThread(self.host)
 
@@ -70,9 +70,7 @@ class TestContainerStopThread(unittest.TestCase):
 
     def assert_ssh_connected(self):
         """Assert the SSHClient is created and connected."""
-        self.ssh_client_class.assert_called_once_with()
-        self.ssh_client.load_system_host_keys.assert_called_once_with()
-        self.ssh_client.set_missing_host_key_policy.assert_called_once_with(WarningPolicy)
+        self.get_ssh_client.assert_called_once_with()
         self.ssh_client.connect.assert_called_once_with(self.host)
 
     @contextmanager
@@ -396,8 +394,8 @@ class TestRemoteServiceWaiter(unittest.TestCase):
         # set self.systemctl_works to False to mimic cases when running the command does not
         # change the service's status
         self.systemctl_works = True
-        self.ssh_client_class = mock.patch('sat.cli.bootsys.platform.SSHClient').start()
-        self.ssh_client = self.ssh_client_class.return_value
+        self.get_ssh_client = mock.patch('sat.cli.bootsys.platform.get_ssh_client').start()
+        self.ssh_client = self.get_ssh_client.return_value
         self.ssh_client.exec_command.side_effect = self._fake_ssh_command
         self.ssh_return_values = mock.Mock(), mock.Mock(), mock.Mock()
         self.ssh_return_values[1].channel.recv_exit_status.return_value = 0
@@ -422,9 +420,7 @@ class TestRemoteServiceWaiter(unittest.TestCase):
 
     def assert_ssh_connected(self):
         """Assert the SSH client connected to the host."""
-        self.ssh_client_class.assert_called_once_with()
-        self.ssh_client.load_system_host_keys.assert_called_once_with()
-        self.ssh_client.set_missing_host_key_policy.assert_called_once_with(WarningPolicy)
+        self.get_ssh_client.assert_called_once_with()
         self.ssh_client.connect.assert_called_once_with(self.host)
 
     def test_init(self):
@@ -607,6 +603,7 @@ class TestDoPlatformAction(unittest.TestCase):
     def setUp(self):
         """Set up mocks."""
         self.known_action = 'start'
+        self.mock_args = mock.Mock()
         self.mock_first_step = mock.Mock()
         self.mock_second_step = mock.Mock()
         self.mock_steps = {
@@ -618,8 +615,8 @@ class TestDoPlatformAction(unittest.TestCase):
         }
         mock.patch('sat.cli.bootsys.platform.STEPS_BY_ACTION', self.mock_steps).start()
 
-        self.mock_prompt_for_ncn_verification = mock.patch(
-            'sat.cli.bootsys.platform.prompt_for_ncn_verification').start()
+        self.mock_get_and_verify_ncn_groups = mock.patch(
+            'sat.cli.bootsys.platform.get_and_verify_ncn_groups').start()
 
         self.mock_print = mock.patch('builtins.print').start()
 
@@ -631,7 +628,7 @@ class TestDoPlatformAction(unittest.TestCase):
         invalid_action = 'bounce'
         with self.assertRaises(SystemExit):
             with self.assertLogs(level=logging.ERROR) as cm:
-                do_platform_action(invalid_action)
+                do_platform_action(self.mock_args, invalid_action)
 
         expected_err = f'Invalid action "{invalid_action}" to perform on platform services.'
         self.assertEqual(cm.records[0].message, expected_err)
@@ -639,10 +636,10 @@ class TestDoPlatformAction(unittest.TestCase):
     def test_failed_ncn_verification(self):
         """Test do_platform_action when NCN verification fails."""
         bad_ncn_msg = 'bad NCNs'
-        self.mock_prompt_for_ncn_verification.side_effect = FatalPlatformError(bad_ncn_msg)
+        self.mock_get_and_verify_ncn_groups.side_effect = FatalBootsysError(bad_ncn_msg)
         with self.assertRaises(SystemExit):
             with self.assertLogs(level=logging.ERROR) as cm:
-                do_platform_action(self.known_action)
+                do_platform_action(self.mock_args, self.known_action)
 
         expected_err = f'Not proceeding with platform {self.known_action}: {bad_ncn_msg}'
         self.assertEqual(cm.records[0].message, expected_err)
@@ -650,8 +647,9 @@ class TestDoPlatformAction(unittest.TestCase):
     def test_do_platform_action_success(self):
         """Test do_platform_action when all steps are successful."""
         with self.assertLogs(level=logging.INFO) as cm:
-            do_platform_action(self.known_action)
+            do_platform_action(self.mock_args, self.known_action)
 
+        self.mock_get_and_verify_ncn_groups.assert_called_once_with(self.mock_args.excluded_ncns)
         self.mock_print.assert_has_calls([
             mock.call('Executing step: first step'),
             mock.call('Executing step: second step')
@@ -664,8 +662,9 @@ class TestDoPlatformAction(unittest.TestCase):
         self.mock_first_step.side_effect = FatalPlatformError('fail')
         with self.assertLogs(level=logging.INFO) as cm:
             with self.assertRaises(SystemExit):
-                do_platform_action(self.known_action)
+                do_platform_action(self.mock_args, self.known_action)
 
+        self.mock_get_and_verify_ncn_groups.assert_called_once_with(self.mock_args.excluded_ncns)
         self.mock_print.assert_called_once_with("Executing step: first step")
         self.assertEqual(cm.records[0].message, 'Executing step: first step')
         self.assertEqual(cm.records[0].levelno, logging.INFO)
@@ -679,8 +678,9 @@ class TestDoPlatformAction(unittest.TestCase):
         self.mock_first_step.side_effect = NonFatalPlatformError('fail')
         with self.assertLogs(level=logging.INFO) as cm:
             with self.assertRaises(SystemExit):
-                do_platform_action(self.known_action)
+                do_platform_action(self.mock_args, self.known_action)
 
+        self.mock_get_and_verify_ncn_groups.assert_called_once_with(self.mock_args.excluded_ncns)
         mock_pester_choices.assert_called_once()
         self.assertEqual([mock.call("Executing step: first step"),
                           mock.call("Aborting.")],
@@ -698,8 +698,9 @@ class TestDoPlatformAction(unittest.TestCase):
         """Test do_platform_action when a step fails non-fatally, and the user continues."""
         self.mock_first_step.side_effect = NonFatalPlatformError('fail')
         with self.assertLogs(level=logging.INFO) as cm:
-            do_platform_action(self.known_action)
+            do_platform_action(self.mock_args, self.known_action)
 
+        self.mock_get_and_verify_ncn_groups.assert_called_once_with(self.mock_args.excluded_ncns)
         mock_pester_choices.assert_called_once()
         self.assertEqual([mock.call("Executing step: first step"),
                           mock.call("Continuing."),
@@ -730,12 +731,12 @@ class TestDoPlatformStartStop(unittest.TestCase):
     def test_do_platform_start(self):
         """Test that do_platform_start correctly calls do_platform_action."""
         do_platform_start(self.args)
-        self.mock_do_platform_action.assert_called_once_with('start')
+        self.mock_do_platform_action.assert_called_once_with(self.args, 'start')
 
     def test_do_platform_stop(self):
         """Test that do_platform_stop correctly calls do_platform_action."""
         do_platform_stop(self.args)
-        self.mock_do_platform_action.assert_called_once_with('stop')
+        self.mock_do_platform_action.assert_called_once_with(self.args, 'stop')
 
 
 class TestDoStopContainers(unittest.TestCase):
@@ -864,103 +865,6 @@ class TestDoCephUnfreeze(unittest.TestCase):
             do_ceph_unfreeze(self.ncn_groups)
         self.toggle_ceph_freeze_flags.assert_not_called()
         self.ceph_waiter_cls.assert_not_called()
-
-
-class TestPromptForNCNVerification(unittest.TestCase):
-    """Tests for prompt_for_ncn_verification function."""
-
-    def setUp(self):
-        """Set up mocks."""
-        self.mock_print = mock.patch('builtins.print').start()
-
-        self.mock_managers = ['ncn-m001', 'ncn-m002', 'ncn-m003']
-        self.mock_workers = ['ncn-w001', 'ncn-w002', 'ncn-w003']
-        self.mock_storage = ['ncn-s001', 'ncn-s002']
-
-        def mock_get_hostnames(subroles):
-            if subroles == ['managers']:
-                return set(self.mock_managers)
-            elif subroles == ['workers']:
-                return set(self.mock_workers)
-            elif subroles == ['managers', 'workers']:
-                return set(self.mock_managers + self.mock_workers)
-            elif subroles == ['storage']:
-                return set(self.mock_storage)
-            else:
-                return set()
-
-        self.mock_get_hostnames = mock.patch(
-            'sat.cli.bootsys.platform.get_mgmt_ncn_hostnames', mock_get_hostnames).start()
-
-        self.mock_pester_choices = mock.patch(
-            'sat.cli.bootsys.platform.pester_choices').start()
-
-    def tearDown(self):
-        mock.patch.stopall()
-
-    def assert_printed_messages(self):
-        """Helper function to assert proper messages printed."""
-        self.mock_print.assert_has_calls([
-            mock.call('Identified the following Non-compute Node (NCN) groups as follows.'),
-            mock.call(f'managers: {self.mock_managers}'),
-            mock.call(f'workers: {self.mock_workers}'),
-            mock.call(f'kubernetes: {self.mock_managers + self.mock_workers}'),
-            mock.call(f'storage: {self.mock_storage}')
-        ])
-
-    @staticmethod
-    def get_empty_group_message(group_names):
-        """Helper to get a message for the empty group(s)
-
-        Args:
-            group_names (list of str): The list of empty group names.
-        """
-        return f'Failed to identify members of the following NCN group(s): {group_names}'
-
-    def test_empty_managers(self):
-        """Test with no managers identified."""
-        self.mock_managers = []
-        with self.assertRaises(FatalPlatformError) as err:
-            prompt_for_ncn_verification()
-        self.assertEqual(str(err.exception), self.get_empty_group_message(['managers']))
-        self.assert_printed_messages()
-
-    def test_empty_workers(self):
-        """Test with no workers identified."""
-        self.mock_workers = []
-        with self.assertRaises(FatalPlatformError) as err:
-            prompt_for_ncn_verification()
-        self.assertEqual(str(err.exception), self.get_empty_group_message(['workers']))
-        self.assert_printed_messages()
-
-    def test_empty_managers_and_workers(self):
-        """Test with no managers or workers identified."""
-        self.mock_managers = []
-        self.mock_workers = []
-        with self.assertRaises(FatalPlatformError) as err:
-            prompt_for_ncn_verification()
-        self.assertEqual(str(err.exception),
-                         self.get_empty_group_message(['managers', 'workers', 'kubernetes']))
-        self.assert_printed_messages()
-
-    def test_groups_confirmed(self):
-        """Test with user confirming the identified groups."""
-        self.mock_pester_choices.return_value = 'yes'
-        ncn_groups = prompt_for_ncn_verification()
-        expected_groups = {
-            'managers': self.mock_managers,
-            'workers': self.mock_workers,
-            'kubernetes': self.mock_managers + self.mock_workers,
-            'storage': self.mock_storage
-        }
-        self.assertEqual(expected_groups, ncn_groups)
-
-    def test_groups_denied(self):
-        """Test with user denying the identified groups."""
-        self.mock_pester_choices.return_value = 'no'
-        err_regex = 'User indicated NCN groups are incorrect'
-        with self.assertRaisesRegex(FatalPlatformError, err_regex):
-            prompt_for_ncn_verification()
 
 
 class TestDoServiceActionOnHosts(unittest.TestCase):
