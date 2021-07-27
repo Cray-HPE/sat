@@ -1,7 +1,7 @@
 """
 Functions to create the top-level ArgumentParser for the program.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -161,6 +161,13 @@ def create_parent_parser():
         help='Set minimum log severity for messages reported to log file on this run. '
              'Overrides values set in config file.',
         choices=['debug', 'info', 'warning', 'error', 'critical'])
+
+    parser.add_argument(
+        '--api-timeout',
+        help='The amount of time, in seconds, to wait for calls to any HTTP API to '
+             'complete before considering them failed.',
+        metavar='TIMEOUT',
+        type=int)
 
     subparsers = parser.add_subparsers(metavar='command', dest='command')
     sat.cli.build_out_subparsers(subparsers)

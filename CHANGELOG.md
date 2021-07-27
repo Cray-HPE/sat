@@ -59,6 +59,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added support for ``--format json`` to print reports in JSON.
 - Added support for the ``--filter``, ``--fields``, and ``--reverse`` options
   for summaries created by ``sat hwinv``.
+- Added option to customize the default HTTP timeout length, both using the
+  configuration file (with the ``api_gateway.api_timeout`` option) and with a new
+  command line option, ``--api-timeout``.
 
 ## [3.8.0] - 2021-06-23
 

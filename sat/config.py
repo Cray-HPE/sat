@@ -75,6 +75,7 @@ SAT_CONFIG_SPEC = {
         'cert_verify': OptionSpec(bool, True, None, None),
         'username': OptionSpec(str, getpass.getuser, None, 'username'),
         'token_file': OptionSpec(str, '', None, 'token_file'),
+        'api_timeout': OptionSpec(int, 60, None, 'api_timeout'),
     },
     'bootsys': {
         'max_hsn_states': OptionSpec(int, 10, None, None),

@@ -50,7 +50,7 @@ class APIGatewayClient:
     # This can be set in subclasses to make a client for a specific API
     base_resource_path = ''
 
-    def __init__(self, session=None, host=None, cert_verify=None, timeout=60):
+    def __init__(self, session=None, host=None, cert_verify=None, timeout=None):
         """Initialize the APIGatewayClient.
 
         Args:
@@ -80,7 +80,7 @@ class APIGatewayClient:
         self.session = session
         self.host = host
         self.cert_verify = cert_verify
-        self.timeout = timeout
+        self.timeout = get_config_value('api_gateway.api_timeout') if timeout is None else timeout
 
     def set_timeout(self, timeout):
         self.timeout = timeout
