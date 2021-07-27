@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 from collections import namedtuple
 import logging
 import socket
-from paramiko import SSHClient, SSHException, WarningPolicy
+from paramiko import SSHException
 from threading import Thread
 
 from sat.cached_property import cached_property
@@ -37,7 +37,7 @@ from sat.cli.bootsys.ceph import (
     CephHealthWaiter
 )
 from sat.cli.bootsys.etcd import save_etcd_snapshot_on_host, EtcdInactiveFailure, EtcdSnapshotFailure
-from sat.cli.bootsys.util import get_and_verify_ncn_groups, FatalBootsysError
+from sat.cli.bootsys.util import get_and_verify_ncn_groups, get_ssh_client, FatalBootsysError
 from sat.cli.bootsys.waiting import Waiter
 from sat.util import BeginEndLogger, pester_choices
 
@@ -107,7 +107,7 @@ class RemoteServiceWaiter(Waiter):
         self.service_name = service_name
         self.target_state = target_state
         self.target_enabled = target_enabled
-        self.ssh_client = SSHClient()
+        self.ssh_client = get_ssh_client()
 
     def _run_remote_command(self, command, nonzero_error=True):
         """Run the given command on the remote host.
@@ -160,8 +160,6 @@ class RemoteServiceWaiter(Waiter):
             RuntimeError, SSHException: from _run_remote_command.
         """
         systemctl_action = ('stop', 'start')[self.target_state == 'active']
-        self.ssh_client.load_system_host_keys()
-        self.ssh_client.set_missing_host_key_policy(WarningPolicy)
         self.ssh_client.connect(self.host)
         if self.has_completed():
             self.completed = True
@@ -234,9 +232,7 @@ class ContainerStopThread(Thread):
             SystemExit(1): if there is a failure to connect to `self.host`.
         """
         try:
-            ssh_client = SSHClient()
-            ssh_client.load_system_host_keys()
-            ssh_client.set_missing_host_key_policy(WarningPolicy)
+            ssh_client = get_ssh_client()
             ssh_client.connect(self.host)
             return ssh_client
         except (socket.error, SSHException) as err:

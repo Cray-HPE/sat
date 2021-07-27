@@ -40,8 +40,8 @@ class TestSaveEtcdSnapshotOnHost(unittest.TestCase):
     def setUp(self):
         """Set up some mocks."""
         self.hostname = 'ncn-m001'
-        self.mock_ssh_client_cls = mock.patch('sat.cli.bootsys.etcd.SSHClient').start()
-        self.mock_ssh_client = self.mock_ssh_client_cls.return_value
+        self.mock_get_ssh_client = mock.patch('sat.cli.bootsys.etcd.get_ssh_client').start()
+        self.mock_ssh_client = self.mock_get_ssh_client.return_value
         # Whether the corresponding exec_command should raise SSHException
         self.systemctl_raises = False
         self.mkdir_raises = False
@@ -86,8 +86,7 @@ class TestSaveEtcdSnapshotOnHost(unittest.TestCase):
 
     def assert_ssh_client_connect(self):
         """Assert the SSHClient was created and connected to the hostname."""
-        self.mock_ssh_client_cls.assert_called_once_with()
-        self.mock_ssh_client.load_system_host_keys.assert_called_once_with()
+        self.mock_get_ssh_client.assert_called_once_with()
         self.mock_ssh_client.connect.assert_called_once_with(self.hostname)
 
     def assert_exec_commands(self):
