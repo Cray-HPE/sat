@@ -127,7 +127,7 @@ def do_hsn_bringup(args):
         args: The argparse.Namespace object containing the parsed arguments
             passed to this stage.
     """
-    print('Bringing up HSN and waiting for it to be healthy.')
+    LOGGER.info('Bringing up HSN and waiting for it to be healthy.')
 
     hsn_waiter = HSNBringupWaiter(get_config_value('bootsys.hsn_timeout'))
     with BeginEndLogger('bring up HSN and wait for healthy'):
@@ -140,4 +140,4 @@ def do_hsn_bringup(args):
                      f'{", ".join(port.port_xname for port in hsn_waiter.pending)}')
         sys.exit(1)
     else:
-        print('The HSN is healthy.')
+        LOGGER.info('The HSN is healthy.')

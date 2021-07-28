@@ -64,8 +64,8 @@ def report(finished_diags, timestamp, split):
     """
     completion_stats = defaultdict(list)
     for diag in finished_diags.completed:
-        print("{} finished diag {} with status '{}'."
-              .format(diag.xname, diag.name, diag.taskstate))
+        LOGGER.info("{} finished diag {} with status '{}'."
+                    .format(diag.xname, diag.name, diag.taskstate))
         if hasattr(diag, 'messages'):
             message = diag.messages[0]  # Treat list as single element
             diag_output = message['Message'].replace('\\n', '\n')
@@ -82,8 +82,8 @@ def report(finished_diags, timestamp, split):
                 print(diag_output)
 
     for diag in finished_diags.not_completed:
-        print('{} did not complete diag {}. Status: {}'
-              .format(diag.xname, diag.name, diag.taskstate))
+        LOGGER.info('{} did not complete diag {}. Status: {}'
+                    .format(diag.xname, diag.name, diag.taskstate))
 
     for sev, controllers in completion_stats.items():
         if sev != 'OK':

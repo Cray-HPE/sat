@@ -161,6 +161,6 @@ def do_hwmatch(args):
     )
     report.add_rows(rows)
     if not rows and args.format == 'pretty':
-        print('No mismatches found')
+        LOGGER.info('No mismatches found')
     else:
         print(report)

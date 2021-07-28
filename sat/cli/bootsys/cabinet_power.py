@@ -60,15 +60,15 @@ def do_air_cooled_cabinets_power_off(args):
         raise SystemExit(1)
 
     node_xnames = list(set(river_nodes) - set(river_mgmt_nodes))
-    print(f'Powering off {len(node_xnames)} non-management nodes in air-cooled cabinets.')
+    LOGGER.info(f'Powering off {len(node_xnames)} non-management nodes in air-cooled cabinets.')
     capmc_client = CAPMCClient(SATSession())
     try:
         capmc_client.set_xnames_power_state(node_xnames, 'off', force=True)
     except APIError as err:
         LOGGER.warning(f'Failed to power off all air-cooled non-management nodes: {err}')
 
-    print(f'Waiting for {len(node_xnames)} non-management nodes in air-cooled cabinets '
-          f'to reach powered off state.')
+    LOGGER.info(f'Waiting for {len(node_xnames)} non-management nodes in air-cooled cabinets '
+                f'to reach powered off state.')
     capmc_waiter = CAPMCPowerWaiter(node_xnames, 'off',
                                     get_config_value('bootsys.capmc_timeout'))
     timed_out_xnames = capmc_waiter.wait_for_completion()
@@ -78,8 +78,8 @@ def do_air_cooled_cabinets_power_off(args):
                      f'state after powering off with CAPMC: {timed_out_xnames}')
         raise SystemExit(1)
 
-    print(f'All {len(node_xnames)} non-management nodes in air-cooled cabinets '
-          f'reached powered off state according to CAPMC.')
+    LOGGER.info(f'All {len(node_xnames)} non-management nodes in air-cooled cabinets '
+                f'reached powered off state according to CAPMC.')
 
 
 def do_liquid_cooled_cabinets_power_off(args):
@@ -98,15 +98,15 @@ def do_liquid_cooled_cabinets_power_off(args):
         LOGGER.error(f'Failed to get the xnames of the liquid-cooled chassis: {err}')
         raise SystemExit(1)
 
-    print(f'Powering off all {len(chassis_xnames)} liquid-cooled chassis.')
+    LOGGER.info(f'Powering off all {len(chassis_xnames)} liquid-cooled chassis.')
     capmc_client = CAPMCClient(SATSession())
     try:
         capmc_client.set_xnames_power_state(chassis_xnames, 'off', recursive=True)
     except APIError as err:
         LOGGER.warning(f'Failed to power off all cabinets: {err}')
 
-    print(f'Waiting for {len(chassis_xnames)} liquid-cooled chassis to reach '
-          f'powered off state.')
+    LOGGER.info(f'Waiting for {len(chassis_xnames)} liquid-cooled chassis to reach '
+                f'powered off state.')
     capmc_waiter = CAPMCPowerWaiter(chassis_xnames, 'off',
                                     get_config_value('bootsys.capmc_timeout'))
     timed_out_xnames = capmc_waiter.wait_for_completion()
@@ -116,8 +116,8 @@ def do_liquid_cooled_cabinets_power_off(args):
                      f'state after powering off with CAPMC: {timed_out_xnames}')
         raise SystemExit(1)
 
-    print(f'All {len(chassis_xnames)} liquid-cooled chassis reached powered off '
-          f'state according to CAPMC.')
+    LOGGER.info(f'All {len(chassis_xnames)} liquid-cooled chassis reached powered off '
+                f'state according to CAPMC.')
 
 
 def do_cabinets_power_off(args):
@@ -132,8 +132,8 @@ def do_cabinets_power_off(args):
     if not args.disruptive:
         prompt_continue('powering off compute cabinets')
 
-    print(f'Suspending {HMSDiscoveryCronJob.FULL_NAME} to ensure components '
-          f'remain powered off.')
+    LOGGER.info(f'Suspending {HMSDiscoveryCronJob.FULL_NAME} to ensure components '
+                f'remain powered off.')
     try:
         HMSDiscoveryCronJob().set_suspend_status(True)
     except HMSDiscoveryError as err:
@@ -157,14 +157,14 @@ def do_cabinets_power_on(args):
     Returns:
         None
     """
-    print(f'Resuming {HMSDiscoveryCronJob.FULL_NAME}.')
+    LOGGER.info(f'Resuming {HMSDiscoveryCronJob.FULL_NAME}.')
     try:
         HMSDiscoveryCronJob().set_suspend_status(False)
     except HMSDiscoveryError as err:
         LOGGER.error(f'Failed to resume discovery: {err}')
         raise SystemExit(1)
 
-    print(f'Waiting for {HMSDiscoveryCronJob.FULL_NAME} to be scheduled.')
+    LOGGER.info(f'Waiting for {HMSDiscoveryCronJob.FULL_NAME} to be scheduled.')
     try:
         hms_discovery_waiter = HMSDiscoveryScheduledWaiter()
     except HMSDiscoveryError as err:
@@ -178,7 +178,7 @@ def do_cabinets_power_on(args):
                      f'within expected window after being resumed.')
         raise SystemExit(1)
 
-    print('Waiting for NodeBMCs in liquid-cooled cabinets to be powered on.')
+    LOGGER.info('Waiting for NodeBMCs in liquid-cooled cabinets to be powered on.')
     hsm_client = HSMClient(SATSession())
     try:
         mtn_node_bmcs = hsm_client.get_component_xnames({'Type': 'NodeBMC',
@@ -202,4 +202,4 @@ def do_cabinets_power_on(args):
                      f'{", ".join(bmcs_timed_out)}')
         raise SystemExit(1)
 
-    print('All NodeBMCs have reached powered on state.')
+    LOGGER.info('All NodeBMCs have reached powered on state.')

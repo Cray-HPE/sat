@@ -497,12 +497,12 @@ def do_ceph_unfreeze(ncn_groups):
 
     with BeginEndLogger('wait for ceph health'):
         ceph_timeout = get_config_value('bootsys.ceph_timeout')
-        print(f'Waiting up to {ceph_timeout} seconds for Ceph to become healthy after unfreeze')
+        LOGGER.info(f'Waiting up to {ceph_timeout} seconds for Ceph to become healthy after unfreeze')
         ceph_waiter = CephHealthWaiter(ceph_timeout)
         if not ceph_waiter.wait_for_completion():
             raise FatalPlatformError(f'Ceph is not healthy. Please correct Ceph health and try again.')
         else:
-            print('Ceph is healthy.')
+            LOGGER.info('Ceph is healthy.')
 
 
 def do_etcd_snapshot(ncn_groups):
@@ -600,7 +600,6 @@ def do_platform_action(args, action):
     for step in steps:
         try:
             info_message = f'Executing step: {step.description}'
-            print(info_message)
             LOGGER.info(info_message)
             step.action(ncn_groups)
         except NonFatalPlatformError as err:
@@ -608,13 +607,9 @@ def do_platform_action(args, action):
                            f'platform services {action}: {err}')
             answer = pester_choices(f'Continue with platform services {action}?', ('yes', 'no'))
             if answer == 'yes':
-                continue_message = 'Continuing.'
-                LOGGER.info(continue_message)
-                print(continue_message)
+                LOGGER.info('Continuing.')
             else:
-                abort_message = 'Aborting.'
-                LOGGER.info(abort_message)
-                print(abort_message)
+                LOGGER.info('Aborting.')
                 raise SystemExit(1)
         except FatalPlatformError as err:
             LOGGER.error(f'Fatal error in step "{step.description}" of '

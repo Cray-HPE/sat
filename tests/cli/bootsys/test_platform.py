@@ -618,8 +618,6 @@ class TestDoPlatformAction(unittest.TestCase):
         self.mock_get_and_verify_ncn_groups = mock.patch(
             'sat.cli.bootsys.platform.get_and_verify_ncn_groups').start()
 
-        self.mock_print = mock.patch('builtins.print').start()
-
     def tearDown(self):
         mock.patch.stopall()
 
@@ -650,10 +648,6 @@ class TestDoPlatformAction(unittest.TestCase):
             do_platform_action(self.mock_args, self.known_action)
 
         self.mock_get_and_verify_ncn_groups.assert_called_once_with(self.mock_args.excluded_ncns)
-        self.mock_print.assert_has_calls([
-            mock.call('Executing step: first step'),
-            mock.call('Executing step: second step')
-        ])
         self.assertEqual(cm.records[0].message, 'Executing step: first step')
         self.assertEqual(cm.records[1].message, 'Executing step: second step')
 
@@ -665,7 +659,6 @@ class TestDoPlatformAction(unittest.TestCase):
                 do_platform_action(self.mock_args, self.known_action)
 
         self.mock_get_and_verify_ncn_groups.assert_called_once_with(self.mock_args.excluded_ncns)
-        self.mock_print.assert_called_once_with("Executing step: first step")
         self.assertEqual(cm.records[0].message, 'Executing step: first step')
         self.assertEqual(cm.records[0].levelno, logging.INFO)
         self.assertEqual(cm.records[1].message, f'Fatal error in step "first step" of '
@@ -682,9 +675,6 @@ class TestDoPlatformAction(unittest.TestCase):
 
         self.mock_get_and_verify_ncn_groups.assert_called_once_with(self.mock_args.excluded_ncns)
         mock_pester_choices.assert_called_once()
-        self.assertEqual([mock.call("Executing step: first step"),
-                          mock.call("Aborting.")],
-                         self.mock_print.mock_calls)
         self.assertEqual(cm.records[0].message, 'Executing step: first step')
         self.assertEqual(cm.records[0].levelno, logging.INFO)
         self.assertEqual(cm.records[1].message, f'Non-fatal error in step "first step" of '
@@ -702,10 +692,6 @@ class TestDoPlatformAction(unittest.TestCase):
 
         self.mock_get_and_verify_ncn_groups.assert_called_once_with(self.mock_args.excluded_ncns)
         mock_pester_choices.assert_called_once()
-        self.assertEqual([mock.call("Executing step: first step"),
-                          mock.call("Continuing."),
-                          mock.call("Executing step: second step")],
-                         self.mock_print.mock_calls)
         self.assertEqual(cm.records[0].message, 'Executing step: first step')
         self.assertEqual(cm.records[0].levelno, logging.INFO)
         self.assertEqual(cm.records[1].message, f'Non-fatal error in step "first step" of '

@@ -243,7 +243,7 @@ class BOSSessionThread(Thread):
             '--timeout=0 job/{}'.format(self.boa_job_id)
         )
 
-        print(dedent(f'''
+        LOGGER.info(dedent(f'''
             Waiting for BOA k8s job with id {self.boa_job_id} to complete. Session template: {self.session_template}.
             To monitor the progress of this job, run the following command in a separate window:
                 'kubectl -n services logs -c boa -f --selector job-name={self.boa_job_id}'\
@@ -410,9 +410,9 @@ def do_parallel_bos_operations(session_templates, operation, timeout):
     for thread in bos_session_threads:
         thread.start()
 
-    print(f'Started {operation} operation on BOS '
-          f'{template_plural}: {", ".join(session_templates)}.')
-    print(f'Waiting up to {timeout} seconds for {session_plural} to complete.')
+    LOGGER.info(f'Started {operation} operation on BOS '
+                f'{template_plural}: {", ".join(session_templates)}.')
+    LOGGER.info(f'Waiting up to {timeout} seconds for {session_plural} to complete.')
 
     active_threads = {t.session_template: t for t in bos_session_threads}
     failed_session_templates = []
@@ -420,8 +420,8 @@ def do_parallel_bos_operations(session_templates, operation, timeout):
 
     while active_threads and elapsed_time < timeout:
         if just_finished:
-            print(f'Still waiting on session(s) for template(s): '
-                  f'{", ".join(active_threads.keys())}')
+            LOGGER.info(f'Still waiting on session(s) for template(s): '
+                        f'{", ".join(active_threads.keys())}')
         just_finished = []
 
         for session_template, thread in active_threads.items():
@@ -433,8 +433,8 @@ def do_parallel_bos_operations(session_templates, operation, timeout):
                 failed_session_templates.append(session_template)
                 just_finished.append(session_template)
             elif thread.complete:
-                print(f'{operation.title()} with BOS session template '
-                      f'{session_template} completed.')
+                LOGGER.info(f'{operation.title()} with BOS session template '
+                            f'{session_template} completed.')
                 just_finished.append(session_template)
 
         for finished in just_finished:
@@ -464,7 +464,7 @@ def do_parallel_bos_operations(session_templates, operation, timeout):
             f'{", ".join(failed_session_templates)}'
         )
 
-    print('All BOS sessions completed.')
+    LOGGER.info('All BOS sessions completed.')
 
 
 def get_template_nodes_by_state(session_template_data):

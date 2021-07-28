@@ -51,14 +51,14 @@ class TestInitMain(ExtendedTestCase):
         patch.stopall()
 
     def test_successful_init(self):
-        """Test that a normal 'sat init' calls generate_default_config and prints a success message."""
-        do_init(self.sat_init_args)
+        """Test that a normal 'sat init' calls generate_default_config and logs a success message."""
+        with self.assertLogs(level=logging.INFO) as logs:
+            do_init(self.sat_init_args)
         self.mock_generate_default_config.assert_called_once_with(
             DEFAULT_CONFIG_PATH, username=self.sat_init_args.username, force=self.sat_init_args.force
         )
-        self.mock_print.assert_called_once_with(
-            f'Configuration file "{DEFAULT_CONFIG_PATH}" generated.'
-        )
+        self.assert_in_element(f'Configuration file "{DEFAULT_CONFIG_PATH}" generated.',
+                               logs.output)
 
     def test_init_already_exists(self):
         """Test that a 'sat init' handles the ConfigFileExistsError correctly."""
@@ -80,25 +80,25 @@ class TestInitMain(ExtendedTestCase):
         """Test that giving the output option generates the config at the specified path."""
         mock_path = '/mock/path.toml'
         self.sat_init_args.output = mock_path
-        do_init(self.sat_init_args)
+        with self.assertLogs(level=logging.INFO) as logs:
+            do_init(self.sat_init_args)
         self.mock_generate_default_config.assert_called_once_with(
             mock_path, username=self.sat_init_args.username, force=self.sat_init_args.force
         )
-        self.mock_print.assert_called_once_with(
-            f'Configuration file "{mock_path}" generated.'
-        )
+        self.assert_in_element(f'Configuration file "{mock_path}" generated.',
+                               logs.output)
 
     def test_init_config_file_environment_variable(self):
         """Test that giving the $SAT_CONFIG_FILE environment variable generates the config at the specified path."""
         mock_path = '/mock/path.toml'
         self.mock_getenv.return_value = mock_path
-        do_init(self.sat_init_args)
+        with self.assertLogs(level=logging.INFO) as logs:
+            do_init(self.sat_init_args)
         self.mock_generate_default_config.assert_called_once_with(
             mock_path, username=self.sat_init_args.username, force=self.sat_init_args.force
         )
-        self.mock_print.assert_called_once_with(
-            f'Configuration file "{mock_path}" generated.'
-        )
+        self.assert_in_element(f'Configuration file "{mock_path}" generated.',
+                               logs.output)
 
 
 if __name__ == '__main__':
