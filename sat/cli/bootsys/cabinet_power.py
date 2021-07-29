@@ -28,6 +28,7 @@ from sat.cli.bootsys.discovery import HMSDiscoveryCronJob, HMSDiscoveryError, HM
 from sat.cli.bootsys.power import CAPMCPowerWaiter
 from sat.config import get_config_value
 from sat.session import SATSession
+from sat.util import prompt_continue
 
 
 LOGGER = logging.getLogger(__name__)
@@ -128,6 +129,8 @@ def do_cabinets_power_off(args):
     Returns:
         None
     """
+    if not args.disruptive:
+        prompt_continue('powering off compute cabinets')
 
     print(f'Suspending {HMSDiscoveryCronJob.FULL_NAME} to ensure components '
           f'remain powered off.')

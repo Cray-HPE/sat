@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the default logging level for stderr from "WARNING" to "INFO".
 - Warn instead of rejecting on missing host keys in `sat bootsys` commands which
   use ssh to connect to other management NCNs.
+- Disruptive shutdown stages in ``sat bootsys shutdown`` now prompt the user to
+  continue before proceeding. A new option, ``--disruptive``, was added to
+  bypass this when desired.
 
 ### Fixed
 - Fixed a case where `sat xname2nid` and `sat nid2xname` failed when the input had

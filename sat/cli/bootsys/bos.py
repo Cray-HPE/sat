@@ -38,7 +38,7 @@ from sat.apiclient import APIError, BOSClient, HSMClient
 from sat.cli.bootsys.defaults import PARALLEL_CHECK_INTERVAL
 from sat.config import get_config_value
 from sat.session import SATSession
-from sat.util import get_val_by_path
+from sat.util import get_val_by_path, prompt_continue
 
 LOGGER = logging.getLogger(__name__)
 
@@ -734,6 +734,9 @@ def do_bos_shutdowns(args):
 
     Returns: None
     """
+    if not args.disruptive:
+        prompt_continue('shutdown of compute nodes and UANs using BOS')
+
     try:
         do_bos_operations('shutdown', get_config_value('bootsys.bos_shutdown_timeout'))
     except BOSFailure as err:
