@@ -73,10 +73,10 @@ def do_hwhist(args):
     """
 
     if args.xnames and args.fruids:
-        LOGGER.error('The fruid option is not valid with the xname option.')
+        LOGGER.error('The fruid options are not valid with the xname options.')
         raise SystemExit(1)
     if args.xnames and args.by_fru:
-        LOGGER.error('The xname option is not valid with the by-fru option.')
+        LOGGER.error('The xname options are not valid with the by-fru option.')
         raise SystemExit(1)
 
     id_args = None
