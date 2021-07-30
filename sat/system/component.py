@@ -1,7 +1,7 @@
 """
 Class to define a generic component obtained from Hardware State Manager (HSM).
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -81,6 +81,7 @@ class BaseComponent:
     # The list of fields supported by the component. Subclasses can override or add.
     fields = [
         ComponentField('xname'),
+        ComponentField('FRUID'),
         ComponentField('Manufacturer'),
         ComponentField('Model'),
         ComponentField('Part Number'),
@@ -185,6 +186,11 @@ class BaseComponent:
     def xname(self):
         """sat.xname.XName: The xname of the component."""
         return XName(self.raw_data['ID'])
+
+    @cached_property
+    def fruid(self):
+        """str: The FRUID of the component."""
+        return self.raw_data['PopulatedFRU']['FRUID']
 
     @cached_property
     def fru_info(self):

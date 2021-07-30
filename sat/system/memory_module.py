@@ -1,7 +1,7 @@
 """
 Class to represent a memory module object obtained from Hardware State Manager (HSM).
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -37,6 +37,7 @@ class MemoryModule(NodeComponent):
 
     fields = [
         ComponentField('xname'),
+        ComponentField('FRUID'),
         # Allow summary by manufacturer and model unlike in BaseComponent
         ComponentField('Manufacturer', summarizable=True),
         ComponentField('Model', summarizable=True),
