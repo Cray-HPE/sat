@@ -29,16 +29,22 @@ from sat.constants import MISSING_VALUE
 from sat.report import Report
 from sat.session import SATSession
 
+from sat.cli.hwhist.hwhist_fields import (
+    BY_FRU_FIELD_MAPPING,
+    BY_LOCATION_FIELD_MAPPING
+)
+
 
 LOGGER = logging.getLogger(__name__)
 
 
-def make_raw_table(hw_history, headers):
+def make_raw_table(hw_history, field_mapping):
     """Create a table of hardware history data for components from HSM API data.
 
     Args:
         hw_history ([dict]): A list of dictionaries with component history data.
-        headers ([str]): A list of dictionary keys for hw_history.
+        field_mapping (OrderedDict): A dictionary of keys for hw_history
+           with lambda functions to extract values.
 
     Returns:
         A list of lists containing hardware history data.
@@ -49,10 +55,8 @@ def make_raw_table(hw_history, headers):
         if not component.get('ID') or not component.get('History'):
             continue
         for event in component.get('History'):
-            row = []
-            for header in headers:
-                row.append(event.get(header, MISSING_VALUE))
-            raw_table.append(row)
+            raw_table.append([extractor(event)
+                              for extractor in field_mapping.values()])
 
     return raw_table
 
@@ -75,20 +79,20 @@ def do_hwhist(args):
         LOGGER.error('The xname option is not valid with the by-fru option.')
         raise SystemExit(1)
 
-    by_fru = args.by_fru
-    if args.fruids:
-        by_fru = True
-
     id_args = None
     if args.fruids:
         id_args = set(arg for arg in args.fruids if arg != '')
     if args.xnames:
         id_args = set(arg for arg in args.xnames if arg != '')
 
+    by_fru = args.by_fru
+    if args.fruids:
+        by_fru = True
+
     if by_fru:
-        headers = ['FRUID', 'ID', 'Timestamp', 'EventType']
+        field_mapping = BY_FRU_FIELD_MAPPING
     else:
-        headers = ['ID', 'FRUID', 'Timestamp', 'EventType']
+        field_mapping = BY_LOCATION_FIELD_MAPPING
 
     hsm_client = HSMClient(SATSession())
 
@@ -99,7 +103,7 @@ def do_hwhist(args):
         raise SystemExit(1)
 
     report = Report(
-        headers, None,
+        tuple(field_mapping.keys()), None,
         args.sort_by, args.reverse,
         get_config_value('format.no_headings'),
         get_config_value('format.no_borders'),
@@ -107,7 +111,7 @@ def do_hwhist(args):
         display_headings=args.fields,
         print_format=args.format)
 
-    raw_table = make_raw_table(hw_history, headers)
+    raw_table = make_raw_table(hw_history, field_mapping)
     report.add_rows(raw_table)
 
     if id_args:

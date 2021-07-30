@@ -197,6 +197,10 @@ class TestBaseComponentProperties(unittest.TestCase):
         """Test the xname property."""
         self.assertEqual(self.component.xname, DEFAULT_XNAME)
 
+    def test_fruid(self):
+        """Test the fruid property."""
+        self.assertEqual(self.component.fruid, DEFAULT_FRUID)
+
     def test_fru_info(self):
         """Test the fru_info property."""
         raw_fru_info = self.raw_data['PopulatedFRU']['{}FRUInfo'.format(DEFAULT_HSM_TYPE)]
