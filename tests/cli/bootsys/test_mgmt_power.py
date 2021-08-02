@@ -21,12 +21,17 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+from argparse import Namespace
 import unittest
 from unittest.mock import patch
 
 from paramiko.ssh_exception import SSHException, NoValidConnectionsError
 
-from sat.cli.bootsys.mgmt_power import SSHAvailableWaiter, IPMIPowerStateWaiter
+from sat.cli.bootsys.mgmt_power import (
+    do_power_off_ncns,
+    SSHAvailableWaiter,
+    IPMIPowerStateWaiter,
+)
 
 
 class TestSSHAvailableWaiter(unittest.TestCase):
@@ -109,3 +114,32 @@ class TestIPMIPowerStateWaiter(unittest.TestCase):
         self.mock_subprocess_run.return_value.returncode = 1
         waiter = IPMIPowerStateWaiter(self.members, 'on', self.timeout, self.username, self.password)
         self.assertFalse(waiter.member_has_completed(self.members[0]))
+
+
+class TestDoPowerOffNcns(unittest.TestCase):
+    """Tests for the do_power_off_ncns() function"""
+    def setUp(self):
+        self.mock_get_user_pass = patch('sat.cli.bootsys.mgmt_power.get_username_and_password_interactively').start()
+        self.mock_get_user_pass.return_value = ('user', 'pass')
+
+        self.mock_get_ssh_client = patch('sat.cli.bootsys.mgmt_power.get_ssh_client').start()
+        self.mock_prompt_continue = patch('sat.cli.bootsys.mgmt_power.prompt_continue').start()
+        self.mock_do_mgmt_shutdown_power = patch('sat.cli.bootsys.mgmt_power.do_mgmt_shutdown_power').start()
+
+        self.args = Namespace(disruptive=False, excluded_ncns=set())
+
+    def tearDown(self):
+        patch.stopall()
+
+    def test_mgmt_ncns_power_off(self):
+        """Test the user is prompted to power off management NCNs."""
+        do_power_off_ncns(self.args)
+        self.mock_prompt_continue.assert_called_once()
+        self.mock_do_mgmt_shutdown_power.assert_called_once()
+
+    def test_mgmt_ncns_skip_prompt_power_off(self):
+        """Test that the user prompt to power off management NCNs can be skipped."""
+        self.args.disruptive = True
+        do_power_off_ncns(self.args)
+        self.mock_prompt_continue.assert_not_called()
+        self.mock_do_mgmt_shutdown_power.assert_called_once()

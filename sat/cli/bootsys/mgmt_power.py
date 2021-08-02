@@ -282,7 +282,8 @@ def do_power_off_ncns(args):
     """
 
     action_msg = 'shutdown of other management NCNs'
-    prompt_continue(action_msg)
+    if not args.disruptive:
+        prompt_continue(action_msg)
     username, password = get_username_and_password_interactively(username_prompt='IPMI username',
                                                                  password_prompt='IPMI password')
     ssh_client = get_ssh_client()

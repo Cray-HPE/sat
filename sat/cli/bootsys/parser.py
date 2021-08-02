@@ -183,6 +183,10 @@ def _add_bootsys_action_subparser(subparsers, action):
         action, help=f'Perform a {action} operation',
         description=f'Performs a portion of the {action} operation on the system.'
     )
+    action_parser.add_argument('--disruptive', action='store_true',
+                               help='Do not prompt for confirmation before performing '
+                                    'disruptive actions.')
+
     _add_stage_options(action_parser, action)
     _add_bos_template_options(action_parser, action)
     _add_timeout_options(action_parser, action)

@@ -723,6 +723,7 @@ class TestDoPlatformStartStop(unittest.TestCase):
     def setUp(self):
         """Set up mocks."""
         self.args = Namespace()
+        self.args.disruptive = False
         self.mock_do_platform_action = mock.patch('sat.cli.bootsys.platform.do_platform_action').start()
 
     def tearDown(self):
@@ -733,10 +734,12 @@ class TestDoPlatformStartStop(unittest.TestCase):
         do_platform_start(self.args)
         self.mock_do_platform_action.assert_called_once_with(self.args, 'start')
 
-    def test_do_platform_stop(self):
+    @mock.patch('sat.cli.bootsys.platform.prompt_continue')
+    def test_do_platform_stop(self, mock_prompt_continue):
         """Test that do_platform_stop correctly calls do_platform_action."""
         do_platform_stop(self.args)
         self.mock_do_platform_action.assert_called_once_with(self.args, 'stop')
+        mock_prompt_continue.assert_called_once()
 
 
 class TestDoStopContainers(unittest.TestCase):

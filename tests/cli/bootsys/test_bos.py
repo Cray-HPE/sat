@@ -22,6 +22,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
+from argparse import Namespace
 import logging
 import shlex
 import subprocess
@@ -33,6 +34,7 @@ from sat.cli.bootsys.bos import (
     BOSFailure,
     BOSSessionThread,
     boa_job_successful,
+    do_bos_shutdowns,
     get_session_templates
 )
 from tests.common import ExtendedTestCase
@@ -339,6 +341,34 @@ class TestGetSessionTemplates(ExtendedTestCase):
             actual = get_session_templates()
         self.assert_in_element(self.deprecated_warning.format(','.join(expected)), logs.output)
         self.assertCountEqual(expected, actual)
+
+
+class TestDoBosShutdowns(ExtendedTestCase):
+    """Tests for the do_bos_shutdowns() function."""
+    def setUp(self):
+        self.mock_prompt = patch('sat.cli.bootsys.bos.prompt_continue').start()
+        self.mock_do_bos_ops = patch('sat.cli.bootsys.bos.do_bos_operations').start()
+        self.mock_get_config = patch('sat.cli.bootsys.bos.get_config_value', return_value=60).start()
+
+        self.args = Namespace()
+        self.args.disruptive = False
+
+    def tearDown(self):
+        patch.stopall()
+
+    def test_do_bos_shutdowns_prompt(self):
+        """Test running BOS shutdown with prompting to continue."""
+        do_bos_shutdowns(self.args)
+        self.mock_prompt.assert_called_once()
+        self.mock_do_bos_ops.assert_called_once_with('shutdown', 60)
+
+    def test_do_bos_shutdowns_without_prompt(self):
+        """Test running BOS shutdown without prompting."""
+        self.args.disruptive = True
+        do_bos_shutdowns(self.args)
+
+        self.mock_prompt.assert_not_called()
+        self.mock_do_bos_ops.assert_called_once_with('shutdown', 60)
 
 
 if __name__ == '__main__':

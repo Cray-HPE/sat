@@ -89,6 +89,18 @@ SHUTDOWN AND BOOT OPTIONS
 -------------------------
 These options apply to both the ``shutdown`` and ``boot`` actions.
 
+**--disruptive**
+        Certain actions can be disruptive to the system, and so require
+        interactive user confirmation to proceed. Using the ``--disruptive``
+        option skips any interactive user prompts. If ``--disruptive`` is used
+        with a stage which is not disruptive, it is ignored. The following 
+        shutdown stages are considered disruptive:
+
+        * bos-operations
+        * cabinet-power
+        * platform-services
+        * ncn-power
+
 **--stage** *STAGE*
         The stage of the boot or shutdown to execute. See ``--list-stages``
         to see the list of stages available for each action.
