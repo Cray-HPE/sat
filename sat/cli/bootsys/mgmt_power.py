@@ -261,13 +261,13 @@ def do_mgmt_shutdown_power(ssh_client, username, password, excluded_ncns, ncn_sh
 
     try:
         with IPMIConsoleLogger(other_ncns, username, password):
-            print(f'Sending shutdown command to other NCNs: {", ".join(other_ncns)}')
+            LOGGER.info(f'Sending shutdown command to other NCNs: {", ".join(other_ncns)}')
             start_shutdown(other_ncns, ssh_client)
-            print(f'Waiting up to {ncn_shutdown_timeout} seconds for other NCNs to '
-                  f'reach powered off state according to ipmitool: {", ".join(other_ncns)}.')
+            LOGGER.info(f'Waiting up to {ncn_shutdown_timeout} seconds for other NCNs to '
+                        f'reach powered off state according to ipmitool: {", ".join(other_ncns)}.')
             finish_shutdown(other_ncns, username, password,
                             ncn_shutdown_timeout, ipmi_timeout)
-            print('Shutdown and power off of all other NCNs complete.')
+            LOGGER.info('Shutdown and power off of all other NCNs complete.')
     except ConsoleLoggingError as err:
         LOGGER.error(f'Aborting shutdown of NCNs due failure to set up NCN console logging: {err}')
         raise SystemExit(1)
@@ -292,7 +292,7 @@ def do_power_off_ncns(args):
         do_mgmt_shutdown_power(ssh_client, username, password, args.excluded_ncns,
                                get_config_value('bootsys.ncn_shutdown_timeout'),
                                get_config_value('bootsys.ipmi_timeout'))
-    print('Succeeded with {}.'.format(action_msg))
+    LOGGER.info('Succeeded with {}.'.format(action_msg))
 
 
 def do_power_on_ncns(args):
@@ -323,8 +323,8 @@ def do_power_on_ncns(args):
             with IPMIConsoleLogger(affected_ncns, username, password):
                 for ncn_group in ordered_boot_groups:
                     ncn_boot_timeout = get_config_value('bootsys.ncn_boot_timeout')
-                    print(f'Powering on NCNs and waiting up to {ncn_boot_timeout} seconds '
-                          f'for them to be reachable via SSH: {", ".join(ncn_group)}')
+                    LOGGER.info(f'Powering on NCNs and waiting up to {ncn_boot_timeout} seconds '
+                                f'for them to be reachable via SSH: {", ".join(ncn_group)}')
 
                     # TODO (SAT-555): Probably should not send a power on if it's already on.
                     ipmi_waiter = IPMIPowerStateWaiter(ncn_group, 'on',
@@ -342,9 +342,9 @@ def do_power_on_ncns(args):
                                      ', '.join(inaccessible_nodes))
                         raise SystemExit(1)
                     else:
-                        print(f'Powered on NCNs: {", ".join(ncn_group)}')
+                        LOGGER.info(f'Powered on NCNs: {", ".join(ncn_group)}')
         except ConsoleLoggingError as err:
             LOGGER.error(f'Aborting boot of NCNs due failure to set up NCN console logging: {err}')
             raise SystemExit(1)
 
-    print('Succeeded with {}.'.format(action_msg))
+    LOGGER.info('Succeeded with {}.'.format(action_msg))

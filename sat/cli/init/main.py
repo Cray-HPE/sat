@@ -40,6 +40,6 @@ def do_init(args):
     config_file_path = args.output or os.getenv('SAT_CONFIG_FILE', DEFAULT_CONFIG_PATH)
     try:
         generate_default_config(config_file_path, username=args.username, force=args.force)
-        print(f'Configuration file "{config_file_path}" generated.')
+        LOGGER.info(f'Configuration file "{config_file_path}" generated.')
     except ConfigFileExistsError as err:
         LOGGER.warning(err)

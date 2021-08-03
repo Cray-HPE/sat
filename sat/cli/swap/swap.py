@@ -220,8 +220,8 @@ class Swapper(metaclass=abc.ABCMeta):
         # Get the port data (xname, port_link, policy_link) to enable/disable for this swap
         port_data_list = self.get_and_check_ports(component_id, force)
 
-        # Print the affected port xnames
-        print(f'Ports: {" ".join([p["xname"] for p in port_data_list])}')
+        # Log the affected port xnames
+        LOGGER.info(f'Ports: {" ".join([p["xname"] for p in port_data_list])}')
 
         if save_ports:
             ports_filename = f'{component_name}-ports.json'
@@ -229,7 +229,6 @@ class Swapper(metaclass=abc.ABCMeta):
 
         if dry_run:
             LOGGER.info(f'Dry run, so not enabling/disabling {self.component_type} {component_name}')
-            print(f'Dry run completed with no action to enable/disable {self.component_type}.')
         else:
             LOGGER.info(
                 f'{("Disabling", "Enabling")[action == "enable"]} '
@@ -243,7 +242,7 @@ class Swapper(metaclass=abc.ABCMeta):
                 LOGGER.error(f'Failed to {action} {self.component_type} {component_name}.')
                 raise SystemExit(ERR_PORT_POLICY_TOGGLE_FAIL)
 
-            print(
+            LOGGER.info(
                 f'{self.component_type.capitalize()} has '
                 f'been {("disabled", "enabled")[action == "enable"]}'
                 f'{(" and is ready for replacement.", ".")[action == "enable"]}'

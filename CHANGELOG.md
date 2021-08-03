@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Disruptive shutdown stages in ``sat bootsys shutdown`` now prompt the user to
   continue before proceeding. A new option, ``--disruptive``, was added to
   bypass this when desired.
+- Changed all informational print statements to be INFO level logging messages.
 
 ### Fixed
 - Fixed a case where `sat xname2nid` and `sat nid2xname` failed when the input had

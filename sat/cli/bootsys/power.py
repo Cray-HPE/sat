@@ -133,8 +133,8 @@ def do_nodes_power_off(timeout):
         # All nodes are already off
         return set(), set()
 
-    print(f'Forcing power off of {num_on_nodes} compute or application '
-          f'{inf.plural("node")} still powered on: {", ".join(on_nodes)}')
+    LOGGER.info(f'Forcing power off of {num_on_nodes} compute or application '
+                f'{inf.plural("node")} still powered on: {", ".join(on_nodes)}')
 
     wait_nodes = on_nodes
     failed_nodes = set()
@@ -152,8 +152,8 @@ def do_nodes_power_off(timeout):
             return set(), on_nodes
 
     num_wait_nodes = len(wait_nodes)
-    print(f'Waiting {timeout} seconds until {num_wait_nodes} {inf.plural("node", num_wait_nodes)} '
-          f'reach powered off state according to CAPMC.')
+    LOGGER.info(f'Waiting {timeout} seconds until {num_wait_nodes} {inf.plural("node", num_wait_nodes)} '
+                f'reach powered off state according to CAPMC.')
 
     waiter = CAPMCPowerWaiter(wait_nodes, 'off', timeout)
     timed_out_nodes = waiter.wait_for_completion()

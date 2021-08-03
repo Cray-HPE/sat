@@ -93,8 +93,8 @@ def do_k8s(args):
         sys.exit(1)
 
     if not args.co_located_replicas:
-        print('Summary: There were {} replica-sets that had pods running on '
-              'the same node.'.format(len(dupes)))
+        LOGGER.info('Summary: There were {} replica-sets that had pods running on '
+                    'the same node.'.format(len(dupes)))
     else:
         headers, rows = create_report(dupes, args)
 

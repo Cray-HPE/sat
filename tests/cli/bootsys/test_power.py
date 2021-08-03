@@ -23,7 +23,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 import logging
 import unittest
-from unittest.mock import call, patch
+from unittest.mock import patch
 
 from sat.apiclient import APIError
 from sat.cli.bootsys.power import (
@@ -131,22 +131,25 @@ class TestDoNodesPowerOff(ExtendedTestCase):
         """Stop all patches."""
         patch.stopall()
 
-    def assert_print_calls(self, num_wait=None, include_wait_call=True):
-        """Assert that the expected print calls are made.
+    def assert_log_calls(self, logs, num_wait=None, include_wait_call=True):
+        """Assert that the expected logging calls are made.
 
         Args:
+            logs (object): the recording object returned from the assertLogs()
+                context manager. has two attributes: `output` and `records`
             num_wait (int): the number of nodes waited on. defaults to
                 len(self.all_nodes)
             include_wait_call (bool): whether to include a print statement
                 for a wait.
         """
         num_wait = num_wait if num_wait is not None else len(self.all_nodes)
-        calls = [call(f'Forcing power off of {len(self.all_nodes)} compute or application '
-                      f'nodes still powered on: {", ".join(self.all_nodes)}')]
+        calls = [f'Forcing power off of {len(self.all_nodes)} compute or application '
+                 f'nodes still powered on: {", ".join(self.all_nodes)}']
         if include_wait_call:
-            calls.append(call(f'Waiting {self.timeout} seconds until {num_wait} nodes '
-                              f'reach powered off state according to CAPMC.'))
-        self.mock_print.assert_has_calls(calls)
+            calls.append(f'Waiting {self.timeout} seconds until {num_wait} nodes '
+                         f'reach powered off state according to CAPMC.')
+        for c in calls:
+            self.assert_in_element(c, logs.output)
 
     def assert_capmc_client_call(self):
         """Assert the call is made to the CAPMCClient to power off nodes."""
@@ -168,7 +171,8 @@ class TestDoNodesPowerOff(ExtendedTestCase):
 
     def test_do_nodes_power_off_success(self):
         """Test do_nodes_power_off in the successful case."""
-        timed_out, failed = do_nodes_power_off(self.timeout)
+        with self.assertLogs(level=logging.INFO) as cm:
+            timed_out, failed = do_nodes_power_off(self.timeout)
 
         self.assert_capmc_client_call()
         self.assertEqual(set(), timed_out)
@@ -177,7 +181,7 @@ class TestDoNodesPowerOff(ExtendedTestCase):
             self.all_nodes, 'off', self.timeout
         )
         self.mock_capmc_waiter.wait_for_completion.assert_called_once_with()
-        self.assert_print_calls()
+        self.assert_log_calls(cm)
 
     def test_do_nodes_power_off_one_failed(self):
         """Test do_nodes_power_off when one fails to power off and the rest succeed."""
@@ -193,7 +197,7 @@ class TestDoNodesPowerOff(ExtendedTestCase):
         capmc_err = CAPMCError(capmc_err_msg, xname_errs=failed_xname_errs)
         self.mock_capmc_client.set_xnames_power_state.side_effect = capmc_err
 
-        with self.assertLogs(level=logging.WARNING) as cm:
+        with self.assertLogs(level=logging.INFO) as cm:
             timed_out, failed = do_nodes_power_off(self.timeout)
 
         self.assert_in_element(f'{capmc_err_msg}\n'
@@ -208,7 +212,7 @@ class TestDoNodesPowerOff(ExtendedTestCase):
             self.all_nodes - expected_failed, 'off', self.timeout
         )
         self.mock_capmc_waiter.wait_for_completion.assert_called_once_with()
-        self.assert_print_calls(num_wait=len(self.all_nodes - expected_failed))
+        self.assert_log_calls(cm, num_wait=len(self.all_nodes - expected_failed))
 
     def test_do_nodes_power_off_capmc_failed(self):
         """Test do_nodes_power_off when the CAPMC power off request fails."""
@@ -217,7 +221,7 @@ class TestDoNodesPowerOff(ExtendedTestCase):
         expected_failed = self.all_nodes
         self.mock_capmc_client.set_xnames_power_state.side_effect = capmc_err
 
-        with self.assertLogs(level=logging.WARNING) as cm:
+        with self.assertLogs(level=logging.INFO) as cm:
             timed_out, failed = do_nodes_power_off(self.timeout)
 
         self.assert_in_element(capmc_err_msg, cm.output)
@@ -225,20 +229,21 @@ class TestDoNodesPowerOff(ExtendedTestCase):
         self.assertEqual(set(), timed_out)
         self.assertEqual(expected_failed, failed)
         self.mock_capmc_waiter_cls.assert_not_called()
-        self.assert_print_calls(include_wait_call=False)
+        self.assert_log_calls(cm, include_wait_call=False)
 
     def test_do_nodes_power_off_one_timed_out(self):
         """Test do_node_power_off when one node times out."""
         expected_timed_out = {self.compute_nodes[0]}
         self.mock_capmc_waiter.wait_for_completion.return_value = expected_timed_out
 
-        timed_out, failed = do_nodes_power_off(self.timeout)
+        with self.assertLogs(level=logging.INFO) as cm:
+            timed_out, failed = do_nodes_power_off(self.timeout)
 
         self.assert_capmc_client_call()
         self.assertEqual(expected_timed_out, timed_out)
         self.assertEqual(set(), failed)
         self.mock_capmc_waiter_cls.assert_called_once_with(self.all_nodes, 'off', self.timeout)
-        self.assert_print_calls()
+        self.assert_log_calls(cm)
 
 
 class TestGetNodesByRoleAndState(unittest.TestCase):

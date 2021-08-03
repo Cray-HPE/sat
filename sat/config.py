@@ -432,5 +432,5 @@ def generate_default_config(path, username=None, force=False):
             output_stream.write(process_toml_output(toml_str))
 
     except IOError as ioerr:
-        print("ERROR: {}".format(ioerr))
+        LOGGER.error("{}".format(ioerr))
         raise SystemExit(1)
