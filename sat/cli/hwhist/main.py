@@ -25,7 +25,6 @@ import logging
 
 from sat.apiclient import APIError, HSMClient
 from sat.config import get_config_value
-from sat.constants import MISSING_VALUE
 from sat.report import Report
 from sat.session import SATSession
 

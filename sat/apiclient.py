@@ -478,7 +478,7 @@ class HSMClient(APIGatewayClient):
         """Get component history from HSM, optionally for a single ID or FRUID.
 
         Args:
-            cid (str): A component ID which is either an xname or FRUID or None.
+            cid (str or None): A component ID which is either an xname or FRUID or None.
             by_fru (bool): if True, query HSM history using HardwareByFRU.
 
         Returns:
@@ -538,9 +538,9 @@ class HSMClient(APIGatewayClient):
                 # In either case (exception or None is returned),
                 # keep going and try to get history for other cids.
                 try:
-                    components_by_id = self.get_component_history_by_id(cid, by_fru)
-                    if components_by_id:
-                        components.extend(components_by_id)
+                    component_history = self.get_component_history_by_id(cid, by_fru)
+                    if component_history:
+                        components.extend(component_history)
                 except APIError as err:
                     LOGGER.debug(f'HSM API error for {cid}: {err}')
 
