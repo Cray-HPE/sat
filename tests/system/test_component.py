@@ -30,7 +30,8 @@ from sat.constants import EMPTY_VALUE, MISSING_VALUE
 from sat.system.field import ComponentField
 from tests.common import ExtendedTestCase
 from tests.system.component_data import DEFAULT_HSM_TYPE, DEFAULT_XNAME, DEFAULT_SERIAL_NUMBER, \
-    DEFAULT_PART_NUMBER, DEFAULT_SKU, DEFAULT_MODEL, DEFAULT_MANUFACTURER, get_component_raw_data
+    DEFAULT_PART_NUMBER, DEFAULT_SKU, DEFAULT_MODEL, DEFAULT_MANUFACTURER, \
+    DEFAULT_FRUID, get_component_raw_data
 
 
 class SampleComponent(BaseComponent):
@@ -196,6 +197,10 @@ class TestBaseComponentProperties(unittest.TestCase):
         """Test the xname property."""
         self.assertEqual(self.component.xname, DEFAULT_XNAME)
 
+    def test_fruid(self):
+        """Test the fruid property."""
+        self.assertEqual(self.component.fruid, DEFAULT_FRUID)
+
     def test_fru_info(self):
         """Test the fru_info property."""
         raw_fru_info = self.raw_data['PopulatedFRU']['{}FRUInfo'.format(DEFAULT_HSM_TYPE)]
@@ -233,6 +238,7 @@ class TestBaseComponentProperties(unittest.TestCase):
         """Test the get_dict method."""
         expected_dict = {
             'xname': DEFAULT_XNAME,
+            'FRUID': DEFAULT_FRUID,
             'Manufacturer': DEFAULT_MANUFACTURER,
             'Model': DEFAULT_MODEL,
             'Part Number': DEFAULT_PART_NUMBER,
@@ -248,6 +254,7 @@ class TestBaseComponentProperties(unittest.TestCase):
         """Test the get_dict method with the canonical field names."""
         expected_dict = {
             'xname': DEFAULT_XNAME,
+            'fruid': DEFAULT_FRUID,
             'manufacturer': DEFAULT_MANUFACTURER,
             'model': DEFAULT_MODEL,
             'part_number': DEFAULT_PART_NUMBER,

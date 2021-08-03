@@ -68,6 +68,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added option to customize the default HTTP timeout length, both using the
   configuration file (with the ``api_gateway.api_timeout`` option) and with a new
   command line option, ``--api-timeout``.
+- Added FRUID to output from ``sat hwinv``.
+- Added a new ``sat hwhist`` subcommand to display hardware component history
+  by xname (location) or by FRUID.
 
 ## [3.8.0] - 2021-06-23
 

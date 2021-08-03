@@ -474,6 +474,78 @@ class HSMClient(APIGatewayClient):
 
         return components
 
+    def get_component_history_by_id(self, cid=None, by_fru=False):
+        """Get component history from HSM, optionally for a single ID or FRUID.
+
+        Args:
+            cid (str or None): A component ID which is either an xname or FRUID or None.
+            by_fru (bool): if True, query HSM history using HardwareByFRU.
+
+        Returns:
+            components ([dict]): A list of dictionaries from HSM with component history or None.
+
+        Raises:
+            APIError: if there is a failure querying the HSM API or getting
+                the required information from the response.
+        """
+        err_prefix = 'Failed to get HSM component history'
+        params = {}
+        if by_fru:
+            inventory_type = 'HardwareByFRU'
+            if cid:
+                params = {'fruid': cid}
+        else:
+            inventory_type = 'Hardware'
+            if cid:
+                params = {'id': cid}
+
+        try:
+            components = self.get('Inventory', inventory_type, 'History', params=params).json()['Components']
+        except APIError as err:
+            raise APIError(f'{err_prefix}: {err}')
+        except ValueError as err:
+            raise APIError(f'{err_prefix} due to bad JSON in response: {err}')
+        except KeyError as err:
+            raise APIError(f'{err_prefix} due to missing {err} key in response.')
+
+        return components
+
+    def get_component_history(self, cids=None, by_fru=False):
+        """Get component history from HSM.
+
+        Args:
+            cids (set(str)): A set of component IDs which are either an xname or FRUID or None.
+            by_fru (bool): if True, query HSM history using HardwareByFRU.
+
+        Returns:
+            components ([dict]): A list of dictionaries from HSM with component history.
+
+        Raises:
+            APIError: if there is a failure querying the HSM API or getting
+                the required information from the response.
+        """
+
+        if not cids:
+            components = self.get_component_history_by_id(None, by_fru)
+        else:
+            components = []
+            for cid in cids:
+                # An exception is raised if HSM API returns a 400 when
+                # an xname has an invalid format.
+                # If the cid is a FRUID or a correctly formatted xname
+                # that does not exist in the hardware inventory,
+                # then None is returned because History is an empty list.
+                # In either case (exception or None is returned),
+                # keep going and try to get history for other cids.
+                try:
+                    component_history = self.get_component_history_by_id(cid, by_fru)
+                    if component_history:
+                        components.extend(component_history)
+                except APIError as err:
+                    LOGGER.debug(f'HSM API error for {cid}: {err}')
+
+        return components
+
 
 class FabricControllerClient(APIGatewayClient):
     base_resource_path = 'fabric-manager/'
