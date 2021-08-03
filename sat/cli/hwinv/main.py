@@ -253,7 +253,7 @@ def get_all_lists(system, args):
             filter_strs=args.filter_strs,
             show_empty=args.show_empty,
             show_missing=args.show_missing,
-            display_headings=args.fields,
+            display_headings=display_fields,
             print_format=args.format
         )
         component_report.add_rows(component_dicts)
