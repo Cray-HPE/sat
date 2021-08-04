@@ -89,6 +89,18 @@ SHUTDOWN AND BOOT OPTIONS
 -------------------------
 These options apply to both the ``shutdown`` and ``boot`` actions.
 
+**--disruptive**
+        Certain actions can be disruptive to the system, and so require
+        interactive user confirmation to proceed. Using the ``--disruptive``
+        option skips any interactive user prompts. If ``--disruptive`` is used
+        with a stage which is not disruptive, it is ignored. The following 
+        shutdown stages are considered disruptive:
+
+        * bos-operations
+        * cabinet-power
+        * platform-services
+        * ncn-power
+
 **--stage** *STAGE*
         The stage of the boot or shutdown to execute. See ``--list-stages``
         to see the list of stages available for each action.
@@ -119,6 +131,23 @@ These options apply to both the ``shutdown`` and ``boot`` actions.
         config file. This option is deprecated in favor of ``--bos-templates``
         (above). If ``--bos-templates`` or its configuration-file equivalent is
         specified, then this option will be ignored.
+
+**--excluded-ncns** *EXCLUDED_NCNS*
+        A comma-separated list of NCN hostnames that should be excluded from the
+        shutdown and boot operations. This option only applies to the ncn-power
+        and platform-services stages. This option should only be used to exclude
+        NCNs if they are inaccessible and already outside of the Kubernetes
+        cluster. Using this option in other circumstances will cause serious
+        problems when cleanly shutting down or booting the system.
+
+        Note that ncn-m001 will always be excluded from the ncn-power stage
+        because ncn-m001 is the node on which you are assumed to be running the
+        command.
+
+        The ncn-power and platform-services stages will both prompt the user to
+        ensure that the correct list of NCNs are being targeted. NCN hostnames
+        specified here that do not match any of the recognized NCN hostnames on
+        the system are silently ignored.
 
 SHUTDOWN TIMEOUT OPTIONS
 ------------------------

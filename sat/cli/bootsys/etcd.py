@@ -25,7 +25,9 @@ import logging
 import os
 import socket
 
-from paramiko import SSHClient, SSHException
+from sat.cli.bootsys.util import get_ssh_client
+
+from paramiko import SSHException
 
 LOGGER = logging.getLogger(__name__)
 
@@ -59,8 +61,7 @@ def save_etcd_snapshot_on_host(hostname):
         EtcdSnapshotFailure: if there is a failure to create the directory for
             the snapshot or a failure to create the snapshot
     """
-    ssh_client = SSHClient()
-    ssh_client.load_system_host_keys()
+    ssh_client = get_ssh_client()
 
     try:
         ssh_client.connect(hostname)

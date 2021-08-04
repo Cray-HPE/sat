@@ -123,11 +123,10 @@ def do_status(args):
         args.sort_by, args.reverse,
         get_config_value('format.no_headings'),
         get_config_value('format.no_borders'),
-        filter_strs=args.filter_strs)
+        filter_strs=args.filter_strs,
+        display_headings=args.fields,
+        print_format=args.format)
 
     report.add_rows(raw_table)
 
-    if args.format == 'yaml':
-        print(report.get_yaml())
-    else:
-        print(report)
+    print(report)

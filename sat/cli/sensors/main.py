@@ -58,7 +58,7 @@ class ServiceExit(Exception):
 
 
 def service_shutdown(signum, frame):
-    logging.warning('Caught signal %d', signum)
+    LOGGER.warning('Caught signal %d', signum)
     traceback.print_stack(frame)
     raise ServiceExit
 
@@ -167,8 +167,8 @@ def print_xnames_not_included(xnames, types, hsm_xnames_info):
                 xnames_not_included.append(xname)
 
         if xnames_not_included:
-            print(f'BMC {inf.plural("xname", len(xnames_not_included))} '
-                  f'{xnames_not_included} not available from HSM API for {types}.')
+            LOGGER.info(f'BMC {inf.plural("xname", len(xnames_not_included))} '
+                        f'{xnames_not_included} not available from HSM API for {types}.')
 
 
 def expand_and_screen_xnames(xnames, types, recursive):
@@ -312,7 +312,7 @@ def get_telemetry_metrics(topics, xnames_info, batchsize, update_until_timeout, 
                 LOGGER.error('Exiting due to error pinging telemetry API')
                 raise SystemExit(1)
 
-        print('Please be patient...')
+        LOGGER.info('Please be patient...')
         wait_for_threads(telemetry_clients, stop_event, update_until_timeout, total_timeout)
 
     except ServiceExit:
@@ -353,8 +353,8 @@ def do_sensors(args):
                      f'{args.xnames} and {inf.plural("type", len(args.types))}: {args.types}')
         raise SystemExit(1)
 
-    print('Telemetry data being collected for '
-          f'{", ".join(xname_info["xname"] for xname_info in xnames_info)}')
+    LOGGER.info('Telemetry data being collected for '
+                f'{", ".join(xname_info["xname"] for xname_info in xnames_info)}')
 
     try:
         all_topics_results = get_telemetry_metrics(args.topics, xnames_info,
@@ -367,26 +367,25 @@ def do_sensors(args):
                            for topic_result in all_topics_results if not topic_result['Done']
                            and not topic_result['APIError']]
         if topics_with_api_error:
-            print(f'Telemetry API error getting xnames data from topics '
-                  f'{", ".join(t for t in topics_with_api_error)}.')
+            LOGGER.warning(f'Telemetry API error getting xnames data from topics '
+                           f'{", ".join(t for t in topics_with_api_error)}.')
         if topics_not_done:
-            print(f'Timed out after {args.timeout} seconds searching for xnames data from topics '
-                  f'{", ".join(t for t in topics_not_done)}.')
+            LOGGER.warning(f'Timed out after {args.timeout} seconds searching for xnames data from topics '
+                           f'{", ".join(t for t in topics_not_done)}.')
 
         report = Report(
             tuple(FIELD_MAPPING.keys()), None,
             args.sort_by, args.reverse,
             get_config_value('format.no_headings'),
             get_config_value('format.no_borders'),
-            filter_strs=args.filter_strs)
+            filter_strs=args.filter_strs,
+            display_headings=args.fields,
+            print_format=args.format)
 
         raw_table = make_raw_table(all_topics_results)
         report.add_rows(raw_table)
 
-        if args.format == 'yaml':
-            print(report.get_yaml())
-        else:
-            print(report)
+        print(report)
 
     except ServiceExit:
-        print('Exiting due to SIGINT or SIGTERM.')
+        LOGGER.warning('Exiting due to SIGINT or SIGTERM.')

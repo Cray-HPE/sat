@@ -1,7 +1,7 @@
 """
 Class to aid with unified formatting and printing of data.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -24,25 +24,28 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import logging
 from collections import OrderedDict
+import sys
 
+import inflect
 from parsec import ParseError
 from prettytable import PrettyTable
 
 from sat.config import get_config_value
 from sat.constants import EMPTY_VALUE, MISSING_VALUE
 from sat.filtering import (
-    filter_list,
     parse_multiple_query_strings,
     remove_constant_values
 )
 from sat.util import (
     get_rst_header,
     match_query_key,
-    yaml_dump
+    yaml_dump,
+    json_dump
 )
 
 
 LOGGER = logging.getLogger(__name__)
+inf = inflect.engine()
 
 
 class Report:
@@ -53,7 +56,9 @@ class Report:
                  no_headings=None, no_borders=None,
                  align='l', filter_strs=None,
                  show_empty=None, show_missing=None,
-                 force_columns=None):
+                 force_columns=None,
+                 display_headings=None,
+                 print_format='pretty'):
         """Create a new Report instance.
 
         Args:
@@ -77,6 +82,11 @@ class Report:
             force_columns: a set of column names whose columns must always be present
                 in the output, even if all their rows are EMPTY_VALUE or MISSING_VALUE.
                 If None, then default to the normal behavior of show_empty and show_missing.
+            display_headings: a list of headings which should be included in the
+                output. This list should be a subset of headings.
+            print_format: (str) The format to to return the report. Expected to be 'pretty',
+                'json', or 'yaml'.
+
         """
         self.headings = headings
         self.title = title
@@ -100,22 +110,20 @@ class Report:
         self.sort_by = sort_by
         self.reverse = reverse
         self.align = align
-        self.filter_strs = filter_strs or []
+        self.print_format = print_format
 
         self.force_columns = set(force_columns if force_columns is not None else [])
 
-        # TODO: We're parsing the filter strings twice with this approach,
-        # though it involves fewer code changes. This should be consolidated in
-        # the future.
-        if self.filter_strs:
-            try:
-                filter_fn = parse_multiple_query_strings(self.filter_strs)
-                self.force_columns |= filter_fn.get_filtered_fields(self.headings)
-            except ParseError:
-                # If there is a parsing error in the filters, we can ignore it
-                # for now. When the filters are re-parsed when filtering
-                # occurs, the parse error will be logged as normal.
-                pass
+        try:
+            if filter_strs:
+                self.filter_fn = parse_multiple_query_strings(filter_strs, self.headings)
+                self.force_columns |= self.filter_fn.get_filtered_fields()
+            else:
+                self.filter_fn = None
+        except ParseError as err:
+            LOGGER.error("The given filter has invalid syntax; returning no output. (%s)", err)
+            LOGGER.warning("See the man page for this subcommand for further details on filter syntax.")
+            sys.exit(1)
 
         # find the heading to sort on
         if sort_by is not None:
@@ -133,24 +141,47 @@ class Report:
                 if not self.sort_by:
                     LOGGER.warning(warn_str, sort_by, self.headings)
 
+        if display_headings is not None:
+            self.display_headings = []
+
+            unknown_headings = set()
+            duplicate_headings = set()
+
+            for heading in display_headings:
+                matched_heading = match_query_key(heading, self.headings)
+
+                if matched_heading is None:
+                    unknown_headings.add(heading)
+                elif matched_heading in self.display_headings:
+                    duplicate_headings.add(heading)
+                else:
+                    self.display_headings.append(matched_heading)
+
+            if unknown_headings:
+                LOGGER.warning('%s %s %s not present in %s; ignoring',
+                               inf.plural_noun('field', count=len(unknown_headings)),
+                               inf.join(list(unknown_headings)),
+                               inf.plural_verb('is', count=len(unknown_headings)),
+                               f'table "{self.title}"' if self.title else 'output')
+            if duplicate_headings:
+                LOGGER.warning('%s %s %s duplicated in %s; using only the first instance',
+                               inf.plural_noun('field', count=len(duplicate_headings)),
+                               inf.join(list(duplicate_headings)),
+                               inf.plural_verb('is', count=len(duplicate_headings)),
+                               f'table "{self.title}"' if self.title else 'output')
+
+            self.force_columns |= set(self.display_headings)
+
+        else:
+            self.display_headings = self.headings
+
     def __str__(self):
-        """Return this report as a pretty-looking table.
+        """Return this report according to its format.
 
         Returns:
-            This report as a pretty-looking table.
+            The report formatted as a string.
         """
-        heading = ''
-        if not self.no_headings and self.title:
-            heading += get_rst_header(self.title, min_len=80)
-
-        if not self.data:
-            return heading
-
-        pt = self.get_pretty_table()
-        if pt is not None:
-            return heading + str(pt)
-        else:
-            return ''
+        return self.get_formatted_report(self.print_format)
 
     def convert_row(self, row):
         """Returns a row as it should appear as an entry in the report.
@@ -248,7 +279,7 @@ class Report:
                     values are either all EMPTY_VALUE or all MISSING_VALUE.
         """
         if not data_rows:
-            return self.headings, data_rows
+            return self.display_headings, data_rows
 
         if not self.show_empty:
             data_rows = remove_constant_values(data_rows, EMPTY_VALUE, protect=self.force_columns)
@@ -256,10 +287,46 @@ class Report:
             data_rows = remove_constant_values(data_rows, MISSING_VALUE, protect=self.force_columns)
 
         # We could just take data_rows[0].keys(), but for extra assurance that
-        # order is maintained, take from self.headings.
-        new_headings = [heading for heading in self.headings
+        # order is maintained, take from self.display_headings.
+        new_headings = [heading for heading in self.display_headings
                         if heading in data_rows[0].keys()]
         return new_headings, data_rows
+
+    def get_rows_to_print(self):
+        """Creates a list of rows to print.
+
+        Rows are sorted, filtered, and have the correct columns. Empty and
+        missing columns are removed.
+
+        Returns:
+            a list of OrderedDicts containing sorted rows which match the
+            filters given in the filter strings of the Report. The columns
+            returned are limited to those in the display_headings minus those
+            whose rows contain only EMPTY or MISSING.
+        """
+
+        self.sort_data()
+        try:
+            selected = [OrderedDict(zip(self.display_headings, [row[column] for column in self.display_headings]))
+                        for row in filter(self.filter_fn, self.data)]
+        except KeyError as err:
+            LOGGER.error('The query key "%s" does not match '
+                         'any fields in the input; returning no output.',
+                         err.args[0])
+            LOGGER.info('Available field headings: %s', ', '.join(self.headings))
+        except TypeError as err:
+            LOGGER.error('%s', err.args[0])
+        else:
+            headings, culled = self.remove_empty_and_missing(selected)
+
+            # If every row is empty, don't return any rows at all.
+            if not any(culled):
+                return headings, []
+
+            return headings, culled
+
+        # This is returned in the error case.
+        return [], []
 
     def get_pretty_table(self):
         """Return a PrettyTable instance created from the data and format opts.
@@ -268,16 +335,9 @@ class Report:
             A prettytable.PrettyTable reference. Returns None if an error
             occurred.
         """
-        self.sort_data()
-
-        try:
-            rows_to_print = filter_list(self.data, self.filter_strs)
-        except (KeyError, ParseError, TypeError, ValueError) as err:
-            LOGGER.error("An error occurred while filtering; "
-                         "returning no output. (%s)", err)
-            return None
-
-        headings, rows_to_print = self.remove_empty_and_missing(rows_to_print)
+        headings, rows_to_print = self.get_rows_to_print()
+        if not rows_to_print:
+            return ''
 
         pt = PrettyTable()
         pt.field_names = headings
@@ -292,25 +352,42 @@ class Report:
 
         return pt
 
-    def get_yaml(self):
-        """Retrieve the report's yaml representation.
+    def get_formatted_report(self, report_format):
+        """Retrieve the report's data according to the given format.
 
-        Returns:
-            The data of the report formatted as a string in yaml format.
+            Args:
+                report_format (str): The format to print the report in. Expected
+                to be 'pretty', 'yaml', or 'json'.
+
+            Returns:
+                The report formatted as a string.
         """
-        self.sort_data()
+        if report_format == 'pretty':
+            heading = ''
+            if not self.no_headings and self.title:
+                heading += get_rst_header(self.title, min_len=80)
 
-        try:
-            rows_to_print = filter_list(self.data, self.filter_strs)
+            if not self.data:
+                return heading
 
-        except (KeyError, ParseError, TypeError, ValueError) as err:
-            LOGGER.error("An error occurred while filtering; "
-                         "returning no output. (%s)", err)
-            return ''
+            pt = self.get_pretty_table()
+            if pt is not None:
+                return heading + str(pt)
+            else:
+                return ''
+        elif report_format == 'yaml':
+            dump_fn = yaml_dump
+        elif report_format == 'json':
+            dump_fn = json_dump
+        else:
+            # This case theoretically shouldn't happen.
+            raise ValueError('Invalid report format.')
 
-        _, rows_to_print = self.remove_empty_and_missing(rows_to_print)
+        _, rows_to_print = self.get_rows_to_print()
 
         if not self.no_headings and self.title:
-            return yaml_dump({self.title: rows_to_print})
+            return dump_fn({self.title: rows_to_print})
         else:
-            return yaml_dump(rows_to_print)
+            if not rows_to_print:
+                return ''
+            return dump_fn(rows_to_print)

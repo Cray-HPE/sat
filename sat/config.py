@@ -75,6 +75,7 @@ SAT_CONFIG_SPEC = {
         'cert_verify': OptionSpec(bool, True, None, None),
         'username': OptionSpec(str, getpass.getuser, None, 'username'),
         'token_file': OptionSpec(str, '', None, 'token_file'),
+        'api_timeout': OptionSpec(int, 60, None, 'api_timeout'),
     },
     'bootsys': {
         'max_hsn_states': OptionSpec(int, 10, None, None),
@@ -94,8 +95,8 @@ SAT_CONFIG_SPEC = {
     },
     'logging': {
         'file_name': OptionSpec(str, '/var/log/cray/sat/sat.log', None, 'logfile'),
-        'file_level': OptionSpec(str, 'INFO', validate_log_level, 'loglevel'),
-        'stderr_level': OptionSpec(str, 'WARNING', validate_log_level, 'loglevel'),
+        'file_level': OptionSpec(str, 'INFO', validate_log_level, 'loglevel_file'),
+        'stderr_level': OptionSpec(str, 'INFO', validate_log_level, 'loglevel_stderr'),
     },
     's3': {
         'endpoint': OptionSpec(str, 'https://rgw-vip.nmn', None, None),
@@ -431,5 +432,5 @@ def generate_default_config(path, username=None, force=False):
             output_stream.write(process_toml_output(toml_str))
 
     except IOError as ioerr:
-        print("ERROR: {}".format(ioerr))
+        LOGGER.error("{}".format(ioerr))
         raise SystemExit(1)

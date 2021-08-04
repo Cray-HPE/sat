@@ -157,6 +157,13 @@ class TestLogging(unittest.TestCase):
         self.assertIsInstance(handler, logging.StreamHandler)
         self.assertEqual(handler.level, logging.WARNING)
 
+    @mock.patch('os.makedirs')
+    def test_configure_logging_no_directory(self, mock_makedirs):
+        """Test no log directories are created when they are not needed"""
+        self.config_values['logging.file_name'] = 'sat.log'
+        configure_logging()
+        mock_makedirs.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()

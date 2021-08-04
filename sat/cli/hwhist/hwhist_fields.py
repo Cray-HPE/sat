@@ -1,7 +1,7 @@
 """
-The main entry point for the init subcommand.
+Contains structures and code for fields that are displayed by the hwhist subcommand.
 
-(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -21,25 +21,26 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-import logging
-import os
 
-from sat.config import ConfigFileExistsError, DEFAULT_CONFIG_PATH, generate_default_config
+from collections import OrderedDict
 
-
-LOGGER = logging.getLogger(__name__)
+from sat.constants import MISSING_VALUE
+from sat.xname import XName
 
 
-def do_init(args):
-    """Run the init command with the given arguments.
+# Fields that are displayed for hardware component history by location (xname)
+XNAME_FIELD = [
+    ('xname', lambda event: XName(event.get('ID', MISSING_VALUE)))
+]
+FRUID_FIELD = [
+    ('FRUID', lambda event: event.get('FRUID', MISSING_VALUE))
+]
+COMMON_FIELDS = [
+    ('Timestamp', lambda event: event.get('Timestamp', MISSING_VALUE)),
+    ('EventType', lambda event: event.get('EventType', MISSING_VALUE))
+]
+BY_LOCATION_FIELDS = XNAME_FIELD + FRUID_FIELD + COMMON_FIELDS
+BY_FRU_FIELDS = FRUID_FIELD + XNAME_FIELD + COMMON_FIELDS
 
-    Args:
-        args: The argparse.Namespace object containing the parsed arguments
-            passed to this subcommand.
-    """
-    config_file_path = args.output or os.getenv('SAT_CONFIG_FILE', DEFAULT_CONFIG_PATH)
-    try:
-        generate_default_config(config_file_path, username=args.username, force=args.force)
-        LOGGER.info(f'Configuration file "{config_file_path}" generated.')
-    except ConfigFileExistsError as err:
-        LOGGER.warning(err)
+BY_LOCATION_FIELD_MAPPING = OrderedDict(BY_LOCATION_FIELDS)
+BY_FRU_FIELD_MAPPING = OrderedDict(BY_FRU_FIELDS)

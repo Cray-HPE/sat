@@ -27,8 +27,8 @@ given field. In list output, information about the components of each type is
 displayed in a tabular format. Options can be used to control which types of
 components are summarized, by which attributes each component type is
 summarized, which types of components are listed, and which fields are displayed
-for each component type. Both YAML and a human-readable, or "pretty", format are
-supported.
+for each component type. YAML, JSON, and a human-readable, or "pretty", format
+are supported.
 
 The default behavior of this subcommand is to display summaries and lists of all
 component types in the system in pretty format. That is, the default behavior is

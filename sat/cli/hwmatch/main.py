@@ -1,7 +1,7 @@
 """
 The main entry point for the hwmatch subcommand.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -156,10 +156,11 @@ def do_hwmatch(args):
         TABLE_HEADINGS, sort_by=args.sort_by, reverse=args.reverse,
         no_headings=get_config_value('format.no_headings'),
         no_borders=get_config_value('format.no_borders'),
-        filter_strs=args.filter_strs
+        filter_strs=args.filter_strs, display_headings=args.fields,
+        print_format=args.format
     )
     report.add_rows(rows)
     if not rows and args.format == 'pretty':
-        print('No mismatches found')
+        LOGGER.info('No mismatches found')
     else:
-        print(report.get_yaml() if args.format == 'yaml' else report)
+        print(report)

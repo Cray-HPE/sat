@@ -54,7 +54,7 @@ def get_xname_using_nid(nid, components):
         if str(cnid) == nid:
             xname = component.get('ID')
             if xname:
-                LOGGER.info(f'xname: {xname}, nid: {nid}')
+                LOGGER.debug(f'xname: {xname}, nid: {nid}')
             else:
                 LOGGER.error(f'HSM API has no ID for valid NID: {cnid}')
             break
@@ -233,7 +233,7 @@ def do_nid2xname(args):
 
     any_missing_xnames = False
     xnames = []
-    for arg in args.nids:
+    for arg in (n.strip() for n in args.nids):
         # Each arg is a list of nids and nid ranges separated by commas.
         # A nid is either an integer or a string of the form: nid123456,
         # that is “nid” and a number.

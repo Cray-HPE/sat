@@ -77,7 +77,7 @@ class TestDoNid2xname(ExtendedTestCase):
 
     def test_one_nid_exists(self):
         """Test do_nid2xname with one valid nid."""
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         self.assert_in_element(f'xname: {self.node_data[0]["ID"]}, nid: {self.node_data[0]["NID"]}',
                                logs.output)
@@ -98,7 +98,7 @@ class TestDoNid2xname(ExtendedTestCase):
     def test_two_nids_exist(self):
         """Test do_nid2xname with two valid nids."""
         self.fake_args.nids = ['1006', '1069']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         for node in self.node_data[0:1]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -108,7 +108,7 @@ class TestDoNid2xname(ExtendedTestCase):
     def test_two_comma_separated_nids_exist(self):
         """Test do_nid2xname with two valid comma separated nids."""
         self.fake_args.nids = ['001006,001069']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         for node in self.node_data[0:1]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -118,7 +118,7 @@ class TestDoNid2xname(ExtendedTestCase):
     def test_two_comma_separated_nids_with_space_exist(self):
         """Test do_nid2xname with two valid comma separated nids with space."""
         self.fake_args.nids = ['nid001069,', 'nid001073']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         for node in self.node_data[1:2]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -128,7 +128,7 @@ class TestDoNid2xname(ExtendedTestCase):
     def test_four_nids_different_formats_exist(self):
         """Test do_nid2xname with four valid nids using different formats."""
         self.fake_args.nids = ['nid001069', 'nid1073', '1074', '001006']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         for node in self.node_data[0:3]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -149,7 +149,7 @@ class TestDoNid2xname(ExtendedTestCase):
     def test_one_nid_range(self):
         """Test do_nid2xname with one nid range."""
         self.fake_args.nids = ['1073-1074']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         for node in self.node_data[2:3]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -171,7 +171,7 @@ class TestDoNid2xname(ExtendedTestCase):
     def test_one_pdsh_nid_range(self):
         """Test do_nid2xname with one pdsh nid range."""
         self.fake_args.nids = ['nid[1073-1074]']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         for node in self.node_data[2:3]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -181,7 +181,7 @@ class TestDoNid2xname(ExtendedTestCase):
     def test_complex_pdsh_nid_range(self):
         """Test do_nid2xname with complex pdsh nid range."""
         self.fake_args.nids = ['nid[1006,1069,1073-1074]']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         for node in self.node_data[2:3]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -191,7 +191,7 @@ class TestDoNid2xname(ExtendedTestCase):
     def test_nids_with_nid_range(self):
         """Test do_nid2xname with two nids and one nid range."""
         self.fake_args.nids = ['1006', '1069', '1073-1074']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         for node in self.node_data[0:3]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -201,7 +201,7 @@ class TestDoNid2xname(ExtendedTestCase):
     def test_nids_with_pdsh_nid_range(self):
         """Test do_nid2xname with two nids and one pdsh nid range."""
         self.fake_args.nids = ['1006', '1069', 'nid[1073-1074]']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         for node in self.node_data[0:3]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -211,7 +211,7 @@ class TestDoNid2xname(ExtendedTestCase):
     def test_mix_of_nids_with_nid_range(self):
         """Test do_nid2xname with mix of nids and nid range."""
         self.fake_args.nids = ['1006', '1073-1074', '1069']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         for node in self.node_data[0:3]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -221,7 +221,7 @@ class TestDoNid2xname(ExtendedTestCase):
     def test_mix_of_nids_with_pdsh_nid_range(self):
         """Test do_nid2xname with mix of nids and pdsh nid range."""
         self.fake_args.nids = ['1006', 'nid[1073-1074,1069]']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         for node in self.node_data[0:3]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -231,7 +231,7 @@ class TestDoNid2xname(ExtendedTestCase):
     def test_mix_of_nids_with_nid_ranges_different_formats(self):
         """Test do_nid2xname with mix of nids and nid ranges with different formats."""
         self.fake_args.nids = ['nid1006', 'nid1073-1074', 'nid001069']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         for node in self.node_data[0:3]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -241,7 +241,7 @@ class TestDoNid2xname(ExtendedTestCase):
     def test_mix_of_nids_with_pdsh_nid_ranges_different_formats(self):
         """Test do_nid2xname with mix of nids and pdsh nid ranges with different formats."""
         self.fake_args.nids = ['nid1006', 'nid[1073-1074]', 'nid001069']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         for node in self.node_data[0:3]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -295,7 +295,7 @@ class TestDoNid2xname(ExtendedTestCase):
     def test_comma_separated_mix_of_nids_with_nid_range(self):
         """Test do_nid2xname with comma separated mix of nids and nid range."""
         self.fake_args.nids = ['1006,1073-1074,1069']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         for node in self.node_data[0:3]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -305,7 +305,7 @@ class TestDoNid2xname(ExtendedTestCase):
     def test_comma_separated_mix_of_nids_with_pdsh_nid_range(self):
         """Test do_nid2xname with comma separated mix of nids and pdsh nid range."""
         self.fake_args.nids = ['1006,nid10[73-74],1069']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         for node in self.node_data[0:3]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -315,7 +315,7 @@ class TestDoNid2xname(ExtendedTestCase):
     def test_comma_separated_mix_of_nids_with_nid_range_with_space(self):
         """Test do_nid2xname with comma separated mix of nids and nid range with space."""
         self.fake_args.nids = ['1006,', '1073-1074,', '1069']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         for node in self.node_data[0:3]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -325,7 +325,7 @@ class TestDoNid2xname(ExtendedTestCase):
     def test_comma_separated_mix_of_nids_with_pdsh_nid_range_with_space(self):
         """Test do_nid2xname with comma separated mix of nids and pdsh_nid range with space."""
         self.fake_args.nids = ['1006,', 'nid[1073-1074],', '1069']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         for node in self.node_data[0:3]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)
@@ -335,7 +335,7 @@ class TestDoNid2xname(ExtendedTestCase):
     def test_comma_separated_mix_of_nids_with_nid_ranges_different_formats(self):
         """Test do_nid2xname with comma separated mix of nids and nid ranges with different formats."""
         self.fake_args.nids = ['nid1006,nid1073-1074,nid001069,nid10[69,73-74]']
-        with self.assertLogs(level=logging.INFO) as logs:
+        with self.assertLogs(level=logging.DEBUG) as logs:
             do_nid2xname(self.fake_args)
         for node in self.node_data[0:3]:
             self.assert_in_element(f'xname: {node["ID"]}, nid: {node["NID"]}', logs.output)

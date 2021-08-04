@@ -1,7 +1,7 @@
 """
-Unit tests for sat/util.py .
+Unit tests for sat/report.py.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -23,13 +23,17 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 from collections import defaultdict
 from copy import deepcopy
+from itertools import repeat, permutations
 import unittest
 from unittest.mock import call, Mock, patch
 
+from parsec import ParseError
 import yaml
+import json
 
 from sat.report import Report
 from sat.constants import EMPTY_VALUE, MISSING_VALUE
+from sat.xname import XName
 
 
 def get_report_printed_list(report):
@@ -248,18 +252,88 @@ class TestReport(unittest.TestCase):
             act_types = [type(x) for x in actual.values()]
             self.assertEqual(exp_types, act_types)
 
-    def test_yaml_dump(self):
-        """Verify that yaml dumps can be read by python3-yaml.
+    def test_getting_rows_to_print(self):
+        """Test getting rows to print with no filters or fields"""
+        report = Report(self.headings)
+        report.add_rows(self.entries)
+        headings, rows = report.get_rows_to_print()
+
+        self.assertEqual(headings, self.headings)
+        for rendered_row, given_row in zip(rows, self.entries):
+            for rendered_column_entry, given_column_entry in zip(rendered_row.values(), given_row):
+                self.assertEqual(rendered_column_entry, given_column_entry)
+
+    def test_getting_rows_to_print_invalid_filter_key(self):
+        """Test no rows are returned when the filter key is invalid."""
+        report = Report(self.headings, filter_strs=['foo=bar'])
+        report.add_rows(self.entries)
+        self.assertEqual(report.get_rows_to_print(), ([], []))
+
+    def test_getting_rows_to_print_invalid_comparison(self):
+        """Test type errors in filter result in no rows returned."""
+        report = Report(self.headings, filter_strs=['name >= 2'])
+        report.add_rows(self.entries)
+        self.assertEqual(report.get_rows_to_print(), ([], []))
+
+    def test_getting_all_empty_rows_returns_no_rows(self):
+        """If all columns in Report were culled by remove_missing_or_empty, return an empty table."""
+        report = Report(self.headings)
+        report.add_rows(repeat([EMPTY_VALUE] * 3, 10))
+        self.assertEqual(report.get_rows_to_print(), ([], []))
+
+    @patch('sat.filtering.parse_multiple_query_strings', side_effect=ParseError)
+    def test_constructing_report_with_invalid_filter_syntax(self, _):
+        """Test creating a Report with invalid filter syntax causes SAT to exit."""
+        with self.assertRaises(SystemExit):
+            report = Report(self.headings, filter_strs=['some bad filter'])
+
+    def test_get_formatted_report_yaml(self):
+        """Verify that yaml reports can be read by python3-yaml.
         """
         report = Report(self.headings)
         report.add_rows(self.entries)
 
-        yaml_s = report.get_yaml()
+        yaml_s = report.get_formatted_report('yaml')
 
         data = yaml.safe_load(yaml_s)
         for expected, actual in zip(self.entries, data):
             # yaml.safe_load sorts keys
             self.assertEqual(sorted(expected), sorted(actual.values()))
+
+    def test_get_formatted_report_json(self):
+        """Verify that json reports can be read by json library.
+        """
+        report = Report(self.headings)
+        report.add_rows(self.entries)
+
+        json_s = report.get_formatted_report('json')
+
+        data = json.loads(json_s)
+        for expected, actual in zip(self.entries, data):
+            self.assertEquals(expected, list(actual.values()))
+
+    def test_get_formatted_report_json_with_xnames(self):
+        """Json dumps should encode XName datatypes as strings.
+        """
+        header_s = 'xname'
+        xname_s = 'x0000c0s00b0n0'
+
+        report = Report([header_s])
+        report.add_row([XName(xname_s)])
+
+        json_s = report.get_formatted_report('json')
+        data = json.loads(json_s)
+        self.assertEquals(xname_s, data[0][header_s])
+
+    def test_print_report(self):
+        """str(report) should depend on the format instance variable.
+        """
+        report = Report(self.headings)
+        report.add_rows(self.entries)
+
+        for format in ['pretty', 'json', 'yaml']:
+            report.print_format = format
+            self.assertEqual(report.get_formatted_report(format), str(report))
 
 
 class TestReportFormatting(unittest.TestCase):
@@ -316,12 +390,22 @@ class TestReportFormatting(unittest.TestCase):
     def test_sorted_yaml(self):
         """The YAML output list should be sorted as well.
         """
-        report = Report(self.headings, sort_by=0)
+        report = Report(self.headings, sort_by=0, print_format='yaml')
 
         report.add_rows(self.out_of_order)
 
-        loaded_yaml = yaml.safe_load(report.get_yaml())
+        loaded_yaml = yaml.safe_load(str(report))
         self.assertEqual(self.entries_as_dict, loaded_yaml)
+
+    def test_sorted_json(self):
+        """The json output should be sorted also.
+        """
+        report = Report(self.headings, sort_by=0, print_format='json')
+
+        report.add_rows(self.out_of_order)
+
+        loaded_json = json.loads(str(report))
+        self.assertEqual(self.entries_as_dict, loaded_json)
 
     def test_reverse_sorting(self):
         """The internal PT should reverse its order if report.reverse.
@@ -458,6 +542,56 @@ class TestReportFormatting(unittest.TestCase):
         for expected, actual in zip(str_entries, pt_s):
             self.assertEqual(expected, actual)
 
+    def test_showing_single_column(self):
+        """Test showing only a single column of the output."""
+        for index, heading in enumerate(self.headings):
+            report = Report(self.headings, display_headings=[heading])
+            report.add_rows(self.entries)
+            pt_s = get_report_printed_list(report)
+
+            expected_rows = [[row[index]] for row in self.entries]
+            for expected, actual in zip(expected_rows, pt_s):
+                self.assertEqual(expected, actual)
+
+    def test_show_multiple_columns(self):
+        """Test showing multiple columns of the output in different orders."""
+        for length in range(1, len(self.headings) + 1):
+            for display_headings in permutations(enumerate(self.headings), length):
+                # turn [(index_0, heading_0), (index_1, heading_1)...] into
+                # ([index_0, index_1, ...], [heading_0, heading_1...])
+                indices, headings = zip(*display_headings)
+
+                report = Report(self.headings, display_headings=headings)
+                report.add_rows(self.entries)
+                pt_s = get_report_printed_list(report)
+
+                expected_rows = [[row[index] for index in indices]
+                                 for row in self.entries]
+                for expected, actual in zip(expected_rows, pt_s):
+                    self.assertEqual(expected, actual)
+
+    def test_show_invalid_column(self):
+        """Test invalid columns passed to --fields are ignored."""
+        report = Report(self.headings, display_headings=['name', 'not_a_valid_heading'])
+        report.add_rows(self.entries)
+
+        pt_s = get_report_printed_list(report)
+
+        expected_rows = [[row[0]] for row in self.entries]
+        for expected, actual in zip(expected_rows, pt_s):
+            self.assertEqual(expected, actual)
+
+    def test_do_not_show_duplicate_columns(self):
+        """Test that duplicates passed to --fields are only printed once."""
+        report = Report(self.headings, display_headings=['name', 'name'])
+        report.add_rows(self.entries)
+
+        pt_s = get_report_printed_list(report)
+
+        expected_rows = [[row[0]] for row in self.entries]
+        for expected, actual in zip(expected_rows, pt_s):
+            self.assertEqual(expected, actual)
+
 
 class TestReportEmptyMissingRemoval(unittest.TestCase):
     """Test the remove_empty_and_missing method."""
@@ -469,6 +603,7 @@ class TestReportEmptyMissingRemoval(unittest.TestCase):
         self.headings = ['xname', 'serial_number', 'manufacturer']
         # Make a copy to ensure `self.headings` isn't modified
         mock_report.headings = deepcopy(self.headings)
+        mock_report.display_headings = mock_report.headings
         self.mock_report = mock_report
 
         # Note that the actual values don't matter here since we're mocking

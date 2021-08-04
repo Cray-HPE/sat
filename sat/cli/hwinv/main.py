@@ -1,7 +1,7 @@
 """
 The main entry point for the hwinv subcommand.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -27,14 +27,16 @@ import re
 import sys
 
 import inflect
+from parsec import ParseError
 
 from sat.apiclient import APIError, HSMClient
 from sat.cli.hwinv.summary import ComponentSummary
 from sat.config import get_config_value
+from sat.filtering import parse_multiple_query_strings
 from sat.report import Report
 from sat.session import SATSession
 from sat.system.system import System
-from sat.util import yaml_dump
+from sat.util import yaml_dump, json_dump
 
 LOGGER = logging.getLogger(__name__)
 
@@ -102,6 +104,11 @@ def report_unused_options(args):
                       'show_{component}_xnames']
     }
 
+    op_to_ignored_args = {
+        'list': [],
+        'summarize': ['sort_by', 'show_empty', 'show_missing']
+    }
+
     messages = []
     message_template = (
         "The option '{option}' has no effect because it was specified without "
@@ -145,8 +152,62 @@ def report_unused_options(args):
                         )
                     )
 
+    for operation, ignored_args in op_to_ignored_args.items():
+        op_requested = any([operation in arg and getattr(args, arg)]
+                           for arg in vars(args))
+        if op_requested:
+            for ignored_arg in ignored_args:
+                if getattr(args, ignored_arg):
+                    messages.append(f"The option --{ignored_arg.replace('_', '-')} "
+                                    f"is ignored for {operation} operations.")
+
     return messages
 
+
+def get_display_fields(args, object_type, operation):
+    """Gets a list of fields which should be displayed in the output.
+
+    Determining which fields to display is done as follows. If present, the
+    value of the --*-fields or --*-summary-fields option corresponding to a
+    given list or summary is always used, where appropriate. If --fields is
+    present, its value is used if the --*-fields or --*-summary-fields option
+    is not present. If neither is present, all fields are used.
+
+    Args:
+        args (argparse.Namespace): the commandline arguments parsed by
+            argparse
+        object_type (BaseComponent): the component being listed or summarized
+        operation (str): either 'list' or 'summarize'
+
+    Returns:
+        A list of ComponentField objects corresponding to the fields to be
+        present in the displayed report.
+    """
+
+    inflector = inflect.engine()
+
+    if operation != 'list':
+        specific_fields_arg_name = f'{object_type.arg_name}_{operation}_fields'
+        field_getter = getattr(object_type, f'get_{operation}_fields')
+    else:
+        specific_fields_arg_name = f'{object_type.arg_name}_fields'
+        field_getter = object_type.get_listable_fields
+
+    specific_fields = getattr(args, specific_fields_arg_name)
+
+    if specific_fields:
+        if args.fields:
+            arg_name = f"--{specific_fields_arg_name.replace('_', '-')}"
+            LOGGER.warning("Using the %s %s specified by "
+                           "%s in '%s' %s.",
+                           inflector.join([f"'{field}'" for field in specific_fields]),
+                           inflector.plural_noun('field', len(specific_fields)),
+                           arg_name,
+                           object_type.pretty_name,
+                           operation)
+        return field_getter(specific_fields)
+    else:
+        return field_getter(args.fields)
 
 def get_all_lists(system, args):
     """Gets a list containing Reports listing each type of component.
@@ -165,19 +226,23 @@ def get_all_lists(system, args):
 
     for object_type, comp_dict in system.components_by_type.items():
         list_arg_name = 'list_{}'.format(inflector.plural(object_type.arg_name))
-        fields_arg_name = '{}_fields'.format(object_type.arg_name)
 
         # Continue if list of this component type was not requested
         if not (args.list_all or getattr(args, list_arg_name)):
             continue
 
-        field_filters = getattr(args, fields_arg_name)
-        fields = object_type.get_listable_fields(field_filters)
+        display_fields = get_display_fields(args, object_type, 'list')
+        all_fields = object_type.get_listable_fields()
+        if set(display_fields) != set(all_fields):
+            display_fields = [field.pretty_name for field in display_fields]
+        else:
+            display_fields = None
+
         field_key_attr = 'pretty_name' if args.format == 'pretty' else 'canonical_name'
-        headings = [getattr(field, field_key_attr) for field in fields]
+        headings = [getattr(field, field_key_attr) for field in all_fields]
         list_title = object_type.get_list_title(args.format)
 
-        component_dicts = [component.get_dict(fields, field_key_attr)
+        component_dicts = [component.get_dict(all_fields, field_key_attr)
                            for component in comp_dict.values()]
 
         component_report = Report(
@@ -186,8 +251,10 @@ def get_all_lists(system, args):
             no_headings=get_config_value('format.no_headings'),
             no_borders=get_config_value('format.no_borders'),
             filter_strs=args.filter_strs,
-            show_empty=field_filters or args.show_empty,
-            show_missing=field_filters or args.show_missing
+            show_empty=args.show_empty,
+            show_missing=args.show_missing,
+            display_headings=display_fields,
+            print_format=args.format
         )
         component_report.add_rows(component_dicts)
 
@@ -214,7 +281,6 @@ def get_all_summaries(system, args):
 
     for object_type, comp_dict in system.components_by_type.items():
         summarize_arg_name = 'summarize_{}'.format(inflector.plural(object_type.arg_name))
-        fields_arg_name = '{}_summary_fields'.format(object_type.arg_name)
         xnames_arg_name = 'show_{}_xnames'.format(object_type.arg_name)
 
         if not hasattr(args, summarize_arg_name):
@@ -222,14 +288,25 @@ def get_all_summaries(system, args):
             continue
 
         if args.summarize_all or getattr(args, summarize_arg_name):
-            field_filters = getattr(args, fields_arg_name)
-            fields = object_type.get_summary_fields(field_filters)
+            display_fields = get_display_fields(args, object_type, 'summary')
+            all_fields = object_type.get_summary_fields()
+            try:
+                filter_fn = (parse_multiple_query_strings(
+                    args.filter_strs,
+                    [field.canonical_name for field in all_fields]
+                ) if args.filter_strs else None)
+            except ParseError as err:
+                LOGGER.error("The given filter has invalid syntax; returning no output. (%s)", err)
+                sys.exit(1)
 
             include_xnames = getattr(args, xnames_arg_name)
 
             components = comp_dict.values()
-            all_summaries.append(ComponentSummary(object_type, fields,
-                                                  components, include_xnames))
+            all_summaries.append(ComponentSummary(object_type, all_fields,
+                                                  components, include_xnames,
+                                                  filter_fn=filter_fn,
+                                                  display_fields=display_fields,
+                                                  reverse=args.reverse))
 
     return all_summaries
 
@@ -257,20 +334,23 @@ def get_pretty_output(summaries, lists):
     return full_summary_string + full_list_string
 
 
-def get_yaml_output(summaries, lists):
-    """Gets the complete output formatted as YAML.
+def get_formatted_output(summaries, lists, dump_format):
+    """Gets the complete output formatted as JSON or YAML.
 
     Args:
         summaries (Iterable): The `ComponentSummary` objects returned by
             `get_all_summaries`.
         lists (Iterable): The `Report` objects returned by `get_all_lists`.
+        dump_format (string): The format to output the report in, expected
+        to be 'json' or 'yaml'
 
     Returns:
         A string containing the complete output requested by the args in
-        YAML format.
+        JSON or YAML format.
     """
     # The way we are constructing a top-level dictionary by joining together
     # YAML representations of dictionaries is not optimal, but it works for now.
+    # TODO: This creates valid YAML, but not JSON. See CRAYSAT-1046.
     summary_str = ''
     summary_dicts = OrderedDict()
 
@@ -280,10 +360,16 @@ def get_yaml_output(summaries, lists):
         for key, val in summary_dict.items():
             summary_dicts[key] = val
 
-    if summary_dicts:
-        summary_str += yaml_dump(summary_dicts)
+    if dump_format == 'yaml':
+        dump_fn = yaml_dump
+    elif dump_format == 'json':
+        dump_fn = json_dump
+    else:
+        raise ValueError('Unexpected dump format received.')
 
-    return summary_str + ''.join(report.get_yaml() for report in lists)
+    summary_str += dump_fn(summary_dicts) if summary_dicts else ''
+
+    return summary_str + ''.join(str(report) for report in lists)
 
 
 def get_all_output(system, args):
@@ -295,10 +381,10 @@ def get_all_output(system, args):
     summaries = get_all_summaries(system, args)
     lists = get_all_lists(system, args)
 
-    if args.format == 'yaml':
-        return get_yaml_output(summaries, lists)
-    elif args.format == 'pretty':
+    if args.format == 'pretty':
         return get_pretty_output(summaries, lists)
+    else:
+        return get_formatted_output(summaries, lists, args.format)
 
 
 def do_hwinv(args):

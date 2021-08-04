@@ -82,7 +82,7 @@ class CableEndpoints:
         src_file = os.path.join(self.src_dir, self.p2p_file)
         dest_file = os.path.join(self.dest_dir, self.p2p_file)
         cmd = f'kubectl -n {namespace} -c {container} cp {pod}:{src_file} {dest_file}'
-        LOGGER.info(f'Running {cmd}')
+        LOGGER.debug(f'Running {cmd}')
 
         try:
             subprocess.check_call(shlex.split(cmd),

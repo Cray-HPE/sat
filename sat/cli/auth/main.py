@@ -27,6 +27,7 @@ import logging
 
 from sat.config import get_config_value
 from sat.session import SATSession
+from sat.util import pester
 
 LOGGER = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ def do_auth(args):
     getpass.getuser() is called to get the system username of the user invoking sat.
 
     The token is saved to $HOME/.config/sat/tokens/hostname.username.json,
-    unless overriden by --token-file on the command line.
+    unless overriden by --token-file on the command line or in the config file.
 
     Args:
         args: The argparse.Namespace object containing the parsed arguments
@@ -51,13 +52,17 @@ def do_auth(args):
     """
 
     session = SATSession(no_unauth_warn=True)
+    if session.token and not pester(
+                    f'Token already exists for "{session.username}" on "{session.host}". '
+                    f'Overwrite?'):
+        return
+
     password = getpass.getpass('Password for {}: '.format(session.username))
 
     session.fetch_token(password)
     if session.token:
-        print('Succeeded!')
+        LOGGER.info('Succeeded!')
         session.save()
     else:
-        print('Authentication failed!')
         LOGGER.error('Authentication Failed.')
         raise SystemExit(1)

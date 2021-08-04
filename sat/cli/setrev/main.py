@@ -138,7 +138,7 @@ def write_site_data(sitefile, data):
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=InsecureRequestWarning)
             s3.Object(s3_bucket, sitefile).upload_file(sitefile)
-        print(f'Successfully wrote site info file {sitefile} to S3.')
+        LOGGER.info(f'Successfully wrote site info file {sitefile} to S3.')
     except OSError as err:
         LOGGER.error('Unable to write %s. Error: %s', sitefile, err)
     except (BotoCoreError, ClientError, Boto3Error) as err:

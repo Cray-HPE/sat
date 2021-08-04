@@ -333,11 +333,11 @@ def do_state_capture(args):
     state_recorders = [PodStateRecorder()]
 
     failed = []
-    print('Capturing system state.')
+    LOGGER.info('Capturing system state.')
     with BeginEndLogger('system state capture'):
         for sr in state_recorders:
             try:
-                print(f'Capturing {sr.description}')
+                LOGGER.info(f'Capturing {sr.description}')
                 sr.dump_state()
             except StateError as err:
                 LOGGER.error(f'Failed to capture {sr.description}: {err}')
@@ -346,4 +346,4 @@ def do_state_capture(args):
     if failed:
         sys.exit(1)
     else:
-        print('Finished capturing system state.')
+        LOGGER.info('Finished capturing system state.')

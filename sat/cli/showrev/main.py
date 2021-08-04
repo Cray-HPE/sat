@@ -1,7 +1,7 @@
 """
 The main entry point for the showrev subcommand.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -90,7 +90,8 @@ def do_showrev(args):
         else:
             reports.append(Report(
                 headings, title, sort_by, reverse, no_headings, no_borders,
-                filter_strs=args.filter_strs))
+                filter_strs=args.filter_strs, display_headings=args.fields,
+                print_format=args.format))
             reports[-1].add_rows(data)
 
     assign_default_args(args)
@@ -129,9 +130,4 @@ def do_showrev(args):
         LOGGER.error('No data collected')
         sys.exit(1)
 
-    if args.format == 'yaml':
-        for report in reports:
-            print(report.get_yaml())
-    else:
-        for report in reports:
-            print(str(report) + '\n\n')
+    print('\n'.join(str(report) for report in reports))

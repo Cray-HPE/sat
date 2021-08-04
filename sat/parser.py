@@ -1,7 +1,7 @@
 """
 Functions to create the top-level ArgumentParser for the program.
 
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -134,19 +134,40 @@ def create_parent_parser():
 
     parser.add_argument(
         '--token-file',
-        help='Token file to use for authentication. Overrides value derived '
-             'from other settings, or set in config file.')
+        help='Token file to use for authentication. '
+             'In order to share the token file between the host and container '
+             'when sat is run in a container environment, '
+             'the path should be either an absolute or relative path of a file '
+             'in or below the home or current directory. '
+             'Overrides value derived from other settings, or set in config file.')
 
     parser.add_argument(
         '--logfile',
-        help='Set location of logs for this run. Overrides value set in config file.')
+        help='Set location of logs for this run. '
+             'In order to share the location between the host and container '
+             'when sat is run in a container environment, '
+             'the path should be either an absolute or relative path of a file '
+             'in or below the home or current directory. '
+             'Overrides value set in config file.')
 
     parser.add_argument(
-        '--loglevel',
-        help='Set minimum log severity to report for this run. This level applies to '
-             'messages logged to stderr and to the log file. Overrides values set in '
-             'config file.',
+        '--loglevel-stderr', '--loglevel',
+        help='Set minimum log severity for messages output to stderr on this run. '
+             'Overrides value set in config file.',
         choices=['debug', 'info', 'warning', 'error', 'critical'])
+
+    parser.add_argument(
+        '--loglevel-file',
+        help='Set minimum log severity for messages reported to log file on this run. '
+             'Overrides values set in config file.',
+        choices=['debug', 'info', 'warning', 'error', 'critical'])
+
+    parser.add_argument(
+        '--api-timeout',
+        help='The amount of time, in seconds, to wait for calls to any HTTP API to '
+             'complete before considering them failed.',
+        metavar='TIMEOUT',
+        type=int)
 
     subparsers = parser.add_subparsers(metavar='command', dest='command')
     sat.cli.build_out_subparsers(subparsers)

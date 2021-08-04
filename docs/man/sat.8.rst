@@ -32,21 +32,37 @@ OPTIONS
 These global options must be specified before the subcommand.
 
 **--logfile** *file*
-        Set the location of logs for this run. This overrides the value in
-        the configuration file.
+        Set the location of logs for this run. In order to share the location
+        between the host and container when sat is run in a container environment,
+        the path should be either an absolute or relative path of a file
+        in or below the home or current directory.
+        This overrides the value in the configuration file.
+
+**--loglevel-stderr** *level*
+        Set the minimum log severity to output to stderr. This overrides the
+        value in the configuration file.
 
 **--loglevel** *level*
-        Set the minimum log severity to report. This overrides the values in
-        the configuration file for both stderr and log file (the configuration
-        options "logging.file_level" and "logging.stderr_level").
+        An alias for --loglevel-stderr.
+
+**--loglevel-file** *level*
+        Set the minimum log severity to report to log file. This overrides the
+        value in the configuration file.
 
 **--username** *username*
         Username to use when loading or fetching authentication
         tokens. Overrides value set in config file.
 
 **--token-file** *token-file*
-        Token file to use for authentication. Overrides value derived from other
-        settings, or set in config file.
+        Token file to use for authentication. In order to share the token file
+        between the host and container when sat is run in a container environment,
+        the path should be either an absolute or relative path of a file
+        in or below the home or current directory.
+        Overrides value derived from other settings, or set in config file.
+
+**--api-timeout** *timeout*
+        The amount of time, in seconds, allowed to wait for calls to any HTTP API
+        to return before considering them failed. Overrides value set in config file.
 
 **-h, --help**
         Print the help message for sat.
@@ -93,6 +109,14 @@ API_GATEWAY
         Store the login token between sessions with the api-gateway. If this
         value isn't provided, then SAT will use the default location as
         specified in sat-auth(8).
+
+
+**api_timeout**
+        This is the timeout for all calls to HTTP REST APIs, in seconds. This
+        is the amount of time allowed to wait for calls to any HTTP API to
+        return before considering them failed. Overrides value set in config
+        file.
+
 
 BOOTSYS
 -------
@@ -227,11 +251,12 @@ LOGGING
 
 **file_level**
         Indicates the minimum log severity that will cause a log to be entered
-        into the file.
+        into the file. Defaults to "INFO".
 
 **stderr_level**
         SAT also prints log messages to stderr, and this parameter sets the
         minimum log severity that will cause a log to be printed to stderr.
+        Defaults to "INFO".
 
 SEE ALSO
 ========
@@ -241,6 +266,7 @@ sat-bmccreds(8),
 sat-bootsys(8),
 sat-diag(8),
 sat-firmware(8),
+sat-hwhist(8),
 sat-hwinv(8),
 sat-hwmatch(8),
 sat-init(8),

@@ -21,6 +21,7 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+from json.encoder import JSONEncoder
 import sys
 from collections import OrderedDict
 from datetime import timedelta
@@ -40,6 +41,7 @@ except ImportError:
     from yaml import SafeDumper
 from yaml.resolver import BaseResolver
 from yaml import dump
+from json import dumps
 import boto3
 from prettytable import PrettyTable
 
@@ -59,13 +61,14 @@ def pester(message,
     Queries user on stdin for some value until the user provides an input
     that matches `valid_answer`.
 
-    By default, this asks for a yes or no answer.
+    By default, this asks for a yes or no answer, returning True for yes and
+    False for no.
 
     Args:
         message: a string with a prompt to be printed before asking the user.
-        valid_answer: a regex string for which if message matches,
-            return some value based on the input. If falsy, then the first
-            response is used for the return value.
+        valid_answer: a regex string to verify the user's response before
+            returning some value based on it. If it is falsy, no validation
+            occurs and the original user response is returned.
         human_readable_valid: a human-readable version of valid_answer.
             This is displayed at the prompt. If either it or valid_answer is
             falsy (e.g., None or empty string), then no guidance is given.
@@ -173,32 +176,6 @@ def get_username_and_password_interactively(username=None, username_prompt='User
     return username, password
 
 
-def get_pretty_printed_dict(d, min_len=0):
-    """Get the pretty-printed string representation of a dict.
-
-    Args:
-        d (dict): The dictionary to pretty-print
-        min_len (int): The minimum length of the keys column to enforce.
-
-    Returns:
-        A nicely formatted string representation of a dict.
-    """
-    # Add 1 to length of keys for the colon
-    key_field_width = max(max(len(str(k)) for k in d) + 1, min_len)
-    return '\n'.join('{:<{width}} {}'.format('{}:'.format(key), value,
-                                             width=key_field_width)
-                     for key, value in d.items())
-
-
-def pretty_print_dict(d, min_len=0):
-    """Pretty-print a simple dictionary.
-
-    Args:
-        See `get_pretty_printed_dict`.
-    """
-    print(get_pretty_printed_dict(d, min_len))
-
-
 def get_pretty_table(rows, headings=None, sort_by=None):
     """Gets a PrettyTable instance with the given rows and headings.
 
@@ -215,7 +192,7 @@ def get_pretty_table(rows, headings=None, sort_by=None):
     """
     pt = PrettyTable()
     pt.border = False
-    pt.left_padding_width = 0
+    pt.left_padding_width = 1
 
     if headings:
         pt.field_names = headings
@@ -242,25 +219,6 @@ def get_pretty_table(rows, headings=None, sort_by=None):
         pt.add_row(row)
 
     return pt
-
-
-def get_pretty_printed_list(rows, headings=None, sort_by=None):
-    """Gets the pretty-printed table representation of a list of lists.
-
-    Args: See `get_pretty_table`.
-
-    Returns:
-        A string containing a pretty-printed table.
-    """
-    return str(get_pretty_table(rows, headings, sort_by))
-
-
-def pretty_print_list(rows, headings=None, sort_by=None):
-    """Pretty prints a list of lists.
-
-    Args: See `get_pretty_table`.
-    """
-    print(get_pretty_printed_list(rows, headings, sort_by))
 
 
 def get_rst_header(header, header_level=1, min_len=80):
@@ -389,6 +347,26 @@ SATDumper.add_representer(XName, _xname_representer)
 
 # A function to dump YAML to be used by all SAT code.
 yaml_dump = partial(dump, Dumper=SATDumper, **YAML_FORMAT_PARAMS)
+
+JSON_FORMAT_PARAMS = {'indent': 4}
+
+
+class SATEncoder(JSONEncoder):
+    """"A JSONEncoder that will properly format xnames when printing to JSON."""
+    def default(self, o):
+        """
+        Inform encoder how to encode XName objects.
+
+        Overrides JSONEncoder.default(), which is called by the encoder when
+        it encounters an object it does not know how to encode.
+        """
+        if isinstance(o, XName):
+            return str(o)
+        return JSONEncoder.default(self, o)
+
+
+# A function to dump json to be used by all SAT code.
+json_dump = partial(dumps, cls=SATEncoder, **JSON_FORMAT_PARAMS)
 
 
 def get_resource_filename(name, section='.'):

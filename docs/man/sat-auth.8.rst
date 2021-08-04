@@ -57,7 +57,7 @@ The following command creates a new token for a user named "uastest".
 
     # sat --username uastest auth
 
-And the token file will be created at
+If **token_file** is unset, the token file will be created at
 ~/.config/sat/tokens/api_gw_service_nmn_local.uastest.json
 
 Since the file is written in json format, jq can be used to print the access
