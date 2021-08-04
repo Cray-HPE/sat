@@ -25,7 +25,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [3.9.0] - 2021-08-04
 
 ### Changed
 - The ``--loglevel`` option is now an alias for the new ``--loglevel-stderr``.
@@ -55,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in subcommands which display a report.
 - Added ``--loglevel-stderr`` and ``--loglevel-file`` to set logging level for
   stderr and log file separately.
-- Added help and man page documention on files that are absolute or relative
+- Added help and man page documentation on files that are absolute or relative
   paths in or below the home or current directory.
 - Added prompt for whether user would like to continue when ``sat auth`` would
   overwrite an existing token.
