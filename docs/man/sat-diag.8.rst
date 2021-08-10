@@ -21,12 +21,14 @@ DESCRIPTION
 The diag subcommand is used for running L1 diagnostics on an arbitrary
 number of chassis, nodes, and switches in liquid-cooled cabinets and
 Slingshot top-of-rack switches. This tool accepts a list of xnames of
-controllers (BMCs) of the chassis, node, or switch to target. This list
-may be passed on the command line, from a file, and/or stdin, and will
-launch a given command on these controllers. Targets are polled at a
-specific interval. A report is printed after all targets have completed
-their diagnostics, either to stdout (default) or to files, one for each
-switch. API gateway authentication is required.
+controllers (BMCs) of the chassis, node, or switch to target. Note that
+the diag subcommand supports only BMCs which have type "RouterBMC" in
+the HSM database, i.e. Rosetta switches. This list may be passed on the
+command line, from a file, and/or stdin, and will launch a given command
+on these controllers. Targets are polled at a specific interval. A
+report is printed after all targets have completed their diagnostics,
+either to stdout (default) or to files, one for each switch. API gateway
+authentication is required.
 
 ARGUMENTS
 =========
@@ -59,6 +61,11 @@ These options must be specified after the subcommand.
         diagnostics can disrupt production environments, so this flag
         should be used with caution. This flag is useful for running
         automated scripts which do not have interactive input.
+
+**--no-hsm-check**
+        If this flag is supplied, HSM will not be queried to check if 
+        target components are RouterBMCs. (This is useful when running 
+        diagnostics when HSM is unavailable.)
 
 **--split**
         If this flag is supplied, write the contents of stdout returned

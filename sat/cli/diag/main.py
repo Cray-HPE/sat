@@ -29,9 +29,10 @@ import sys
 
 import inflect
 
-from sat.apiclient import APIError
-from sat.util import pester
+from sat.apiclient import APIError, HSMClient
 from sat.cli.diag.fox import RunningDiagPool
+from sat.session import SATSession
+from sat.util import pester
 
 
 inf = inflect.engine()
@@ -160,6 +161,21 @@ def run_diags_from_prompt(xnames, cli_args):
         run_diag_set(xnames, diag_command, diag_args, cli_args)
 
 
+def get_rosetta_switches():
+    """Get a set containing xnames of all compoments of type RouterBMC.
+
+    Returns:
+        A set of xnames for all Rosetta switches on the system.
+    """
+
+    api_client = HSMClient(SATSession())
+    try:
+        return set(bmc['ID'] for bmc in api_client.get_bmcs_by_type(bmc_type='RouterBMC'))
+    except APIError as err:
+        LOGGER.error("Could not get RouterBMC components from HSM: %s", err)
+        sys.exit(1)
+
+
 def do_diag(args):
     """Runs the diag command with the given arguments.
 
@@ -178,6 +194,16 @@ def do_diag(args):
         LOGGER.error("Exactly one of `--interactive` or a command may be given; "
                      "they must not be used together, but one must be specified.")
         sys.exit(1)
+
+    if not args.no_hsm_check:
+        available_rosetta_switches = get_rosetta_switches()
+        non_rosetta_targets = set(args.xnames) - available_rosetta_switches
+        if non_rosetta_targets:
+            LOGGER.error("sat diag may only be used with Rosetta switches. "
+                         "The following targets are not Rosetta switches: %s",
+                         inf.join(list(non_rosetta_targets)))
+            LOGGER.info("Available Rosetta switches: %s", inf.join(list(available_rosetta_switches)))
+            sys.exit(1)
 
     really_run = args.disruptive \
         or pester("Controller diagnostics can degrade or disrupt "

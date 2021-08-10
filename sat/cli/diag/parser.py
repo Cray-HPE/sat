@@ -44,6 +44,9 @@ def add_diag_subparser(subparsers):
                              help='Some diagnostics may be disruptive to a running system. '
                              'Passing --disruptive confirms that the user really intends to do '
                              'potentially dangerous actions')
+    diag_parser.add_argument('--no-hsm-check', action='store_true',
+                             help='Do not query HSM to check if target components are RouterBMCs. '
+                                  '(Useful when running diagnostics when HSM is unavailable.)')
     diag_parser.add_argument('--split', action='store_true',
                              help='Write a split report, writing output from each switch '
                              'to its own file rather than stdout.')
