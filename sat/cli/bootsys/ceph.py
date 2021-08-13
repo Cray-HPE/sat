@@ -23,8 +23,12 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 import json
 import logging
+import socket
 import subprocess
 
+from paramiko import SSHException
+
+from sat.cli.bootsys.util import get_mgmt_ncn_groups, get_ssh_client
 from sat.cli.bootsys.waiting import Waiter
 
 LOGGER = logging.getLogger(__name__)
@@ -46,7 +50,7 @@ class CephHealthWaiter(Waiter):
             check_ceph_health(allow_osdmap_flags=False)
             return True
         except CephHealthCheckError as err:
-            LOGGER.info('Ceph is not healthy: %s', err)
+            LOGGER.debug('Ceph is not healthy: %s', err)
             return False
 
 
