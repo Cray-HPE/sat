@@ -498,7 +498,7 @@ def do_ceph_unfreeze(ncn_groups):
     with BeginEndLogger('wait for ceph health'):
         ceph_timeout = get_config_value('bootsys.ceph_timeout')
         LOGGER.info(f'Waiting up to {ceph_timeout} seconds for Ceph to become healthy after unfreeze')
-        ceph_waiter = CephHealthWaiter(ceph_timeout)
+        ceph_waiter = CephHealthWaiter(ceph_timeout, poll_interval=5)
         if not ceph_waiter.wait_for_completion():
             raise FatalPlatformError(f'Ceph is not healthy. Please correct Ceph health and try again.')
         else:

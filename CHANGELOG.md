@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Improved error handling of missing or empty FRUID key in system component data.
+- The Ceph health timeout in the ``platform-services`` stage of ``sat bootsys boot``
+  was changed to 60 seconds, from 600 seconds previously.
 
 ### Added
 - Added a check for running SDU sessions to the ``session-checks`` stage of a
