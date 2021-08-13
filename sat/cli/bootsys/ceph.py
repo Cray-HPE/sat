@@ -28,7 +28,7 @@ import subprocess
 
 from paramiko import SSHException
 
-from sat.cli.bootsys.util import get_mgmt_ncn_groups, get_ssh_client
+from sat.cli.bootsys.util import get_ssh_client
 from sat.cli.bootsys.waiting import Waiter
 
 LOGGER = logging.getLogger(__name__)
@@ -39,8 +39,16 @@ class CephHealthCheckError(Exception):
     pass
 
 
+class CephServiceRestartError(Exception):
+    """There was an issue interacting with Ceph services."""
+    pass
+
+
 class CephHealthWaiter(Waiter):
     """Waiter for the Ceph cluster health status."""
+    def __init__(self, timeout, storage_hosts, poll_interval=5, retries=1):
+        super().__init__(timeout, poll_interval=poll_interval, retries=retries)
+        self.storage_hosts = storage_hosts
 
     def condition_name(self):
         return "Ceph cluster in healthy state"
@@ -52,6 +60,54 @@ class CephHealthWaiter(Waiter):
         except CephHealthCheckError as err:
             LOGGER.debug('Ceph is not healthy: %s', err)
             return False
+
+    def on_retry_action(self):
+        """Restart the ceph services on all storage nodes.
+
+        This action will restart the systemd units for the Ceph services on each
+        storage node.
+
+        Args: None.
+        Returns: None.
+        """
+        for node in self.storage_hosts:
+            client = get_ssh_client()
+            try:
+                try:
+                    client.connect(node)
+                except (SSHException, socket.error) as err:
+                    raise CephServiceRestartError(err)
+
+                _, stdout, stderr = client.exec_command('cephadm ls')
+                stderr_contents = stderr.read().decode().strip()
+                if stderr_contents:
+                    raise CephServiceRestartError(f"Could not list Ceph systemd units: "
+                                                  f"{stderr_contents}")
+
+                try:
+                    cephadm_result = json.load(stdout)
+                    systemd_units = [service['systemd_unit'] for service in cephadm_result]
+                except ValueError as err:
+                    raise CephServiceRestartError(f"cephadm returned malformed JSON while "
+                                                  f"listing services: {err}") from err
+                except KeyError as err:
+                    raise CephServiceRestartError(f"cephadm returned valid JSON, but it "
+                                                  f"was missing the required 'systemd_unit' key")
+
+                for systemd_unit in systemd_units:
+                    LOGGER.debug("Restarting unit %s on node %s", systemd_unit, node)
+                    _, _, stderr = client.exec_command(f'systemctl restart "{systemd_unit}"')
+                    stderr_contents = stderr.read().decode().strip()
+                    if stderr_contents:
+                        raise CephServiceRestartError(f"Could not restart systemd unit {systemd_unit}: "
+                                                      f"{stderr_contents}")
+                    else:
+                        LOGGER.debug(f"Restarted {systemd_unit} on {node}, stderr returned empty.")
+
+            except CephServiceRestartError as err:
+                LOGGER.warning("Could not restart Ceph services on storage node %s: %s", node, err)
+            finally:
+                client.close()
 
 
 def validate_ceph_warning_state(ceph_check_data, allow_osdmap_flags=True):
