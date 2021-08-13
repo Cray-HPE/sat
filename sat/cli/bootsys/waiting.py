@@ -27,6 +27,10 @@ import logging
 from threading import Thread
 import time
 
+import inflect
+
+
+inf = inflect.engine()
 LOGGER = logging.getLogger(__file__)
 
 
@@ -38,12 +42,18 @@ class Waiter(metaclass=abc.ABCMeta):
         poll_interval (int): the interval, in seconds, between polls for
             completion.
         completed (bool): True if the condition has been met, False otherwise.
+        retries (int): the number of times waiting may be retried. By default,
+            this is 0, meaning the wait will only occur once.
     """
-    def __init__(self, timeout, poll_interval=1):
+    def __init__(self, timeout, poll_interval=1, retries=0):
         self.timeout = timeout
         self.poll_interval = poll_interval
         self.completed = False
         self._waiter_thread = None
+
+        if retries < 0:
+            raise ValueError("Retries cannot be less than zero.")
+        self.retries_remaining = retries
 
     @abc.abstractmethod
     def condition_name(self):
@@ -84,6 +94,16 @@ class Waiter(metaclass=abc.ABCMeta):
         behaviors by overriding this method.
         """
 
+    def on_retry_action(self):
+        """Perform some action between retries.
+
+        If retries is set to zero for a Waiter instance, this
+        function will never be called.
+
+        The default implementation does nothing. Implement custom
+        behaviors by overriding this method.
+        """
+
     def wait_for_completion(self):
         """Wait for the condition to be achieved or for timeout.
 
@@ -96,23 +116,33 @@ class Waiter(metaclass=abc.ABCMeta):
         if self.completed:
             return True
 
-        start_time = time.monotonic()
+        while not self.completed:
+            start_time = time.monotonic()
+            while time.monotonic() - start_time < self.timeout:
+                self.on_check_action()
 
-        while time.monotonic() - start_time < self.timeout:
-            self.on_check_action()
+                # Store value in case we want to use it in post_wait_action.
+                self.completed = self.has_completed()
+                if self.completed:
+                    break
 
-            # Store value in case we want to use it in post_wait_action.
-            self.completed = self.has_completed()
-            if self.completed:
-                break
+                time.sleep(self.poll_interval)
 
-            time.sleep(self.poll_interval)
+            if not self.completed:
+                LOGGER.error('Waiting for condition "%s" timed out after %d seconds',
+                             self.condition_name(), self.timeout)
+
+                if self.retries_remaining:
+                    LOGGER.info('Retrying waiting for condition "%s". (%d %s remaining)',
+                                self.condition_name(), self.retries_remaining,
+                                inf.plural_noun('retry', self.retries_remaining))
+                    self.retries_remaining -= 1
+                    self.on_retry_action()
+                else:
+                    # Waiting failed, and there are no more retries left.
+                    break
 
         self.post_wait_action()
-
-        if not self.completed:
-            LOGGER.error('Waiting for condition "%s" timed out after %d seconds',
-                         self.condition_name(), self.timeout)
 
         return self.completed
 
