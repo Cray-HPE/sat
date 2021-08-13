@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - ``sat diag`` will now query HSM to verify that the components targeted for 
   diagnostics are Rosetta switches.
+- Changed sat to use the V2 HSM API.
 
 ### Added
 - Added a check for running SDU sessions to the ``session-checks`` stage of a

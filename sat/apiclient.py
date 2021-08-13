@@ -271,7 +271,7 @@ class APIGatewayClient:
 
 
 class HSMClient(APIGatewayClient):
-    base_resource_path = 'smd/hsm/v1/'
+    base_resource_path = 'smd/hsm/v2/'
 
     def get_bmcs_by_type(self, bmc_type=None, check_keys=True):
         """Get a list of BMCs, optionally of a single type.
