@@ -21,6 +21,7 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+import re
 import unittest
 
 
@@ -30,6 +31,10 @@ class ExtendedTestCase(unittest.TestCase):
     def assert_in_element(self, element, container):
         """Assert the given element is in one of the elements in container.
 
+        Args:
+            element: The element to search for
+            container (Iterable): The iterable in which to search for an item
+                that contains element.
         Returns:
             None.
 
@@ -45,6 +50,10 @@ class ExtendedTestCase(unittest.TestCase):
     def assert_not_in_element(self, element, container):
         """Assert the given element is not in one of the elements in container.
 
+        Args:
+            element: The element to search for
+            container (Iterable): The iterable in which to search for an item
+                that contains element.
         Returns:
             None.
 
@@ -55,3 +64,25 @@ class ExtendedTestCase(unittest.TestCase):
             if element in item:
                 self.fail("Element '{}' is in one of the elements in "
                           "the given container.".format(element))
+
+    def assert_regex_matches_element(self, regex_str, container):
+        """Assert the given regex matches one of the elements in container.
+
+        Args:
+            regex_str (str): The regular expression string to match
+            container (Iterable of str): The iterable in which to search for a
+                match for the regex_str
+
+        Returns:
+            None.
+
+        Raises:
+            AssertionError: if the assertion fails.
+        """
+        regex = re.compile(regex_str)
+
+        for item in container:
+            if regex.match(item):
+                return
+        self.fail("Regex '{}' does not match any of the elements in "
+                  "the given container.".format(regex_str))
