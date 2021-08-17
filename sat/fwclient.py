@@ -26,11 +26,14 @@ import logging
 import time
 from datetime import datetime, timedelta
 
+import inflect
+
 from sat.apiclient import APIGatewayClient, APIError
 from sat.constants import MISSING_VALUE
 from sat.xname import XName
 
 
+inf = inflect.engine()
 LOGGER = logging.getLogger(__name__)
 
 
@@ -364,11 +367,11 @@ class FASClient(APIGatewayClient):
 
         return response
 
-    def get_device_firmwares(self, xname=None):
-        """Returns devices optionally associated with a particular xname.
+    def get_device_firmwares(self, xnames=None):
+        """Returns devices optionally associated with particular xnames.
 
         Args:
-            xname (str): Xname to get device firmware information from.
+            xnames ([str]): Xnames to get device firmware information from.
                 If no value is provided, then all xnames will be queried.
 
         Returns:
@@ -378,49 +381,21 @@ class FASClient(APIGatewayClient):
             takes.
 
         Raises:
-            APIError: If creating the temporary snapshot failed, or if
-                the resulting snapshot contained no data.
+            APIError: If creating the temporary snapshot failed,
+                or the schema of the JSON payload returned from FAS 
+                was malformed.
         """
         # This can raise APIError
-        response = self._create_temporary_snapshot(xnames=[xname] if xname else None)
+        response = self._create_temporary_snapshot(xnames)
         try:
             devices = response['devices']
-            if not devices:
-                err_message = (
-                    f'The snapshot does not have any devices under its "devices" key' +
-                    f' for xname {xname}.' if xname else '.'
+            missing_xnames = set(xnames or []) - set(device.get('xname') for device in devices)
+            if missing_xnames:
+                LOGGER.warning(
+                    'The snapshot is missing the following %s: %s',
+                    inf.plural('xname', len(missing_xnames)),
+                    inf.join(list(missing_xnames))
                 )
-                raise APIError(err_message)
             return devices
         except KeyError:
             raise APIError('The JSON payload did not contain a "devices" field.')
-
-    def get_multiple_device_firmwares(self, xnames):
-        """Returns devices associated with a list of xnames.
-
-        This function wraps around get_device_firmwares and creates
-        a snapshot for each xname, so that if an API error occurs for
-        just one, the remaining xnames may still be queried.
-
-        Args:
-            xnames (list): A list of xnames for which to query firmware.
-
-        Returns:
-            A list of device dictionaries for the given xnames. This
-            can be passed to make_fw_table. See the docstring of
-            make_fw_table for the format this list of dictionaries
-            takes.
-
-        Raises:
-            APIError: if the given xnames yielded no firmware data.
-        """
-        device_firmwares = []
-        for xname in xnames:
-            try:
-                xname_device_firmwares = self.get_device_firmwares(xname)
-                device_firmwares.extend(xname_device_firmwares)
-            except APIError as err:
-                LOGGER.error('Error getting firmware for xname %s: %s', xname, err)
-        if not device_firmwares:
-            raise APIError(FASClient.err_no_firmware_found)
-        return device_firmwares

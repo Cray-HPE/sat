@@ -177,7 +177,7 @@ class TestFirmware(ExtendedTestCase):
         """Getting all firmware uses get_device_firmwares to produce a report."""
         args = self.parser.parse_args(['firmware'])
         do_firmware(args)
-        self.firmware_client.get_device_firmwares.assert_called_once_with()
+        self.firmware_client.get_device_firmwares.assert_called_once_with(None)
         self.assertFirmwareTables([self.firmware_client.get_device_firmwares.return_value])
         self.assertReport(None, args, self.firmware_client.make_fw_table.return_value)
 
@@ -191,22 +191,22 @@ class TestFirmware(ExtendedTestCase):
         """Getting firmware by xname produces a report for the xname"""
         args = self.parser.parse_args(['firmware', '-x', 'x5000c0s3b0'])
         do_firmware(args)
-        self.firmware_client.get_multiple_device_firmwares.assert_called_once_with(args.xnames)
-        self.assertFirmwareTables([self.firmware_client.get_multiple_device_firmwares.return_value])
+        self.firmware_client.get_device_firmwares.assert_called_once_with(args.xnames)
+        self.assertFirmwareTables([self.firmware_client.get_device_firmwares.return_value])
         self.assertReport(None, args, self.firmware_client.make_fw_table.return_value)
 
     def test_get_firmware_multiple_xnames(self):
         """Getting firmware for several xnames produces a report for them."""
         args = self.parser.parse_args(['firmware', '-x', 'x3000c0s2b0', '-x', 'x5000c0s3b0', ])
         do_firmware(args)
-        self.firmware_client.get_multiple_device_firmwares.assert_called_once_with(args.xnames)
-        self.assertFirmwareTables([self.firmware_client.get_multiple_device_firmwares.return_value])
+        self.firmware_client.get_device_firmwares.assert_called_once_with(args.xnames)
+        self.assertFirmwareTables([self.firmware_client.get_device_firmwares.return_value])
         self.assertReport(None, args, self.firmware_client.make_fw_table.return_value)
 
     def test_get_firmware_xname_api_error(self):
         """An API Error getting firmware by xname exits with an error."""
         args = self.parser.parse_args(['firmware', '-x', 'x3000c0s0b0'])
-        self.firmware_client.get_multiple_device_firmwares.side_effect = APIError('No firmware found.')
+        self.firmware_client.get_device_firmwares.side_effect = APIError('No firmware found.')
         self.assertExitsWithError(do_firmware, args, 'No firmware found.')
 
 
