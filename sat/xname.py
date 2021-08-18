@@ -29,7 +29,15 @@ from sat.cached_property import cached_property
 class XName:
     """An xname representing a component in the system."""
 
+    CABINET_XNAME_REGEX = re.compile(r'x\d+$')
+    CHASSIS_XNAME_REGEX = re.compile(r'x\d+c\d+$')
+    SLOT_XNAME_REGEX = re.compile(r'x\d+c\d+s\d+$')
+    BMC_XNAME_REGEX = re.compile(r'x\d+c\d+s\d+b\d+$')
     NODE_XNAME_REGEX = re.compile(r'x\d+c\d+s\d+b\d+n\d+')
+
+    # Types corresponding to the xname REGEXs
+    XNAME_TYPES = ('CABINET', 'CHASSIS', 'SLOT', 'BMC', 'NODE', 'UNKNOWN')
+
 
     def __init__(self, xname_str):
         """Creates a new xname object from the given xname string.
@@ -85,6 +93,24 @@ class XName:
         """
         xname_str = ''.join(str(t) for t in tokens)
         return cls(xname_str)
+
+    def get_type(self):
+        """Get the type of the xname using the str representation and regular expression.
+
+        Returns:
+            A str from XNAME_TYPES.
+        """
+        if self.NODE_XNAME_REGEX.match(self.xname_str):
+            return 'NODE'
+        if self.BMC_XNAME_REGEX.match(self.xname_str):
+            return 'BMC'
+        if self.SLOT_XNAME_REGEX.match(self.xname_str):
+            return 'SLOT'
+        if self.CHASSIS_XNAME_REGEX.match(self.xname_str):
+            return 'CHASSIS'
+        if self.CABINET_XNAME_REGEX.match(self.xname_str):
+            return 'CABINET'
+        return 'UNKNOWN'
 
     def get_ancestor(self, levels):
         """Get the ancestor of this xname by stripping off levels.
