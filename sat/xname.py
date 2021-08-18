@@ -38,7 +38,6 @@ class XName:
     # Types corresponding to the xname REGEXs
     XNAME_TYPES = ('CABINET', 'CHASSIS', 'SLOT', 'BMC', 'NODE', 'UNKNOWN')
 
-
     def __init__(self, xname_str):
         """Creates a new xname object from the given xname string.
 
