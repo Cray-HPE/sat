@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diagnostics are Rosetta switches.
 - Changed sat to use the V2 HSM API.
 
+### Fixed
+- Improved error handling of missing or empty FRUID key in system component data.
+
 ### Added
 - Added a check for running SDU sessions to the ``session-checks`` stage of a
   ``shutdown`` action in ``sat bootsys``.

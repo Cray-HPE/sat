@@ -190,7 +190,7 @@ class BaseComponent:
     @cached_property
     def fruid(self):
         """str: The FRUID of the component."""
-        return self.raw_data['PopulatedFRU']['FRUID']
+        return ComponentDataDict(self.raw_data['PopulatedFRU'])['FRUID']
 
     @cached_property
     def fru_info(self):
