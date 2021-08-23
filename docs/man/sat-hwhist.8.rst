@@ -50,47 +50,51 @@ These options must be specified after the subcommand.
 EXAMPLES
 ========
 
-Report the FRU history for the processor located at xname: x3000c0s3b0n0p0:
+Report the FRU history for the processor located at xname: x1000c3s4b0n1p0:
 
 ::
 
-  # sat hwhist --xname x3000c0s3b0n0p0
-  +-----------------+---------------------------------------------------+-----------------------------+-----------+
-  | xname           | FRUID                                             | Timestamp                   | EventType |
-  +-----------------+---------------------------------------------------+-----------------------------+-----------+
-  | x3000c0s3b0n0p0 | Processor.AdvancedMicroDevicesInc.2B48CBA44CEC0D6 | 2021-06-02T18:37:31.619581Z | Detected  |
-  | x3000c0s3b0n0p0 | Processor.AdvancedMicroDevicesInc.2B48CBA44CEC0D6 | 2021-06-16T14:42:49.528142Z | Detected  |
-  | x3000c0s3b0n0p0 | Processor.AdvancedMicroDevicesInc.2B48CBA44CEC0D6 | 2021-06-17T17:20:52.326343Z | Detected  |
-  | x3000c0s3b0n0p0 | Processor.AdvancedMicroDevicesInc.2B48CBA44CEC0D6 | 2021-06-24T21:45:22.485414Z | Detected  |
-  | x3000c0s3b0n0p0 | Processor.AdvancedMicroDevicesInc.2B48CBA44CEC0D6 | 2021-07-27T00:10:15.649104Z | Detected  |
-  +-----------------+---------------------------------------------------+-----------------------------+-----------+
+  # sat hwhist --xname x1000c3s4b0n1p0
+  +-----------------+-------------------------------------------------+-----------------------------+-----------+
+  | xname           | FRUID                                           | Timestamp                   | EventType |
+  +-----------------+-------------------------------------------------+-----------------------------+-----------+
+  | x1000c3s4b0n1p0 | Processor.AdvancedMicroDevicesInc.9KB2525W00198 | 2021-03-18T19:18:01.657016Z | Added     |
+  | x1000c3s4b0n1p0 | Processor.AdvancedMicroDevicesInc.9KB2525W00198 | 2021-03-29T16:49:57.983025Z | Removed   |
+  | x1000c3s4b0n1p0 | Processor.AdvancedMicroDevicesInc.9KB2525W00087 | 2021-03-29T16:49:57.987507Z | Added     |
+  | x1000c3s4b0n1p0 | Processor.AdvancedMicroDevicesInc.9KB2525W00087 | 2021-03-29T19:32:04.43173Z  | Removed   |
+  | x1000c3s4b0n1p0 | Processor.AdvancedMicroDevicesInc.9KB2525W00198 | 2021-03-29T19:32:04.43664Z  | Added     |
+  | x1000c3s4b0n1p0 | Processor.AdvancedMicroDevicesInc.9KB2525W00198 | 2021-05-13T15:10:42.012758Z | Scanned   |
+  | x1000c3s4b0n1p0 | Processor.AdvancedMicroDevicesInc.9KB2525W00198 | 2021-05-21T03:17:25.463946Z | Detected  |
+  +-------------------------------------------------+-----------------+-----------------------------+-----------+
 
-Report the FRU history for the power supply with FRUID: NodeEnclosurePowerSupply.LiteonPower.6K9L10103I1236Ukkj:
-
-::
-
-  # sat hwhist --fruid NodeEnclosurePowerSupply.LiteonPower.6K9L10103I1236U
-  +------------------------------------------------------+----------------+-----------------------------+-----------+
-  | FRUID                                                | xname          | Timestamp                   | EventType |
-  +------------------------------------------------------+----------------+-----------------------------+-----------+
-  | NodeEnclosurePowerSupply.LiteonPower.6K9L10103I1236U | x3000c0s17e0t1 | 2021-06-02T18:37:34.623145Z | Detected  |
-  | NodeEnclosurePowerSupply.LiteonPower.6K9L10103I1236U | x3000c0s17e0t1 | 2021-06-16T14:42:58.449096Z | Detected  |
-  | NodeEnclosurePowerSupply.LiteonPower.6K9L10103I1236U | x3000c0s17e0t1 | 2021-06-17T17:20:53.450429Z | Detected  |
-  | NodeEnclosurePowerSupply.LiteonPower.6K9L10103I1236U | x3000c0s17e0t1 | 2021-06-24T21:45:23.952613Z | Detected  |
-  | NodeEnclosurePowerSupply.LiteonPower.6K9L10103I1236U | x3000c0s17e0t1 | 2021-07-27T00:10:29.759025Z | Detected  |
-  +------------------------------------------------------+----------------+-----------------------------+-----------+
-
-Report the FRU history for FRUID Memory.Hynix.HMA41GR7MFR8NTFT1.102538C8 and filter by EventType:
+Report the FRU history for the processor with FRUID: Processor.AdvancedMicroDevicesInc.9KB2525W00198:
 
 ::
 
-  # sat hwhist --fruid Memory.Hynix.HMA41GR7MFR8NTFT1.102538C8 --filter eventtype!=Scanned
-  +-----------------------------------------+-----------------+-----------------------------+-----------+
-  | FRUID                                   | xname           | Timestamp                   | EventType |
-  +-----------------------------------------+-----------------+-----------------------------+-----------+
-  | Memory.Hynix.HMA41GR7MFR8NTFT1.102538C8 | x3000c0s7b0n0d9 | 2021-05-04T19:33:03.396677Z | Added     |
-  +-----------------------------------------+-----------------+-----------------------------+-----------+
+  # sat hwhist --fruid Processor.AdvancedMicroDevicesInc.9KB2525W00198
+  +-------------------------------------------------+-----------------+-----------------------------+-----------+
+  | FRUID                                           | xname           | Timestamp                   | EventType |
+  +-------------------------------------------------+-----------------+-----------------------------+-----------+
+  | Processor.AdvancedMicroDevicesInc.9KB2525W00198 | x1000c3s4b0n1p0 | 2021-03-18T19:18:01.657016Z | Added     |
+  | Processor.AdvancedMicroDevicesInc.9KB2525W00198 | x1000c3s4b0n1p0 | 2021-03-29T16:49:57.983025Z | Removed   |
+  | Processor.AdvancedMicroDevicesInc.9KB2525W00198 | x1000c3s4b0n1p1 | 2021-03-29T16:49:57.987507Z | Added     |
+  | Processor.AdvancedMicroDevicesInc.9KB2525W00198 | x1000c3s4b0n1p1 | 2021-03-29T19:32:04.43173Z  | Removed   |
+  | Processor.AdvancedMicroDevicesInc.9KB2525W00198 | x1000c3s4b0n1p0 | 2021-03-29T19:32:04.43664Z  | Added     |
+  | Processor.AdvancedMicroDevicesInc.9KB2525W00198 | x1000c3s4b0n1p0 | 2021-05-13T15:10:42.012758Z | Scanned   |
+  | Processor.AdvancedMicroDevicesInc.9KB2525W00198 | x1000c3s4b0n1p0 | 2021-05-21T03:17:25.463946Z | Detected  |
+  +-------------------------------------------------+-----------------+-----------------------------+-----------+
 
+Report the FRU history for the memory located at xname: x3000c0s25b0n0d19 and filter by EventType:
+
+::
+
+  sat hwhist -x x3000c0s25b0n0d19 --filter eventtype=Added
+  +-------------------+-----------------------------------------+-----------------------------+-----------+
+  | xname             | FRUID                                   | Timestamp                   | EventType |
+  +-------------------+-----------------------------------------+-----------------------------+-----------+
+  | x3000c0s25b0n0d19 | Memory.Micron.18ASF2G72PZ3G2E2.23D75423 | 2021-03-17T20:21:53.403648Z | Added     |
+  | x3000c0s25b0n0d19 | Memory.Hynix.HMA82GR7CJR8NXN.3469DF66   | 2021-04-27T13:55:17.509194Z | Added     |
+  +-------------------+-----------------------------------------+-----------------------------+-----------+
 
 SEE ALSO
 ========
