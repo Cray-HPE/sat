@@ -42,7 +42,7 @@ TIMEOUT_SPECS = [
                 'management nodes are reachable via SSH after boot.'),
     TimeoutSpec('k8s', ['boot'], 600,
                 'Kubernetes pods have returned to their pre-shutdown state.'),
-    TimeoutSpec('ceph', ['boot'], 600,
+    TimeoutSpec('ceph', ['boot'], 60,
                 'ceph has returned to a healthy state.'),
     TimeoutSpec('bgp', ['boot', 'shutdown'], 600,
                 'BGP routes report that they are established on management switches.'),

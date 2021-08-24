@@ -118,16 +118,37 @@ class TestWaiter(WaiterTestCase):
         waiter = FailingWaiter(2)
         self.assertFalse(waiter.wait_for_completion())
 
+    def test_no_negative_retries(self):
+        """Test that the number of retries cannot be negative"""
+        with self.assertRaises(ValueError):
+            SuccessfulWaiter = get_mock_waiter(True)
+            instance = SuccessfulWaiter(10, retries=-1)
+
     @patch('sat.cli.bootsys.waiting.Waiter.pre_wait_action')
     @patch('sat.cli.bootsys.waiting.Waiter.post_wait_action')
-    def test_hooks_are_called(self, mock_post_wait, mock_pre_wait):
-        """Check that all user-defined hooks are always called"""
+    @patch('sat.cli.bootsys.waiting.Waiter.on_retry_action')
+    def test_pre_post_hooks_are_called(self, mock_on_retry, mock_post_wait, mock_pre_wait):
+        """Check that user-defined pre/post hooks are always called"""
         SuccessfulWaiter = get_mock_waiter(True)
         instance = SuccessfulWaiter(10)
         instance.wait_for_completion()
 
         mock_pre_wait.assert_called_once()
         mock_post_wait.assert_called_once()
+        mock_on_retry.assert_not_called()
+
+    @patch('sat.cli.bootsys.waiting.Waiter.pre_wait_action')
+    @patch('sat.cli.bootsys.waiting.Waiter.post_wait_action')
+    @patch('sat.cli.bootsys.waiting.Waiter.on_retry_action')
+    def test_on_retry_hooks_are_called(self, mock_on_retry, mock_post_wait, mock_pre_wait):
+        """Check that user-defined on-retry hook is called on retry"""
+        NotQuiteReadyWaiter = get_mock_waiter([False, True])
+        instance = NotQuiteReadyWaiter(0.5, retries=1)
+        instance.wait_for_completion()
+
+        mock_pre_wait.assert_called_once()
+        mock_post_wait.assert_called_once()
+        mock_on_retry.assert_called_once()
 
     def test_wait_async_launch_thread(self):
         """Test that a thread is created when waiting asynchronously"""
