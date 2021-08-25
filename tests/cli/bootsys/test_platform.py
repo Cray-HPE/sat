@@ -829,15 +829,10 @@ class TestDoCephUnfreeze(unittest.TestCase):
         self.get_config_value = mock.patch('sat.cli.bootsys.platform.get_config_value').start()
         self.ceph_waiter_cls = mock.patch('sat.cli.bootsys.platform.CephHealthWaiter').start()
         self.ceph_waiter = self.ceph_waiter_cls.return_value
-        self.do_service_action_on_hosts = mock.patch('sat.cli.bootsys.platform.do_service_action_on_hosts').start()
 
     def test_do_ceph_unfreeze_success(self):
         """Test do_ceph_unfreeze in the successful case."""
         do_ceph_unfreeze(self.ncn_groups)
-        self.assertEqual(
-            self.do_service_action_on_hosts.mock_calls,
-            [mock.call(self.ncn_groups['storage'], service, 'active') for service in self.ceph_services]
-        )
         self.toggle_ceph_freeze_flags.assert_called_once_with(freeze=False)
         self.get_config_value.assert_called_once_with('bootsys.ceph_timeout')
         self.ceph_waiter_cls.assert_called_once_with(self.get_config_value.return_value, self.ncn_groups['storage'], retries=1)
@@ -849,22 +844,10 @@ class TestDoCephUnfreeze(unittest.TestCase):
         expected_error_regex = 'Ceph is not healthy. Please correct Ceph health and try again.'
         with self.assertRaisesRegex(FatalPlatformError, expected_error_regex):
             do_ceph_unfreeze(self.ncn_groups)
-        self.assertEqual(
-            self.do_service_action_on_hosts.mock_calls,
-            [mock.call(self.ncn_groups['storage'], service, 'active') for service in self.ceph_services]
-        )
         self.toggle_ceph_freeze_flags.assert_called_once_with(freeze=False)
         self.get_config_value.assert_called_once_with('bootsys.ceph_timeout')
         self.ceph_waiter_cls.assert_called_once_with(self.get_config_value.return_value, self.ncn_groups['storage'], retries=1)
         self.ceph_waiter.wait_for_completion.assert_called_once_with()
-
-    def test_do_ceph_unfreeze_failed_service_start(self):
-        """do_ceph_unfreeze should not unfreeze or wait for Ceph health if starting the service(s) failed."""
-        self.do_service_action_on_hosts.side_effect = FatalPlatformError
-        with self.assertRaises(FatalPlatformError):
-            do_ceph_unfreeze(self.ncn_groups)
-        self.toggle_ceph_freeze_flags.assert_not_called()
-        self.ceph_waiter_cls.assert_not_called()
 
 
 class TestDoServiceActionOnHosts(unittest.TestCase):
