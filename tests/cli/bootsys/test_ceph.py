@@ -21,13 +21,17 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+from functools import partial
+from io import BytesIO
 import json
 import logging
 import unittest
-from unittest.mock import patch, call
-
+import socket
 import subprocess
 from subprocess import CalledProcessError
+from unittest.mock import patch, call, MagicMock
+
+from paramiko import SSHException
 
 from sat.cli.bootsys.ceph import (
     CephHealthWaiter,
@@ -38,12 +42,24 @@ from sat.cli.bootsys.ceph import (
 from tests.common import ExtendedTestCase
 
 
+def mock_ceph_exec_command(cmd_str, stdin=b'', stdout=b'', stderr=b''):
+    if cmd_str.startswith('cephadm'):
+        stdout = b'[{"systemd_unit": "foo"}]'
+
+    return tuple(BytesIO(content) for content in [stdin, stdout, stderr])
+
+
 class TestCephWaiter(unittest.TestCase):
     """Tests for the CephHealthWaiter class"""
 
     def setUp(self):
         self.mock_check_ceph_health = patch('sat.cli.bootsys.ceph.check_ceph_health').start()
-        self.waiter = CephHealthWaiter(10)
+        self.storage_hosts = [f'ncn-s00{n}' for n in range(1, 4)]
+        self.waiter = CephHealthWaiter(10, self.storage_hosts)
+
+        self.mock_ssh_client = MagicMock()
+        self.mock_ssh_client.exec_command.side_effect = mock_ceph_exec_command
+        patch('sat.cli.bootsys.ceph.get_ssh_client', return_value=self.mock_ssh_client).start()
 
     def tearDown(self):
         patch.stopall()
@@ -58,6 +74,47 @@ class TestCephWaiter(unittest.TestCase):
         self.mock_check_ceph_health.side_effect = CephHealthCheckError
         self.assertFalse(self.waiter.has_completed())
         self.mock_check_ceph_health.assert_called_once_with(allow_osdmap_flags=False)
+
+    def test_ceph_restart_services(self):
+        """Test that Ceph services can be restarted before retrying."""
+        self.waiter.on_retry_action()
+        self.mock_ssh_client.connect.assert_has_calls([
+            call(host) for host in self.storage_hosts
+        ])
+        self.mock_ssh_client.exec_command.assert_has_calls([
+            call('cephadm ls'),
+            call('systemctl restart "foo"')
+        ])
+        self.mock_ssh_client.close.assert_called()
+
+    def test_ceph_restart_services_fails_on_ssh_connect(self):
+        """Test that warnings are logged when service restart encounters SSH errors"""
+        for exc in [SSHException, socket.error]:
+            self.mock_ssh_client.connect.side_effect = exc
+            with self.assertLogs(level='WARNING'):
+                self.waiter.on_retry_action()
+            self.mock_ssh_client.exec_command.assert_not_called()
+            self.mock_ssh_client.close.assert_called()
+
+            self.mock_ssh_client.reset_mock()
+
+    def test_ceph_restart_fails_with_cephadm(self):
+        """Test that warnings are logged when service restart fails from cephadm call"""
+        self.mock_ssh_client.exec_command.side_effect = partial(mock_ceph_exec_command, stderr=b'something went wrong')
+        with self.assertLogs(level='WARNING'):
+            self.waiter.on_retry_action()
+        self.mock_ssh_client.close.assert_called()
+
+    def test_ceph_restart_fails_with_systemctl(self):
+        """Test that warnings are logged when service restart fails from cephadm call"""
+        call_results = [tuple(BytesIO(stream) for stream in streams) for streams in [
+            [b'', b'[{"systemd_unit": "foo"}]', b''],
+            [b'', b'', b'something went wrong']
+        ]] * 3
+        self.mock_ssh_client.exec_command.side_effect = call_results
+        with self.assertLogs(level='WARNING'):
+            self.waiter.on_retry_action()
+        self.mock_ssh_client.close.assert_called()
 
 
 class TestToggleCephFreezeFlags(ExtendedTestCase):

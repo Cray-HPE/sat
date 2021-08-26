@@ -25,6 +25,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.2] - 2021-08-25
+
+### Fixed
+
+- The Ceph health timeout in the ``platform-services`` stage of ``sat bootsys boot``
+  was changed to 60 seconds, from 600 seconds previously.
+- If waiting for Ceph health to become "OK" times out during the ``platform-services``
+  stage of ``sat bootsys boot``, the Ceph services will now be restarted on the 
+  storage nodes, and Ceph health will be waited on again.
+- Fixed an error in the ``platform-services`` stage of ``sat bootsys boot``
+  related to trying to start non-existent Ceph services.
+
 ## [3.7.1] - 2021-07-27
 
 ### Added
