@@ -22,6 +22,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 import re
+from collections import OrderedDict
 
 from sat.cached_property import cached_property
 
@@ -29,14 +30,13 @@ from sat.cached_property import cached_property
 class XName:
     """An xname representing a component in the system."""
 
-    CABINET_XNAME_REGEX = re.compile(r'x\d+$')
-    CHASSIS_XNAME_REGEX = re.compile(r'x\d+c\d+$')
-    SLOT_XNAME_REGEX = re.compile(r'x\d+c\d+s\d+$')
-    BMC_XNAME_REGEX = re.compile(r'x\d+c\d+s\d+b\d+$')
-    NODE_XNAME_REGEX = re.compile(r'x\d+c\d+s\d+b\d+n\d+')
-
-    # Types corresponding to the xname REGEXs
-    XNAME_TYPES = ('CABINET', 'CHASSIS', 'SLOT', 'BMC', 'NODE', 'UNKNOWN')
+    XNAME_REGEX_BY_TYPE = OrderedDict([
+        ('NODE', re.compile(r'x\d+c\d+s\d+b\d+n\d+')),
+        ('BMC', re.compile(r'x\d+c\d+s\d+b\d+$')),
+        ('SLOT', re.compile(r'x\d+c\d+s\d+$')),
+        ('CHASSIS', re.compile(r'x\d+c\d+$')),
+        ('CABINET', re.compile(r'x\d+$'))
+    ])
 
     def __init__(self, xname_str):
         """Creates a new xname object from the given xname string.
@@ -99,16 +99,10 @@ class XName:
         Returns:
             A str from XNAME_TYPES.
         """
-        if self.NODE_XNAME_REGEX.match(self.xname_str):
-            return 'NODE'
-        if self.BMC_XNAME_REGEX.match(self.xname_str):
-            return 'BMC'
-        if self.SLOT_XNAME_REGEX.match(self.xname_str):
-            return 'SLOT'
-        if self.CHASSIS_XNAME_REGEX.match(self.xname_str):
-            return 'CHASSIS'
-        if self.CABINET_XNAME_REGEX.match(self.xname_str):
-            return 'CABINET'
+        for xname_type, xname_regex in self.XNAME_REGEX_BY_TYPE.items():
+            if xname_regex.fullmatch(self.xname_str):
+                return xname_type
+
         return 'UNKNOWN'
 
     def get_ancestor(self, levels):
@@ -147,11 +141,11 @@ class XName:
             The parent node XName of this XName, or None if this XName is not
             the child of a node XName.
         """
-        match = self.NODE_XNAME_REGEX.match(str(self))
+        match = self.XNAME_REGEX_BY_TYPE['NODE'].match(str(self))
         if match:
             return XName(match.group(0))
-        else:
-            return None
+
+        return None
 
     def get_cabinet(self):
         """Get the cabinet of this xname.

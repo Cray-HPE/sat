@@ -262,7 +262,7 @@ class TestDoXname2nid(ExtendedTestCase):
                 do_xname2nid(self.fake_args)
         self.assertEqual(cm.exception.code, ERR_MISSING_NAMES)
         self.mock_hsm_client.get_node_components.assert_called_once_with()
-        self.assert_in_element('HSM API has no NID for valid ID: x1000c2s2b0n2', logs.output)
+        self.assert_in_element('HSM API has no NID for valid node xname: x1000c2s2b0n2', logs.output)
         self.assert_in_element('xname: x1000c2s2b0n2, nid: MISSING', logs.output)
         self.mock_print.assert_not_called()
 
@@ -279,7 +279,7 @@ class TestDoXname2nid(ExtendedTestCase):
                 do_xname2nid(self.fake_args)
         self.assertEqual(cm.exception.code, ERR_MISSING_NAMES)
         self.mock_hsm_client.get_node_components.assert_called_once_with()
-        self.assert_in_element('HSM API has no NID for valid ID: x1000c2s2b0n2', logs.output)
+        self.assert_in_element('HSM API has no NID for valid node xname: x1000c2s2b0n2', logs.output)
         self.mock_print.assert_called_once_with('nid001073,nid001074')
 
 

@@ -37,7 +37,7 @@ ERR_HSM_API_FAILED = 2
 
 
 def init_xname_results(xname_args):
-    """Initialize an ordered dictionary that will contain xnames and nids.
+    """Initialize an ordered dictionary that will contain xnames and nid results.
 
     Args:
         xname_args ([str]): A list of xname arguments as input by the user.
@@ -60,82 +60,71 @@ def init_xname_results(xname_args):
     return xname_results
 
 
-def get_matching_args_and_set_found(cid, xname_results):
-    """Get a list of xnames from xname_results that match or contain a node cid and set found.
+def process_node_component(node_xname, node_component, xname_results):
+    """Check if a node xname matches one or more xname arguments and add to the xname_results.
 
     Args:
-        cid (str): A component ID for a node.
-        xname_results (OrderdedDict): A dictionary with xnames as keys.
+        node_xname (str): A component xname for a node being processed.
+        node_component (Dict): A dictionary with node component data from HSM for node_xname.
+        xname_results (OrderedDict): A dictionary with results for xname arguments.
 
     Returns:
-        matching_args ([str]: A list of xnames.
+        True if the node component matches one or more arguments in xname_results.
+        Otherwise returns False.
     """
 
-    matching_args = []
-    for arg in [k for k, item in xname_results.items() if item['type'] != 'UNKNOWN']:
-        if (cid == arg or (
-                xname_results[arg]['type'] != 'NODE' and
-                xname_results[arg]['xname'].contains_component(XName(cid)))):
-            matching_args.append(arg)
-            xname_results[arg]['found'] = True
+    node_component_match = False
+    nid = node_component.get('NID')
 
-    return matching_args
+    # Check for xname matches with the arguments even if nid is None
+    for arg, result in xname_results.items():
+        # Need to check each arg and store cid/nid data for that argument if match
+        # The xname_results found flag is also set to True for the argument
+        arg_match = False
+        if (arg == node_xname or (
+                result['type'] != 'NODE' and
+                result['type'] != 'UNKNOWN' and
+                result['xname'].contains_component(XName(node_xname)))):
+            result['found'] = True
+            arg_match = True
 
+        if arg_match and nid:
+            node_component_match = True
+            result['nodes'].append({'cid': node_xname, 'nid': nid})
+        elif arg_match and not nid:
+            # Keep track of missing NIDs for each argument
+            node_component_match = True
+            result['missing_nids'] = True
 
-def all_valid_args_found(xname_results):
-    """Check if all valid xname arguments have been found.
+    # Log an error one time if there was a node component match but no NID in the HSM data
+    # Don't log an error if there was not a match
+    if node_component_match and not nid:
+        LOGGER.error(f'HSM API has no NID for valid node xname: {node_xname}')
 
-    Args:
-        xname_results (OrderdedDict): A dictionary with xnames as keys.
-
-    Returns:
-        True if all valid xnames in xname_results have been found.
-    """
-
-    for vals in xname_results.values():
-        if vals['type'] != 'UNKNOWN' and not vals['found']:
-            return False
-
-    return True
-
-
-def update_nodes_in_results(cid, nid, matching_args, xname_results):
-    """Update the node results for the matching arguments.
-
-    Args:
-        cid (str): A component ID for a node.
-        nid (int): A node ID for a node.
-        matching_args ([str]: A list of xnames.
-        xname_results (OrderdedDict): A dictionary with xnames as keys.
-    """
-
-    if not nid:
-        LOGGER.error(f'HSM API has no NID for valid ID: {cid}')
-    for marg in matching_args:
-        if nid:
-            xname_results[marg]['nodes'].append({'cid': cid, 'nid': nid})
-        else:
-            xname_results[marg]['missing_nids'] = True
+    return node_component_match
 
 
 def make_nid_list_from_results(xname_results):
     """Create a list of nids from xname_results.
 
     Args:
-        xname_results (OrderdedDict): A dictionary with xnames as keys.
+        xname_results (OrderedDict): A dictionary with xnames as keys.
 
     Returns:
         nids ([str]): A list of nids.
         missing_nids (bool): True if any xnames had no nids or missing nids.
     """
 
-    nids = []
+    all_nids = []
     missing_nids = False
     for xname, vals in xname_results.items():
         if vals['nodes']:
+            nids = []
+            vals['nodes'].sort(key=lambda item: item.get('nid'))
             for node in vals['nodes']:
                 nids.append('nid' + str(node['nid']).zfill(NUM_NID_DIGITS))
                 LOGGER.debug(f'xname: {node["cid"]}, nid: {node["nid"]}')
+            all_nids += nids
         else:
             missing_nids = True
             LOGGER.error(f'xname: {xname}, nid: {MISSING_VALUE}')
@@ -144,7 +133,7 @@ def make_nid_list_from_results(xname_results):
         if vals['missing_nids']:
             missing_nids = True
 
-    return nids, missing_nids
+    return all_nids, missing_nids
 
 
 def do_xname2nid(args):
@@ -170,30 +159,35 @@ def do_xname2nid(args):
         LOGGER.error('Request to HSM API failed: %s', err)
         raise SystemExit(ERR_HSM_API_FAILED)
 
+    # Create a dictionary with the results for each of the xname arguments
     xname_results = init_xname_results(args.xnames)
+
+    # Loop through the node components sorted by node xname as a string
     for component in sorted(components, key=lambda c: c.get('ID', MISSING_VALUE)):
-        cid = component.get('ID')
-        if not cid:
+        node_xname = component.get('ID')
+        if not node_xname:
+            LOGGER.error(f'HSM API has no xname for node component: {component}')
             continue
-        matching_args = get_matching_args_and_set_found(cid, xname_results)
 
-        # The components are sorted by the xname(str).
-        # When a BMC or higher level contaianer is first matched, the argument
-        # is marked as found.
-        # The end of the container is detected when there is no match.
-        # Then, all_valid_args_found() is used to check the 'found' flags.
+        # Flag to indicate whether or not a node component matches one or more args
+        node_component_match = process_node_component(node_xname, component, xname_results)
 
-        if not matching_args and all_valid_args_found(xname_results):
+        if not node_component_match and \
+           all(result['found'] or result['type'] == 'UNKNOWN' for result in xname_results.values()):
+            # Exit the for loop early if all nodes for all valid xname arguments have been found.
+            # For NODE arguments, there will be only one matching node component.
+            # For BMC, SLOT, CHASSIS, and CABINET arguments (container xname), there can be
+            # multiple node components that match.
+            #
+            # The node components being processed in the for loop are sorted by the xname(str).
+            # When a container xname arg is first matched, the xname argument is marked as found.
+            # The end of the node components in the container is detected when there is no match
+            # since they are sorted.
             break
-        if not matching_args:
-            continue
-        update_nodes_in_results(cid, component.get('NID'), matching_args, xname_results)
 
     nids, any_missing_nids = make_nid_list_from_results(xname_results)
 
     if nids:
-        if len(xname_results) == 1:
-            list.sort(nids)
         print(','.join(nids))
     if any_missing_nids:
         raise SystemExit(ERR_MISSING_NAMES)
