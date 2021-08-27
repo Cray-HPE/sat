@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ``sat diag`` will now query HSM to verify that the components targeted for 
   diagnostics are Rosetta switches.
 - Changed sat to use the V2 HSM API.
+- Changed ``sat xname2nid`` subcommand to translate slot, chassis, and cabinet
+  xnames to node IDs in addition to node and node BMC xnames.
 
 ### Fixed
 - Improved error handling of missing or empty FRUID key in system component data.
