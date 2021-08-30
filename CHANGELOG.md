@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   storage nodes, and Ceph health will be waited on again.
 - Fixed an error in the ``platform-services`` stage of ``sat bootsys boot``
   related to trying to start non-existent Ceph services.
+- Fix a traceback that occurred if the user did not have permission to write to
+  the log file.
 
 ### Added
 - Added a check for running SDU sessions to the ``session-checks`` stage of a
