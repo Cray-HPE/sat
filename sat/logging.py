@@ -103,11 +103,14 @@ def configure_logging():
         try:
             os.makedirs(log_dir, exist_ok=True)
         except OSError as err:
-            LOGGER.error("Unable to create log directory '%s': %s", log_dir, err)
+            LOGGER.warning("Unable to create log directory '%s': %s", log_dir, err)
             return
-
-    file_handler = logging.FileHandler(filename=log_file_name)
-    file_handler.setLevel(log_file_level)
-    file_formatter = logging.Formatter(FILE_LOG_FORMAT)
-    file_handler.setFormatter(file_formatter)
-    sat_logger.addHandler(file_handler)
+    try:
+        file_handler = logging.FileHandler(filename=log_file_name)
+    except OSError as err:
+        LOGGER.warning("Unable to write to log file: %s", err)
+    else:
+        file_handler.setLevel(log_file_level)
+        file_formatter = logging.Formatter(FILE_LOG_FORMAT)
+        file_handler.setFormatter(file_formatter)
+        sat_logger.addHandler(file_handler)
