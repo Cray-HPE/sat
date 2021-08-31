@@ -412,7 +412,21 @@ class TestFASClient(ExtendedTestCase):
         ready_response = Mock()
         ready_response.json.return_value = {
             'ready': True,
-            'devices': Mock()
+            'devices': [{
+                'xname': 'x3000c0r15b0',
+                'targets': [
+                    {
+                        'name': 'BMC',
+                        'targetName': '',
+                        'firmwareVersion': '1.00'
+                    },
+                    {
+                        'name': 'FPGA0',
+                        'targetName': '',
+                        'firmwareVersion': '2.00'
+                    }
+                ]
+            }]
         }
         # Mock the return values of get() to test that we wait for the snapshot to be ready
         self.mock_get.side_effect = (
@@ -442,7 +456,21 @@ class TestFASClient(ExtendedTestCase):
         ready_response = Mock()
         ready_response.json.return_value = {
             'ready': True,
-            'devices': Mock()
+            'devices': [{
+                'xname': 'x3000c0r15b0',
+                'targets': [
+                    {
+                        'name': 'BMC',
+                        'targetName': '',
+                        'firmwareVersion': '1.00'
+                    },
+                    {
+                        'name': 'FPGA0',
+                        'targetName': '',
+                        'firmwareVersion': '2.00'
+                    }
+                ]
+            }]
         }
         self.mock_get.side_effect = (
             not_ready_response,
@@ -450,7 +478,7 @@ class TestFASClient(ExtendedTestCase):
         )
 
         expected = ready_response.json.return_value['devices']
-        actual = self.fas_client.get_device_firmwares(xname_to_query)
+        actual = self.fas_client.get_device_firmwares([xname_to_query])
 
         exp_name = 'SAT-{}-{}-{}-{}-{}-{}'.format(
             now.year, now.month, now.day, now.hour, now.minute, now.second)
@@ -508,45 +536,6 @@ class TestFASClient(ExtendedTestCase):
         err_regex = r'not contain a "devices" field'
         with self.assertRaisesRegex(APIError, err_regex):
             self.fas_client.get_device_firmwares()
-
-    def test_get_multiple_device_firmwares(self):
-        """Test getting multiple device firmwares combines the firmware into a big table."""
-        mock_get_device_firmwares = patch.object(self.fas_client, 'get_device_firmwares').start()
-        mock_firmware_devs = [
-            [Mock(), Mock(), Mock()],
-            [Mock(), Mock(), Mock()]
-        ]
-        mock_get_device_firmwares.side_effect = mock_firmware_devs
-        expected = mock_firmware_devs[0] + mock_firmware_devs[1]
-        actual = self.fas_client.get_multiple_device_firmwares(xnames=['x3000c0r15b0', 'x3000c0s17b1'])
-        self.assertEqual(expected, actual)
-
-    def test_get_multiple_device_firmwares_error(self):
-        """When one call to get_device_firmwares raises APIError, get_multiple_device_firmwares should log an error."""
-        mock_get_device_firmwares = patch.object(self.fas_client, 'get_device_firmwares').start()
-        mock_firmware_devs = [Mock(), Mock(), Mock()]
-        mock_get_device_firmwares.side_effect = [
-            APIError('API failed'), mock_firmware_devs
-        ]
-        expected = mock_firmware_devs
-        with self.assertLogs(level=logging.ERROR) as logs:
-            actual = self.fas_client.get_multiple_device_firmwares(xnames=['x3000c0r15b0', 'x3000c0s17b1'])
-        self.assertEqual(expected, actual)
-        self.assert_in_element('Error getting firmware for xname x3000c0r15b0: API failed', logs.output)
-
-    def test_get_multiple_device_firmwares_no_firmware(self):
-        """When multiple calls to get_device_firmwares result in no firmware due to errors, raise APIError"""
-        mock_get_device_firmwares = patch.object(self.fas_client, 'get_device_firmwares').start()
-        mock_get_device_firmwares.side_effect = [
-            APIError('API failed'), APIError('API failed again!')
-        ]
-        err_regex = r'No firmware found.'
-        with self.assertLogs(level=logging.ERROR) as logs:
-            with self.assertRaisesRegex(APIError, err_regex):
-                self.fas_client.get_multiple_device_firmwares(xnames=['x3000c0r15b0', 'x3000c0s17b1'])
-
-        self.assert_in_element('Error getting firmware for xname x3000c0r15b0: API failed', logs.output)
-        self.assert_in_element('Error getting firmware for xname x3000c0s17b1: API failed again!', logs.output)
 
     def test_make_fw_table(self):
         """Test creating a table from a basic firmware response"""
