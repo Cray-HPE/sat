@@ -21,6 +21,7 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+from collections import OrderedDict
 import logging
 
 from sat.apiclient import APIError, HSMClient
@@ -35,42 +36,104 @@ ERR_MISSING_NAMES = 1
 ERR_HSM_API_FAILED = 2
 
 
-def get_nids_using_xname(xname, components):
-    """Get the nids for a given xname from node component data from the HSM API.
+def init_xname_results(xname_args):
+    """Initialize an ordered dictionary that will contain xnames and nid results.
 
     Args:
-        xname(str): The Node or NodeBMC xname.
-        components(list): A list of dictionaries representing the node components
-            in the system.
+        xname_args ([str]): A list of xname arguments as input by the user.
 
     Returns:
-        A list of nids corresponding to the xname.
-        A bool of True/False indicating whether or not any nids are MISSING.
+        xname_results (OrderedDict): A dictionary with xnames as keys.
     """
 
+    xname_results = OrderedDict()
+    for arg in xname_args:
+        for xname in [x for x in (x.strip() for x in arg.split(',')) if x]:
+            xname_results[xname] = {
+                'xname': XName(xname),
+                'type': XName(xname).get_type(),
+                'found': False,
+                'missing_nids': False,
+                'nodes': []
+            }
+
+    return xname_results
+
+
+def process_node_component(node_xname, node_component, xname_results):
+    """Check if a node xname matches one or more xname arguments and add to the xname_results.
+
+    Args:
+        node_xname (str): A component xname for a node being processed.
+        node_component (Dict): A dictionary with node component data from HSM for node_xname.
+        xname_results (OrderedDict): A dictionary with results for xname arguments.
+
+    Returns:
+        True if the node component matches one or more arguments in xname_results.
+        Otherwise returns False.
+    """
+
+    node_component_match = False
+    nid = node_component.get('NID')
+
+    # Check for xname matches with the arguments even if nid is None
+    for arg, result in xname_results.items():
+        # Need to check each arg and store cid/nid data for that argument if match
+        # The xname_results found flag is also set to True for the argument
+        arg_match = False
+        if (arg == node_xname or (
+                result['type'] != 'NODE' and
+                result['type'] != 'UNKNOWN' and
+                result['xname'].contains_component(XName(node_xname)))):
+            result['found'] = True
+            arg_match = True
+
+        if arg_match and nid:
+            node_component_match = True
+            result['nodes'].append({'cid': node_xname, 'nid': nid})
+        elif arg_match and not nid:
+            # Keep track of missing NIDs for each argument
+            node_component_match = True
+            result['missing_nids'] = True
+
+    # Log an error one time if there was a node component match but no NID in the HSM data
+    # Don't log an error if there was not a match
+    if node_component_match and not nid:
+        LOGGER.error(f'HSM API has no NID for valid node xname: {node_xname}')
+
+    return node_component_match
+
+
+def make_nid_list_from_results(xname_results):
+    """Create a list of nids from xname_results.
+
+    Args:
+        xname_results (OrderedDict): A dictionary with xnames as keys.
+
+    Returns:
+        nids ([str]): A list of nids.
+        missing_nids (bool): True if any xnames had no nids or missing nids.
+    """
+
+    all_nids = []
     missing_nids = False
-    nids = []
-    for component in components:
-        cid = component.get('ID')
-        if not cid:
-            continue
-        if cid == xname or str(XName(cid).get_direct_parent()) == xname:
-            nid = component.get('NID')
-            if nid:
-                nids.append('nid' + str(nid).zfill(NUM_NID_DIGITS))
-                LOGGER.debug(f'xname: {cid}, nid: {nid}')
-            else:
-                missing_nids = True
-                LOGGER.error(f'HSM API has no NID for valid ID: {cid}')
-            if XName.NODE_XNAME_REGEX.match(xname):
-                # There is only one match for the node xname
-                break
+    for xname, vals in xname_results.items():
+        if vals['nodes']:
+            nids = []
+            vals['nodes'].sort(key=lambda item: item.get('nid'))
+            for node in vals['nodes']:
+                nids.append('nid' + str(node['nid']).zfill(NUM_NID_DIGITS))
+                LOGGER.debug(f'xname: {node["cid"]}, nid: {node["nid"]}')
+            all_nids += nids
+        else:
+            missing_nids = True
+            LOGGER.error(f'xname: {xname}, nid: {MISSING_VALUE}')
 
-    if not nids:
-        missing_nids = True
-        LOGGER.error(f'xname: {xname}, nid: {MISSING_VALUE}')
+        # A node container can have some nids set but still be missing some if bad HSM data
+        if vals['missing_nids']:
+            missing_nids = True
 
-    return nids, missing_nids
+    return all_nids, missing_nids
 
 
 def do_xname2nid(args):
@@ -87,6 +150,7 @@ def do_xname2nid(args):
         SystemExit(1): if one or more xnames can not be translated.
         SystemExit(2): if request to HSM API fails.
     """
+
     hsm_client = HSMClient(SATSession())
 
     try:
@@ -95,15 +159,33 @@ def do_xname2nid(args):
         LOGGER.error('Request to HSM API failed: %s', err)
         raise SystemExit(ERR_HSM_API_FAILED)
 
-    any_missing_nids = False
-    nids = []
-    for arg in args.xnames:
-        for xname in [x for x in (x.strip() for x in arg.split(',')) if x]:
-            xname_nids, missing_nids = get_nids_using_xname(xname, components)
-            if missing_nids:
-                any_missing_nids = True
-            if xname_nids:
-                nids.extend(xname_nids)
+    # Create a dictionary with the results for each of the xname arguments
+    xname_results = init_xname_results(args.xnames)
+
+    # Loop through the node components sorted by node xname as a string
+    for component in sorted(components, key=lambda c: c.get('ID', MISSING_VALUE)):
+        node_xname = component.get('ID')
+        if not node_xname:
+            LOGGER.error(f'HSM API has no xname for node component: {component}')
+            continue
+
+        # Flag to indicate whether or not a node component matches one or more args
+        node_component_match = process_node_component(node_xname, component, xname_results)
+
+        if not node_component_match and \
+           all(result['found'] or result['type'] == 'UNKNOWN' for result in xname_results.values()):
+            # Exit the for loop early if all nodes for all valid xname arguments have been found.
+            # For NODE arguments, there will be only one matching node component.
+            # For BMC, SLOT, CHASSIS, and CABINET arguments (container xname), there can be
+            # multiple node components that match.
+            #
+            # The node components being processed in the for loop are sorted by the xname(str).
+            # When a container xname arg is first matched, the xname argument is marked as found.
+            # The end of the node components in the container is detected when there is no match
+            # since they are sorted.
+            break
+
+    nids, any_missing_nids = make_nid_list_from_results(xname_results)
 
     if nids:
         print(','.join(nids))

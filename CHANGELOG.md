@@ -25,6 +25,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.10.0] - 2021-09-03
+
+### Changed
+- ``sat diag`` will now query HSM to verify that the components targeted for 
+  diagnostics are Rosetta switches.
+- Changed sat to use the V2 HSM API.
+- Changed ``sat xname2nid`` subcommand to translate slot, chassis, and cabinet
+  xnames to node IDs in addition to node and node BMC xnames.
+
+### Fixed
+- Improved error handling of missing or empty FRUID key in system component data.
+- The Ceph health timeout in the ``platform-services`` stage of ``sat bootsys boot``
+  was changed to 60 seconds, from 600 seconds previously.
+- If waiting for Ceph health to become "OK" times out during the ``platform-services``
+  stage of ``sat bootsys boot``, the Ceph services will now be restarted on the 
+  storage nodes, and Ceph health will be waited on again.
+- Fixed an error in the ``platform-services`` stage of ``sat bootsys boot``
+  related to trying to start non-existent Ceph services.
+- Fix a traceback that occurred if the user did not have permission to write to
+  the log file.
+
+### Added
+- Added a check for running SDU sessions to the ``session-checks`` stage of a
+  ``shutdown`` action in ``sat bootsys``.
+
+### Security
+- Incremented version of Alpine Linux from 3.13.2 to 3.13.5
+  to address OpenSSL CVE-2021-3711.
+
 ## [3.9.0] - 2021-08-04
 
 ### Changed

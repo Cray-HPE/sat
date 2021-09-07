@@ -35,10 +35,10 @@ In the second phase, it checks for any active sessions across multiple different
 services in the system, including the Boot Orchestration Service (BOS), the
 Configuration Framework Service (CFS), the Compute Rolling Upgrade Service
 (CRUS), the Firmware Action Service (FAS) or the Firmware Update Service (FUS),
-and the Node Memory Dump (NMD) service. If any active sessions are found, it
-will print information about those sessions and exit with exit code 1. If it
-does not find any active sessions, it will print messages to that effect and
-proceed with the next phase of the shutdown.
+the Node Memory Dump (NMD) service, and the System Dump Utility (SDU). If any
+active sessions are found, it will print information about those sessions and
+exit with exit code 1. If it does not find any active sessions, it will print
+messages to that effect and proceed with the next phase of the shutdown.
 
 In the third phase, it uses the Boot Orchestration Service (BOS) to shut down
 the compute nodes and User Access Nodes (UANs). It attempts to check whether the

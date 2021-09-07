@@ -22,7 +22,9 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 import logging
+import socket
 import sys
 import warnings
 
@@ -31,6 +33,7 @@ from kubernetes.client import CoreV1Api
 from kubernetes.client.rest import ApiException
 from kubernetes.config import load_kube_config
 from kubernetes.config.config_exception import ConfigException
+from paramiko.ssh_exception import SSHException
 from yaml import YAMLLoadWarning
 
 from sat.apiclient import (
@@ -40,6 +43,7 @@ from sat.apiclient import (
     CRUSClient,
     NMDClient
 )
+from sat.cli.bootsys.util import get_mgmt_ncn_groups, get_ssh_client
 from sat.constants import MISSING_VALUE
 from sat.fwclient import FASClient
 from sat.report import Report
@@ -56,19 +60,15 @@ class ServiceCheckError(Exception):
     pass
 
 
-class ServiceActivityChecker(ABC):
-    """An abstract base class for checking service activity."""
-
+class ActivityChecker(ABC):
+    """An abstract base class for checking arbitrary activities."""
     def __init__(self):
-        """Create a new ServiceActivityChecker."""
+        """Create a new ActivityChecker."""
         # The name of the service
         self.service_name = ''
         # The singular noun describing the sessions
         self.session_name = 'session'
-        # cray CLI args to get more information about a specific session
-        self.cray_cli_args = ''
-        # The field name that identifies a session
-        self.id_field_name = ''
+        self.status_command_args = ''
 
     def get_err(self, msg):
         """Return a ServiceCheckError with a an error message.
@@ -101,10 +101,11 @@ class ServiceActivityChecker(ABC):
                                      INFLECTOR.plural(self.session_name))
 
     @property
-    def cray_cli_command(self):
-        """str: The cray CLI command to get more info about a session."""
-        return 'cray {} {}'.format(self.cray_cli_args,
-                                   self.id_field_name.upper())
+    def more_details(self):
+        """str: A string describing how to get further details about running activities."""
+        if self.status_command_args:
+            return "For more details, execute '{}'.".format(self.status_command_args)
+        return ""
 
     @abstractmethod
     def get_active_sessions(self):
@@ -117,6 +118,120 @@ class ServiceActivityChecker(ABC):
             ServiceCheckError: if unable to get the sessions.
         """
         return []
+
+
+# noinspection PyAbstractClass
+class ServiceActivityChecker(ActivityChecker):
+    """An abstract base class for checking service activity.
+
+    This class should be used for checking services accessible from the cray
+    cli.
+    """
+
+    def __init__(self):
+        """Create a new ServiceActivityChecker."""
+        super().__init__()
+        # cray CLI args to get more information about a specific session
+        self.cray_cli_args = ''
+        # The field name that identifies a session
+        self.id_field_name = ''
+
+    @property
+    def cray_cli_command(self):
+        """str: The cray CLI command to get more info about a session."""
+        return 'cray {} {}'.format(self.cray_cli_args,
+                                   self.id_field_name.upper())
+
+    @property
+    def more_details(self):
+        return "For more details, execute '{}'.".format(self.cray_cli_command)
+
+
+class SDUActivityChecker(ActivityChecker):
+    """A class that checks for SDU being used to actively dump system state."""
+    def __init__(self):
+        """Create a new SDUActivityChecker."""
+        super().__init__()
+        self.service_name = 'SDU'
+        self.session_name = 'session'
+
+        self.ssh_client = get_ssh_client()
+        mgmt_ncns, _ = get_mgmt_ncn_groups()
+        self.remote_manager_ncns = mgmt_ncns['managers']
+
+        self.active_sdu_sessions = []
+
+    def get_active_sessions(self):
+        """Get any active SDU sessions.
+
+        Returns:
+            A list of OrderedDicts representing the active SDU sessions.
+
+        Raises:
+            ServiceCheckError: if unable to get the active SDU sessions.
+        """
+        self.active_sdu_sessions = []
+
+        for ncn in self.remote_manager_ncns:
+            try:
+                self.ssh_client.connect(ncn)
+                command = 'sdu bash pgrep sdu'
+                LOGGER.debug("Running command %s on NCN \"%s\"", command, ncn)
+                channel = self.ssh_client.get_transport().open_session()
+                channel.exec_command(command)
+
+                self.interpret_return_value(ncn, channel.recv_exit_status(), channel.makefile_stderr().read())
+            except (SSHException, socket.error) as err:
+                raise self.get_err(f'Unable to connect to management NCN "{ncn}": {str(err)}')
+            finally:
+                self.ssh_client.close()
+
+        return self.active_sdu_sessions
+
+    def interpret_return_value(self, ncn, retval, stderr):
+        """Helper function to perform actions based on SDU status.
+
+        If the return code of `sdu bash pgrep sdu` is 0, there is an SDU
+        session running on the host which executed the command. This session
+        will be added to the list of active sessions.
+
+        If the return code is 1, there is no session running. If the return
+        code is 125, this signifies that there is an issue connecting to the
+        container. If the return code is 127, the command was not found (i.e.
+        SDU is not installed on the given host.) For any of these conditions, a
+        warning will be printed, but no active session is added.
+
+        If any other return code is given, this is treated as an error. Some
+        return codes are known errors, and a proper error message will be
+        supplied in those cases.
+
+        Args:
+            ncn (str): the hostname of the NCN being checked for an SDU session
+            retval (int): the return code of the sdu/pgrep process checking for SDU
+                sessions
+            stderr (bytes): the raw contents of stderr from the sdu/pgrep process
+
+        Raises:
+            ServiceCheckError: if an error occurred while checking for an SDU session.
+        """
+        if retval == 0:
+            LOGGER.debug("Active SDU session found on %s (pgrep returned 0)", ncn)
+            self.active_sdu_sessions.append(OrderedDict([('ncn', ncn)]))
+        elif retval == 1:
+            LOGGER.debug("No SDU session detected on %s (pgrep returned 1)", ncn)
+        elif retval == 125:
+            LOGGER.warning("The cray-sdu-rda container is not running on %s.", ncn)
+        elif retval == 127:
+            LOGGER.warning("The `sdu` command was not found on %s.", ncn)
+        else:
+            stderr_contents = stderr.decode().strip()
+            err_details = f'(return code: {retval}, stderr: "{stderr_contents}")'
+            errmsg = {
+                2:   f"Syntax error on pgrep commandline on {ncn}. {stderr_contents}",
+                3:   f"Fatal error running pgrep on {ncn}. {stderr_contents}",
+            }.get(retval, f"An unknown error occurred while checking {ncn}. {err_details}")
+
+            raise self.get_err(errmsg)
 
 
 class BOSActivityChecker(ServiceActivityChecker):
@@ -397,15 +512,16 @@ def _report_active_sessions(service_activity_checkers):
             continue
 
         active_services.append(checker.service_name)
-        LOGGER.info(
-            "Found {} {}. Details shown below. For more details, "
-            "execute '{}'.".format(
-                len(sessions),
-                INFLECTOR.singular_noun(checker.active_sessions_desc,
-                                        count=len(sessions)),
-                checker.cray_cli_command
-            )
+
+        log_msg = "Found {} {}. Details shown below.".format(
+            len(sessions),
+            INFLECTOR.singular_noun(checker.active_sessions_desc,
+                                    count=len(sessions))
         )
+        if checker.more_details:
+            log_msg += " " + checker.more_details
+
+        LOGGER.info(log_msg)
         report = Report(headings, title=checker.report_title)
         report.add_rows(sessions)
         print(report)
@@ -436,7 +552,8 @@ def do_service_activity_check(args):
         CFSActivityChecker(),
         CRUSActivityChecker(),
         FirmwareActivityChecker(),
-        NMDActivityChecker()
+        NMDActivityChecker(),
+        SDUActivityChecker()
     ]
 
     active, failed = _report_active_sessions(service_activity_checkers)

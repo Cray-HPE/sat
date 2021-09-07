@@ -2,7 +2,7 @@
 #
 # Dockerfile for SAT
 
-FROM arti.dev.cray.com/baseos-docker-master-local/alpine:3.13.2 as base
+FROM arti.dev.cray.com/baseos-docker-master-local/alpine:3.13.5 as base
 
 WORKDIR /sat
 COPY CHANGELOG.md README.md /sat/

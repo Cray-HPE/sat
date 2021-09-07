@@ -484,12 +484,6 @@ def do_ceph_unfreeze(ncn_groups):
         FatalPlatformError: if ceph is not healthy or if unfreezing ceph fails.
     """
     storage_hosts = ncn_groups['storage']
-    ceph_services = [
-        'ceph-osd.target', 'ceph-radosgw.target', 'ceph-mon.target', 'ceph-mgr.target', 'ceph-mds.target'
-    ]
-    for ceph_service in ceph_services:
-        do_service_action_on_hosts(storage_hosts, ceph_service, 'active')
-
     try:
         toggle_ceph_freeze_flags(freeze=False)
     except RuntimeError as err:
@@ -498,7 +492,7 @@ def do_ceph_unfreeze(ncn_groups):
     with BeginEndLogger('wait for ceph health'):
         ceph_timeout = get_config_value('bootsys.ceph_timeout')
         LOGGER.info(f'Waiting up to {ceph_timeout} seconds for Ceph to become healthy after unfreeze')
-        ceph_waiter = CephHealthWaiter(ceph_timeout)
+        ceph_waiter = CephHealthWaiter(ceph_timeout, storage_hosts, retries=1)
         if not ceph_waiter.wait_for_completion():
             raise FatalPlatformError(f'Ceph is not healthy. Please correct Ceph health and try again.')
         else:

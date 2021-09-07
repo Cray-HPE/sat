@@ -54,9 +54,9 @@ class BaseFilterFunction(abc.ABC):
         """Checks whether a row should be included in output.
 
         Implementations may raise the following exceptions:
-            KeyError: if the key filtered against is not present 
+            KeyError: if the key filtered against is not present
                 in the row
-            TypeError: if the filter comparison has two inputs of 
+            TypeError: if the filter comparison has two inputs of
                 incompatible types
         """
 

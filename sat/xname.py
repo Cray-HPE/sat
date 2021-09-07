@@ -22,6 +22,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 import re
+from collections import OrderedDict
 
 from sat.cached_property import cached_property
 
@@ -29,7 +30,13 @@ from sat.cached_property import cached_property
 class XName:
     """An xname representing a component in the system."""
 
-    NODE_XNAME_REGEX = re.compile(r'x\d+c\d+s\d+b\d+n\d+')
+    XNAME_REGEX_BY_TYPE = OrderedDict([
+        ('NODE', re.compile(r'x\d+c\d+s\d+b\d+n\d+')),
+        ('BMC', re.compile(r'x\d+c\d+s\d+b\d+$')),
+        ('SLOT', re.compile(r'x\d+c\d+s\d+$')),
+        ('CHASSIS', re.compile(r'x\d+c\d+$')),
+        ('CABINET', re.compile(r'x\d+$'))
+    ])
 
     def __init__(self, xname_str):
         """Creates a new xname object from the given xname string.
@@ -86,6 +93,18 @@ class XName:
         xname_str = ''.join(str(t) for t in tokens)
         return cls(xname_str)
 
+    def get_type(self):
+        """Get the type of the xname using the str representation and regular expression.
+
+        Returns:
+            A str from XNAME_TYPES.
+        """
+        for xname_type, xname_regex in self.XNAME_REGEX_BY_TYPE.items():
+            if xname_regex.fullmatch(self.xname_str):
+                return xname_type
+
+        return 'UNKNOWN'
+
     def get_ancestor(self, levels):
         """Get the ancestor of this xname by stripping off levels.
 
@@ -122,11 +141,11 @@ class XName:
             The parent node XName of this XName, or None if this XName is not
             the child of a node XName.
         """
-        match = self.NODE_XNAME_REGEX.match(str(self))
+        match = self.XNAME_REGEX_BY_TYPE['NODE'].match(str(self))
         if match:
             return XName(match.group(0))
-        else:
-            return None
+
+        return None
 
     def get_cabinet(self):
         """Get the cabinet of this xname.

@@ -209,6 +209,7 @@ def get_display_fields(args, object_type, operation):
     else:
         return field_getter(args.fields)
 
+
 def get_all_lists(system, args):
     """Gets a list containing Reports listing each type of component.
 
