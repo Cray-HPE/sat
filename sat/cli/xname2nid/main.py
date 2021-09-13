@@ -36,6 +36,33 @@ ERR_MISSING_NAMES = 1
 ERR_HSM_API_FAILED = 2
 
 
+def group(ints):
+    """Group a list of integers as ranges that are yielded as tuples.
+
+    Args:
+        ints ([int]): A list of integers.
+
+    Yields:
+        A tuple for each range representing a group.
+    """
+
+    first = ints[0]
+    last = first
+    for num in ints[1:]:
+        if num - 1 == last:
+            # Part of the group, bump the end
+            last = num
+        else:
+            # Not part of the group
+            # Yield current group and start a new group
+            yield first, last
+            first = num
+            last = first
+
+    # Yield the last group
+    yield first, last
+
+
 def init_xname_results(xname_args):
     """Initialize an ordered dictionary that will contain xnames and nid results.
 
@@ -104,14 +131,15 @@ def process_node_component(node_xname, node_component, xname_results):
     return node_component_match
 
 
-def make_nid_list_from_results(xname_results):
+def make_nid_list_from_results(xname_results, remove_duplicates):
     """Create a list of nids from xname_results.
 
     Args:
         xname_results (OrderedDict): A dictionary with xnames as keys.
+        remove_duplicates (bool): True if duplicate nids should be removed.
 
     Returns:
-        nids ([str]): A list of nids.
+        all_nids ([int]): A list of nids that are sorted with duplicates removed if requested.
         missing_nids (bool): True if any xnames had no nids or missing nids.
     """
 
@@ -122,7 +150,7 @@ def make_nid_list_from_results(xname_results):
             nids = []
             vals['nodes'].sort(key=lambda item: item.get('nid'))
             for node in vals['nodes']:
-                nids.append('nid' + str(node['nid']).zfill(NUM_NID_DIGITS))
+                nids.append(node['nid'])
                 LOGGER.debug(f'xname: {node["cid"]}, nid: {node["nid"]}')
             all_nids += nids
         else:
@@ -133,7 +161,47 @@ def make_nid_list_from_results(xname_results):
         if vals['missing_nids']:
             missing_nids = True
 
+    # Remove duplicates if necessary
+    if remove_duplicates:
+        all_nids = sorted(set(all_nids))
+
     return all_nids, missing_nids
+
+
+def format_nid_list(nids, nid_format):
+    """Create a string representing nids from a list of integer nids in the specified format.
+
+    Args:
+        nids ([int]): A list of nids.
+        nid_format (str): The format of the nid list to be returned.
+
+    Returns:
+        (str): A string representing a list of nids in the format specified.
+    """
+
+    # Create the list of nids in the specified format
+    formatted_nids = []
+    if nid_format == 'nid':
+        for nid in nids:
+            formatted_nids.append('nid' + str(nid).zfill(NUM_NID_DIGITS))
+        return ','.join(formatted_nids)
+
+    # Format is range, for example, nid[001001-001002,001005,001033-001034]
+    nid_ranges = list(group(nids))
+
+    # Check if no range and just one nid in list, then return single nid string
+    if len(nid_ranges) == 1 and nid_ranges[0][0] == nid_ranges[0][1]:
+        return 'nid' + str(nid_ranges[0][0]).zfill(NUM_NID_DIGITS)
+
+    for nid_range in nid_ranges:
+        if nid_range[0] == nid_range[1]:
+            formatted_nids.append(str(nid_range[0]).zfill(NUM_NID_DIGITS))
+        else:
+            range_start = str(nid_range[0]).zfill(NUM_NID_DIGITS)
+            range_end = str(nid_range[1]).zfill(NUM_NID_DIGITS)
+            formatted_nids.append(range_start + '-' + range_end)
+
+    return 'nid' + '[' + ','.join(formatted_nids) + ']'
 
 
 def do_xname2nid(args):
@@ -185,9 +253,15 @@ def do_xname2nid(args):
             # since they are sorted.
             break
 
-    nids, any_missing_nids = make_nid_list_from_results(xname_results)
+    # For nid output, keep duplicate nids
+    # The default format is range - remove duplicates and sort for range output
+    remove_duplicates = True
+    if args.format == 'nid':
+        remove_duplicates = False
+    nids, any_missing_nids = make_nid_list_from_results(xname_results, remove_duplicates)
 
     if nids:
-        print(','.join(nids))
+        print(format_nid_list(nids, args.format))
+
     if any_missing_nids:
         raise SystemExit(ERR_MISSING_NAMES)

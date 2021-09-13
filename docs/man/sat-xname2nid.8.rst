@@ -39,6 +39,14 @@ These options must be specified after the subcommand.
 **-h, --help**
         Print the help message for 'sat xname2nid'.
 
+**-f, --format** {**nid**, **range**}
+        Display the nids in the format specified.
+        If the **range** format is used, the nids are displayed as
+        ranges with the nids sorted and duplicate nids removed.
+        If the **nid** format is used, the nids are displayed as
+        strings with the nids sorted for each xname and displayed in the
+        order of the xnames specified.  Defaults to **range**.
+
 EXAMPLES
 ========
 
@@ -54,6 +62,13 @@ Translate two node xnames to nids:
 ::
 
     # sat xname2nid x3000c0s1b0n0,x1000c2s0b0n0
+    nid[001064,100011]
+
+Translate two node xnames to nids using nid format:
+
+::
+
+    # sat xname2nid --format nid x3000c0s1b0n0,x1000c2s0b0n0
     nid100011,nid001064
 
 Translate a node BMC xname to nids:
@@ -61,28 +76,49 @@ Translate a node BMC xname to nids:
 ::
 
     # sat xname2nid x1000c5s2b0
-    nid001168,nid001169
+    nid[001168-001169]
 
 Translate a slot xname to nids:
 
 ::
 
     # sat xname2nid x1000c5s0
-    nid001160,nid001161,nid001162,nid001163
+    nid[001160-001163]
 
 Translate a chassis xname to nids:
 
 ::
 
     # sat xname2nid x1000c5
-    nid001160,nid001161,nid001162,nid001163,nid001164,nid001165,nid001166,nid001167,nid001168,nid001169,nid001170,nid001171,nid001172,nid001173,nid001174,nid001175,nid001176,nid001177,nid001178,nid001179,nid001180,nid001181,nid001182,nid001183,nid001184,nid001185,nid001186,nid001187,nid001188,nid001189,nid001190,nid001191
+    nid[001160-001191]
 
 Translate a node xname and a slot xname to nids:
 
 ::
 
     # sat xname2nid x3000c0s1b0n0,x1000c5s1
+    nid[001164-001167,100011]
+
+Translate a node xname and a slot xname to nids using nid format:
+
+::
+
+    # sat xname2nid --format nid x3000c0s1b0n0,x1000c5s1
     nid100011,nid001164,nid001165,nid001166,nid001167
+
+Translate a node xname and a slot xname with duplicates to nids:
+
+::
+
+    # sat xname2nid x1000c5s1b1,x1000c5s1
+    nid[001164-001167]
+
+Translate a node xname and a slot xname with duplicates to nids using nid format:
+
+::
+
+    # sat xname2nid --format nid x1000c5s1b1,x1000c5s1
+    nid001166,nid001167,nid001164,nid001165,nid001166,nid001167
 
 SEE ALSO
 ========
