@@ -39,7 +39,7 @@ def do_bootprep(args):
     Returns:
         None
     """
-    LOGGER.info(f'Loading schema file.')
+    LOGGER.info(f'Loading schema file')
     try:
         schema_validator = load_bootprep_schema()
     except BootPrepInternalError as err:
@@ -50,7 +50,7 @@ def do_bootprep(args):
     try:
         load_and_validate_instance(args.input_file, schema_validator)
     except BootPrepValidationError as err:
-        LOGGER.error(err)
+        LOGGER.error(str(err))
         raise SystemExit(1)
 
-    LOGGER.info(f'Input file successfully validated.')
+    LOGGER.info('Input file successfully validated')
