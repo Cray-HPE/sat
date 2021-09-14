@@ -60,4 +60,7 @@ setup(
             'sat=sat.main:main'
         ]
     },
+
+    # Include the schema file for the input to `sat bootprep` in the package
+    package_data={'sat': ['data/schema/bootprep_schema.yaml']}
 )
