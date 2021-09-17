@@ -100,10 +100,7 @@ def get_current_firmware(client, xnames):
         SystemExit: if getting firmware resulted in an APIError.
     """
     try:
-        if xnames:
-            device_firmwares = client.get_multiple_device_firmwares(xnames)
-        else:
-            device_firmwares = client.get_device_firmwares()
+        device_firmwares = client.get_device_firmwares(xnames or None)
     except APIError as err:
         LOGGER.error('Failed to get firmware: %s', err)
         raise SystemExit(1)
