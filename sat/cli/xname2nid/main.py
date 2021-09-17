@@ -40,7 +40,8 @@ def group(ints):
     """Group a list of integers as ranges that are yielded as tuples.
 
     Args:
-        ints ([int]): A list of integers.
+        ints ([int]): A list of integers that may be unsorted.
+            Caller should sort and delete duplicates if required.
 
     Yields:
         A tuple for each range representing a group.
@@ -187,21 +188,22 @@ def format_nid_list(nids, nid_format):
         return ','.join(formatted_nids)
 
     # Format is range, for example, nid[001001-001002,001005,001033-001034]
-    nid_ranges = list(group(nids))
-
     # Check if no range and just one nid in list, then return single nid string
-    if len(nid_ranges) == 1 and nid_ranges[0][0] == nid_ranges[0][1]:
-        return 'nid' + str(nid_ranges[0][0]).zfill(NUM_NID_DIGITS)
+    if len(nids) == 1:
+        return f'nid{str(nids[0]).zfill(NUM_NID_DIGITS)}'
 
-    for nid_range in nid_ranges:
-        if nid_range[0] == nid_range[1]:
-            formatted_nids.append(str(nid_range[0]).zfill(NUM_NID_DIGITS))
+    nid_ranges = list(group(nids))
+    for range_start, range_end in nid_ranges:
+        if range_start == range_end:
+            formatted_nids.append(
+                str(range_start).zfill(NUM_NID_DIGITS)
+            )
         else:
-            range_start = str(nid_range[0]).zfill(NUM_NID_DIGITS)
-            range_end = str(nid_range[1]).zfill(NUM_NID_DIGITS)
-            formatted_nids.append(range_start + '-' + range_end)
+            formatted_nids.append(
+                f'{str(range_start).zfill(NUM_NID_DIGITS)}-{str(range_end).zfill(NUM_NID_DIGITS)}'
+            )
 
-    return 'nid' + '[' + ','.join(formatted_nids) + ']'
+    return f'nid[{",".join(formatted_nids)}]'
 
 
 def do_xname2nid(args):

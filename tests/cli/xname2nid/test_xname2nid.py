@@ -202,8 +202,6 @@ class TestDoXname2nid(ExtendedTestCase):
             do_xname2nid(self.fake_args)
         self.assert_in_element(f'xname: {self.node_data[0]["ID"]}, nid: {self.node_data[0]["NID"]}',
                                logs.output)
-        self.assert_in_element(f'xname: {self.node_data[0]["ID"]}, nid: {self.node_data[0]["NID"]}',
-                               logs.output)
         self.mock_hsm_client.get_node_components.assert_called_once_with()
         self.mock_print.assert_called_once_with('nid001006')
 
@@ -213,8 +211,6 @@ class TestDoXname2nid(ExtendedTestCase):
         self.fake_args.format = 'nid'
         with self.assertLogs(level=logging.DEBUG) as logs:
             do_xname2nid(self.fake_args)
-        self.assert_in_element(f'xname: {self.node_data[0]["ID"]}, nid: {self.node_data[0]["NID"]}',
-                               logs.output)
         self.assert_in_element(f'xname: {self.node_data[0]["ID"]}, nid: {self.node_data[0]["NID"]}',
                                logs.output)
         self.mock_hsm_client.get_node_components.assert_called_once_with()
