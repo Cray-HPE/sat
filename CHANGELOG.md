@@ -25,6 +25,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+- Added a ``--format`` option to ``sat xname2nid`` to set the output format
+  to either 'range' or 'nid' for the node IDs.
+
 ## [3.10.0] - 2021-09-03
 
 ### Changed
@@ -33,8 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed sat to use the V2 HSM API.
 - Changed ``sat xname2nid`` subcommand to translate slot, chassis, and cabinet
   xnames to node IDs in addition to node and node BMC xnames.
-- Added a ``--format`` option to ``sat xname2nid`` to set the output format
-  to either 'range' or 'nid' for the node IDs.
 
 ### Fixed
 - Improved error handling of missing or empty FRUID key in system component data.
