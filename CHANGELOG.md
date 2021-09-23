@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed ``sat bootsys boot --stage cabinet-power`` to query CAPMC for power status of
   ComputeModules instead of the unsupported NodeBMC type.
 
+### Fixed
+- Actions which wait on certain conditions (for example within ``sat bootsys``) will
+  fail out more quickly when checking for the completion condition fails
+  irrecoverably, instead of repeating a failing check until waiting times out.
+
 ## [3.10.0] - 2021-09-03
 
 ### Changed

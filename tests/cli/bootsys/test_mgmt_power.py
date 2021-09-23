@@ -23,7 +23,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 from argparse import Namespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from paramiko.ssh_exception import SSHException, NoValidConnectionsError
 
@@ -32,6 +32,7 @@ from sat.cli.bootsys.mgmt_power import (
     SSHAvailableWaiter,
     IPMIPowerStateWaiter,
 )
+from sat.cli.bootsys.waiting import WaitingFailure
 
 
 class TestSSHAvailableWaiter(unittest.TestCase):
@@ -78,6 +79,7 @@ class TestIPMIPowerStateWaiter(unittest.TestCase):
         self.timeout = 1
         self.username = 'root'
         self.password = 'pass'
+        self.threshold = 3
 
     def tearDown(self):
         patch.stopall()
@@ -109,11 +111,37 @@ class TestIPMIPowerStateWaiter(unittest.TestCase):
         for member in self.members:
             self.assertFalse(waiter.member_has_completed(member))
 
-    def test_ipmi_command_fails(self):
-        """Test that we skip future checks on failing nodes."""
+    def test_ipmi_command_fails_logs_once(self):
+        """Test that a failing ipmitool command only logs one message"""
         self.mock_subprocess_run.return_value.returncode = 1
-        waiter = IPMIPowerStateWaiter(self.members, 'on', self.timeout, self.username, self.password)
-        self.assertFalse(waiter.member_has_completed(self.members[0]))
+        waiter = IPMIPowerStateWaiter(self.members, 'on', self.timeout, self.username, self.password,
+                                      failure_threshold=self.threshold)
+        with self.assertLogs(level='WARNING') as cm:
+            for _ in range(self.threshold - 1):
+                waiter.member_has_completed(self.members[0])
+
+        self.assertEqual(len(cm.output), 1)
+
+    def test_ipmi_command_fails_then_succeeds(self):
+        """Test that an impitool command can fail a few times without stopping waiting"""
+        self.mock_subprocess_run.side_effect = [MagicMock(returncode=1) for _ in range(self.threshold - 1)] + \
+                                               [MagicMock(returncode=0)]
+        waiter = IPMIPowerStateWaiter(self.members, 'on', self.timeout, self.username, self.password,
+                                      failure_threshold=self.threshold)
+        for _ in range(self.threshold):
+            try:
+                waiter.member_has_completed(self.members[0])
+            except WaitingFailure:
+                self.fail('WaitingFailure should not have been raised')
+
+    def test_ipmi_command_repeat_fails(self):
+        """Test that we skip future checks on repeatedly failing nodes."""
+        self.mock_subprocess_run.return_value.returncode = 1
+        waiter = IPMIPowerStateWaiter(self.members, 'on', self.timeout, self.username, self.password,
+                                      failure_threshold=self.threshold)
+        with self.assertRaises(WaitingFailure):
+            for _ in range(self.threshold + 1):
+                waiter.member_has_completed(self.members[0])
 
 
 class TestDoPowerOffNcns(unittest.TestCase):
