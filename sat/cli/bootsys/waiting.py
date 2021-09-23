@@ -129,6 +129,26 @@ class Waiter(metaclass=abc.ABCMeta):
         behaviors by overriding this method.
         """
 
+    def _wait_polling_loop(self):
+        """Internal helper function which implements the polling loop for a given Waiter class.
+
+        This function essentially implements one waiting attempt, and different
+        implementations can be used to optimize waiting methods for different
+        situations, and should generally not be overwritten by client classes
+        outside this module.
+        """
+        start_time = time.monotonic()
+        while time.monotonic() - start_time < self.timeout:
+            self.on_check_action()
+
+            # Store value in case we want to use it in post_wait_action.
+            self.completed = self.has_completed()
+
+            if self.completed:
+                break
+
+            time.sleep(self.poll_interval)
+
     def wait_for_completion(self):
         """Wait for the condition to be achieved or for timeout.
 
@@ -143,17 +163,7 @@ class Waiter(metaclass=abc.ABCMeta):
 
         try:
             while not self.completed:
-                start_time = time.monotonic()
-                while time.monotonic() - start_time < self.timeout:
-                    self.on_check_action()
-
-                    # Store value in case we want to use it in post_wait_action.
-                    self.completed = self.has_completed()
-
-                    if self.completed:
-                        break
-
-                    time.sleep(self.poll_interval)
+                self._wait_polling_loop()
 
                 if not self.completed:
                     LOGGER.error('Waiting for condition "%s" timed out after %d seconds',
@@ -279,11 +289,12 @@ class GroupWaiter(Waiter):
             which it is known will never complete.
     """
 
-    def __init__(self, members, timeout, poll_interval=1):
+    def __init__(self, members, timeout, poll_interval=1, retries=0):
+        super().__init__(timeout, poll_interval, retries)
+
         self.members = set(members)
         self.pending = set(self.members)
-
-        super().__init__(timeout, poll_interval)
+        self.failed = set()
 
     @abc.abstractmethod
     def member_has_completed(self, member):
@@ -308,13 +319,21 @@ class GroupWaiter(Waiter):
                    for member in self.members)
 
     def wait_for_completion(self):
-        """Wait until all members have completed, or timeout is reached.
+        """Wait until all members have completed (or failed), or timeout is reached.
 
         Returns:
             set: A set of members which did not complete if the timeout was
                 reached, or the empty set if all members complete.
         """
-        self.pre_wait_action()
+        super().wait_for_completion()
+        return self.pending
+
+    def _wait_polling_loop(self):
+        """Alternate implementation of the polling loop for waiting on groups.
+
+        This removes completed and failed members from as it goes, and excludes
+        them from future attempts as a small optimization.
+        """
 
         start_time = time.monotonic()
 
@@ -324,25 +343,19 @@ class GroupWaiter(Waiter):
 
         while self.pending and time.monotonic() - start_time < self.timeout:
             completed = set()
-            failed = set()
 
             self.on_check_action()
-            for member in self.pending:
+            for member in (self.pending - self.failed):
                 try:
                     if self.member_has_completed(member):
                         completed.add(member)
-                except WaitingFailure:
-                    failed.add(member)
+                except WaitingFailure as err:
+                    LOGGER.error('Could not wait for condition "%s" for member %s: %s',
+                                 self.condition_name(), str(member), err)
+                    self.failed.add(member)
 
-            self.pending -= (completed | failed)
+            self.pending -= (completed | self.failed)
 
             time.sleep(self.poll_interval)
 
-        # At this point we've either completed all members or there
-        # are some still pending which have timed out.
-        if self.pending:
-            LOGGER.error('Waiting for condition "%s" timed out after %d seconds',
-                         self.condition_name(), self.timeout)
-
-        self.post_wait_action()
-        return self.pending
+        self.completed = not self.pending

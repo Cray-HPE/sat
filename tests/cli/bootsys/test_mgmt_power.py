@@ -140,7 +140,7 @@ class TestIPMIPowerStateWaiter(unittest.TestCase):
         waiter = IPMIPowerStateWaiter(self.members, 'on', self.timeout, self.username, self.password,
                                       failure_threshold=self.threshold)
         with self.assertRaises(WaitingFailure):
-            for _ in range(self.threshold + 1):
+            for _ in range(self.threshold):
                 waiter.member_has_completed(self.members[0])
 
 

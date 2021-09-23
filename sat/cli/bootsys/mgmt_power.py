@@ -58,8 +58,8 @@ class IPMIPowerStateWaiter(GroupWaiter):
             username (str): the username to use when running ipmitool commands
             password (str): the password to use when running ipmitool commands
             failure_threshold (int): if a call to ipmitool gives a nonzero
-                return code this many times for a given member, then that member
-                will be marked as failed.
+                return code this many times in a row for a given member, then
+                that member will be marked as failed.
         """
         self.power_state = power_state
         self.username = username
