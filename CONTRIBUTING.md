@@ -38,6 +38,10 @@ Contributors must follow the guidelines below:
 6. When a new release is issued, the container version should be updated to match
    the version in ``CHANGELOG.md``.  The container is versioned based on the contents
    of the .version file in the root of the repository.
+7. Contributions which require updates to the documentation should have the
+   associated documentation changes submitted as pull requests to the sat-docs
+   repository. Documentation changes should follow the guidelines given in that
+   repository, including writing style requirements.
 
 # Developer Documentation
 
