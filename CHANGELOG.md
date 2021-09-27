@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Added a ``--format`` option to ``sat xname2nid`` to set the output format
   to either 'range' or 'nid' for the node IDs.
+- Added hostname information from SLS to `sat status` output.
 
 ## [3.10.0] - 2021-09-03
 

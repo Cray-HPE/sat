@@ -24,7 +24,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 from collections import OrderedDict
 import logging
 
-from sat.apiclient import APIError, HSMClient
+from sat.apiclient import APIError, HSMClient, SLSClient
 from sat.config import get_config_value
 from sat.constants import MISSING_VALUE
 from sat.report import Report
@@ -33,6 +33,7 @@ from sat.xname import XName
 
 API_KEYS_TO_HEADERS = OrderedDict([
     ('ID', 'xname'),
+    ('Aliases', 'Aliases'),
     ('Type', 'Type'),
     ('NID', 'NID'),
     ('State', 'State'),
@@ -42,7 +43,7 @@ API_KEYS_TO_HEADERS = OrderedDict([
     ('Class', 'Class'),
     ('Role', 'Role'),
     ('SubRole', 'Subrole'),
-    ('NetType', 'Net Type')
+    ('NetType', 'Net Type'),
 ])
 
 LOGGER = logging.getLogger(__name__)
@@ -77,6 +78,27 @@ def make_raw_table(components):
             for component in components]
 
 
+def get_component_aliases(sls_component_dicts):
+    """Extract component aliases from an SLS response payload.
+
+    Args:
+        - sls_component_dicts ([dict]): a response payload
+             from SLS; essentially a list of dictionaries which
+             should at the minimum contain keys 'Xname' and
+             'ExtraProperties', and 'ExtraProperties' should be a
+             dict containing key 'Aliases'
+
+    Returns:
+        A dictionary mapping xnames to a list of aliases (i.e. hostnames).
+    """
+    xname_aliases = {}
+    for component in sls_component_dicts:
+        if {'Xname', 'ExtraProperties'}.issubset(set(component.keys())):
+            if 'Aliases' in component.get('ExtraProperties'):
+                xname_aliases[component['Xname']] = component.get('ExtraProperties').get('Aliases')
+    return xname_aliases
+
+
 def do_status(args):
     """Displays node status.
 
@@ -95,12 +117,13 @@ def do_status(args):
     Raises:
         UsageError: if an argument is invalid
     """
-    api_client = HSMClient(SATSession())
+    session = SATSession()
+    hsm_client = HSMClient(session)
     if 'all' in args.types:
         args.types = []
 
     try:
-        response = api_client.get('State', 'Components', params={'type': args.types})
+        response = hsm_client.get('State', 'Components', params={'type': args.types})
     except APIError as err:
         LOGGER.error('Request to HSM API failed: %s', err)
         raise SystemExit(1)
@@ -116,6 +139,22 @@ def do_status(args):
     except KeyError as err:
         LOGGER.error("Key '%s' not present in API response JSON.", err)
         raise SystemExit(1)
+
+    sls_client = SLSClient(session)
+    sls_component_aliases = {}
+    try:
+        sls_reponse = sls_client.get('hardware')
+        sls_component_aliases = get_component_aliases(sls_reponse.json())
+    except APIError as err:
+        LOGGER.error('Request to SLS API failed: %s', err)
+    except ValueError as err:
+        LOGGER.error('Failed to parse JSON from SLS: %s', err)
+
+    for component in components:
+        if component.get('ID') in sls_component_aliases:
+            component['Aliases'] = ', '.join(sls_component_aliases.get(component['ID']))
+        else:
+            component['Aliases'] = MISSING_VALUE
 
     raw_table = make_raw_table(components)
     report = Report(
