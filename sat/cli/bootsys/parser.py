@@ -33,7 +33,7 @@ TIMEOUT_SPECS = [
     TimeoutSpec('capmc', ['shutdown'], 120,
                 'components reach powered off state after they are shutdown with CAPMC.'),
     TimeoutSpec('discovery', ['boot'], 600,
-                'node controllers (NodeBMCs) reach the powered on state '
+                'compute modules reach the powered on state '
                 'after the HMS Discovery cronjob is resumed.'),
     TimeoutSpec('ipmi', ['boot', 'shutdown'], 60,
                 'management NCNs reach the desired power state after IPMI '
