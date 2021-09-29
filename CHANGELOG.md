@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to either 'range' or 'nid' for the node IDs.
 - Added hostname information from SLS to `sat status` output.
 
+### Fixed
+- Fixed ``sat bootsys boot --stage cabinet-power`` to query CAPMC for power status of
+  ComputeModules instead of the unsupported NodeBMC type.
+
 ## [3.10.0] - 2021-09-03
 
 ### Changed
