@@ -84,7 +84,7 @@ def do_cabinets_power_on(args):
 
     Do not do this with a manual call to CAPMC. Instead, restart the
     hms-discovery cronjob in k8s, and let it do the power on for us. Then wait
-    for all the compute node BMCs of type "Mountain" to be powered on in CAPMC.
+    for all the compute modules of type "Mountain" to be powered on in CAPMC.
 
     Args:
         args (argparse.Namespace): The parsed bootsys arguments.
@@ -113,28 +113,28 @@ def do_cabinets_power_on(args):
                      f'within expected window after being resumed.')
         raise SystemExit(1)
 
-    print('Waiting for NodeBMCs in liquid-cooled cabinets to be powered on.')
+    LOGGER.info('Waiting for ComputeModules in liquid-cooled cabinets to be powered on.')
     hsm_client = HSMClient(SATSession())
     try:
-        mtn_node_bmcs = hsm_client.get_component_xnames({'Type': 'NodeBMC',
-                                                         'Class': 'Mountain'},
-                                                        omit_empty=False)
+        mtn_compute_modules = hsm_client.get_component_xnames({'Type':  'ComputeModule',
+                                                               'Class': 'Mountain'},
+                                                              omit_empty=False)
     except APIError as err:
-        LOGGER.error(f'Failed to get list of NodeBMCs to wait on: {err}')
+        LOGGER.error(f'Failed to get list of ComputeModules to wait on: {err}')
         raise SystemExit(1)
 
-    # Once NodeBMCs are powered on, it is possible to boot nodes with BOS.
+    # Once ComputeModules are powered on, it is possible to boot nodes with BOS.
     # Suppress warnings about CAPMC state query errors because we expect the
-    # BMCs/node controllers to be unreachable until they are powered on.
-    bmc_waiter = CAPMCPowerWaiter(mtn_node_bmcs, 'on',
-                                  get_config_value('bootsys.discovery_timeout'),
-                                  suppress_warnings=True)
-    bmcs_timed_out = bmc_waiter.wait_for_completion()
+    # compute modules to be unreachable until they are powered on.
+    module_waiter = CAPMCPowerWaiter(mtn_compute_modules, 'on',
+                                     get_config_value('bootsys.discovery_timeout'),
+                                     suppress_warnings=True)
+    modules_timed_out = module_waiter.wait_for_completion()
 
-    if bmcs_timed_out:
-        LOGGER.error(f'The following compute node BMC(s) failed to reach a powered '
+    if modules_timed_out:
+        LOGGER.error(f'The following compute module(s) failed to reach a powered '
                      f'on state after resuming {HMSDiscoveryCronJob.FULL_NAME}: '
-                     f'{", ".join(bmcs_timed_out)}')
+                     f'{", ".join(modules_timed_out)}')
         raise SystemExit(1)
 
-    print('All NodeBMCs have reached powered on state.')
+    LOGGER.info('All ComputeModules have reached powered on state.')
