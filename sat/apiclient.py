@@ -123,7 +123,8 @@ class APIGatewayClient:
                 r = requester.post(url, data=req_param, verify=self.cert_verify,
                                    json=json, timeout=self.timeout)
             elif req_type == 'PUT':
-                r = requester.put(url, data=req_param, verify=self.cert_verify, timeout=self.timeout)
+                r = requester.put(url, data=req_param, verify=self.cert_verify,
+                                  json=json, timeout=self.timeout)
             elif req_type == 'PATCH':
                 r = requester.patch(url, data=req_param, verify=self.cert_verify, timeout=self.timeout)
             elif req_type == 'DELETE':
@@ -222,13 +223,14 @@ class APIGatewayClient:
 
         return r
 
-    def put(self, *args, payload):
+    def put(self, *args, payload=None, json=None):
         """Issue an HTTP PUT request to resource given in `args`.
 
         Args:
             *args: Variable length list of path components used to construct
                 the path to PUT target.
-            payload: JSON data to put.
+            payload: The encoded data to send as the PUT body.
+            json: The data dict to encode as JSON and send as the PUT body.
 
         Returns:
             The requests.models.Response object if the request was successful.
@@ -238,7 +240,7 @@ class APIGatewayClient:
                 raises a RequestException of any kind.
         """
 
-        r = self._make_req(*args, req_type='PUT', req_param=payload)
+        r = self._make_req(*args, req_type='PUT', req_param=payload, json=json)
 
         return r
 
@@ -676,7 +678,34 @@ class BOSClient(APIGatewayClient):
 
 
 class CFSClient(APIGatewayClient):
-    base_resource_path = 'cfs/'
+    base_resource_path = 'cfs/v2/'
+
+    def get_configurations(self):
+        """Get the CFS configurations
+
+        Returns:
+            The CFS configurations.
+
+        Raises:
+            APIError: if there is an issue getting configurations
+        """
+        try:
+            return self.get('configurations').json()
+        except APIError as err:
+            raise APIError(f'Failed to get CFS configurations: {err}')
+        except ValueError as err:
+            raise APIError(f'Failed to parse JSON in response from CFS when getting '
+                           f'CFS configurations: {err}')
+
+    def put_configuration(self, config_name, request_body):
+        """Create a new configuration or update an existing configuration
+
+        Args:
+            config_name (str): the name of the configuration to create/update
+            request_body (dict): the configuration data, which should have a
+                'layers' key.
+        """
+        self.put('configurations', config_name, json=request_body)
 
 
 class CRUSClient(APIGatewayClient):

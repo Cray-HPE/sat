@@ -150,7 +150,7 @@ class TestAPIGatewayClient(unittest.TestCase):
 
         mock_requests_put.assert_called_once_with(
             get_http_url_prefix(api_gw_host) + '/'.join(path_components),
-            data=payload, verify=True, timeout=60
+            data=payload, verify=True, timeout=60, json=None
         )
 
     @mock.patch('requests.put', side_effect=requests.exceptions.RequestException)
@@ -213,8 +213,8 @@ class TestAPIGatewayClient(unittest.TestCase):
 
                     with self.assertRaisesRegex(APIError, err_regex):
                         kwargs = {}
-                        if verb in ('put', 'patch'):
-                            # put and patch methods require a payload keyword-only argument
+                        if verb == 'patch':
+                            # patch method requires a payload keyword-only argument
                             kwargs['payload'] = {}
                         getattr(client, verb)(path, **kwargs)
 
@@ -240,8 +240,8 @@ class TestAPIGatewayClient(unittest.TestCase):
 
                     with self.assertRaisesRegex(APIError, err_regex):
                         kwargs = {}
-                        if verb in ('put', 'patch'):
-                            # put and patch methods require a payload keyword-only argument
+                        if verb == 'patch':
+                            # patch method requires a payload keyword-only argument
                             kwargs['payload'] = {}
                         getattr(client, verb)(path, **kwargs)
 
@@ -267,8 +267,8 @@ class TestAPIGatewayClient(unittest.TestCase):
 
                     with self.assertRaisesRegex(APIError, err_regex):
                         kwargs = {}
-                        if verb in ('put', 'patch'):
-                            # put and patch methods require a payload keyword-only argument
+                        if verb == 'patch':
+                            # patch method requires a payload keyword-only argument
                             kwargs['payload'] = {}
                         getattr(client, verb)(path, **kwargs)
 

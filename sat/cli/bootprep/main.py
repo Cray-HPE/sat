@@ -23,7 +23,12 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 import logging
 
-from sat.cli.bootprep.errors import BootPrepInternalError, BootPrepValidationError
+from sat.cli.bootprep.errors import (
+    BootPrepInternalError,
+    BootPrepValidationError,
+    ConfigurationCreateError
+)
+from sat.cli.bootprep.configuration import create_cfs_configurations
 from sat.cli.bootprep.validate import load_bootprep_schema, load_and_validate_instance
 
 LOGGER = logging.getLogger(__name__)
@@ -48,9 +53,15 @@ def do_bootprep(args):
 
     LOGGER.info(f'Validating given input file {args.input_file}')
     try:
-        load_and_validate_instance(args.input_file, schema_validator)
+        instance = load_and_validate_instance(args.input_file, schema_validator)
     except BootPrepValidationError as err:
         LOGGER.error(str(err))
         raise SystemExit(1)
 
     LOGGER.info('Input file successfully validated')
+
+    try:
+        create_cfs_configurations(instance, args)
+    except ConfigurationCreateError as err:
+        LOGGER.error(str(err))
+        raise SystemExit(1)

@@ -42,6 +42,33 @@ def add_bootprep_subparser(subparsers):
     )
 
     bootprep_parser.add_argument(
+        '--dry-run', '-d', action='store_true',
+        help='Do a dry-run. Do not actually create CFS configurations, '
+             'build images, customize images, or create BOS session templates, '
+             'but walk through all the other steps.'
+    )
+    bootprep_parser.add_argument(
+        '--save-files', '-s', action='store_true',
+        help='Save files that could be passed to the CFS and BOS to create CFS '
+             'configurations and BOS session templates, respectively.'
+    )
+    bootprep_parser.add_argument(
+        '--output-dir', '-o', default='.',
+        help='The directory to which files output by the "--save-files" option '
+             'should be output.'
+    )
+
+    existing_configs_group = bootprep_parser.add_mutually_exclusive_group()
+    existing_configs_group.add_argument(
+        '--skip-existing-configs', action='store_true',
+        help='Skip creating any configurations that already exist.'
+    )
+    existing_configs_group.add_argument(
+        '--overwrite-configs', action='store_true',
+        help='Overwrite any configurations that already exist.'
+    )
+
+    bootprep_parser.add_argument(
         'input_file', help='Path to the input YAML file that defines the '
                            'configurations, images, and session templates '
                            'to create.')
