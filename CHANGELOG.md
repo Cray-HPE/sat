@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a ``--format`` option to ``sat xname2nid`` to set the output format
   to either 'range' or 'nid' for the node IDs.
 - Added hostname information from SLS to `sat status` output.
+- Added more information about unsuccessful API requests to the ``APIError``
+  messages. This info is parsed from responses that use content type
+  "application/problem+json" in their failure responses.
 
 ### Fixed
 - Fixed ``sat bootsys boot --stage cabinet-power`` to query CAPMC for power status of
