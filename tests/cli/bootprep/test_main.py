@@ -43,6 +43,8 @@ class TestDoBootprep(unittest.TestCase):
         self.args = Namespace(input_file=self.input_file)
         self.mock_load_bootprep_schema = patch('sat.cli.bootprep.main.load_bootprep_schema').start()
         self.mock_load_and_validate = patch('sat.cli.bootprep.main.load_and_validate_instance').start()
+        self.validated_instance = self.mock_load_and_validate.return_value
+        self.mock_create_cfs_configs = patch('sat.cli.bootprep.main.create_cfs_configurations').start()
 
     def tearDown(self):
         patch.stopall()
@@ -55,6 +57,7 @@ class TestDoBootprep(unittest.TestCase):
         self.mock_load_bootprep_schema.assert_called_once_with()
         self.mock_load_and_validate.assert_called_once_with(
             self.input_file, self.mock_load_bootprep_schema.return_value)
+        self.mock_create_cfs_configs.assert_called_once_with(self.validated_instance, self.args)
         info_msgs = [r.msg for r in cm.records]
         expected_msgs = [
             'Loading schema file',

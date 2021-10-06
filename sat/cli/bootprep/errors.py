@@ -111,3 +111,8 @@ class EnhancedValidationError(Exception):
             description += ':\n' + indent('\n'.join(str(ctx) for ctx in self.best_context),
                                           NESTED_ERROR_INDENT)
         return description
+
+
+class ConfigurationCreateError(Exception):
+    """A fatal error occurred during the creation of CFS configurations"""
+    pass
