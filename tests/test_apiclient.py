@@ -186,6 +186,92 @@ class TestAPIGatewayClient(unittest.TestCase):
         with self.assertRaises(sat.apiclient.APIError):
             client.delete(*path_components)
 
+    def test_request_failed_with_problem_description(self):
+        """Test get, post, put, patch, and delete with fail HTTP codes and additional problem details"""
+        api_gw_host = 'my-api-gw'
+        client = sat.apiclient.APIGatewayClient(host=api_gw_host)
+        path = 'fail'
+        expected_url = f'{get_http_url_prefix(api_gw_host)}{path}'
+        status_code = 400
+        reason = 'Bad Request'
+        problem_title = 'Title of problem'
+        problem_detail = 'Details of problem and how to fix it'
+
+        verbs_to_test = ['get', 'post', 'put', 'patch', 'delete']
+        for verb in verbs_to_test:
+            with self.subTest(verb=verb):
+                with mock.patch(f'requests.{verb}') as mock_request_func:
+                    mock_response = mock.Mock(ok=False, status_code=status_code, reason=reason)
+                    mock_response.json.return_value = {
+                        'title': problem_title,
+                        'detail': problem_detail
+                    }
+                    mock_request_func.return_value = mock_response
+
+                    err_regex = (f"{verb.upper()} request to URL '{expected_url}' failed with status "
+                                 f"code {status_code}: {reason}. {problem_title} Detail: {problem_detail}")
+
+                    with self.assertRaisesRegex(APIError, err_regex):
+                        kwargs = {}
+                        if verb in ('put', 'patch'):
+                            # put and patch methods require a payload keyword-only argument
+                            kwargs['payload'] = {}
+                        getattr(client, verb)(path, **kwargs)
+
+    def test_request_failed_no_problem_description(self):
+        """Test get, post, put, patch, and delete with fail HTTP codes and no problem details"""
+        api_gw_host = 'my-api-gw'
+        client = sat.apiclient.APIGatewayClient(host=api_gw_host)
+        path = 'fail'
+        expected_url = f'{get_http_url_prefix(api_gw_host)}{path}'
+        status_code = 400
+        reason = 'Bad Request'
+
+        verbs_to_test = ['get', 'post', 'put', 'patch', 'delete']
+        for verb in verbs_to_test:
+            with self.subTest(verb=verb):
+                with mock.patch(f'requests.{verb}') as mock_request_func:
+                    mock_response = mock.Mock(ok=False, status_code=status_code, reason=reason)
+                    mock_response.json.return_value = {}
+                    mock_request_func.return_value = mock_response
+
+                    err_regex = (f"{verb.upper()} request to URL '{expected_url}' failed with "
+                                 f"status code {status_code}: {reason}")
+
+                    with self.assertRaisesRegex(APIError, err_regex):
+                        kwargs = {}
+                        if verb in ('put', 'patch'):
+                            # put and patch methods require a payload keyword-only argument
+                            kwargs['payload'] = {}
+                        getattr(client, verb)(path, **kwargs)
+
+    def test_request_failed_invalid_json_response(self):
+        """Test get, post, put, patch, and delete with fail HTTP codes and response not valid JSON"""
+        api_gw_host = 'my-api-gw'
+        client = sat.apiclient.APIGatewayClient(host=api_gw_host)
+        path = 'fail'
+        expected_url = f'{get_http_url_prefix(api_gw_host)}{path}'
+        status_code = 400
+        reason = 'Bad Request'
+
+        verbs_to_test = ['get', 'post', 'put', 'patch', 'delete']
+        for verb in verbs_to_test:
+            with self.subTest(verb=verb):
+                with mock.patch(f'requests.{verb}') as mock_request_func:
+                    mock_response = mock.Mock(ok=False, status_code=status_code, reason=reason)
+                    mock_response.json.side_effect = ValueError
+                    mock_request_func.return_value = mock_response
+
+                    err_regex = (f"{verb.upper()} request to URL '{expected_url}' failed with "
+                                 f"status code {status_code}: {reason}")
+
+                    with self.assertRaisesRegex(APIError, err_regex):
+                        kwargs = {}
+                        if verb in ('put', 'patch'):
+                            # put and patch methods require a payload keyword-only argument
+                            kwargs['payload'] = {}
+                        getattr(client, verb)(path, **kwargs)
+
 
 class TestHSMClient(unittest.TestCase):
     """Tests for the APIGatewayClient class: HSM client."""

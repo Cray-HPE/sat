@@ -139,12 +139,24 @@ class APIGatewayClient:
         except requests.exceptions.RequestException as err:
             raise APIError("{} request to URL '{}' failed: {}".format(req_type, url, err))
 
-        if not r:
-            raise APIError("{} request to URL '{}' failed with status "
-                           "code {}: {}".format(req_type, url, r.status_code, r.reason))
-
         LOGGER.debug("Received response to %s request to URL '%s' "
                      "with status code: '%s': %s", req_type, r.url, r.status_code, r.reason)
+
+        if not r.ok:
+            api_err_msg = (f"{req_type} request to URL '{url}' failed with status "
+                           f"code {r.status_code}: {r.reason}")
+            # Attempt to get more information from response
+            try:
+                problem = r.json()
+            except ValueError:
+                raise APIError(api_err_msg)
+
+            if 'title' in problem:
+                api_err_msg += f'. {problem["title"]}'
+            if 'detail' in problem:
+                api_err_msg += f' Detail: {problem["detail"]}'
+
+            raise APIError(api_err_msg)
 
         return r
 
