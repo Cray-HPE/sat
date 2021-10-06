@@ -382,7 +382,7 @@ class FASClient(APIGatewayClient):
 
         Raises:
             APIError: If creating the temporary snapshot failed,
-                or the schema of the JSON payload returned from FAS 
+                or the schema of the JSON payload returned from FAS
                 was malformed.
         """
         # This can raise APIError

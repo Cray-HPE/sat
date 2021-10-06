@@ -225,7 +225,7 @@ class TestGetComponentAliases(unittest.TestCase):
         """Test that get_component_aliases returns the correct aliases for xnames"""
         correct_mapping = {
             'x3000c0s17b1n0': ['nid000001'],
-            'x3000c0s5b0n0':  ['ncn-m003' ],
+            'x3000c0s5b0n0':  ['ncn-m003'],
         }
         self.assertEqual(get_component_aliases(self.sample_sls_response), correct_mapping)
 
