@@ -25,7 +25,7 @@ from copy import deepcopy
 
 import unittest
 
-from sat.cli.status.main import API_KEYS_TO_HEADERS, make_raw_table
+from sat.cli.status.main import API_KEYS_TO_HEADERS, make_raw_table, get_component_aliases
 from sat.constants import MISSING_VALUE
 from sat.xname import XName
 
@@ -153,6 +153,81 @@ class TestStatusBase(unittest.TestCase):
         self.assertIsInstance(raw_table[0][0], XName)
         self.assertEqual(raw_table[0][0], XName(single_node['ID']))
         self.assertTrue(all(len(row) == len(API_KEYS_TO_HEADERS) for row in raw_table))
+
+
+class TestGetComponentAliases(unittest.TestCase):
+    """Tests for retrieving component aliases from SLS."""
+    def setUp(self):
+        self.sample_sls_response = [
+            {
+                "Parent": "x3000c0s17b1",
+                "Xname": "x3000c0s17b1n0",
+                "Type": "comptype_node",
+                "Class": "River",
+                "TypeString": "Node",
+                "LastUpdated": 1620156675,
+                "LastUpdatedTime": "2021-05-04 19:31:15.806794 +0000 +0000",
+                "ExtraProperties": {
+                    "Aliases": [
+                        "nid000001"
+                    ],
+                    "NID": 1,
+                    "Role": "Compute"
+                }
+            },
+            {
+                "Parent": "x3000c0s5b0",
+                "Xname": "x3000c0s5b0n0",
+                "Type": "comptype_node",
+                "Class": "River",
+                "TypeString": "Node",
+                "LastUpdated": 1620156675,
+                "LastUpdatedTime": "2021-05-04 19:31:15.806794 +0000 +0000",
+                "ExtraProperties": {
+                    "Aliases": [
+                        "ncn-m003"
+                    ],
+                    "NID": 100003,
+                    "Role": "Management",
+                    "SubRole": "Master"
+                }
+            },
+            {
+                "Parent": "x3000c0w21",
+                "Xname": "x3000c0w21j33",
+                "Type": "comptype_mgmt_switch_connector",
+                "Class": "River",
+                "TypeString": "MgmtSwitchConnector",
+                "LastUpdated": 1620156675,
+                "LastUpdatedTime": "2021-05-04 19:31:15.806794 +0000 +0000",
+                "ExtraProperties": {
+                    "NodeNics": [
+                        "x3000c0s17b2"
+                    ],
+                    "VendorName": "ethernet1/1/33"
+                }
+            }
+        ]
+
+    def test_get_component_aliases_returns_node_aliases(self):
+        """Test the normal operation of get_component_aliases"""
+        component_aliases = get_component_aliases(self.sample_sls_response)
+        for xname in ['x3000c0s17b1n0', 'x3000c0s5b0n0']:
+            with self.subTest(xname):
+                self.assertIn(xname, component_aliases)
+
+    def test_get_component_aliases_only_contains_nodes(self):
+        """Test that components without aliases are not mapped to hostnames"""
+        component_aliases = get_component_aliases(self.sample_sls_response)
+        self.assertNotIn('x3000c0w21j33', component_aliases)
+
+    def test_get_component_aliases_returns_correct_aliases(self):
+        """Test that get_component_aliases returns the correct aliases for xnames"""
+        correct_mapping = {
+            'x3000c0s17b1n0': ['nid000001'],
+            'x3000c0s5b0n0':  ['ncn-m003'],
+        }
+        self.assertEqual(get_component_aliases(self.sample_sls_response), correct_mapping)
 
 
 if __name__ == '__main__':

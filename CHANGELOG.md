@@ -25,6 +25,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+- Added a ``--format`` option to ``sat xname2nid`` to set the output format
+  to either 'range' or 'nid' for the node IDs.
+- Added hostname information from SLS to `sat status` output.
+- Added more information about unsuccessful API requests to the ``APIError``
+  messages. This info is parsed from responses that use content type
+  "application/problem+json" in their failure responses.
+
+### Fixed
+- Fixed ``sat bootsys boot --stage cabinet-power`` to query CAPMC for power status of
+  ComputeModules instead of the unsupported NodeBMC type.
+
+### Fixed
+- Actions which wait on certain conditions (for example within ``sat bootsys``) will
+  fail out more quickly when checking for the completion condition fails
+  irrecoverably, instead of repeating a failing check until waiting times out.
+- The ``ncn-power`` stage of ``sat bootsys`` will now only print one error
+  message if ``impitool`` fails multiple times consecutively for a given
+  component. If the number of failures for a given component exceeds 3, then
+  that component will be marked as failed.
+
 ## [3.10.0] - 2021-09-03
 
 ### Changed
@@ -45,6 +68,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   related to trying to start non-existent Ceph services.
 - Fix a traceback that occurred if the user did not have permission to write to
   the log file.
+- Actions which wait on certain conditions (for example within ``sat bootsys``) will
+  fail out more quickly when checking for the completion condition fails
+  irrecoverably, instead of repeating a failing check until waiting times out.
 
 ### Added
 - Added a check for running SDU sessions to the ``session-checks`` stage of a

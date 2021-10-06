@@ -47,78 +47,79 @@ Show status of all nodes in the system:
 ::
 
   # sat status
-  +----------------+------+-----+-------+------+---------+------+-------+------------+---------+----------+
-  | xname          | Type | NID | State | Flag | Enabled | Arch | Class | Role       | Subrole | Net Type |
-  +----------------+------+-----+-------+------+---------+------+-------+------------+---------+----------+
-  | x3000c0s1b0n0  | Node | 100 | On    | OK   | True    | X86  | River | Management | Master  | Sling    |
-  | x3000c0s3b0n0  | Node | 101 | On    | OK   | True    | X86  | River | Management | Master  | Sling    |
-  | x3000c0s5b0n0  | Node | 102 | On    | OK   | True    | X86  | River | Management | Worker  | Sling    |
-  | x3000c0s9b0n0  | Node | 104 | Ready | OK   | True    | X86  | River | Management | Worker  | Sling    |
-  | x3000c0s11b0n0 | Node | 105 | Ready | OK   | True    | X86  | River | Management | Worker  | Sling    |
-  | x3000c0s13b0n0 | Node | 106 | On    | OK   | True    | X86  | River | Management | Storage | Sling    |
-  | x3000c0s15b0n0 | Node | 107 | On    | OK   | True    | X86  | River | Management | Storage | Sling    |
-  | x3000c0s17b0n0 | Node | 108 | On    | OK   | True    | X86  | River | Management | Storage | Sling    |
-  | x3000c0s19b1n0 | Node | 1   | Ready | OK   | True    | X86  | River | Compute    | None    | Sling    |
-  | x3000c0s19b2n0 | Node | 2   | Ready | OK   | True    | X86  | River | Compute    | None    | Sling    |
-  | x3000c0s19b3n0 | Node | 3   | Ready | OK   | True    | X86  | River | Compute    | None    | Sling    |
-  | x3000c0s19b4n0 | Node | 4   | Ready | OK   | True    | X86  | River | Compute    | None    | Sling    |
-  +----------------+------+-------+-----+------+---------+------+-------+------------+---------+----------+
-
+  +----------------+-----------+------+----------+---------+---------+---------+------+-------+-------------+---------+----------+
+  | xname          | Aliases   | Type | NID      | State   | Flag    | Enabled | Arch | Class | Role        | Subrole | Net Type |
+  +----------------+-----------+------+----------+---------+---------+---------+------+-------+-------------+---------+----------+
+  | x3000c0s1b0n0  | ncn-m001  | Node | 100001   | Ready   | OK      | True    | X86  | River | Management  | Master  | Sling    |
+  | x3000c0s3b0n0  | ncn-m002  | Node | 100002   | Ready   | OK      | True    | X86  | River | Management  | Master  | Sling    |
+  | x3000c0s5b0n0  | ncn-m003  | Node | 100003   | Ready   | Warning | True    | X86  | River | Management  | Master  | Sling    |
+  | x3000c0s7b0n0  | ncn-w001  | Node | 100004   | Ready   | OK      | True    | X86  | River | Management  | Worker  | Sling    |
+  | x3000c0s9b0n0  | ncn-w002  | Node | 100005   | Ready   | OK      | True    | X86  | River | Management  | Worker  | Sling    |
+  | x3000c0s11b0n0 | ncn-s001  | Node | 100006   | Ready   | OK      | True    | X86  | River | Management  | Storage | Sling    |
+  | x3000c0s13b0n0 | ncn-s002  | Node | 100007   | Ready   | OK      | True    | X86  | River | Management  | Storage | Sling    |
+  | x3000c0s15b0n0 | ncn-s003  | Node | 100008   | Ready   | Warning | True    | X86  | River | Management  | Storage | Sling    |
+  | x3000c0s17b1n0 | nid000001 | Node | 1        | Ready   | Warning | True    | X86  | River | Compute     | None    | Sling    |
+  | x3000c0s17b2n0 | nid000002 | Node | 2        | Ready   | OK      | True    | X86  | River | Compute     | None    | Sling    |
+  | x3000c0s17b3n0 | nid000003 | Node | 3        | Ready   | OK      | True    | X86  | River | Compute     | None    | Sling    |
+  | x3000c0s17b4n0 | nid000004 | Node | 4        | Ready   | Warning | True    | X86  | River | Compute     | None    | Sling    |
+  | x3000c0s24b0n0 | ncn-w003  | Node | 100009   | Ready   | OK      | True    | X86  | River | Management  | Worker  | Sling    |
+  | x3000c0s26b0n0 | uan01     | Node | 49169216 | Standby | Alert   | True    | X86  | River | Application | UAN     | Sling    |
+  +----------------+-----------+------+----------+---------+---------+---------+------+-------+-------------+---------+----------+
 
 Show status of nid 1:
 
 ::
 
   # sat status --filter nid=1
-  +----------------+------+-----+-------+------+---------+------+-------+---------+---------+----------+
-  | xname          | Type | NID | State | Flag | Enabled | Arch | Class | Role    | Subrole | Net Type |
-  +----------------+------+-----+-------+------+---------+------+-------+---------+---------+----------+
-  | x3000c0s19b1n0 | Node | 1   | Ready | OK   | True    | X86  | River | Compute | None    | Sling    |
-  +----------------+------+-----+-------+------+---------+------+-------+---------+---------+----------+
+  +----------------+-----------+------+-----+-------+---------+---------+------+-------+---------+---------+----------+
+  | xname          | Aliases   | Type | NID | State | Flag    | Enabled | Arch | Class | Role    | Subrole | Net Type |
+  +----------------+-----------+------+-----+-------+---------+---------+------+-------+---------+---------+----------+
+  | x3000c0s17b1n0 | nid000001 | Node | 1   | Ready | Warning | True    | X86  | River | Compute | None    | Sling    |
+  +----------------+-----------+------+-----+-------+---------+---------+------+-------+---------+---------+----------+
 
 Show status of the node with xname x3000c0s1b0n0:
 
 ::
 
   # sat status --filter xname=x3000c0s1b0n0
-  +----------------+------+-----+-------+------+---------+------+-------+------------+---------+----------+
-  | xname          | Type | NID | State | Flag | Enabled | Arch | Class | Role       | Subrole | Net Type |
-  +----------------+------+-----+-------+------+---------+------+-------+------------+---------+----------+
-  | x3000c0s1b0n0  | Node | 100 | On    | OK   | True    | X86  | River | Management | Master  | Sling    |
-  +----------------+------+-----+-------+------+---------+------+-------+------------+---------+----------+
+  +---------------+----------+------+--------+-------+------+---------+------+-------+------------+---------+----------+
+  | xname         | Aliases  | Type | NID    | State | Flag | Enabled | Arch | Class | Role       | Subrole | Net Type |
+  +---------------+----------+------+--------+-------+------+---------+------+-------+------------+---------+----------+
+  | x3000c0s1b0n0 | ncn-m001 | Node | 100001 | Ready | OK   | True    | X86  | River | Management | Master  | Sling    |
+  +---------------+----------+------+--------+-------+------+---------+------+-------+------------+---------+----------+
 
 Filters are case-insensitive as well:
 
 ::
 
   # sat status --filter role=compute
-  +----------------+------+-----+-------+------+---------+------+-------+---------+---------+----------+
-  | xname          | Type | NID | State | Flag | Enabled | Arch | Class | Role    | Subrole | Net Type |
-  +----------------+------+-----+-------+------+---------+------+-------+---------+---------+----------+
-  | x3000c0s19b1n0 | Node | 1   | Ready | OK   | True    | X86  | River | Compute | None    | Sling    |
-  | x3000c0s19b2n0 | Node | 2   | Ready | OK   | True    | X86  | River | Compute | None    | Sling    |
-  | x3000c0s19b3n0 | Node | 3   | Ready | OK   | True    | X86  | River | Compute | None    | Sling    |
-  | x3000c0s19b4n0 | Node | 4   | Ready | OK   | True    | X86  | River | Compute | None    | Sling    |
-  +----------------+------+-----+-------+------+---------+------+-------+---------+---------+----------+
+  +----------------+-----------+------+-----+-------+---------+---------+------+-------+---------+---------+----------+
+  | xname          | Aliases   | Type | NID | State | Flag    | Enabled | Arch | Class | Role    | Subrole | Net Type |
+  +----------------+-----------+------+-----+-------+---------+---------+------+-------+---------+---------+----------+
+  | x3000c0s17b1n0 | nid000001 | Node | 1   | Ready | Warning | True    | X86  | River | Compute | None    | Sling    |
+  | x3000c0s17b2n0 | nid000002 | Node | 2   | Ready | OK      | True    | X86  | River | Compute | None    | Sling    |
+  | x3000c0s17b3n0 | nid000003 | Node | 3   | Ready | OK      | True    | X86  | River | Compute | None    | Sling    |
+  | x3000c0s17b4n0 | nid000004 | Node | 4   | Ready | Warning | True    | X86  | River | Compute | None    | Sling    |
+  +----------------+-----------+------+-----+-------+---------+---------+------+-------+---------+---------+----------+
 
 Query all types of components:
 
 ::
 
   # sat status --types all
-  +----------------+---------------+---------+-----------+---------+---------+------+----------+-------------+---------+----------+
-  | xname          | Type          | NID     | State     | Flag    | Enabled | Arch | Class    | Role        | Subrole | Net Type |
-  +----------------+---------------+---------+-----------+---------+---------+------+----------+-------------+---------+----------+
-  | x3000c0r24b0   | RouterBMC     | MISSING | Ready     | Warning | True    | X86  | River    | MISSING     | MISSING | Sling    |
-  | x3000c0r24e0   | HSNBoard      | MISSING | On        | OK      | True    | X86  | River    | MISSING     | MISSING | Sling    |
-  | x3000c0s1b0    | NodeBMC       | MISSING | Ready     | OK      | True    | X86  | River    | MISSING     | MISSING | Sling    |
-  | x3000c0s19e1   | NodeEnclosure | MISSING | On        | OK      | True    | X86  | River    | MISSING     | MISSING | Sling    |
-  | x3000c0s26b0n0 | Node          | 5000    | Ready     | OK      | True    | X86  | River    | Application | UAN     | Sling    |
-  | x5000c1        | Chassis       | MISSING | On        | Warning | True    | X86  | Mountain | MISSING     | MISSING | Sling    |
-  | x5000c1b0      | ChassisBMC    | MISSING | Ready     | Warning | True    | X86  | Mountain | MISSING     | MISSING | Sling    |
-  | x5000c1r5      | RouterModule  | MISSING | On        | OK      | True    | X86  | Mountain | MISSING     | MISSING | Sling    |
-  | x5000c1s0      | ComputeModule | MISSING | On        | OK      | True    | X86  | Mountain | MISSING     | MISSING | Sling    |
-  +----------------+---------------+---------+-----------+---------+---------+------+----------+-------------+---------+----------+
+  +----------------+-----------+---------------+----------+---------+---------+---------+------+-------+-------------+---------+----------+
+  | xname          | Aliases   | Type          | NID      | State   | Flag    | Enabled | Arch | Class | Role        | Subrole | Net Type |
+  +----------------+-----------+---------------+----------+---------+---------+---------+------+-------+-------------+---------+----------+
+  | x3000c0r22b0   | MISSING   | RouterBMC     | MISSING  | Ready   | OK      | True    | X86  | River | MISSING     | MISSING | Sling    |
+  | x3000c0r22e0   | MISSING   | HSNBoard      | MISSING  | On      | OK      | True    | X86  | River | MISSING     | MISSING | Sling    |
+  | x3000c0s1b0n0  | ncn-m001  | Node          | 100001   | Ready   | OK      | True    | X86  | River | Management  | Master  | Sling    |
+  | x3000c0s3b0    | MISSING   | NodeBMC       | MISSING  | Ready   | OK      | True    | X86  | River | MISSING     | MISSING | Sling    |
+  | x3000c0s3b0n0  | ncn-m002  | Node          | 100002   | Ready   | OK      | True    | X86  | River | Management  | Master  | Sling    |
+  | x3000c0s3e0    | MISSING   | NodeEnclosure | MISSING  | On      | OK      | True    | X86  | River | MISSING     | MISSING | Sling    |
+  | x3000c0s5b0    | MISSING   | NodeBMC       | MISSING  | Ready   | OK      | True    | X86  | River | MISSING     | MISSING | Sling    |
+  | x3000c0s5b0n0  | ncn-m003  | Node          | 100003   | Ready   | Warning | True    | X86  | River | Management  | Master  | Sling    |
+  | x3000c0s5e0    | MISSING   | NodeEnclosure | MISSING  | On      | OK      | True    | X86  | River | MISSING     | MISSING | Sling    |
+  ...
 
 Possible Values
 ---------------

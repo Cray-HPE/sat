@@ -21,6 +21,7 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+from collections import defaultdict
 import logging
 import shlex
 import socket
@@ -32,7 +33,7 @@ from paramiko.ssh_exception import BadHostKeyException, AuthenticationException,
 
 from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger, ConsoleLoggingError
 from sat.cli.bootsys.util import get_and_verify_ncn_groups, get_ssh_client, FatalBootsysError
-from sat.cli.bootsys.waiting import GroupWaiter
+from sat.cli.bootsys.waiting import GroupWaiter, WaitingFailure
 from sat.config import get_config_value
 from sat.util import BeginEndLogger, get_username_and_password_interactively, prompt_continue
 
@@ -46,7 +47,7 @@ class IPMIPowerStateWaiter(GroupWaiter):
     Waits for all members to reach the given IPMI power state."""
 
     def __init__(self, members, power_state, timeout, username, password,
-                 send_command=False, poll_interval=1):
+                 send_command=False, poll_interval=1, failure_threshold=3):
         """Constructor for an IPMIPowerStateWaiter object.
 
         Args:
@@ -56,11 +57,17 @@ class IPMIPowerStateWaiter(GroupWaiter):
                 to each node before waiting.
             username (str): the username to use when running ipmitool commands
             password (str): the password to use when running ipmitool commands
+            failure_threshold (int): if a call to ipmitool gives a nonzero
+                return code this many times in a row for a given member, then
+                that member will be marked as failed.
         """
         self.power_state = power_state
         self.username = username
         self.password = password
         self.send_command = send_command
+
+        self.failure_threshold = failure_threshold
+        self.consecutive_failures = defaultdict(int)
 
         super().__init__(members, timeout, poll_interval=poll_interval)
 
@@ -95,15 +102,20 @@ class IPMIPowerStateWaiter(GroupWaiter):
             proc = subprocess.run(ipmi_command, stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE, encoding='utf-8')
         except OSError as err:
-            # TODO (SAT-552): Improve handling of ipmitool errors
-            LOGGER.error('Unable to find ipmitool: %s', err)
-            return False
+            raise WaitingFailure(f'Unable to find ipmitool: {err}')
 
         if proc.returncode:
-            # TODO (SAT-552): Improve handling of ipmitool errors
-            LOGGER.error('ipmitool command failed with code %s: stderr: %s',
-                         proc.returncode, proc.stderr)
+            if not self.consecutive_failures[member]:
+                LOGGER.warning("impitool command failed with code %d: %s",
+                               proc.returncode, proc.stderr)
+
+            self.consecutive_failures[member] += 1
+            if self.consecutive_failures[member] >= self.failure_threshold:
+                raise WaitingFailure(f'ipmitool command failed {self.consecutive_failures[member]} time(s) '
+                                     f'with code {proc.returncode}; stderr: {proc.stderr}')
             return False
+        elif self.consecutive_failures[member]:
+            self.consecutive_failures[member] = 0
 
         return self.power_state in proc.stdout
 
