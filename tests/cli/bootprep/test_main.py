@@ -29,6 +29,8 @@ from unittest.mock import patch
 from sat.cli.bootprep.errors import (
     BootPrepInternalError,
     BootPrepValidationError,
+    ConfigurationCreateError,
+    ImageCreateError,
     ValidationErrorCollection
 )
 from sat.cli.bootprep.main import do_bootprep
@@ -45,6 +47,7 @@ class TestDoBootprep(unittest.TestCase):
         self.mock_load_and_validate = patch('sat.cli.bootprep.main.load_and_validate_instance').start()
         self.validated_instance = self.mock_load_and_validate.return_value
         self.mock_create_configurations = patch('sat.cli.bootprep.main.create_configurations').start()
+        self.mock_create_images = patch('sat.cli.bootprep.main.create_images').start()
 
     def tearDown(self):
         patch.stopall()
@@ -58,6 +61,7 @@ class TestDoBootprep(unittest.TestCase):
         self.mock_load_and_validate.assert_called_once_with(
             self.input_file, self.mock_load_bootprep_schema.return_value)
         self.mock_create_configurations.assert_called_once_with(self.validated_instance, self.args)
+        self.mock_create_images.assert_called_once_with(self.validated_instance, self.args)
         info_msgs = [r.msg for r in cm.records]
         expected_msgs = [
             'Loading schema file',
@@ -75,9 +79,9 @@ class TestDoBootprep(unittest.TestCase):
                 do_bootprep(self.args)
 
         self.assertEqual(1, raises_cm.exception.code)
-        error_msgs = [r.msg for r in logs_cm.records if r.levelno == logging.ERROR]
-        self.assertEqual([f'Internal error while loading schema: {internal_err_msg}'],
-                         error_msgs)
+        self.assertEqual(1, len(logs_cm.records))
+        self.assertEqual(f'Internal error while loading schema: {internal_err_msg}',
+                         logs_cm.records[0].msg)
         self.mock_load_and_validate.assert_not_called()
 
     def test_do_bootprep_validation_error(self):
@@ -89,8 +93,8 @@ class TestDoBootprep(unittest.TestCase):
                 do_bootprep(self.args)
 
         self.assertEqual(1, raises_cm.exception.code)
-        error_msgs = [r.msg for r in logs_cm.records if r.levelno == logging.ERROR]
-        self.assertEqual([validation_err_msg], error_msgs)
+        self.assertEqual(1, len(logs_cm.records))
+        self.assertEqual(validation_err_msg, logs_cm.records[0].msg)
         self.mock_load_and_validate.assert_called_once_with(
             self.input_file, self.mock_load_bootprep_schema.return_value)
 
@@ -102,11 +106,43 @@ class TestDoBootprep(unittest.TestCase):
                 do_bootprep(self.args)
 
         self.assertEqual(1, raises_cm.exception.code)
-        error_msgs = [r.msg for r in logs_cm.records if r.levelno == logging.ERROR]
-        self.assertEqual(['Input file is invalid with the following validation errors:\n'],
-                         error_msgs)
+        self.assertEqual(1, len(logs_cm.records))
+        self.assertEqual('Input file is invalid with the following validation errors:\n',
+                         logs_cm.records[0].msg)
         self.mock_load_and_validate.assert_called_once_with(
             self.input_file, self.mock_load_bootprep_schema.return_value)
+
+    def test_do_bootprep_configuration_create_error(self):
+        """Test do_bootprep when an error occurs creating a configuration"""
+        create_err_msg = 'Failed to create a configuration'
+        self.mock_create_configurations.side_effect = ConfigurationCreateError(create_err_msg)
+        with self.assertRaises(SystemExit) as raises_cm:
+            with self.assertLogs(level=logging.ERROR) as logs_cm:
+                do_bootprep(self.args)
+
+        self.assertEqual(1, raises_cm.exception.code)
+        self.assertEqual(1, len(logs_cm.records))
+        self.assertEqual(create_err_msg, logs_cm.records[0].msg)
+        self.mock_load_and_validate.assert_called_once_with(
+            self.input_file, self.mock_load_bootprep_schema.return_value)
+        self.mock_create_configurations.assert_called_once_with(self.validated_instance, self.args)
+        self.mock_create_images.assert_not_called()
+
+    def test_do_bootprep_image_create_error(self):
+        """Test do_bootprep when an error occurs creating an image."""
+        create_err_msg = 'Failed to create an image'
+        self.mock_create_images.side_effect = ImageCreateError(create_err_msg)
+        with self.assertRaises(SystemExit) as raises_cm:
+            with self.assertLogs(level=logging.ERROR) as logs_cm:
+                do_bootprep(self.args)
+
+        self.assertEqual(1, raises_cm.exception.code)
+        self.assertEqual(1, len(logs_cm.records))
+        self.assertEqual(create_err_msg, logs_cm.records[0].msg)
+        self.mock_load_and_validate.assert_called_once_with(
+            self.input_file, self.mock_load_bootprep_schema.return_value)
+        self.mock_create_configurations.assert_called_once_with(self.validated_instance, self.args)
+        self.mock_create_images.assert_called_once_with(self.validated_instance, self.args)
 
 
 if __name__ == '__main__':

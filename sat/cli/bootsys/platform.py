@@ -38,7 +38,7 @@ from sat.cli.bootsys.ceph import (
 )
 from sat.cli.bootsys.etcd import save_etcd_snapshot_on_host, EtcdInactiveFailure, EtcdSnapshotFailure
 from sat.cli.bootsys.util import get_and_verify_ncn_groups, get_ssh_client, FatalBootsysError
-from sat.cli.bootsys.waiting import Waiter
+from sat.waiting import Waiter
 from sat.util import BeginEndLogger, pester_choices, prompt_continue
 
 LOGGER = logging.getLogger(__name__)
