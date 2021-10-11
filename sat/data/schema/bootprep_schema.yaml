@@ -204,7 +204,7 @@ properties:
           type: string
         configuration_group_names:
           description: >
-            The name of the Ansible group to set up in the CFS session when
+            The name of the Ansible groups to set up in the CFS session when
             customizing the image. Required if the "configuration" field is
             present.
           type: array
