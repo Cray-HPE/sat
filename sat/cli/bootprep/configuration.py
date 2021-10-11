@@ -355,7 +355,7 @@ def handle_existing_configs(cfs_client, input_configs, args):
         return [config for config in input_configs if config.name not in existing_names]
 
 
-def create_cfs_configurations(instance, args):
+def create_configurations(instance, args):
     """Create the CFS configurations defined in the given instance.
 
     Args:
