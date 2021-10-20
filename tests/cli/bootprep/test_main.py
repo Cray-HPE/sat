@@ -45,7 +45,12 @@ class TestDoBootprep(unittest.TestCase):
         self.args = Namespace(input_file=self.input_file)
         self.mock_load_bootprep_schema = patch('sat.cli.bootprep.main.load_bootprep_schema').start()
         self.mock_load_and_validate = patch('sat.cli.bootprep.main.load_and_validate_instance').start()
-        self.validated_instance = self.mock_load_and_validate.return_value
+        self.validated_data = self.mock_load_and_validate.return_value
+        self.mock_input_instance_cls = patch('sat.cli.bootprep.main.InputInstance').start()
+        self.mock_input_instance = self.mock_input_instance_cls.return_value
+        self.mock_sat_session = patch('sat.cli.bootprep.main.SATSession').start()
+        self.mock_cfs_client = patch('sat.cli.bootprep.main.CFSClient').start().return_value
+        self.mock_ims_client = patch('sat.cli.bootprep.main.IMSClient').start().return_value
         self.mock_create_configurations = patch('sat.cli.bootprep.main.create_configurations').start()
         self.mock_create_images = patch('sat.cli.bootprep.main.create_images').start()
 
@@ -60,8 +65,10 @@ class TestDoBootprep(unittest.TestCase):
         self.mock_load_bootprep_schema.assert_called_once_with()
         self.mock_load_and_validate.assert_called_once_with(
             self.input_file, self.mock_load_bootprep_schema.return_value)
-        self.mock_create_configurations.assert_called_once_with(self.validated_instance, self.args)
-        self.mock_create_images.assert_called_once_with(self.validated_instance, self.args)
+        self.mock_input_instance_cls.assert_called_once_with(
+            self.validated_data, self.mock_cfs_client, self.mock_ims_client)
+        self.mock_create_configurations.assert_called_once_with(self.mock_input_instance, self.args)
+        self.mock_create_images.assert_called_once_with(self.mock_input_instance, self.args)
         info_msgs = [r.msg for r in cm.records]
         expected_msgs = [
             'Loading schema file',
@@ -125,11 +132,13 @@ class TestDoBootprep(unittest.TestCase):
         self.assertEqual(create_err_msg, logs_cm.records[0].msg)
         self.mock_load_and_validate.assert_called_once_with(
             self.input_file, self.mock_load_bootprep_schema.return_value)
-        self.mock_create_configurations.assert_called_once_with(self.validated_instance, self.args)
+        self.mock_input_instance_cls.assert_called_once_with(
+            self.validated_data, self.mock_cfs_client, self.mock_ims_client)
+        self.mock_create_configurations.assert_called_once_with(self.mock_input_instance, self.args)
         self.mock_create_images.assert_not_called()
 
     def test_do_bootprep_image_create_error(self):
-        """Test do_bootprep when an error occurs creating an image."""
+        """Test do_bootprep when an error occurs creating an image"""
         create_err_msg = 'Failed to create an image'
         self.mock_create_images.side_effect = ImageCreateError(create_err_msg)
         with self.assertRaises(SystemExit) as raises_cm:
@@ -141,8 +150,10 @@ class TestDoBootprep(unittest.TestCase):
         self.assertEqual(create_err_msg, logs_cm.records[0].msg)
         self.mock_load_and_validate.assert_called_once_with(
             self.input_file, self.mock_load_bootprep_schema.return_value)
-        self.mock_create_configurations.assert_called_once_with(self.validated_instance, self.args)
-        self.mock_create_images.assert_called_once_with(self.validated_instance, self.args)
+        self.mock_input_instance_cls.assert_called_once_with(
+            self.validated_data, self.mock_cfs_client, self.mock_ims_client)
+        self.mock_create_configurations.assert_called_once_with(self.mock_input_instance, self.args)
+        self.mock_create_images.assert_called_once_with(self.mock_input_instance, self.args)
 
 
 if __name__ == '__main__':

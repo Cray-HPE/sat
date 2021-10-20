@@ -22,484 +22,17 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 from argparse import Namespace
-from copy import deepcopy
 import logging
 import os
-from textwrap import dedent
 import unittest
 from unittest.mock import patch, MagicMock, Mock
 
-from kubernetes.config import ConfigException
-from kubernetes.client import ApiException
-
 from sat.apiclient import APIError
-from sat.apiclient.vcs import VCSError
 from sat.cli.bootprep.configuration import (
     create_configurations,
-    handle_existing_configs,
-    CFSConfiguration,
-    CFSConfigurationLayer,
-    GitCFSConfigurationLayer,
-    LATEST_VERSION_VALUE,
-    ProductCFSConfigurationLayer
+    handle_existing_configs
 )
 from sat.cli.bootprep.errors import ConfigurationCreateError
-
-
-class TestCFSConfigurationLayer(unittest.TestCase):
-    """Tests for the CFSConfigurationLayer class"""
-
-    def setUp(self):
-        """Mock the constructors for the child classes"""
-        self.mock_git_layer = patch('sat.cli.bootprep.configuration.GitCFSConfigurationLayer').start()
-        self.mock_product_layer = patch('sat.cli.bootprep.configuration.ProductCFSConfigurationLayer').start()
-
-    def tearDown(self):
-        patch.stopall()
-
-    def test_get_configuration_layer_git(self):
-        """Test the get_configuration_layer static method with a git layer"""
-        # Just needs a 'git' key; we're mocking the GitCFSConfigurationLayer class
-        layer_data = {'git': {}}
-        layer = CFSConfigurationLayer.get_configuration_layer(layer_data)
-        self.assertEqual(self.mock_git_layer.return_value, layer)
-
-    def test_get_configuration_layer_product(self):
-        """Test the get_configuration_layer static method with a product layer"""
-        layer_data = {'product': {}}
-        layer = CFSConfigurationLayer.get_configuration_layer(layer_data)
-        self.assertEqual(self.mock_product_layer.return_value, layer)
-
-    def test_get_configuration_layer_unknown(self):
-        """Test the get_configuration_layer static method with bad layer data"""
-        # All that matters is that it does not have a 'product' or 'git' key
-        # This should never happen in practice because input files are validated against
-        # a JSON schema that requires either the 'git' or 'product' keys.
-        layer_data = {'unknown': {}}
-        expected_err = 'Unrecognized type of configuration layer'
-        with self.assertRaisesRegex(ValueError, expected_err):
-            CFSConfigurationLayer.get_configuration_layer(layer_data)
-
-
-class TestGitCFSConfigurationLayer(unittest.TestCase):
-    """Tests for the GitCFSConfigurationLayer class"""
-
-    def setUp(self):
-        """Create some layer data to use in unit tests."""
-        self.playbook = 'site.yaml'
-        self.branch_layer_data = {
-            'playbook': self.playbook,
-            'name': 'branch_layer',
-            'git': {
-                'url': 'https://api-gw-service-nmn.local/vcs/cray/cos-config-management.git',
-                'branch': 'integration'
-            }
-        }
-        self.commit_layer_data = {
-            'playbook': self.playbook,
-            'name': 'commit_layer',
-            'git': {
-                'url': 'https://api-gw-service-nmn.local/vcs/cray/analytics-config-management.git',
-                'commit': '01f9a2aac3e315c5caa00db4019f1d934171dba0'
-            }
-        }
-
-        self.branch_head_commit = 'e6bfdb28d44669c4317d6dc021c22a75cebb3bfb'
-        self.mock_vcs_repo = patch('sat.cli.bootprep.configuration.VCSRepo').start()
-        self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = self.branch_head_commit
-
-        patch('sat.cli.bootprep.configuration.CFSConfigurationLayer.resolve_branches', False).start()
-
-    def tearDown(self):
-        patch.stopall()
-
-    def test_playbook_property_present(self):
-        """Test the playbook property when a playbook is in the layer data"""
-        layer = GitCFSConfigurationLayer(self.branch_layer_data)
-        self.assertEqual(self.playbook, layer.playbook)
-
-    def test_playbook_property_not_present(self):
-        """Test the playbook property when a playbook is not in the layer data"""
-        del self.branch_layer_data['playbook']
-        layer = GitCFSConfigurationLayer(self.branch_layer_data)
-        self.assertIsNone(layer.playbook)
-
-    def test_name_property_present(self):
-        """Test the name property when the name is in the layer data"""
-        layer = GitCFSConfigurationLayer(self.branch_layer_data)
-        self.assertEqual(self.branch_layer_data['name'], layer.name)
-
-    def test_name_property_not_present(self):
-        """Test the name property when the name is not in the layer data"""
-        del self.branch_layer_data['name']
-        layer = GitCFSConfigurationLayer(self.branch_layer_data)
-        self.assertIsNone(layer.name)
-
-    def test_clone_url_property(self):
-        """Test the clone_url property."""
-        layer = GitCFSConfigurationLayer(self.branch_layer_data)
-        self.assertEqual(self.branch_layer_data['git']['url'], layer.clone_url)
-
-    def test_branch_property_present(self):
-        """Test the branch property when the branch is in the layer data"""
-        layer = GitCFSConfigurationLayer(self.branch_layer_data)
-        self.assertEqual(self.branch_layer_data['git']['branch'], layer.branch)
-
-    def test_branch_property_not_present(self):
-        """Test the branch property when the branch is not in the layer data"""
-        layer = GitCFSConfigurationLayer(self.commit_layer_data)
-        self.assertIsNone(layer.branch)
-
-    def test_commit_property_present(self):
-        """Test the commit property when the commit is in the layer data"""
-        layer = GitCFSConfigurationLayer(self.commit_layer_data)
-        self.assertEqual(self.commit_layer_data['git']['commit'], layer.commit)
-
-    def test_commit_property_not_present(self):
-        """Test the commit property when the commit is not in the layer data"""
-        layer = GitCFSConfigurationLayer(self.branch_layer_data)
-        self.assertIsNone(layer.commit)
-
-    def test_get_cfs_api_data_optional_properties(self):
-        """Test get_cfs_api_data method with all optional properties present."""
-        branch_layer = GitCFSConfigurationLayer(self.branch_layer_data)
-        commit_layer = GitCFSConfigurationLayer(self.commit_layer_data)
-        subtests = (('branch', branch_layer), ('commit', commit_layer))
-        for present_property, layer in subtests:
-            with self.subTest(present_property=present_property):
-                expected = deepcopy(getattr(self, f'{present_property}_layer_data'))
-                expected['cloneUrl'] = expected['git']['url']
-                del expected['git']['url']
-                # Move branch or commit to the top level
-                for key, value in expected['git'].items():
-                    expected[key] = value
-                del expected['git']
-                self.assertEqual(expected, layer.get_cfs_api_data())
-
-    def test_commit_property_branch_commit_lookup(self):
-        """Test looking up commit hash from branch in VCS when branch not supported in CSM"""
-        with patch('sat.cli.bootprep.configuration.CFSConfigurationLayer.resolve_branches', True):
-            layer = GitCFSConfigurationLayer(self.branch_layer_data)
-            self.assertEqual(layer.commit, self.branch_head_commit)
-
-    def test_commit_property_branch_commit_vcs_query_fails(self):
-        """Test looking up commit hash raises ConfiurationCreateError when VCS is inaccessible"""
-        with patch('sat.cli.bootprep.configuration.CFSConfigurationLayer.resolve_branches', True):
-            layer = GitCFSConfigurationLayer(self.branch_layer_data)
-            self.mock_vcs_repo.return_value.get_commit_hash_for_branch.side_effect = VCSError
-            with self.assertRaises(ConfigurationCreateError):
-                _ = layer.commit
-
-    def test_commit_property_branch_commit_lookup_fails(self):
-        """Test looking up commit hash for nonexistent branch when branch not supported in CSM"""
-        with patch('sat.cli.bootprep.configuration.CFSConfigurationLayer.resolve_branches', True):
-            layer = GitCFSConfigurationLayer(self.branch_layer_data)
-            self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = None
-            with self.assertRaises(ConfigurationCreateError):
-                _ = layer.commit
-
-
-class TestProductConfigurationLayer(unittest.TestCase):
-    """Tests for the ProductConfigurationLayer class."""
-
-    def setUp(self):
-        """Mock K8s API to return fake product catalog data and set up layers"""
-        # Minimal set of product catalog data needed for these tests
-        self.old_url = 'https://vcs.local/vcs/cray/cos-config-management.git'
-        self.old_commit = '82537e59c24dd5607d5f5d6f92cdff971bd9c615'
-        self.new_url = 'https://vcs.local/vcs/cray/newcos-config-management.git'
-        self.new_commit = '6b0d9d55d399c92abae08002e75b9a1ce002f917'
-        self.product_name = 'cos'
-        self.product_version = '2.1.50'
-        self.cos_data_string = dedent(f"""
-        {self.product_version}:
-          configuration:
-            clone_url: {self.old_url}
-            commit: {self.old_commit}
-        2.1.51:
-          configuration:
-            clone_url: {self.new_url}
-            commit: {self.new_commit}
-        """)
-        self.product_catalog_data = {
-            'cos': self.cos_data_string
-        }
-
-        self.playbook = 'site.yaml'
-        self.version_layer_data = {
-            'name': 'version_layer',
-            'playbook': self.playbook,
-            'product': {
-                'name': self.product_name,
-                'version': self.product_version
-            }
-        }
-        self.version_layer = ProductCFSConfigurationLayer(self.version_layer_data)
-        self.branch = 'integration'
-        self.branch_layer_data = {
-            'name': 'branch_layer',
-            'playbook': self.playbook,
-            'product': {
-                'name': self.product_name,
-                'branch': self.branch
-            }
-        }
-        self.branch_layer = ProductCFSConfigurationLayer(self.branch_layer_data)
-
-        self.mock_core_v1_api_cls = patch('sat.cli.bootprep.configuration.CoreV1Api').start()
-        self.mock_core_v1_api = self.mock_core_v1_api_cls.return_value
-        self.mock_load_kube_config = patch('sat.cli.bootprep.configuration.load_kube_config').start()
-        mock_config_map_response = Mock(data=self.product_catalog_data)
-        self.mock_core_v1_api.read_namespaced_config_map.return_value = mock_config_map_response
-
-        self.branch_head_commit = 'e6bfdb28d44669c4317d6dc021c22a75cebb3bfb'
-        self.mock_vcs_repo = patch('sat.cli.bootprep.configuration.VCSRepo').start()
-        self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = self.branch_head_commit
-
-        patch('sat.cli.bootprep.configuration.CFSConfigurationLayer.resolve_branches', False).start()
-
-    def tearDown(self):
-        patch.stopall()
-
-    def test_k8s_api_property_success(self):
-        """Test getting the k8s_api property when the config is successfully loaded"""
-        k8s_api = self.version_layer.k8s_api
-        self.assertEqual(self.mock_core_v1_api, k8s_api)
-
-    def test_k8s_api_property_load_failure(self):
-        """Test getting the k8s_api property when there is a failure loading the config"""
-        exceptions = (FileNotFoundError, ConfigException)
-        err_regex = 'Failed to load Kubernetes config which is required to read product catalog data'
-        for exception in exceptions:
-            with self.subTest(exception=exception):
-                self.mock_load_kube_config.side_effect = exception
-                with self.assertRaisesRegex(ConfigurationCreateError, err_regex):
-                    _ = self.version_layer.k8s_api
-
-    def test_product_name_property(self):
-        """Test the product_name property"""
-        self.assertEqual(self.product_name, self.version_layer.product_name)
-
-    def test_product_version_property_present(self):
-        """Test the product_version property when version is in the layer data"""
-        self.assertEqual(self.product_version, self.version_layer.product_version)
-
-    def test_product_version_property_not_present(self):
-        """Test the product_version property when version is not in the layer data"""
-        self.assertEqual(LATEST_VERSION_VALUE, self.branch_layer.product_version)
-
-    def test_product_version_data_explicit_version(self):
-        """Test getting product version data from the product catalog for an explicit version"""
-        expected_version_data = {
-            'configuration': {
-                'clone_url': self.old_url,
-                'commit': self.old_commit
-            }
-        }
-        self.assertEqual(expected_version_data, self.version_layer.product_version_data)
-
-    def test_product_version_data_no_version(self):
-        """Test getting product version data from the product catalog for an assumed latest version"""
-        expected_version_data = {
-            'configuration': {
-                'clone_url': self.new_url,
-                'commit': self.new_commit
-            }
-        }
-        self.assertEqual(expected_version_data, self.branch_layer.product_version_data)
-
-    def test_product_version_data_latest_version(self):
-        """Test getting product version data from the product catalog for explicit latest version"""
-        latest_layer_data = deepcopy(self.branch_layer_data)
-        latest_layer_data['product']['version'] = LATEST_VERSION_VALUE
-        latest_layer = ProductCFSConfigurationLayer(latest_layer_data)
-        expected_version_data = {
-            'configuration': {
-                'clone_url': self.new_url,
-                'commit': self.new_commit
-            }
-        }
-        self.assertEqual(expected_version_data, latest_layer.product_version_data)
-
-    def test_product_version_data_k8s_api_exception(self):
-        """Test getting product version data when there is a failure to obtain the config map"""
-        self.mock_core_v1_api.read_namespaced_config_map.side_effect = ApiException
-        err_regex = 'Failed to read Kubernetes ConfigMap cray-product-catalog in services namespace'
-        with self.assertRaisesRegex(ConfigurationCreateError, err_regex):
-            _ = self.version_layer.product_version_data
-
-    def test_product_version_data_unknown_product(self):
-        """Test getting product version data for an unknown product"""
-        layer_data = deepcopy(self.version_layer_data)
-        unknown_product = 'unknown'
-        layer_data['product']['name'] = unknown_product
-        layer = ProductCFSConfigurationLayer(layer_data)
-
-        err_regex = f'Product {unknown_product} not present in product catalog'
-        with self.assertRaisesRegex(ConfigurationCreateError, err_regex):
-            _ = layer.product_version_data
-
-    def test_product_version_data_bad_yaml(self):
-        """Test getting product version data when the data is not valid YAML"""
-        invalid_yaml_data = {self.product_name: 'foo: bar: baz'}
-        mock_response = Mock(data=invalid_yaml_data)
-        self.mock_core_v1_api.read_namespaced_config_map.return_value = mock_response
-
-        err_regex = f'Product {self.product_name} data not in valid YAML format in product catalog'
-        with self.assertRaisesRegex(ConfigurationCreateError, err_regex):
-            _ = self.version_layer.product_version_data
-
-    def test_product_version_data_unknown_version(self):
-        """Test getting product version data for an unknown version of a product"""
-        layer_data = deepcopy(self.version_layer_data)
-        unknown_version = '99.99.99'
-        layer_data['product']['version'] = unknown_version
-        layer = ProductCFSConfigurationLayer(layer_data)
-
-        err_regex = (f'No match found for version {unknown_version} of product '
-                     f'{self.product_name} in product catalog')
-        with self.assertRaisesRegex(ConfigurationCreateError, err_regex):
-            _ = layer.product_version_data
-
-    def test_clone_url_present(self):
-        """Test clone_url when present in product catalog data"""
-        self.assertEqual(self.old_url, self.version_layer.clone_url)
-
-    def test_clone_url_configuration_key_not_present(self):
-        """Test clone_url when the 'configuration' key is missing in product catalog data"""
-        bad_product_catalog_data = {self.product_name: f'{self.product_version}: {{}}'}
-        mock_response = Mock(data=bad_product_catalog_data)
-        self.mock_core_v1_api.read_namespaced_config_map.return_value = mock_response
-
-        err_regex = (f"No clone URL present for product {self.product_name}; "
-                     f"missing key: 'configuration'")
-        with self.assertRaisesRegex(ConfigurationCreateError, err_regex):
-            _ = self.version_layer.clone_url
-
-    def test_clone_url_clone_url_key_not_present(self):
-        """Test clone_url when the 'clone_url' key is missing in product catalog data"""
-        bad_product_catalog_data = {self.product_name: f'{self.product_version}:\n'
-                                                       f'  configuration: {{}}'}
-        mock_response = Mock(data=bad_product_catalog_data)
-        self.mock_core_v1_api.read_namespaced_config_map.return_value = mock_response
-
-        err_regex = (f"No clone URL present for product {self.product_name}; "
-                     f"missing key: 'clone_url'")
-        with self.assertRaisesRegex(ConfigurationCreateError, err_regex):
-            _ = self.version_layer.clone_url
-
-    def test_branch_property_present(self):
-        """Test the branch property when branch is in the layer data"""
-        self.assertEqual(self.branch, self.branch_layer.branch)
-
-    def test_branch_property_not_present(self):
-        """Test the branch property when branch is not in the layer data"""
-        self.assertIsNone(self.version_layer.branch)
-
-    def test_commit_property_branch_present(self):
-        """Test the commit property when a branch is in the layer data"""
-        self.assertIsNone(self.branch_layer.commit)
-
-    def test_commit_property_branch_not_present(self):
-        """Test the commit property when a branch is not in the layer data"""
-        self.assertEqual(self.old_commit, self.version_layer.commit)
-
-    def test_commit_property_branch_commit_lookup(self):
-        """Test looking up commit hash from branch in VCS when branch not supported in CSM"""
-        CFSConfigurationLayer.resolve_branches = True
-        with patch('sat.cli.bootprep.configuration.CFSConfigurationLayer.resolve_branches', True):
-            self.assertEqual(self.branch_layer.commit, self.branch_head_commit)
-
-    def test_commit_property_branch_commit_vcs_query_fails(self):
-        """Test looking up commit hash raises ConfiurationCreateError when VCS is inaccessible"""
-        CFSConfigurationLayer.resolve_branches = True
-        self.mock_vcs_repo.return_value.get_commit_hash_for_branch.side_effect = VCSError
-        with patch('sat.cli.bootprep.configuration.CFSConfigurationLayer.resolve_branches', True):
-            with self.assertRaises(ConfigurationCreateError):
-                _ = self.branch_layer.commit
-
-    def test_commit_property_branch_commit_lookup_fails(self):
-        """Test looking up commit hash for nonexistent branch when branch not supported in CSM"""
-        CFSConfigurationLayer.resolve_branches = True
-        self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = None
-        with patch('sat.cli.bootprep.configuration.CFSConfigurationLayer.resolve_branches', True):
-            with self.assertRaises(ConfigurationCreateError):
-                _ = self.branch_layer.commit
-
-
-class TestCFSConfiguration(unittest.TestCase):
-    """Tests for the CFSConfiguration class"""
-
-    def setUp(self):
-        """Mock CFSConfigurationLayer.get_configuration_layer"""
-        self.config_name = 'compute-config'
-        self.num_layers = 3
-        self.config_data = {
-            'name': self.config_name,
-            'layers': [{}] * self.num_layers
-        }
-        self.layers = [Mock() for _ in range(self.num_layers)]
-        self.mock_get_config_layer = patch(
-            'sat.cli.bootprep.configuration.CFSConfigurationLayer.get_configuration_layer').start()
-        self.mock_get_config_layer.side_effect = self.layers
-
-    def tearDown(self):
-        patch.stopall()
-
-    def test_init(self):
-        """Test creation of a CFSConfiguration"""
-        config = CFSConfiguration(self.config_data)
-        self.assertEqual(self.config_name, config.name)
-        self.assertEqual(self.layers, config.layers)
-
-    def test_name_property(self):
-        """Test the name property of the CFSConfiguration"""
-        config = CFSConfiguration(self.config_data)
-        self.assertEqual(self.config_name, config.name)
-
-    def test_get_cfs_api_data(self):
-        """Test successful case of get_cfs_api_data"""
-        expected = {
-            'layers': [layer.get_cfs_api_data.return_value
-                       for layer in self.layers]
-        }
-        config = CFSConfiguration(self.config_data)
-        self.assertEqual(expected, config.get_cfs_api_data())
-
-    def test_get_cfs_api_data_one_failure(self):
-        """Test when there is a failure to get data for one layer"""
-        failing_layer = self.layers[1]
-        create_fail_msg = 'bad layer'
-        failing_layer.get_cfs_api_data.side_effect = ConfigurationCreateError(create_fail_msg)
-        err_regex = fr'Failed to create 1 layer\(s\) of configuration {self.config_name}'
-        config = CFSConfiguration(self.config_data)
-
-        with self.assertLogs(level=logging.ERROR) as logs_cm:
-            with self.assertRaisesRegex(ConfigurationCreateError, err_regex):
-                config.get_cfs_api_data()
-
-        self.assertEqual(1, len(logs_cm.records))
-        self.assertEqual(f'Failed to create layers[1] of configuration '
-                         f'{self.config_name}: {create_fail_msg}',
-                         logs_cm.records[0].message)
-
-    def test_get_cfs_api_data_multiple_failures(self):
-        """Test when there are failures to get data for multiple layers"""
-        create_fail_msg = 'bad layer'
-        for layer in self.layers:
-            layer.get_cfs_api_data.side_effect = ConfigurationCreateError(create_fail_msg)
-        err_regex = fr'Failed to create 3 layer\(s\) of configuration {self.config_name}'
-        config = CFSConfiguration(self.config_data)
-
-        with self.assertLogs(level=logging.ERROR) as logs_cm:
-            with self.assertRaisesRegex(ConfigurationCreateError, err_regex):
-                config.get_cfs_api_data()
-
-        self.assertEqual(self.num_layers, len(logs_cm.records))
-        for idx in range(self.num_layers):
-            self.assertEqual(f'Failed to create layers[{idx}] of configuration '
-                             f'{self.config_name}: {create_fail_msg}',
-                             logs_cm.records[idx].message)
 
 
 class TestHandleExistingConfigs(unittest.TestCase):
@@ -663,20 +196,19 @@ class TestCreateCFSConfigurations(unittest.TestCase):
     """Tests for the create_configurations function"""
 
     def setUp(self):
-        """Mock CFSConfiguration, CFSClient, SATSession, open, json.dump; create args"""
+        """Mock InputConfiguration, CFSClient, SATSession, open, json.dump; create args"""
 
         self.config_names = ['compute-1.4.2', 'uan-1.4.2']
         self.instance_data = {
             'configurations': [{'name': name, 'layers': []} for name in self.config_names]
         }
 
-        self.mock_cfs_config_cls = patch('sat.cli.bootprep.configuration.CFSConfiguration').start()
         self.mock_cfs_configs = []
         for config_name in self.config_names:
             mock_cfs_config = Mock()
             mock_cfs_config.name = config_name
             self.mock_cfs_configs.append(mock_cfs_config)
-        self.mock_cfs_config_cls.side_effect = self.mock_cfs_configs
+        self.mock_instance = Mock(input_configurations=self.mock_cfs_configs)
 
         self.mock_session = patch('sat.cli.bootprep.configuration.SATSession').start()
         self.mock_cfs_client_cls = patch('sat.cli.bootprep.configuration.CFSClient').start()
@@ -731,7 +263,6 @@ class TestCreateCFSConfigurations(unittest.TestCase):
         self.assertEqual(1, len(logs_cm.records))
         self.assertEqual('Given input did not define any CFS configurations',
                          logs_cm.records[0].message)
-        self.mock_cfs_config_cls.assert_not_called()
         self.mock_session.assert_not_called()
         self.mock_cfs_client_cls.assert_not_called()
         self.mock_handle_existing_configs.assert_not_called()
@@ -745,7 +276,7 @@ class TestCreateCFSConfigurations(unittest.TestCase):
         """Assert the given config was dumped to a file
 
         Args:
-            config (Mock): A Mock object representing a CFSConfiguration
+            config (Mock): A Mock object representing a InputConfiguration
         """
         expected_base_file_name = f'cfs-config-{config.name}.json'
         self.mock_open.assert_any_call(
@@ -762,7 +293,7 @@ class TestCreateCFSConfigurations(unittest.TestCase):
         """Assert the given config was PUT to CFS
 
         Args:
-            config (Mock): A mock object representing a CFSConfiguration
+            config (Mock): A mock object representing a InputConfiguration
         """
         self.mock_cfs_client.put_configuration.assert_any_call(
             config.name,
@@ -770,15 +301,8 @@ class TestCreateCFSConfigurations(unittest.TestCase):
         )
 
     def test_create_cfs_configurations_no_configurations(self):
-        """Test create_configurations when configurations key is not present"""
-        instance = {'images': [], 'session_templates': []}
-        with self.assertLogs(level=logging.INFO) as logs_cm:
-            create_configurations(instance, self.args)
-        self.assert_no_action_taken(logs_cm)
-
-    def test_create_cfs_configurations_empty_list(self):
-        """Test create_configurations when configurations is an empty list"""
-        instance = {'configurations': [], 'images': [], 'session_templates': []}
+        """Test create_configurations when instance contains no configurations"""
+        instance = Mock(input_configurations=[])
         with self.assertLogs(level=logging.INFO) as logs_cm:
             create_configurations(instance, self.args)
         self.assert_no_action_taken(logs_cm)
@@ -805,7 +329,7 @@ class TestCreateCFSConfigurations(unittest.TestCase):
     def test_create_cfs_configurations_success(self):
         """Test create_configurations in default, successful path"""
         with self.assertLogs(level=logging.INFO) as logs_cm:
-            create_configurations(self.instance_data, self.args)
+            create_configurations(self.mock_instance, self.args)
 
         self.assert_cfs_client_created()
         self.mock_handle_existing_configs.assert_called_once_with(
@@ -828,7 +352,7 @@ class TestCreateCFSConfigurations(unittest.TestCase):
 
         with self.assertRaisesRegex(ConfigurationCreateError, err_regex):
             with self.assertLogs(level=logging.INFO) as logs_cm:
-                create_configurations(self.instance_data, self.args)
+                create_configurations(self.mock_instance, self.args)
 
         self.assert_cfs_client_created()
         self.mock_handle_existing_configs.assert_called_once_with(
@@ -852,7 +376,7 @@ class TestCreateCFSConfigurations(unittest.TestCase):
         self.mock_makedirs.side_effect = OSError(os_err_msg)
 
         with self.assertLogs(level=logging.WARNING) as logs_cm:
-            create_configurations(self.instance_data, self.args)
+            create_configurations(self.mock_instance, self.args)
 
         self.assert_cfs_client_created()
         self.mock_handle_existing_configs.assert_called_once_with(
@@ -873,7 +397,7 @@ class TestCreateCFSConfigurations(unittest.TestCase):
         self.mock_open.side_effect = [OSError(os_err_msg), MagicMock()]
 
         with self.assertLogs(level=logging.INFO) as logs_cm:
-            create_configurations(self.instance_data, self.args)
+            create_configurations(self.mock_instance, self.args)
 
         self.assert_cfs_client_created()
         self.mock_handle_existing_configs.assert_called_once_with(
@@ -900,7 +424,7 @@ class TestCreateCFSConfigurations(unittest.TestCase):
         self.args.dry_run = True
 
         with self.assertLogs(level=logging.INFO) as logs_cm:
-            create_configurations(self.instance_data, self.args)
+            create_configurations(self.mock_instance, self.args)
 
         self.assert_cfs_client_created()
         self.mock_handle_existing_configs.assert_called_once_with(
@@ -922,7 +446,7 @@ class TestCreateCFSConfigurations(unittest.TestCase):
 
         with self.assertRaisesRegex(ConfigurationCreateError, err_regex):
             with self.assertLogs(level=logging.INFO) as logs_cm:
-                create_configurations(self.instance_data, self.args)
+                create_configurations(self.mock_instance, self.args)
 
         self.assert_cfs_client_created()
         self.mock_handle_existing_configs.assert_called_once_with(

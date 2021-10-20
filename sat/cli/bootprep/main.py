@@ -23,15 +23,18 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 import logging
 
+from sat.apiclient import CFSClient, IMSClient
 from sat.cli.bootprep.errors import (
     BootPrepInternalError,
     BootPrepValidationError,
     ConfigurationCreateError,
     ImageCreateError
 )
+from sat.cli.bootprep.input.instance import InputInstance
 from sat.cli.bootprep.configuration import create_configurations
 from sat.cli.bootprep.image import create_images
 from sat.cli.bootprep.validate import load_bootprep_schema, load_and_validate_instance
+from sat.session import SATSession
 
 LOGGER = logging.getLogger(__name__)
 
@@ -55,12 +58,17 @@ def do_bootprep(args):
 
     LOGGER.info(f'Validating given input file {args.input_file}')
     try:
-        instance = load_and_validate_instance(args.input_file, schema_validator)
+        instance_data = load_and_validate_instance(args.input_file, schema_validator)
     except BootPrepValidationError as err:
         LOGGER.error(str(err))
         raise SystemExit(1)
 
     LOGGER.info('Input file successfully validated')
+
+    cfs_client = CFSClient(SATSession())
+    ims_client = IMSClient(SATSession())
+
+    instance = InputInstance(instance_data, cfs_client, ims_client)
 
     try:
         create_configurations(instance, args)
