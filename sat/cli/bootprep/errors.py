@@ -116,3 +116,29 @@ class EnhancedValidationError(Exception):
 class ConfigurationCreateError(Exception):
     """A fatal error occurred during the creation of CFS configurations"""
     pass
+
+
+class ImageCreateError(Exception):
+    """A fatal error occurred during the creation of IMS images"""
+    pass
+
+
+class PublicKeyError(ImageCreateError):
+    """An error occurred when getting the IMS public key"""
+    pass
+
+
+class ImageCreateCycleError(ImageCreateError):
+    """A cycle exists in image dependencies."""
+    def __init__(self, cycle_members):
+        """Create a new ImageCreateCycleError.
+
+        Args:
+            cycle_members (list of str): the names of the members of the cycle
+        """
+        self.cycle_members = cycle_members
+
+    def __str__(self):
+        """str: a description of the cycle that exists"""
+        return (f'The following circular dependency exists: '
+                f'{" -> ".join(self.cycle_members + self.cycle_members[:1])}')

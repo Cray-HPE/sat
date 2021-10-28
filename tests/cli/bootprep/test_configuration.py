@@ -34,7 +34,7 @@ from kubernetes.client import ApiException
 
 from sat.apiclient import APIError
 from sat.cli.bootprep.configuration import (
-    create_cfs_configurations,
+    create_configurations,
     handle_existing_configs,
     CFSConfiguration,
     CFSConfigurationLayer,
@@ -600,7 +600,7 @@ class TestHandleExistingConfigs(unittest.TestCase):
 
 
 class TestCreateCFSConfigurations(unittest.TestCase):
-    """Tests for the create_cfs_configurations function"""
+    """Tests for the create_configurations function"""
 
     def setUp(self):
         """Mock CFSConfiguration, CFSClient, SATSession, open, json.dump; create args"""
@@ -709,17 +709,17 @@ class TestCreateCFSConfigurations(unittest.TestCase):
         )
 
     def test_create_cfs_configurations_no_configurations(self):
-        """Test create_cfs_configurations when configurations key is not present"""
+        """Test create_configurations when configurations key is not present"""
         instance = {'images': [], 'session_templates': []}
         with self.assertLogs(level=logging.INFO) as logs_cm:
-            create_cfs_configurations(instance, self.args)
+            create_configurations(instance, self.args)
         self.assert_no_action_taken(logs_cm)
 
     def test_create_cfs_configurations_empty_list(self):
-        """Test create_cfs_configurations when configurations is an empty list"""
+        """Test create_configurations when configurations is an empty list"""
         instance = {'configurations': [], 'images': [], 'session_templates': []}
         with self.assertLogs(level=logging.INFO) as logs_cm:
-            create_cfs_configurations(instance, self.args)
+            create_configurations(instance, self.args)
         self.assert_no_action_taken(logs_cm)
 
     def get_expected_file_path(self, config):
@@ -742,9 +742,9 @@ class TestCreateCFSConfigurations(unittest.TestCase):
         return expected_logs
 
     def test_create_cfs_configurations_success(self):
-        """Test create_cfs_configurations in default, successful path"""
+        """Test create_configurations in default, successful path"""
         with self.assertLogs(level=logging.INFO) as logs_cm:
-            create_cfs_configurations(self.instance_data, self.args)
+            create_configurations(self.instance_data, self.args)
 
         self.assert_cfs_client_created()
         self.mock_handle_existing_configs.assert_called_once_with(
@@ -760,14 +760,14 @@ class TestCreateCFSConfigurations(unittest.TestCase):
         self.assertEqual(expected_logs, [rec.message for rec in logs_cm.records])
 
     def test_create_cfs_configurations_one_cfs_data_failure(self):
-        """Test create_cfs_configurations when one fails in its get_cfs_api_data method"""
+        """Test create_configurations when one fails in its get_cfs_api_data method"""
         create_err = 'failed to get CFS API data'
         self.mock_cfs_configs[0].get_cfs_api_data.side_effect = ConfigurationCreateError(create_err)
         err_regex = r'Failed to create 1 configuration\(s\)'
 
         with self.assertRaisesRegex(ConfigurationCreateError, err_regex):
             with self.assertLogs(level=logging.INFO) as logs_cm:
-                create_cfs_configurations(self.instance_data, self.args)
+                create_configurations(self.instance_data, self.args)
 
         self.assert_cfs_client_created()
         self.mock_handle_existing_configs.assert_called_once_with(
@@ -786,12 +786,12 @@ class TestCreateCFSConfigurations(unittest.TestCase):
         self.assertEqual(expected_logs, [rec.message for rec in logs_cm.records])
 
     def test_create_cfs_configurations_output_dir_failure(self):
-        """Test create_cfs_configurations with a failure to create the output directory"""
+        """Test create_configurations with a failure to create the output directory"""
         os_err_msg = 'insufficient perms'
         self.mock_makedirs.side_effect = OSError(os_err_msg)
 
         with self.assertLogs(level=logging.WARNING) as logs_cm:
-            create_cfs_configurations(self.instance_data, self.args)
+            create_configurations(self.instance_data, self.args)
 
         self.assert_cfs_client_created()
         self.mock_handle_existing_configs.assert_called_once_with(
@@ -807,12 +807,12 @@ class TestCreateCFSConfigurations(unittest.TestCase):
                          logs_cm.records[0].message)
 
     def test_create_cfs_configurations_one_file_failure(self):
-        """Test create_cfs_configurations when one fails to be written to a file"""
+        """Test create_configurations when one fails to be written to a file"""
         os_err_msg = 'insufficient permissions'
         self.mock_open.side_effect = [OSError(os_err_msg), MagicMock()]
 
         with self.assertLogs(level=logging.INFO) as logs_cm:
-            create_cfs_configurations(self.instance_data, self.args)
+            create_configurations(self.instance_data, self.args)
 
         self.assert_cfs_client_created()
         self.mock_handle_existing_configs.assert_called_once_with(
@@ -835,11 +835,11 @@ class TestCreateCFSConfigurations(unittest.TestCase):
         self.assertEqual(expected_warning_logs, warning_logs)
 
     def test_create_cfs_configurations_dry_run(self):
-        """Test create_cfs_configurations in dry-run mode"""
+        """Test create_configurations in dry-run mode"""
         self.args.dry_run = True
 
         with self.assertLogs(level=logging.INFO) as logs_cm:
-            create_cfs_configurations(self.instance_data, self.args)
+            create_configurations(self.instance_data, self.args)
 
         self.assert_cfs_client_created()
         self.mock_handle_existing_configs.assert_called_once_with(
@@ -854,14 +854,14 @@ class TestCreateCFSConfigurations(unittest.TestCase):
         self.assertEqual(expected_logs, [rec.message for rec in logs_cm.records])
 
     def test_create_cfs_configurations_one_api_error(self):
-        """Test create_cfs_configurations when one fails to be created with an APIError"""
+        """Test create_configurations when one fails to be created with an APIError"""
         api_err_msg = 'Failed to create CFS configuration'
         self.mock_cfs_client.put_configuration.side_effect = [APIError(api_err_msg), None]
         err_regex = r'Failed to create 1 configuration\(s\)'
 
         with self.assertRaisesRegex(ConfigurationCreateError, err_regex):
             with self.assertLogs(level=logging.INFO) as logs_cm:
-                create_cfs_configurations(self.instance_data, self.args)
+                create_configurations(self.instance_data, self.args)
 
         self.assert_cfs_client_created()
         self.mock_handle_existing_configs.assert_called_once_with(

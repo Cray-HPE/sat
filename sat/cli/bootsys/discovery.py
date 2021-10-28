@@ -33,7 +33,7 @@ from kubernetes.client import BatchV1beta1Api
 from kubernetes.client.rest import ApiException
 
 from sat.cached_property import cached_property
-from sat.cli.bootsys.waiting import Waiter
+from sat.waiting import Waiter
 
 LOGGER = logging.getLogger(__name__)
 

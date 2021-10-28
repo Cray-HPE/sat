@@ -21,6 +21,7 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+from sat.cli.bootprep.constants import DEFAULT_PUBLIC_KEY_FILE
 
 
 def add_bootprep_subparser(subparsers):
@@ -66,6 +67,34 @@ def add_bootprep_subparser(subparsers):
     existing_configs_group.add_argument(
         '--overwrite-configs', action='store_true',
         help='Overwrite any configurations that already exist.'
+    )
+
+    public_key_group = bootprep_parser.add_mutually_exclusive_group()
+    public_key_file_option = '--public-key-file-path'
+    public_key_id_option = '--public-key-id'
+    default_behavior = (f'If neither {public_key_file_option} nor {public_key_id_option} is specified, '
+                        f'the default is to use the public key located at {DEFAULT_PUBLIC_KEY_FILE}.')
+    public_key_group.add_argument(
+        public_key_file_option,
+        help=f'The SSH public key file to use when building images with IMS. '
+             f'{default_behavior}'
+    )
+    public_key_group.add_argument(
+        public_key_id_option,
+        help=f'The id of the SSH public key stored in IMS to use when building images '
+             f'with IMS. {default_behavior}'
+    )
+
+    existing_images_group = bootprep_parser.add_mutually_exclusive_group()
+    existing_images_group.add_argument(
+        '--skip-existing-images', action='store_true',
+        help='Skip creating any images for which an image of the same name '
+             'already exists.'
+    )
+    existing_images_group.add_argument(
+        '--overwrite-images', action='store_true',
+        help='Overwrite (delete and re-create) any images for which an image '
+             'of the same name already exists.'
     )
 
     bootprep_parser.add_argument(
