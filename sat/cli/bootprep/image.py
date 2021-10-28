@@ -295,6 +295,7 @@ class IMSImage:
             self._image_create_complete = True
             self.image_create_success = job_details.get('status') == 'success'
             self.log_created_image_info(job_details)
+            self.clean_up_image_create_job()
 
         return self._image_create_complete
 
@@ -326,6 +327,27 @@ class IMSImage:
                 LOGGER.warning(f'Failed to determine id of created image')
         else:
             LOGGER.error(log_msg)
+
+    def clean_up_image_create_job(self):
+        """Clean up the image create job if it was successful."""
+        image_create_job_id = self.image_create_job.get('id')
+        if not image_create_job_id:
+            LOGGER.warning(f'Unable to clean up image create job for image '
+                           f'{self.created_image_name} due to missing ID.')
+            return
+
+        ims_job_description = f'completed IMS job with id={image_create_job_id}'
+
+        if self.image_create_success:
+            LOGGER.info(f'Deleting {ims_job_description }')
+            try:
+                self.ims_client.delete('jobs', image_create_job_id)
+            except APIError as err:
+                LOGGER.warning(f'Failed to delete {ims_job_description}: {err}')
+            else:
+                LOGGER.info(f'Deleted {ims_job_description}')
+        else:
+            LOGGER.info(f'Not deleting failed {ims_job_description} to allow debugging')
 
     def begin_image_configure(self):
         """Launch the CFS session to configure the image
