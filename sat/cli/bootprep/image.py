@@ -30,7 +30,7 @@ from sat.cached_property import cached_property
 from sat.cli.bootprep.errors import ImageCreateCycleError, ImageCreateError
 from sat.cli.bootprep.public_key import get_ims_public_key_id
 from sat.session import SATSession
-from sat.util import pester_choices
+from sat.util import get_val_by_path, pester_choices
 from sat.waiting import GroupWaiter, WaitingFailure
 
 LOGGER = logging.getLogger(__name__)
@@ -293,13 +293,39 @@ class IMSImage:
 
         if job_details.get('status') in ('error', 'success'):
             self._image_create_complete = True
-            self.image_create_success = success = job_details.get('status') == 'success'
-
-            LOGGER.log(logging.INFO if success else logging.ERROR,
-                       f'Creation of image {self.created_image_name} '
-                       f'{("failed", "succeeded")[success]}.')
+            self.image_create_success = job_details.get('status') == 'success'
+            self.log_created_image_info(job_details)
 
         return self._image_create_complete
+
+    def log_created_image_info(self, job_details):
+        """Log information about the created image.
+
+        Args:
+            job_details (dict): the job record from IMS
+
+        Returns: None
+        """
+        log_msg = (f'Creation of image {self.created_image_name} '
+                   f'{("failed", "succeeded")[self.image_create_success]}')
+
+        if self.image_create_success:
+            created_image_id = job_details.get('resultant_image_id')
+            if created_image_id:
+                LOGGER.info(f'{log_msg}: id={created_image_id}')
+                try:
+                    image = self.ims_client.get_image(created_image_id)
+                except APIError as err:
+                    LOGGER.warning(str(err))
+                else:
+                    details = ' '.join(f'{dotted_path}={get_val_by_path(image, dotted_path)}'
+                                       for dotted_path in ['id', 'link.path', 'link.etag'])
+                    LOGGER.info(f'Image details: {details}')
+            else:
+                LOGGER.info(log_msg)
+                LOGGER.warning(f'Failed to determine id of created image')
+        else:
+            LOGGER.error(log_msg)
 
     def begin_image_configure(self):
         """Launch the CFS session to configure the image

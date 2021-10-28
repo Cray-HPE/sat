@@ -1090,10 +1090,27 @@ class IMSClient(APIGatewayClient):
             raise APIError(f'Failed to decode JSON from IMS job creation response: {err}')
 
     def get_job(self, job_id):
-        """Get an IMS job"""
+        """Get an IMS job
+
+        Args:
+            job_id (str): the job ID
+        """
         try:
             return self.get('jobs', job_id).json()
         except APIError as err:
             raise APIError(f'Failed to get job {job_id}: {err}')
         except ValueError as err:
             raise APIError(f'Failed to parse JSON response for job {job_id}: {err}')
+
+    def get_image(self, image_id):
+        """Get an IMS image directly by its ID
+
+        Args:
+            image_id (str): the image ID
+        """
+        try:
+            return self.get('images', image_id).json()
+        except APIError as err:
+            raise APIError(f'Failed to get image {image_id}: {err}')
+        except ValueError as err:
+            raise APIError(f'Failed to parse JSON response for image {image_id}: {err}')
