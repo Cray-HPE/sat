@@ -82,6 +82,24 @@ def do_air_cooled_cabinets_power_off(args):
                 f'reached powered off state according to CAPMC.')
 
 
+def get_xnames_for_power_action(hsm_client):
+    """Get xnames of RouterModules, ComputeModules, and Chassis.
+
+    This helper function gets all the xnames used in a power action (turn on or
+    turn off) individually since CAPMC does not support recursively powering off
+    disabled components in Shasta v1.5. See CRAYSAT-920.
+
+    Returns:
+        [str]: all xnames for RouterModules, ComputeModules, and Chassis in
+               the system.
+    """
+    return [component
+            for component_type in ['RouterModule', 'ComputeModule', 'Chassis']
+            for component in hsm_client.get_component_xnames({'type': component_type,
+                                                              'class': 'Mountain',
+                                                              'enabled': True})]
+
+
 def do_liquid_cooled_cabinets_power_off(args):
     """Power off the liquid-cooled compute cabinets in the system.
 
@@ -93,30 +111,33 @@ def do_liquid_cooled_cabinets_power_off(args):
     """
     hsm_client = HSMClient(SATSession())
     try:
-        chassis_xnames = hsm_client.get_component_xnames({'type': 'Chassis', 'class': 'Mountain'})
+        xnames_to_power_off = get_xnames_for_power_action(hsm_client)
     except APIError as err:
-        LOGGER.error(f'Failed to get the xnames of the liquid-cooled chassis: {err}')
+        LOGGER.error(f'Failed to get the xnames of the liquid-cooled chassis and sub-components: {err}')
         raise SystemExit(1)
 
-    LOGGER.info(f'Powering off all {len(chassis_xnames)} liquid-cooled chassis.')
+    LOGGER.info(f'Powering off all liquid-cooled chassis, compute modules, and router modules. '
+                f'({len(xnames_to_power_off)} components total)')
     capmc_client = CAPMCClient(SATSession())
     try:
-        capmc_client.set_xnames_power_state(chassis_xnames, 'off', recursive=True)
+        capmc_client.set_xnames_power_state(xnames_to_power_off, 'off')
     except APIError as err:
         LOGGER.warning(f'Failed to power off all cabinets: {err}')
+        if hasattr(err, '__cause__'):
+            LOGGER.warning(f'Cause: {err.__cause__}')
 
-    LOGGER.info(f'Waiting for {len(chassis_xnames)} liquid-cooled chassis to reach '
+    LOGGER.info(f'Waiting for {len(xnames_to_power_off)} components to reach '
                 f'powered off state.')
-    capmc_waiter = CAPMCPowerWaiter(chassis_xnames, 'off',
+    capmc_waiter = CAPMCPowerWaiter(xnames_to_power_off, 'off',
                                     get_config_value('bootsys.capmc_timeout'))
     timed_out_xnames = capmc_waiter.wait_for_completion()
 
     if timed_out_xnames:
-        LOGGER.error(f'The following chassis failed to reach the powered off '
+        LOGGER.error(f'The following components failed to reach the powered off '
                      f'state after powering off with CAPMC: {timed_out_xnames}')
         raise SystemExit(1)
 
-    LOGGER.info(f'All {len(chassis_xnames)} liquid-cooled chassis reached powered off '
+    LOGGER.info(f'All {len(xnames_to_power_off)} liquid-cooled chassis components reached powered off '
                 f'state according to CAPMC.')
 
 
@@ -181,9 +202,7 @@ def do_cabinets_power_on(args):
     LOGGER.info('Waiting for ComputeModules in liquid-cooled cabinets to be powered on.')
     hsm_client = HSMClient(SATSession())
     try:
-        mtn_compute_modules = hsm_client.get_component_xnames({'Type':  'ComputeModule',
-                                                               'Class': 'Mountain'},
-                                                              omit_empty=False)
+        xnames_to_power_on = get_xnames_for_power_action(hsm_client)
     except APIError as err:
         LOGGER.error(f'Failed to get list of ComputeModules to wait on: {err}')
         raise SystemExit(1)
@@ -191,7 +210,7 @@ def do_cabinets_power_on(args):
     # Once ComputeModules are powered on, it is possible to boot nodes with BOS.
     # Suppress warnings about CAPMC state query errors because we expect the
     # compute modules to be unreachable until they are powered on.
-    module_waiter = CAPMCPowerWaiter(mtn_compute_modules, 'on',
+    module_waiter = CAPMCPowerWaiter(xnames_to_power_on, 'on',
                                      get_config_value('bootsys.discovery_timeout'),
                                      suppress_warnings=True)
     modules_timed_out = module_waiter.wait_for_completion()

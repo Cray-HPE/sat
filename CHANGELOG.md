@@ -47,6 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   message if ``impitool`` fails multiple times consecutively for a given
   component. If the number of failures for a given component exceeds 3, then
   that component will be marked as failed.
+- The `cabinet-power` stage of `sat bootsys` will now query CAPMC for chassis,
+  compute modules, and router modules to power on or off individually instead of
+  recursively in order to power on or off cabinets with disabled subcomponents.
 
 ## [3.10.0] - 2021-09-03
 
