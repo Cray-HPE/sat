@@ -69,9 +69,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   related to trying to start non-existent Ceph services.
 - Fix a traceback that occurred if the user did not have permission to write to
   the log file.
-- Actions which wait on certain conditions (for example within ``sat bootsys``) will
-  fail out more quickly when checking for the completion condition fails
-  irrecoverably, instead of repeating a failing check until waiting times out.
 
 ### Added
 - Added a check for running SDU sessions to the ``session-checks`` stage of a
