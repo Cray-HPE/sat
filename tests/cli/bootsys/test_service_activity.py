@@ -45,7 +45,6 @@ from sat.cli.bootsys.service_activity import (
     _report_active_sessions,
     do_service_activity_check
 )
-from sat.fwclient import FASClient
 from sat.report import Report
 
 

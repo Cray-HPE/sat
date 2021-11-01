@@ -30,7 +30,7 @@ from unittest import mock
 from tests.test_util import ExtendedTestCase
 
 from sat.apiclient import APIError
-from sat.fwclient import FASClient
+from sat.apiclient import FASClient
 from sat.cli.firmware.main import do_firmware
 from sat.cli.firmware.parser import add_firmware_subparser
 

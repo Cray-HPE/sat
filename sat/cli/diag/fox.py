@@ -28,7 +28,7 @@ import time
 
 from sat.apiclient import APIError
 from sat.session import SATSession
-from sat.foxclient import FoxClient
+from sat.apiclient import FoxClient
 
 inf = inflect.engine()
 

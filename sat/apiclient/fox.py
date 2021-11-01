@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 import json
 import logging
 
-from sat.apiclient import APIError, APIGatewayClient
+from sat.apiclient.gateway import APIError, APIGatewayClient
 
 
 LOGGER = logging.getLogger(__name__)
