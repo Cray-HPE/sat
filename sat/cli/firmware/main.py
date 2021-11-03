@@ -24,7 +24,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 import logging
 
 from sat.apiclient import APIError
-from sat.fwclient import FASClient
+from sat.apiclient import FASClient
 from sat.config import get_config_value
 from sat.report import Report
 from sat.session import SATSession
