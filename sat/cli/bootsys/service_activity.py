@@ -45,7 +45,7 @@ from sat.apiclient import (
 )
 from sat.cli.bootsys.util import get_mgmt_ncn_groups, get_ssh_client
 from sat.constants import MISSING_VALUE
-from sat.fwclient import FASClient
+from sat.apiclient import FASClient
 from sat.report import Report
 from sat.session import SATSession
 from sat.util import get_new_ordered_dict, get_val_by_path

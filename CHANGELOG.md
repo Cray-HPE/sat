@@ -25,7 +25,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
+
+### Changed
+- Refactored `sat.apiclient` from a module into a subpackage.
+
+## [3.11.0] - 2021-10-29
 
 ### Changed
 - Added a ``--format`` option to ``sat xname2nid`` to set the output format
@@ -36,10 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "application/problem+json" in their failure responses.
 
 ### Fixed
-- Fixed ``sat bootsys boot --stage cabinet-power`` to query CAPMC for power status of
-  ComputeModules instead of the unsupported NodeBMC type.
-
-### Fixed
 - Actions which wait on certain conditions (for example within ``sat bootsys``) will
   fail out more quickly when checking for the completion condition fails
   irrecoverably, instead of repeating a failing check until waiting times out.
@@ -47,6 +48,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   message if ``impitool`` fails multiple times consecutively for a given
   component. If the number of failures for a given component exceeds 3, then
   that component will be marked as failed.
+- Fixed the ``cabinet-power`` stage of ``sat bootsys`` to query CAPMC for power
+  status of ComputeModules instead of the unsupported NodeBMC type.
+- The ``cabinet-power`` stage of ``sat bootsys`` will now query CAPMC for chassis,
+  compute modules, and router modules to power on or off individually instead of
+  recursively in order to power on or off cabinets with disabled subcomponents.
 
 ## [3.10.0] - 2021-09-03
 
@@ -68,9 +74,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   related to trying to start non-existent Ceph services.
 - Fix a traceback that occurred if the user did not have permission to write to
   the log file.
-- Actions which wait on certain conditions (for example within ``sat bootsys``) will
-  fail out more quickly when checking for the completion condition fails
-  irrecoverably, instead of repeating a failing check until waiting times out.
 
 ### Added
 - Added a check for running SDU sessions to the ``session-checks`` stage of a
