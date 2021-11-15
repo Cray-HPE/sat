@@ -255,6 +255,19 @@ class CFSImageConfigurationSession:
         """datetime.timedelta: the time that has elapsed since the start of the session"""
         return datetime.utcnow() - self.start_time
 
+    @property
+    def resultant_image_id(self):
+        """str or None: the ID of the resultant IMS image created by this session or None"""
+        artifact_list = get_val_by_path(self.data, 'status.artifacts', [])
+        if not artifact_list:
+            return None
+        # A CFS image customization session can produce more than one resulting
+        # image if given multiple target groups referring to different images,
+        # but it is not a common use case, so it is not currently supported by
+        # CFSClient.create_image_customization_session, so just assume there is
+        # only one resultant image here.
+        return artifact_list[0].get('result_id', None)
+
     @staticmethod
     def get_failed_containers(status_by_name):
         """Get the list of failed container names from the given status_by_name

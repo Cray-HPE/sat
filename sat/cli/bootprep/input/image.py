@@ -31,7 +31,6 @@ from sat.apiclient import APIError
 from sat.cached_property import cached_property
 from sat.cli.bootprep.errors import ImageCreateError, ImageCreateCycleError
 from sat.cli.bootprep.image import LOGGER
-from sat.util import get_val_by_path
 
 
 class InputImage:
@@ -41,6 +40,8 @@ class InputImage:
         image_data (dict): the data for an image from the bootprep input file
         ims_client (sat.apiclient.IMSClient): the IMSClient to make requests to
             the IMS API
+        cfs_client (sat.apiclient.CFSClient): the CFSClient to make requests to
+            the CFS API
         public_key_id (str): the id of the public key in IMS to use when
             building the image
         image_ids_to_delete (list of str): ids of IMS images to delete after this
@@ -51,11 +52,16 @@ class InputImage:
             on before it can be created and customized
         image_create_job (dict or None): the IMS job of type 'create' for
             creating the image from a recipe, if applicable.
-        image_create_success (bool): whether the image was successfully created
+        finished_job_details (dict or None): the IMS job record for the finished
+            job. This is set by accessing the image_create_complete property
+            once it is finished.
         image_configure_session (dict or None): the CFS session for customizing
             the image, if applicable.
+        image_create_success (bool): whether the image was successfully created
         image_configure_success (bool): whether the image was successfully
             configured
+        final_image_id (str): the final image ID after creation, customization,
+            and renaming have been completed, as applicable
     """
 
     def __init__(self, image_data, ims_client, cfs_client):
@@ -77,7 +83,6 @@ class InputImage:
         self.public_key_id = None
 
         # Populated by add_images_to_delete method
-        # TODO (CRAYSAT-1198): Delete images after this image is fully created and configured
         self.image_ids_to_delete = []
 
         # These are populated later by add_dependent_image, which is called in find_image_dependencies
@@ -94,6 +99,9 @@ class InputImage:
         self.image_create_success = False
         self._image_configure_complete = False
         self.image_configure_success = False
+
+        # Set by rename_configured_image
+        self.final_image_id = None
 
     @property
     def name(self):
@@ -284,7 +292,7 @@ class InputImage:
             self.image_create_job = self.ims_client.create_image_build_job(
                 self.created_image_name, self.ims_base['id'], self.public_key_id
             )
-            LOGGER.info(f'Created IMS image creation job with id={self.image_create_job.get("id")}')
+            LOGGER.info(f'Created IMS image creation job with ID {self.image_create_job.get("id")}')
         except APIError as err:
             raise ImageCreateError(str(err))
 
@@ -301,7 +309,7 @@ class InputImage:
         if not self.image_create_job:
             raise ImageCreateError(f'No image create job was created for image {self.name}')
         elif 'id' not in self.image_create_job:
-            raise ImageCreateError(f'Unknown image create job id for image {self.name}')
+            raise ImageCreateError(f'Unknown image create job ID for image {self.name}')
 
         image_create_job_id = self.image_create_job['id']
         try:
@@ -335,9 +343,10 @@ class InputImage:
         return self.ims_base['id']
 
     def log_created_image_info(self):
-        """Log information about the created image.
+        """Log information about the created image
 
-        Returns: None
+        Returns:
+            None
         """
         log_msg = (f'Creation of image {self.created_image_name} '
                    f'{("failed", "succeeded")[self.image_create_success]}')
@@ -345,15 +354,7 @@ class InputImage:
         if self.image_create_success:
             created_image_id = self.ims_resultant_image_id
             if created_image_id:
-                LOGGER.info(f'{log_msg}: id={created_image_id}')
-                try:
-                    image = self.ims_client.get_image(created_image_id)
-                except APIError as err:
-                    LOGGER.warning(str(err))
-                else:
-                    details = ' '.join(f'{dotted_path}={get_val_by_path(image, dotted_path)}'
-                                       for dotted_path in ['id', 'link.path', 'link.etag'])
-                    LOGGER.info(f'Image details: {details}')
+                LOGGER.info(f'{log_msg}: ID {created_image_id}')
             else:
                 LOGGER.info(log_msg)
                 LOGGER.warning(f'Failed to determine id of created image')
@@ -361,14 +362,18 @@ class InputImage:
             LOGGER.error(log_msg)
 
     def clean_up_image_create_job(self):
-        """Clean up the image create job if it was successful."""
+        """Clean up the image create job if it was successful
+
+        Returns:
+            None
+        """
         image_create_job_id = self.image_create_job.get('id')
         if not image_create_job_id:
             LOGGER.warning(f'Unable to clean up image create job for image '
                            f'{self.created_image_name} due to missing ID.')
             return
 
-        ims_job_description = f'completed IMS job with id={image_create_job_id}'
+        ims_job_description = f'completed IMS job with ID {image_create_job_id}'
 
         if self.image_create_success:
             LOGGER.info(f'Deleting {ims_job_description }')
@@ -420,12 +425,68 @@ class InputImage:
         try:
             self.image_configure_session.update_status(self.k8s_api)
         except APIError as err:
-            raise ImageCreateError(f'{err}')
+            raise ImageCreateError(str(err))
 
         self._image_configure_complete = self.image_configure_session.complete
         self.image_configure_success = self.image_configure_session.succeeded
 
         return self._image_configure_complete
+
+    def rename_configured_image(self):
+        """Rename the image to the desired final name if it has been configured
+
+        CFS does not allow us to specify the name of the resulting IMS image. It
+        always just appends "_cfs_${CFS_CONFIGURATION_NAME}". In order to get
+        a final, configured image with the desired name, rename it in IMS.
+        """
+        # If the image did not specify a configuration, it was already created
+        # with the desired name, so no rename is necessary.
+        if not self.configuration:
+            LOGGER.debug(f'No rename necessary for unconfigured image named {self.name}')
+            self.final_image_id = self.ims_resultant_image_id
+            return
+
+        configured_image_id = self.image_configure_session.resultant_image_id
+        if not configured_image_id:
+            raise ImageCreateError('Failed to determine ID of configured image.')
+
+        LOGGER.info(f'Renaming configured image with ID {configured_image_id} to {self.name}')
+
+        try:
+            self.final_image_id = self.ims_client.rename_image(configured_image_id, self.name)
+        except APIError as err:
+            raise ImageCreateError(f'Failed to rename configured image with ID {configured_image_id} '
+                                   f'from {self.created_image_name} to {self.name}: {err}')
+
+    def delete_overwritten_images(self):
+        """Delete the images which were marked to be overwritten
+
+        This is called once this image is fully created and configured to delete
+        any images which have the same name as this image which were requested
+        to be overwritten.
+
+        Returns:
+            None
+        """
+        for image_id in self.image_ids_to_delete:
+            try:
+                LOGGER.info(f'Deleting image with ID {image_id} which was overwritten '
+                            f'by a new image named {self.name}')
+                self.ims_client.delete_image(image_id)
+            except APIError as err:
+                # This could cause a later failure when referring to images by
+                # name in BOS session templates, but not necessarily.
+                LOGGER.warning(f'Failed to delete image named {self.name} with ID {image_id}: {err}')
+
+    def log_final_image_info(self):
+        """Log information about the final configured image."""
+        log_msg = (f'Creation of image {self.name} '
+                   f'{("failed", "succeeded")[self.completed_successfully]}')
+
+        if self.completed_successfully:
+            LOGGER.info(f'{log_msg}: ID {self.final_image_id}')
+        else:
+            LOGGER.error(log_msg)
 
     @property
     def has_completed(self):
@@ -447,7 +508,16 @@ class InputImage:
             if not self.image_configure_session:
                 # This properly handles whether configuration is needed or not
                 self.begin_image_configure()
-            return self.image_configure_complete
+
+            if self.image_configure_complete:
+                if self.image_configure_success:
+                    self.rename_configured_image()
+                    self.delete_overwritten_images()
+
+                self.log_final_image_info()
+                return True
+
+            return False
         else:
             return False
 

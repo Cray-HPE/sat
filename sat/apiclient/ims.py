@@ -504,7 +504,7 @@ class IMSClient(APIGatewayClient):
         if not old_manifest:
             LOGGER.warning(f'Image with id {image_id} has no manifest file so '
                            f'no artifacts will be copied.')
-            return new_image
+            return new_image_id
 
         try:
             new_manifest = self.copy_manifest_artifacts(old_manifest, new_image_id, new_name)
@@ -567,7 +567,7 @@ class IMSClient(APIGatewayClient):
         * Delete the old image.
 
         Returns:
-            dict: the new image record for the renamed image
+            str: the new ID of the renamed image
 
         Raises:
             APIError: if there is a failure when trying to do the rename
