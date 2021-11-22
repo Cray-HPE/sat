@@ -1,5 +1,5 @@
 """
-Unit tests for sat.foxclient
+Unit tests for sat.apiclient.fox
 
 (C) Copyright 2021 Hewlett Packard Enterprise Development LP.
 
@@ -39,7 +39,7 @@ from tests.cli.diag.fakes import (
 )
 
 from sat.apiclient import APIGatewayClient, APIError
-from sat.foxclient import FoxClient
+from sat.apiclient import FoxClient
 
 
 class TestFoxClient(ExtendedTestCase):

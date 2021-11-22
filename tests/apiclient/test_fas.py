@@ -1,5 +1,5 @@
 """
-Unit tests for sat.fwclient
+Unit tests for sat.apiclient.fas
 
 (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 
@@ -30,7 +30,7 @@ import unittest
 from unittest.mock import call, Mock, patch
 
 from sat.apiclient import APIError, APIGatewayClient
-from sat.fwclient import _DateTimeEncoder, FASClient, _now_and_later
+from sat.apiclient.fas import _DateTimeEncoder, FASClient, _now_and_later
 from sat.xname import XName
 from tests.test_util import ExtendedTestCase
 
@@ -116,9 +116,9 @@ class TestFASClient(ExtendedTestCase):
         self.mock_get = patch.object(APIGatewayClient, 'get', side_effect=self.mock_api_get).start()
         self.mock_post = patch.object(APIGatewayClient, 'post').start()
         # Functions that sleep do not need to sleep.
-        patch('sat.fwclient.time.sleep').start()
+        patch('sat.apiclient.fas.time.sleep').start()
         # Mock datetime.utcnow() so the return values of _now_and_later are consistent
-        patch('sat.fwclient.datetime.utcnow', return_value=datetime(2021, 3, 7, 23, 35, 0, 403824))
+        patch('sat.apiclient.fas.datetime.utcnow', return_value=datetime(2021, 3, 7, 23, 35, 0, 403824))
         self.json_exception = None
 
     def mock_api_get(self, resource, name=None):
