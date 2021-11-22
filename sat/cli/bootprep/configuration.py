@@ -35,6 +35,7 @@ import yaml
 from yaml import YAMLError, YAMLLoadWarning
 
 from sat.apiclient import APIError, CFSClient
+from sat.apiclient.vcs import VCSError, VCSRepo
 from sat.cli.bootprep.errors import ConfigurationCreateError
 from sat.cached_property import cached_property
 from sat.session import SATSession
@@ -61,6 +62,11 @@ class CFSConfigurationLayer(ABC):
         'name': 'name',
         'playbook': 'playbook'
     }
+
+    # CRAYSAT-1174: Specifying a 'branch' in a CFS configuration layer is not
+    # supported until CSM 1.2. Toggling this variable will change the behavior
+    # for both GitCFSConfigurationLayers and ProductCFSConfigurationLayers.
+    resolve_branches = True
 
     def __init__(self, layer_data):
         """Create a new configuration layer."""
@@ -108,6 +114,10 @@ class CFSConfigurationLayer(ABC):
         cfs_layer_data = {cfs_property: getattr(self, self_property)
                           for cfs_property, self_property in self.REQUIRED_CFS_PROPERTIES.items()}
         for cfs_property, self_property in self.OPTIONAL_CFS_PROPERTIES.items():
+            # CRAYSAT-1174: Ignore branch property if not supported by CFS
+            if self.resolve_branches and cfs_property == 'branch':
+                continue
+
             property_value = getattr(self, self_property)
             if property_value is not None:
                 cfs_layer_data[cfs_property] = property_value
@@ -134,6 +144,30 @@ class CFSConfigurationLayer(ABC):
         else:
             raise ValueError('Unrecognized type of configuration layer')
 
+    def resolve_commit_hash(self, branch):
+        """Query VCS to determine the commit hash at the head of the branch.
+
+        Args:
+            branch (str): the name of the branch to look up
+
+        Returns:
+            str: the commit hash corresponding to the HEAD commit of the branch.
+
+        Raises:
+            ConfigurationCreateError: if there is no such branch on the remote
+                repository.
+        """
+        try:
+            commit_hash = VCSRepo(self.clone_url).get_commit_hash_for_branch(branch)
+        except VCSError as err:
+            raise ConfigurationCreateError(f'Could not query VCS to resolve branch name "{branch}": '
+                                           f'{err}')
+
+        if commit_hash is None:
+            raise ConfigurationCreateError(f'Could not retrieve HEAD commit for branch "{branch}"; '
+                                           'no matching branch was found on remote VCS repo.')
+        return commit_hash
+
 
 class GitCFSConfigurationLayer(CFSConfigurationLayer):
     """
@@ -153,6 +187,9 @@ class GitCFSConfigurationLayer(CFSConfigurationLayer):
     @property
     def commit(self):
         # The 'commit' property is optional
+        if self.resolve_branches and self.branch is not None:
+            # If given a branch, we can look up the commit dynamically.
+            return self.resolve_commit_hash(self.branch)
         return self.layer_data['git'].get('commit')
 
 
@@ -235,6 +272,10 @@ class ProductCFSConfigurationLayer(CFSConfigurationLayer):
     def commit(self):
         # If branch is specified, no commit should be specified
         if self.branch is not None:
+            # However, if CSM requires a commit hash, we can look it up
+            # dynamically from VCS and return it here for compatibility.
+            if self.resolve_branches:
+                return self.resolve_commit_hash(self.branch)
             return None
 
         # If no branch is specified get the commit from the product catalog
@@ -371,6 +412,7 @@ def create_configurations(instance, args):
         ConfigurationCreateError: if there was a failure to create any of the
             configurations defined in `instance`
     """
+    CFSConfigurationLayer.resolve_branches = args.resolve_branches
 
     # The 'configurations' key is optional in the instance
     input_configs = [CFSConfiguration(configuration)
