@@ -30,19 +30,19 @@ NESTED_ERROR_INDENT = ' ' * 4
 
 
 class BootPrepInternalError(Exception):
-    """An internal error occurred in bootprep (e.g. loading the schema)"""
+    """An internal error occurred in bootprep (e.g. loading the schema)."""
     pass
 
 
 class BootPrepValidationError(Exception):
-    """An error occurred while opening, parsing, or validating input file against schema"""
+    """An error occurred while opening, parsing, or validating input file against schema."""
 
 
 class ValidationErrorCollection(BootPrepValidationError):
-    """A group of errors occurred validating the schema"""
+    """A group of errors occurred validating the schema."""
 
     def __init__(self, errors):
-        """Create a ValidationErrorCollection
+        """Create a ValidationErrorCollection.
 
         Args:
             errors (Iterable of jsonschema.ValidationError): An iterable of the
@@ -113,18 +113,33 @@ class EnhancedValidationError(Exception):
         return description
 
 
-class ConfigurationCreateError(Exception):
-    """A fatal error occurred during the creation of CFS configurations"""
+class UserAbortException(Exception):
+    """The user chose to abort execution."""
     pass
 
 
-class ImageCreateError(Exception):
-    """A fatal error occurred during the creation of IMS images"""
+class InputItemCreateError(Exception):
+    """A fatal error occurred during the creation of an item from the input file."""
+    pass
+
+
+class InputItemValidateError(Exception):
+    """An error occurred while validating an item specified in the input file."""
+    pass
+
+
+class ConfigurationCreateError(InputItemCreateError):
+    """A fatal error occurred during the creation of CFS configurations."""
+    pass
+
+
+class ImageCreateError(InputItemCreateError):
+    """A fatal error occurred during the creation of IMS images."""
     pass
 
 
 class PublicKeyError(ImageCreateError):
-    """An error occurred when getting the IMS public key"""
+    """An error occurred when getting the IMS public key."""
     pass
 
 
@@ -142,3 +157,8 @@ class ImageCreateCycleError(ImageCreateError):
         """str: a description of the cycle that exists"""
         return (f'The following circular dependency exists: '
                 f'{" -> ".join(self.cycle_members + self.cycle_members[:1])}')
+
+
+class SessionTemplateCreateError(InputItemCreateError):
+    """A fatal error occurred during the creation of BOS session templates."""
+    pass

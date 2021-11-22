@@ -21,7 +21,43 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+from inflect import engine
+
 from sat.cli.bootprep.constants import DEFAULT_PUBLIC_KEY_FILE
+
+
+inflector = engine()
+
+
+def add_skip_and_overwrite_options(parser, short_item, long_item):
+    """Add skip and overwrite options for existing objects of the given type.
+
+    Adds two mutually exclusive options of the form:
+        --skip-existing-{short_item}s
+        --overwrite-{short_item}s
+
+    Args:
+        parser (argparse.ArgumentParser): the parser to which options should
+            be added
+        short_item (str): the short name for the item that will be used in the
+            option strings, e.g. 'config'
+        long_item (str): the long name for the item that will be used in the
+            help information for the options
+    """
+    group = parser.add_mutually_exclusive_group()
+    plural_short_item = inflector.plural(short_item)
+    plural_long_item = inflector.plural(long_item)
+
+    group.add_argument(
+        f'--skip-existing-{plural_short_item}', action='store_true',
+        help=f'Skip creating any {plural_long_item} for which {inflector.a(long_item)} '
+             f'with the same name already exists.'
+    )
+    group.add_argument(
+        f'--overwrite-{plural_short_item}', action='store_true',
+        help=f'Overwrite any {plural_long_item} for which {inflector.a(long_item)} '
+             f'with the same name already exists.'
+    )
 
 
 def add_bootprep_subparser(subparsers):
@@ -64,15 +100,9 @@ def add_bootprep_subparser(subparsers):
              'creating CFS configurations.'
     )
 
-    existing_configs_group = bootprep_parser.add_mutually_exclusive_group()
-    existing_configs_group.add_argument(
-        '--skip-existing-configs', action='store_true',
-        help='Skip creating any configurations that already exist.'
-    )
-    existing_configs_group.add_argument(
-        '--overwrite-configs', action='store_true',
-        help='Overwrite any configurations that already exist.'
-    )
+    add_skip_and_overwrite_options(bootprep_parser, 'config', 'configuration')
+    add_skip_and_overwrite_options(bootprep_parser, 'image', 'image')
+    add_skip_and_overwrite_options(bootprep_parser, 'template', 'session template')
 
     public_key_group = bootprep_parser.add_mutually_exclusive_group()
     public_key_file_option = '--public-key-file-path'
@@ -88,18 +118,6 @@ def add_bootprep_subparser(subparsers):
         public_key_id_option,
         help=f'The id of the SSH public key stored in IMS to use when building images '
              f'with IMS. {default_behavior}'
-    )
-
-    existing_images_group = bootprep_parser.add_mutually_exclusive_group()
-    existing_images_group.add_argument(
-        '--skip-existing-images', action='store_true',
-        help='Skip creating any images for which an image of the same name '
-             'already exists.'
-    )
-    existing_images_group.add_argument(
-        '--overwrite-images', action='store_true',
-        help='Overwrite (delete and re-create) any images for which an image '
-             'of the same name already exists.'
     )
 
     bootprep_parser.add_argument(

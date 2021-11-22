@@ -23,12 +23,15 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 import logging
 
-from sat.apiclient import CFSClient, IMSClient
+from sat.apiclient import BOSClient, CFSClient, IMSClient
 from sat.cli.bootprep.errors import (
     BootPrepInternalError,
     BootPrepValidationError,
     ConfigurationCreateError,
-    ImageCreateError
+    ImageCreateError,
+    InputItemCreateError,
+    InputItemValidateError,
+    UserAbortException
 )
 from sat.cli.bootprep.input.instance import InputInstance
 from sat.cli.bootprep.configuration import create_configurations
@@ -63,13 +66,24 @@ def do_bootprep(args):
         LOGGER.error(str(err))
         raise SystemExit(1)
 
-    LOGGER.info('Input file successfully validated')
+    LOGGER.info('Input file successfully validated against schema')
 
-    cfs_client = CFSClient(SATSession())
-    ims_client = IMSClient(SATSession())
+    session = SATSession()
+    cfs_client = CFSClient(session)
+    ims_client = IMSClient(session)
+    bos_client = BOSClient(session)
 
-    instance = InputInstance(instance_data, cfs_client, ims_client)
+    instance = InputInstance(instance_data, cfs_client, ims_client, bos_client)
 
+    # TODO (CRAYSAT-1277): Refactor images to use BaseInputItemCollection
+    # TODO (CRAYSAT-1278): Refactor configurations to use BaseInputItemCollection
+    # As part of the above, do more in methods of those classes. Generally, we
+    # should do the following, perhaps in methods on `InputInstance`:
+    # - Validate the input file, which includes:
+    #   - Validate names of new objects are unique
+    #   - Validate that referenced configurations and images exist
+    # - Handle any existing objects of the same name
+    # - Create the objects, if this is not a dry-run (or validation-only run)
     try:
         create_configurations(instance, args)
     except ConfigurationCreateError as err:
@@ -81,3 +95,31 @@ def do_bootprep(args):
     except ImageCreateError as err:
         LOGGER.error(str(err))
         raise SystemExit(1)
+
+    # The IMSClient caches the list of images. Clear the cache so that we can find
+    # newly created images when constructing session templates.
+    ims_client.clear_resource_cache(resource_type='image')
+
+    try:
+        instance.input_session_templates.handle_existing_items(args.overwrite_templates,
+                                                               args.skip_existing_templates,
+                                                               args.dry_run)
+    except UserAbortException:
+        LOGGER.error('Aborted')
+        raise SystemExit(1)
+    except InputItemCreateError as err:
+        LOGGER.error(str(err))
+        raise SystemExit(1)
+
+    try:
+        instance.input_session_templates.validate(dry_run=args.dry_run)
+    except InputItemValidateError as err:
+        LOGGER.error(str(err))
+        raise SystemExit(1)
+
+    if not args.dry_run:
+        try:
+            instance.input_session_templates.create_items()
+        except InputItemCreateError as err:
+            LOGGER.error(str(err))
+            raise SystemExit(1)

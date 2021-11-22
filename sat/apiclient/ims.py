@@ -126,7 +126,7 @@ class IMSClient(APIGatewayClient):
 
         Args:
             resource_type (str): The type of the resource to look for in IMS.
-                Must be one of 'image', 'recipe', or 'public-key'
+                Must be one of `IMSClient.valid_resource_types`.
 
         Raises:
             APIError: if there is an issue getting the images or recipes
@@ -155,8 +155,28 @@ class IMSClient(APIGatewayClient):
         else:
             return cached_value
 
+    def clear_resource_cache(self, resource_type=None):
+        """Clear the cached copy of the resources of the given type.
+
+        Args:
+            resource_type (str): the type of resource for which to clear the
+                cache. Must be one of `IMSClient.valid_resource_types`. If not
+                specified, the cache for all resource types will be cleared.
+
+        Raises:
+            ValueError: if given an invalid `resource_type`
+        """
+        if resource_type is not None and resource_type not in self.valid_resource_types:
+            raise ValueError(f'IMS resource type must be one of {self.valid_resource_types}, '
+                             f'got {resource_type}')
+
+        if resource_type is None:
+            self._cached_resources = {}
+        elif resource_type in self._cached_resources:
+            del self._cached_resources[resource_type]
+
     def get_matching_resources(self, resource_type, resource_id=None, **kwargs):
-        """Get the resource(s) matching the given type and id or name
+        """Get the resource(s) matching the given type and id or name.
 
         If neither `resource_id` nor `name` are specified, then return all the
         resources of the given type.
@@ -203,7 +223,7 @@ class IMSClient(APIGatewayClient):
                        for prop, value in kwargs.items())]
 
     def create_public_key(self, name, public_key):
-        """Create a new public key record in IMS
+        """Create a new public key record in IMS.
 
         Args:
             name (str): the name of the public key record to create in IMS
@@ -255,7 +275,7 @@ class IMSClient(APIGatewayClient):
             raise APIError(f'Failed to decode JSON from IMS job creation response: {err}')
 
     def get_job(self, job_id):
-        """Get an IMS job
+        """Get an IMS job.
 
         Args:
             job_id (str): the job ID
@@ -268,7 +288,7 @@ class IMSClient(APIGatewayClient):
             raise APIError(f'Failed to parse JSON response for job {job_id}: {err}')
 
     def get_image(self, image_id):
-        """Get an IMS image directly by its ID
+        """Get an IMS image directly by its ID.
 
         Args:
             image_id (str): the image ID
@@ -298,12 +318,12 @@ class IMSClient(APIGatewayClient):
         except APIError as err:
             raise APIError(f'Failed to create new empty image named {name}: {err}')
         except ValueError as err:
-            raise APIError(f'Failed to part JSON response when creating empty '
+            raise APIError(f'Failed to parse JSON response when creating empty '
                            f'image named {name}: {err}')
 
     @staticmethod
     def split_s3_artifact_path(path):
-        """Split a path to an artifact in S3 into its bucket and path components
+        """Split a path to an artifact in S3 into its bucket and path components.
 
         Args:
             path (str): An artifact path in the format stored by IMS, e.g.
@@ -361,7 +381,7 @@ class IMSClient(APIGatewayClient):
                                f'with id {image_id}: {err}')
 
     def copy_manifest_artifacts(self, manifest, new_image_id, new_name):
-        """Copy artifacts specified in a manifest to a location for use by a new image
+        """Copy artifacts specified in a manifest to a location for use by a new image.
 
         Args:
             manifest (dict): an IMS image manifest
@@ -434,7 +454,7 @@ class IMSClient(APIGatewayClient):
         }
 
     def upload_image_manifest(self, image_id, manifest):
-        """Upload the image manifest to S3 for the given image ID
+        """Upload the image manifest to S3 for the given image ID.
 
         Args:
             image_id (str): the ID of the image to upload the manifest for
@@ -475,7 +495,7 @@ class IMSClient(APIGatewayClient):
             return manifest_object
 
     def copy_image(self, image_id, new_name):
-        """Make a deep copy of an image
+        """Make a deep copy of an image.
 
         This is a deep copy in that it examines the manifest file of the image
         being copied, copies all artifacts referenced by that manifest in S3,
@@ -536,7 +556,7 @@ class IMSClient(APIGatewayClient):
         return new_image_id
 
     def delete_image(self, image_id):
-        """Delete an image
+        """Delete an image.
 
         Args:
             image_id (str): the id of the image to delete
@@ -551,7 +571,7 @@ class IMSClient(APIGatewayClient):
 
     # TODO (CRAYSAT-1267): Once CASMCMS-7634 is resolved, simplify this to be a PATCH request
     def rename_image(self, image_id, new_name):
-        """Rename an image by performing a deep copy and then delete
+        """Rename an image by performing a deep copy and then delete.
 
         The IMS API does not currently support renaming an image, so this is
         way more complicated than it should be. To accomplish the copy, we must

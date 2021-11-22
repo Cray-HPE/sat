@@ -23,7 +23,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 import logging
 
-from sat.apiclient.gateway import APIGatewayClient
+from sat.apiclient.gateway import APIError, APIGatewayClient
 
 LOGGER = logging.getLogger(__name__)
 
@@ -51,3 +51,35 @@ class BOSClient(APIGatewayClient):
             'operation': operation
         }
         return self.post('session', json=request_body)
+
+    def get_session_templates(self):
+        """Get the BOS session templates.
+
+        Returns:
+            list of dict: the list of BOS session templates
+
+        Raises:
+            APIError: if the GET request to get session templates fails or the
+                response cannot be parsed as JSON
+        """
+        try:
+            return self.get('sessiontemplate').json()
+        except APIError as err:
+            raise APIError(f'Failed to get BOS session templates: {err}')
+        except ValueError as err:
+            raise APIError(f'Failed to parse JSON in response from BOS when '
+                           f'getting session templates: {err}')
+
+    def create_session_template(self, session_template_data):
+        """Create a session template.
+
+        Args:
+            session_template_data (dict): the BOS session template data
+
+        Returns:
+            None
+
+        Raises:
+            APIError: if the POST request to create the session template fails
+        """
+        self.post('sessiontemplate', json=session_template_data)
