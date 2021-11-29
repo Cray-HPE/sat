@@ -24,7 +24,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 from argparse import Namespace
 import logging
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from sat.cli.bootprep.errors import (
     BootPrepInternalError,
@@ -46,10 +46,14 @@ class TestDoBootprep(unittest.TestCase):
         self.skip_existing_templates = False
         self.dry_run = False
         self.args = Namespace(input_file=self.input_file, overwrite_templates=self.overwrite_templates,
-                              skip_existing_templates=self.skip_existing_templates, dry_run=self.dry_run)
-        self.mock_load_bootprep_schema = patch('sat.cli.bootprep.main.load_bootprep_schema').start()
-        self.mock_load_and_validate = patch('sat.cli.bootprep.main.load_and_validate_instance').start()
-        self.validated_data = self.mock_load_and_validate.return_value
+                              skip_existing_templates=self.skip_existing_templates, dry_run=self.dry_run,
+                              view_input_schema=False, generate_schema_docs=False)
+        self.schema_file = 'schema.yaml'
+        self.mock_validator_cls = MagicMock()
+        self.mock_load_and_validate_schema = patch('sat.cli.bootprep.main.load_and_validate_schema',
+                                                   return_value=(self.schema_file, self.mock_validator_cls)).start()
+        self.mock_load_and_validate_instance = patch('sat.cli.bootprep.main.load_and_validate_instance').start()
+        self.validated_data = self.mock_load_and_validate_instance.return_value
         self.mock_input_instance_cls = patch('sat.cli.bootprep.main.InputInstance').start()
         self.mock_input_instance = self.mock_input_instance_cls.return_value
         self.mock_sat_session = patch('sat.cli.bootprep.main.SATSession').start()
@@ -68,9 +72,9 @@ class TestDoBootprep(unittest.TestCase):
         with self.assertLogs(level=logging.INFO) as cm:
             do_bootprep(self.args)
 
-        self.mock_load_bootprep_schema.assert_called_once_with()
-        self.mock_load_and_validate.assert_called_once_with(
-            self.input_file, self.mock_load_bootprep_schema.return_value)
+        self.mock_load_and_validate_schema.assert_called_once_with()
+        self.mock_load_and_validate_instance.assert_called_once_with(
+            self.input_file, self.mock_validator_cls)
         self.mock_input_instance_cls.assert_called_once_with(
             self.validated_data, self.mock_cfs_client, self.mock_ims_client, self.mock_bos_client)
         self.mock_create_configurations.assert_called_once_with(self.mock_input_instance, self.args)
@@ -91,7 +95,7 @@ class TestDoBootprep(unittest.TestCase):
     def test_do_bootprep_schema_error(self):
         """Test do_bootprep when an error occurs validating the schema itself"""
         internal_err_msg = 'bad schema'
-        self.mock_load_bootprep_schema.side_effect = BootPrepInternalError(internal_err_msg)
+        self.mock_load_and_validate_schema.side_effect = BootPrepInternalError(internal_err_msg)
         with self.assertRaises(SystemExit) as raises_cm:
             with self.assertLogs(level=logging.ERROR) as logs_cm:
                 do_bootprep(self.args)
@@ -100,12 +104,12 @@ class TestDoBootprep(unittest.TestCase):
         self.assertEqual(1, len(logs_cm.records))
         self.assertEqual(f'Internal error while loading schema: {internal_err_msg}',
                          logs_cm.records[0].msg)
-        self.mock_load_and_validate.assert_not_called()
+        self.mock_load_and_validate_instance.assert_not_called()
 
     def test_do_bootprep_validation_error(self):
         """Test do_bootprep when an error occurs loading the input file"""
         validation_err_msg = 'failed to load instance'
-        self.mock_load_and_validate.side_effect = BootPrepValidationError(validation_err_msg)
+        self.mock_load_and_validate_instance.side_effect = BootPrepValidationError(validation_err_msg)
         with self.assertRaises(SystemExit) as raises_cm:
             with self.assertLogs(level=logging.ERROR) as logs_cm:
                 do_bootprep(self.args)
@@ -113,12 +117,12 @@ class TestDoBootprep(unittest.TestCase):
         self.assertEqual(1, raises_cm.exception.code)
         self.assertEqual(1, len(logs_cm.records))
         self.assertEqual(validation_err_msg, logs_cm.records[0].msg)
-        self.mock_load_and_validate.assert_called_once_with(
-            self.input_file, self.mock_load_bootprep_schema.return_value)
+        self.mock_load_and_validate_instance.assert_called_once_with(
+            self.input_file, self.mock_validator_cls)
 
     def test_do_bootprep_validation_error_collection(self):
         """Test do_bootprep when an error occurs validating the input against the schema"""
-        self.mock_load_and_validate.side_effect = ValidationErrorCollection([])
+        self.mock_load_and_validate_instance.side_effect = ValidationErrorCollection([])
         with self.assertRaises(SystemExit) as raises_cm:
             with self.assertLogs(level=logging.ERROR) as logs_cm:
                 do_bootprep(self.args)
@@ -127,8 +131,8 @@ class TestDoBootprep(unittest.TestCase):
         self.assertEqual(1, len(logs_cm.records))
         self.assertEqual('Input file is invalid with the following validation errors:\n',
                          logs_cm.records[0].msg)
-        self.mock_load_and_validate.assert_called_once_with(
-            self.input_file, self.mock_load_bootprep_schema.return_value)
+        self.mock_load_and_validate_instance.assert_called_once_with(
+            self.input_file, self.mock_validator_cls)
 
     def test_do_bootprep_configuration_create_error(self):
         """Test do_bootprep when an error occurs creating a configuration"""
@@ -141,8 +145,8 @@ class TestDoBootprep(unittest.TestCase):
         self.assertEqual(1, raises_cm.exception.code)
         self.assertEqual(1, len(logs_cm.records))
         self.assertEqual(create_err_msg, logs_cm.records[0].msg)
-        self.mock_load_and_validate.assert_called_once_with(
-            self.input_file, self.mock_load_bootprep_schema.return_value)
+        self.mock_load_and_validate_instance.assert_called_once_with(
+            self.input_file, self.mock_validator_cls)
         self.mock_input_instance_cls.assert_called_once_with(
             self.validated_data, self.mock_cfs_client, self.mock_ims_client, self.mock_bos_client)
         self.mock_create_configurations.assert_called_once_with(self.mock_input_instance, self.args)
@@ -162,8 +166,8 @@ class TestDoBootprep(unittest.TestCase):
         self.assertEqual(1, raises_cm.exception.code)
         self.assertEqual(1, len(logs_cm.records))
         self.assertEqual(create_err_msg, logs_cm.records[0].msg)
-        self.mock_load_and_validate.assert_called_once_with(
-            self.input_file, self.mock_load_bootprep_schema.return_value)
+        self.mock_load_and_validate_instance.assert_called_once_with(
+            self.input_file, self.mock_validator_cls)
         self.mock_input_instance_cls.assert_called_once_with(
             self.validated_data, self.mock_cfs_client, self.mock_ims_client, self.mock_bos_client)
         self.mock_create_configurations.assert_called_once_with(self.mock_input_instance, self.args)

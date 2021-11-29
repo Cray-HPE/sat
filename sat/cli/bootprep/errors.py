@@ -34,6 +34,10 @@ class BootPrepInternalError(Exception):
     pass
 
 
+class BootPrepDocsError(Exception):
+    """An error occurred during a documentation action."""
+
+
 class BootPrepValidationError(Exception):
     """An error occurred while opening, parsing, or validating input file against schema."""
 

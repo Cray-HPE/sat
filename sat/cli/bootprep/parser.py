@@ -120,7 +120,16 @@ def add_bootprep_subparser(subparsers):
              f'with IMS. {default_behavior}'
     )
 
-    bootprep_parser.add_argument(
-        'input_file', help='Path to the input YAML file that defines the '
-                           'configurations, images, and session templates '
-                           'to create.')
+    action_group = bootprep_parser.add_mutually_exclusive_group(required=True)
+    action_group.add_argument(
+        '--input-file', help='Path to the input YAML file that defines the '
+                             'configurations, images, and session templates '
+                             'to create.')
+    action_group.add_argument(
+        '--view-input-schema', action='store_true',
+        help='View the bootprep input file schema in json-schema format.'
+    )
+    action_group.add_argument(
+        '--generate-schema-docs', action='store_true',
+        help='Generate human-readable HTML documentation for the input file schema.'
+    )

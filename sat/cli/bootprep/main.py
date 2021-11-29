@@ -25,6 +25,7 @@ import logging
 
 from sat.apiclient import BOSClient, CFSClient, IMSClient
 from sat.cli.bootprep.errors import (
+    BootPrepDocsError,
     BootPrepInternalError,
     BootPrepValidationError,
     ConfigurationCreateError,
@@ -35,9 +36,19 @@ from sat.cli.bootprep.errors import (
 )
 from sat.cli.bootprep.input.instance import InputInstance
 from sat.cli.bootprep.configuration import create_configurations
+from sat.cli.bootprep.documentation import (
+    display_schema,
+    generate_docs_tarball,
+    resource_absolute_path,
+)
 from sat.cli.bootprep.image import create_images
-from sat.cli.bootprep.validate import load_bootprep_schema, load_and_validate_instance
+from sat.cli.bootprep.validate import (
+    load_and_validate_instance,
+    load_and_validate_schema,
+    SCHEMA_FILE_RELATIVE_PATH,
+)
 from sat.session import SATSession
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -52,11 +63,24 @@ def do_bootprep(args):
     Returns:
         None
     """
+
     LOGGER.info(f'Loading schema file')
     try:
-        schema_validator = load_bootprep_schema()
+        schema_contents, schema_validator = load_and_validate_schema()
     except BootPrepInternalError as err:
         LOGGER.error(f'Internal error while loading schema: {err}')
+        raise SystemExit(1)
+
+    try:
+        if args.view_input_schema:
+            display_schema(schema_contents)
+            return
+        elif args.generate_schema_docs:
+            schema_path = resource_absolute_path(SCHEMA_FILE_RELATIVE_PATH)
+            generate_docs_tarball(schema_path, args.output_dir)
+            return
+    except BootPrepDocsError as err:
+        LOGGER.error('Could not perform bootprep schema documentation action: %s', err)
         raise SystemExit(1)
 
     LOGGER.info(f'Validating given input file {args.input_file}')
