@@ -33,6 +33,7 @@ from kubernetes.config import ConfigException
 from kubernetes.client import ApiException
 
 from sat.apiclient import APIError
+from sat.apiclient.vcs import VCSError
 from sat.cli.bootprep.configuration import (
     create_configurations,
     handle_existing_configs,
@@ -103,6 +104,15 @@ class TestGitCFSConfigurationLayer(unittest.TestCase):
             }
         }
 
+        self.branch_head_commit = 'e6bfdb28d44669c4317d6dc021c22a75cebb3bfb'
+        self.mock_vcs_repo = patch('sat.cli.bootprep.configuration.VCSRepo').start()
+        self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = self.branch_head_commit
+
+        patch('sat.cli.bootprep.configuration.CFSConfigurationLayer.resolve_branches', False).start()
+
+    def tearDown(self):
+        patch.stopall()
+
     def test_playbook_property_present(self):
         """Test the playbook property when a playbook is in the layer data"""
         layer = GitCFSConfigurationLayer(self.branch_layer_data)
@@ -166,6 +176,28 @@ class TestGitCFSConfigurationLayer(unittest.TestCase):
                 del expected['git']
                 self.assertEqual(expected, layer.get_cfs_api_data())
 
+    def test_commit_property_branch_commit_lookup(self):
+        """Test looking up commit hash from branch in VCS when branch not supported in CSM"""
+        with patch('sat.cli.bootprep.configuration.CFSConfigurationLayer.resolve_branches', True):
+            layer = GitCFSConfigurationLayer(self.branch_layer_data)
+            self.assertEqual(layer.commit, self.branch_head_commit)
+
+    def test_commit_property_branch_commit_vcs_query_fails(self):
+        """Test looking up commit hash raises ConfiurationCreateError when VCS is inaccessible"""
+        with patch('sat.cli.bootprep.configuration.CFSConfigurationLayer.resolve_branches', True):
+            layer = GitCFSConfigurationLayer(self.branch_layer_data)
+            self.mock_vcs_repo.return_value.get_commit_hash_for_branch.side_effect = VCSError
+            with self.assertRaises(ConfigurationCreateError):
+                _ = layer.commit
+
+    def test_commit_property_branch_commit_lookup_fails(self):
+        """Test looking up commit hash for nonexistent branch when branch not supported in CSM"""
+        with patch('sat.cli.bootprep.configuration.CFSConfigurationLayer.resolve_branches', True):
+            layer = GitCFSConfigurationLayer(self.branch_layer_data)
+            self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = None
+            with self.assertRaises(ConfigurationCreateError):
+                _ = layer.commit
+
 
 class TestProductConfigurationLayer(unittest.TestCase):
     """Tests for the ProductConfigurationLayer class."""
@@ -219,6 +251,12 @@ class TestProductConfigurationLayer(unittest.TestCase):
         self.mock_load_kube_config = patch('sat.cli.bootprep.configuration.load_kube_config').start()
         mock_config_map_response = Mock(data=self.product_catalog_data)
         self.mock_core_v1_api.read_namespaced_config_map.return_value = mock_config_map_response
+
+        self.branch_head_commit = 'e6bfdb28d44669c4317d6dc021c22a75cebb3bfb'
+        self.mock_vcs_repo = patch('sat.cli.bootprep.configuration.VCSRepo').start()
+        self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = self.branch_head_commit
+
+        patch('sat.cli.bootprep.configuration.CFSConfigurationLayer.resolve_branches', False).start()
 
     def tearDown(self):
         patch.stopall()
@@ -366,6 +404,28 @@ class TestProductConfigurationLayer(unittest.TestCase):
         """Test the commit property when a branch is not in the layer data"""
         self.assertEqual(self.old_commit, self.version_layer.commit)
 
+    def test_commit_property_branch_commit_lookup(self):
+        """Test looking up commit hash from branch in VCS when branch not supported in CSM"""
+        CFSConfigurationLayer.resolve_branches = True
+        with patch('sat.cli.bootprep.configuration.CFSConfigurationLayer.resolve_branches', True):
+            self.assertEqual(self.branch_layer.commit, self.branch_head_commit)
+
+    def test_commit_property_branch_commit_vcs_query_fails(self):
+        """Test looking up commit hash raises ConfiurationCreateError when VCS is inaccessible"""
+        CFSConfigurationLayer.resolve_branches = True
+        self.mock_vcs_repo.return_value.get_commit_hash_for_branch.side_effect = VCSError
+        with patch('sat.cli.bootprep.configuration.CFSConfigurationLayer.resolve_branches', True):
+            with self.assertRaises(ConfigurationCreateError):
+                _ = self.branch_layer.commit
+
+    def test_commit_property_branch_commit_lookup_fails(self):
+        """Test looking up commit hash for nonexistent branch when branch not supported in CSM"""
+        CFSConfigurationLayer.resolve_branches = True
+        self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = None
+        with patch('sat.cli.bootprep.configuration.CFSConfigurationLayer.resolve_branches', True):
+            with self.assertRaises(ConfigurationCreateError):
+                _ = self.branch_layer.commit
+
 
 class TestCFSConfiguration(unittest.TestCase):
     """Tests for the CFSConfiguration class"""
@@ -451,7 +511,7 @@ class TestHandleExistingConfigs(unittest.TestCase):
         self.set_up_input_configs(['compute-1.5.0', 'uan-1.5.0'])
 
         self.args = Namespace(dry_run=False, overwrite_configs=False,
-                              skip_existing_configs=False)
+                              skip_existing_configs=False, resolve_branches=False)
 
         self.mock_pester = patch('sat.cli.bootprep.configuration.pester_choices').start()
         self.mock_pester.return_value = 'abort'
@@ -656,7 +716,8 @@ class TestCreateCFSConfigurations(unittest.TestCase):
 
         self.mock_json_dump = patch('json.dump').start()
 
-        self.args = Namespace(dry_run=False, save_files=True, output_dir='output')
+        self.args = Namespace(dry_run=False, save_files=True, output_dir='output',
+                              resolve_branches=False)
 
     def tearDown(self):
         patch.stopall()

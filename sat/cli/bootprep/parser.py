@@ -58,6 +58,11 @@ def add_bootprep_subparser(subparsers):
         help='The directory to which files output by the "--save-files" option '
              'should be output.'
     )
+    bootprep_parser.add_argument(
+        '--no-resolve-branches', action='store_false', dest='resolve_branches',
+        help='Do not resolve branch names to corresponding commit hashes before '
+             'creating CFS configurations.'
+    )
 
     existing_configs_group = bootprep_parser.add_mutually_exclusive_group()
     existing_configs_group.add_argument(
