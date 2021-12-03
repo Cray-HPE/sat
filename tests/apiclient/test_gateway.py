@@ -210,11 +210,7 @@ class TestAPIGatewayClient(unittest.TestCase):
                                  f"code {status_code}: {reason}. {problem_title} Detail: {problem_detail}")
 
                     with self.assertRaisesRegex(APIError, err_regex):
-                        kwargs = {}
-                        if verb == 'patch':
-                            # patch method requires a payload keyword-only argument
-                            kwargs['payload'] = {}
-                        getattr(client, verb)(path, **kwargs)
+                        getattr(client, verb)(path)
 
     def test_request_failed_no_problem_description(self):
         """Test get, post, put, patch, and delete with fail HTTP codes and no problem details"""
@@ -237,11 +233,7 @@ class TestAPIGatewayClient(unittest.TestCase):
                                  f"status code {status_code}: {reason}")
 
                     with self.assertRaisesRegex(APIError, err_regex):
-                        kwargs = {}
-                        if verb == 'patch':
-                            # patch method requires a payload keyword-only argument
-                            kwargs['payload'] = {}
-                        getattr(client, verb)(path, **kwargs)
+                        getattr(client, verb)(path)
 
     def test_request_failed_invalid_json_response(self):
         """Test get, post, put, patch, and delete with fail HTTP codes and response not valid JSON"""
@@ -264,11 +256,7 @@ class TestAPIGatewayClient(unittest.TestCase):
                                  f"status code {status_code}: {reason}")
 
                     with self.assertRaisesRegex(APIError, err_regex):
-                        kwargs = {}
-                        if verb == 'patch':
-                            # patch method requires a payload keyword-only argument
-                            kwargs['payload'] = {}
-                        getattr(client, verb)(path, **kwargs)
+                        getattr(client, verb)(path)
 
 
 if __name__ == '__main__':

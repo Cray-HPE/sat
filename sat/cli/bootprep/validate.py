@@ -94,11 +94,11 @@ def load_and_validate_instance(instance_file_path, schema_validator):
     """Load and validate a given input file against the bootprep schema.
 
     Args:
-        instance_file_path (str): The input file for bootprep
-        schema_validator: The validator object from the jsonschema library.
+        instance_file_path (str): the input file for bootprep
+        schema_validator: the validator object from the jsonschema library.
 
     Returns:
-        The dictionary defined in the YAML input file, if valid.
+        dict: the instance defined in the YAML input file, if valid.
 
     Raises:
         BootPrepValidationError: if the file cannot be opened or does not
