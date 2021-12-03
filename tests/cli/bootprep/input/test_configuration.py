@@ -22,9 +22,9 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 import logging
-import unittest
 from copy import deepcopy
 from textwrap import dedent
+import unittest
 from unittest.mock import patch, Mock
 
 from kubernetes.client import ApiException
@@ -81,11 +81,28 @@ class TestInputConfigurationLayer(unittest.TestCase):
             InputConfigurationLayer.get_configuration_layer(layer_data)
 
 
-class TestGitInputConfigurationLayer(unittest.TestCase):
+class TestInputConfigurationLayerBase(unittest.TestCase):
+
+    module_path = 'sat.cli.bootprep.input.configuration'
+
+    def setUp(self):
+        """Patch the resolve_branches class attribute on InputConfigurationLayer"""
+        self.patch_resolve_branches(False).start()
+
+    def tearDown(self):
+        patch.stopall()
+
+    def patch_resolve_branches(self, value):
+        """Patch InputConfigurationLayer.resolve branches to the given value"""
+        return patch(f'{self.module_path}.InputConfigurationLayer.resolve_branches', value)
+
+
+class TestGitInputConfigurationLayer(TestInputConfigurationLayerBase):
     """Tests for the GitInputConfigurationLayer class"""
 
     def setUp(self):
         """Create some layer data to use in unit tests."""
+        super().setUp()
         self.playbook = 'site.yaml'
         self.branch_layer_data = {
             'playbook': self.playbook,
@@ -105,10 +122,8 @@ class TestGitInputConfigurationLayer(unittest.TestCase):
         }
 
         self.branch_head_commit = 'e6bfdb28d44669c4317d6dc021c22a75cebb3bfb'
-        self.mock_vcs_repo = patch('sat.cli.bootprep.input.configuration.VCSRepo').start()
+        self.mock_vcs_repo = patch(f'{self.module_path}.VCSRepo').start()
         self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = self.branch_head_commit
-
-        patch('sat.cli.bootprep.input.configuration.InputConfigurationLayer.resolve_branches', False).start()
 
     def tearDown(self):
         patch.stopall()
@@ -178,13 +193,13 @@ class TestGitInputConfigurationLayer(unittest.TestCase):
 
     def test_commit_property_branch_commit_lookup(self):
         """Test looking up commit hash from branch in VCS when branch not supported in CSM"""
-        with patch('sat.cli.bootprep.input.configuration.InputConfigurationLayer.resolve_branches', True):
+        with self.patch_resolve_branches(True):
             layer = GitInputConfigurationLayer(self.branch_layer_data)
             self.assertEqual(layer.commit, self.branch_head_commit)
 
     def test_commit_property_branch_commit_vcs_query_fails(self):
-        """Test looking up commit hash raises ConfiurationCreateError when VCS is inaccessible"""
-        with patch('sat.cli.bootprep.input.configuration.InputConfigurationLayer.resolve_branches', True):
+        """Test looking up commit hash raises ConfigurationCreateError when VCS is inaccessible"""
+        with self.patch_resolve_branches(True):
             layer = GitInputConfigurationLayer(self.branch_layer_data)
             self.mock_vcs_repo.return_value.get_commit_hash_for_branch.side_effect = VCSError
             with self.assertRaises(ConfigurationCreateError):
@@ -192,18 +207,20 @@ class TestGitInputConfigurationLayer(unittest.TestCase):
 
     def test_commit_property_branch_commit_lookup_fails(self):
         """Test looking up commit hash for nonexistent branch when branch not supported in CSM"""
-        with patch('sat.cli.bootprep.input.configuration.InputConfigurationLayer.resolve_branches', True):
+        with self.patch_resolve_branches(True):
             layer = GitInputConfigurationLayer(self.branch_layer_data)
             self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = None
             with self.assertRaises(ConfigurationCreateError):
                 _ = layer.commit
 
 
-class TestProductConfigurationLayer(unittest.TestCase):
-    """Tests for the ProductConfigurationLayer class."""
+class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
+    """Tests for the ProductInputConfigurationLayer class."""
 
     def setUp(self):
         """Mock K8s API to return fake product catalog data and set up layers"""
+        super().setUp()
+
         # Minimal set of product catalog data needed for these tests
         self.old_url = 'https://vcs.local/vcs/cray/cos-config-management.git'
         self.old_commit = '82537e59c24dd5607d5f5d6f92cdff971bd9c615'
@@ -253,10 +270,8 @@ class TestProductConfigurationLayer(unittest.TestCase):
         self.mock_core_v1_api.read_namespaced_config_map.return_value = mock_config_map_response
 
         self.branch_head_commit = 'e6bfdb28d44669c4317d6dc021c22a75cebb3bfb'
-        self.mock_vcs_repo = patch('sat.cli.bootprep.input.configuration.VCSRepo').start()
+        self.mock_vcs_repo = patch(f'{self.module_path}.VCSRepo').start()
         self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = self.branch_head_commit
-
-        patch('sat.cli.bootprep.input.configuration.InputConfigurationLayer.resolve_branches', False).start()
 
     def tearDown(self):
         patch.stopall()
@@ -406,20 +421,20 @@ class TestProductConfigurationLayer(unittest.TestCase):
 
     def test_commit_property_branch_commit_lookup(self):
         """Test looking up commit hash from branch in VCS when branch not supported in CSM"""
-        with patch('sat.cli.bootprep.input.configuration.InputConfigurationLayer.resolve_branches', True):
+        with self.patch_resolve_branches(True):
             self.assertEqual(self.branch_layer.commit, self.branch_head_commit)
 
     def test_commit_property_branch_commit_vcs_query_fails(self):
-        """Test looking up commit hash raises ConfiurationCreateError when VCS is inaccessible"""
+        """Test looking up commit hash raises ConfigurationCreateError when VCS is inaccessible"""
         self.mock_vcs_repo.return_value.get_commit_hash_for_branch.side_effect = VCSError
-        with patch('sat.cli.bootprep.input.configuration.InputConfigurationLayer.resolve_branches', True):
+        with self.patch_resolve_branches(True):
             with self.assertRaises(ConfigurationCreateError):
                 _ = self.branch_layer.commit
 
     def test_commit_property_branch_commit_lookup_fails(self):
         """Test looking up commit hash for nonexistent branch when branch not supported in CSM"""
         self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = None
-        with patch('sat.cli.bootprep.input.configuration.InputConfigurationLayer.resolve_branches', True):
+        with self.patch_resolve_branches(True):
             with self.assertRaises(ConfigurationCreateError):
                 _ = self.branch_layer.commit
 
