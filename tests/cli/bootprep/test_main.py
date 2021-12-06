@@ -42,7 +42,11 @@ class TestDoBootprep(unittest.TestCase):
     def setUp(self):
         """Mock functions called by do_bootprep"""
         self.input_file = 'input.yaml'
-        self.args = Namespace(input_file=self.input_file)
+        self.overwrite_templates = False
+        self.skip_existing_templates = False
+        self.dry_run = False
+        self.args = Namespace(input_file=self.input_file, overwrite_templates=self.overwrite_templates,
+                              skip_existing_templates=self.skip_existing_templates, dry_run=self.dry_run)
         self.mock_load_bootprep_schema = patch('sat.cli.bootprep.main.load_bootprep_schema').start()
         self.mock_load_and_validate = patch('sat.cli.bootprep.main.load_and_validate_instance').start()
         self.validated_data = self.mock_load_and_validate.return_value
@@ -51,8 +55,10 @@ class TestDoBootprep(unittest.TestCase):
         self.mock_sat_session = patch('sat.cli.bootprep.main.SATSession').start()
         self.mock_cfs_client = patch('sat.cli.bootprep.main.CFSClient').start().return_value
         self.mock_ims_client = patch('sat.cli.bootprep.main.IMSClient').start().return_value
+        self.mock_bos_client = patch('sat.cli.bootprep.main.BOSClient').start().return_value
         self.mock_create_configurations = patch('sat.cli.bootprep.main.create_configurations').start()
         self.mock_create_images = patch('sat.cli.bootprep.main.create_images').start()
+        self.mock_session_templates = self.mock_input_instance.input_session_templates
 
     def tearDown(self):
         patch.stopall()
@@ -66,14 +72,19 @@ class TestDoBootprep(unittest.TestCase):
         self.mock_load_and_validate.assert_called_once_with(
             self.input_file, self.mock_load_bootprep_schema.return_value)
         self.mock_input_instance_cls.assert_called_once_with(
-            self.validated_data, self.mock_cfs_client, self.mock_ims_client)
+            self.validated_data, self.mock_cfs_client, self.mock_ims_client, self.mock_bos_client)
         self.mock_create_configurations.assert_called_once_with(self.mock_input_instance, self.args)
         self.mock_create_images.assert_called_once_with(self.mock_input_instance, self.args)
+        self.mock_session_templates.handle_existing_items.assert_called_once_with(
+            self.overwrite_templates, self.skip_existing_templates, self.dry_run
+        )
+        self.mock_session_templates.validate.assert_called_once_with(dry_run=self.dry_run)
+        self.mock_session_templates.create_items.assert_called_once_with()
         info_msgs = [r.msg for r in cm.records]
         expected_msgs = [
             'Loading schema file',
             f'Validating given input file {self.input_file}',
-            'Input file successfully validated'
+            'Input file successfully validated against schema'
         ]
         self.assertEqual(expected_msgs, info_msgs)
 
@@ -133,9 +144,12 @@ class TestDoBootprep(unittest.TestCase):
         self.mock_load_and_validate.assert_called_once_with(
             self.input_file, self.mock_load_bootprep_schema.return_value)
         self.mock_input_instance_cls.assert_called_once_with(
-            self.validated_data, self.mock_cfs_client, self.mock_ims_client)
+            self.validated_data, self.mock_cfs_client, self.mock_ims_client, self.mock_bos_client)
         self.mock_create_configurations.assert_called_once_with(self.mock_input_instance, self.args)
         self.mock_create_images.assert_not_called()
+        self.mock_session_templates.handle_existing_items.assert_not_called()
+        self.mock_session_templates.validate.assert_not_called()
+        self.mock_session_templates.create_items.assert_not_called()
 
     def test_do_bootprep_image_create_error(self):
         """Test do_bootprep when an error occurs creating an image"""
@@ -151,9 +165,12 @@ class TestDoBootprep(unittest.TestCase):
         self.mock_load_and_validate.assert_called_once_with(
             self.input_file, self.mock_load_bootprep_schema.return_value)
         self.mock_input_instance_cls.assert_called_once_with(
-            self.validated_data, self.mock_cfs_client, self.mock_ims_client)
+            self.validated_data, self.mock_cfs_client, self.mock_ims_client, self.mock_bos_client)
         self.mock_create_configurations.assert_called_once_with(self.mock_input_instance, self.args)
         self.mock_create_images.assert_called_once_with(self.mock_input_instance, self.args)
+        self.mock_session_templates.handle_existing_items.assert_not_called()
+        self.mock_session_templates.validate.assert_not_called()
+        self.mock_session_templates.create_items.assert_not_called()
 
 
 if __name__ == '__main__':
