@@ -34,7 +34,11 @@ Site information is entered with the **sat setrev** command.
 The product information read from Kubernetes includes product name, product
 version, image names and image recipes (if available). It reads information
 from the ``cray-product-catalog`` Kubernetes configuration map. If multiple
-versions of the same product are present, all versions will be listed.
+versions of the same product are present, all versions will be listed. If a
+product version is designated as "active" within the configuration map, then
+its value in the "active" column will be ``True``. If the product is designated
+as not active, this value will be ``False``. Finally, if the product does not
+designate a version as "active", this value will be ``N/A``.
 
 **sat showrev** downloads this site information from the configured S3 bucket if
 available, otherwise a local copy of the site information file is used, if it
@@ -179,16 +183,18 @@ Get product releases:
   ################################################################################
   Product Revision Information
   ################################################################################
-  +--------------+-----------------+---------------------------------------------+---------------------------------------------+
-  | product_name | product_version | images                                      | image_recipes                               |
-  +--------------+-----------------+---------------------------------------------+---------------------------------------------+
-  | analytics    | 1.0.0           | Cray-Analytics.x86_64-base                  | -                                           |
-  | analytics    | base            | -                                           | -                                           |
-  | cos          | 1.4.0           | cray-shasta-compute-sles15sp2.x86_64-1.4.51 | cray-shasta-compute-sles15sp2.x86_64-1.4.51 |
-  | pbs          | 0.1.0           | -                                           | -                                           |
-  | slurm        | 0.1.0           | -                                           | -                                           |
-  | uan          | 2.0.0           | cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0  | cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0  |
-  +--------------+-----------------+---------------------------------------------+---------------------------------------------+
+  +--------------+-----------------+--------+---------------------------------------------+---------------------------------------------+
+  | product_name | product_version | active | images                                      | image_recipes                               |
+  +--------------+-----------------+--------+---------------------------------------------+---------------------------------------------+
+  | analytics    | 1.0.0           | N/A    | Cray-Analytics.x86_64-base                  | -                                           |
+  | analytics    | base            | N/A    | -                                           | -                                           |
+  | cos          | 1.4.0           | N/A    | cray-shasta-compute-sles15sp2.x86_64-1.4.51 | cray-shasta-compute-sles15sp2.x86_64-1.4.51 |
+  | pbs          | 0.1.0           | N/A    | -                                           | -                                           |
+  | sat          | 2.1.0           | False  | -                                           | -                                           |
+  | sat          | 2.2.0           | True   | -                                           | -                                           |
+  | slurm        | 0.1.0           | N/A    | -                                           | -                                           |
+  | uan          | 2.0.0           | N/A    | cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0  | cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0  |
+  +--------------+-----------------+--------+---------------------------------------------+---------------------------------------------+
 
 Get the Slurm product version:
 
@@ -198,11 +204,11 @@ Get the Slurm product version:
   ################################################################################
   Product Revision Information
   ################################################################################
-  +--------------+-----------------+---------------------------------------------+---------------------------------------------+
-  | product_name | product_version | images                                      | image_recipes                               |
-  +--------------+-----------------+---------------------------------------------+---------------------------------------------+
-  | slurm        | 0.1.0           | -                                           | -                                           |
-  +--------------+-----------------+---------------------------------------------+---------------------------------------------+
+  +--------------+-----------------+--------+---------------------------------------------+---------------------------------------------+
+  | product_name | product_version | active | images                                      | image_recipes                               |
+  +--------------+-----------------+--------+---------------------------------------------+---------------------------------------------+
+  | slurm        | 0.1.0           | N/A    | -                                           | -                                           |
+  +--------------+-----------------+--------+---------------------------------------------+---------------------------------------------+
 
 Get local host operating system information:
 
