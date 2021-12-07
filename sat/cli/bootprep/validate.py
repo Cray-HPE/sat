@@ -38,11 +38,12 @@ LOGGER = logging.getLogger(__name__)
 SCHEMA_FILE_RELATIVE_PATH = 'data/schema/bootprep_schema.yaml'
 
 
-def load_bootprep_schema():
+def load_and_validate_schema():
     """Load the bootprep input file schema and check its validity.
 
     Returns:
-        The schema validator object from the jsonschema library.
+        A two-tuple containing the schema file contents as bytes and the schema
+        validator object from the jsonschema library.
 
     Raises:
         BootPrepInternalError: if unable to open or read the schema file, load
@@ -71,7 +72,22 @@ def load_bootprep_schema():
     except SchemaError as err:
         raise BootPrepInternalError(f'bootprep schema file is invalid: {err}')
 
-    return validator_cls(schema)
+    return schema_file_contents, validator_cls(schema)
+
+
+def load_bootprep_schema():
+    """Helper function to load the schema and return only the validator.
+
+    Returns: the schema validator object from the jsonschema
+        library.
+
+    Raises:
+        BootPrepInternalError: if unable to open or read the schema file, load
+            its YAML contents, or validate its schema against the appropriate
+            JSONSchema metaschema.
+    """
+    _, validator_cls = load_and_validate_schema()
+    return validator_cls
 
 
 def validate_instance(instance, schema_validator):
