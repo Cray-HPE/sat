@@ -23,20 +23,20 @@
 
 # TODO (CRAYSAT-1130): Update this to use 2020-12 once official release of jsonschema supports it
 $schema: "https://json-schema.org/draft-07/schema"
-title: bootprep configuration
+title: Bootprep Input File
 description: >
-  A configuration that defines a set of CFS configurations to create, a set of
-  IMS images to create and optionally customize with those CFS configurations,
-  and a set of BOS session templates to create that reference those images and
-  configurations.
+  A description of the set of CFS configurations to create, the set of IMS
+  images to create and optionally customize with the defined CFS configurations,
+  and the set of BOS session templates to create that reference the defined
+  images and configurations.
 type: object
 additionalProperties: false
 properties:
   configurations:
-    description: The CFS configurations to create.
+    description: The set of CFS configurations to create.
     type: array
     items:
-      description: A CFS configuration to create.
+      description: An individual CFS configuration to create.
       type: object
       required: ['name', 'layers']
       additionalProperties: false
@@ -90,13 +90,17 @@ properties:
                         $ref: '#/$defs/CFSLayerGitURL'
                       branch:
                         description: >
-                          The branch of the git repository. This will be passed
-                          directly to CFS. When the CFS configuration is created,
-                          CFS determines the commit hash for the HEAD of this branch
-                          and stores both the branch name and commit hash in the
-                          layer of the configuration. CFS can use the branch name
-                          to update the commit hash to the latest HEAD of the branch
-                          if requested.
+                          The branch of the git repository. This can be either
+                          converted to a commit hash before creating the
+                          configurations, or it can optionally be passed
+                          directly to CFS by passing the `--no-resolve-branches`
+                          option to `sat bootprep`. In the latter instance, when
+                          the CFS configuration is created, CFS determines the
+                          commit hash for the HEAD of this branch and stores
+                          both the branch name and commit hash in the layer of
+                          the configuration. CFS can use the branch name to
+                          update the commit hash to the latest HEAD of the
+                          branch if requested.
                         type: string
 
             - description: >
@@ -290,7 +294,7 @@ properties:
                       description: A node xname.
                       type: string
                   node_roles_groups:
-                    description: Roles to boot in the boot set. 
+                    description: Roles to boot in the boot set.
                     type: array
                     items:
                       description: A node role.
