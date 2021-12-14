@@ -22,6 +22,8 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 import logging
+import os
+import yaml
 
 from sat.apiclient import BOSClient, CFSClient, IMSClient
 from sat.cli.bootprep.errors import (
@@ -36,11 +38,13 @@ from sat.cli.bootprep.errors import (
 )
 from sat.cli.bootprep.input.instance import InputInstance
 from sat.cli.bootprep.configuration import create_configurations
+from sat.cli.bootprep.constants import EXAMPLE_FILE_NAME
 from sat.cli.bootprep.documentation import (
     display_schema,
     generate_docs_tarball,
     resource_absolute_path,
 )
+from sat.cli.bootprep.example import BootprepExampleError, get_example_cos_and_uan_data
 from sat.cli.bootprep.image import create_images
 from sat.cli.bootprep.validate import (
     load_and_validate_instance,
@@ -94,6 +98,37 @@ def do_bootprep_schema(schema_file_contents):
     except BootPrepDocsError as err:
         LOGGER.error(f'Internal error while displaying schema: {err}')
         raise SystemExit(1)
+
+
+def do_bootprep_example(args):
+    """Generate an example bootprep input file.
+
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this subcommand.
+
+    Returns:
+        None
+
+    Raises:
+        SystemExit: If a fatal error is encountered.
+    """
+    full_example_file_path = os.path.join(args.output_dir, EXAMPLE_FILE_NAME)
+
+    try:
+        example_data = get_example_cos_and_uan_data()
+    except BootprepExampleError as err:
+        LOGGER.error(str(err))
+        raise SystemExit(1)
+
+    try:
+        with open(full_example_file_path, 'w') as f:
+            yaml.dump(example_data, f, sort_keys=False)
+    except OSError as err:
+        LOGGER.error(f'Failed to write example data to file {full_example_file_path}: {err}')
+        raise SystemExit(1)
+
+    LOGGER.info(f'Wrote example bootprep input file to {full_example_file_path}.')
 
 
 def do_bootprep_run(schema_validator, args):
@@ -208,3 +243,5 @@ def do_bootprep(args):
         do_bootprep_docs(args)
     elif args.action == 'view-schema':
         do_bootprep_schema(schema_file_contents)
+    elif args.action == 'generate-example':
+        do_bootprep_example(args)
