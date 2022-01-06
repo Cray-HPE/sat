@@ -25,6 +25,7 @@ from collections import defaultdict
 from textwrap import indent
 
 from sat.cached_property import cached_property
+from sat.waiting import DependencyCycleError
 
 NESTED_ERROR_INDENT = ' ' * 4
 
@@ -147,20 +148,9 @@ class PublicKeyError(ImageCreateError):
     pass
 
 
-class ImageCreateCycleError(ImageCreateError):
+class ImageCreateCycleError(ImageCreateError, DependencyCycleError):
     """A cycle exists in image dependencies."""
-    def __init__(self, cycle_members):
-        """Create a new ImageCreateCycleError.
-
-        Args:
-            cycle_members (list of str): the names of the members of the cycle
-        """
-        self.cycle_members = cycle_members
-
-    def __str__(self):
-        """str: a description of the cycle that exists"""
-        return (f'The following circular dependency exists: '
-                f'{" -> ".join(self.cycle_members + self.cycle_members[:1])}')
+    pass
 
 
 class SessionTemplateCreateError(InputItemCreateError):

@@ -255,7 +255,7 @@ class SimultaneousWaiter(Waiter):
             if not issubclass(WaiterClass, Waiter):
                 raise TypeError(f'All classes must be subclasses of Waiter. '
                                 '({WaiterClass.__name__})')
-            self._subwaiters.append(WaiterClass(timeout, poll_interval=poll_interval))
+            self._subwaiters.append(WaiterClass(timeout, poll_interval=poll_interval, **kwargs))
 
         super().__init__(timeout, poll_interval=poll_interval)
 
@@ -355,6 +355,190 @@ class GroupWaiter(Waiter):
                     self.failed.add(member)
 
             self.pending -= (completed | self.failed)
+
+            time.sleep(self.poll_interval)
+
+        self.completed = not self.pending
+
+
+class DependencyCycleError(Exception):
+    """A cycle exists in item dependencies."""
+    def __init__(self, cycle_members):
+        """Create a new DependencyCycleError.
+
+        Args:
+            cycle_members (list of DependencyGroupMember): the members of the cycle
+        """
+        self.cycle_members = cycle_members
+
+    def __str__(self):
+        """str: a description of the cycle that exists"""
+        return (f'The following circular dependency exists: '
+                f'{" -> ".join(str(member) for member in self.cycle_members + self.cycle_members[:1])}')
+
+
+class DependencyGroupMember(abc.ABC):
+    """Mixin class that defines an interface to be used in a DependencyGroupWaiter."""
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.dependencies = set()
+        self.dependents = set()
+
+    def has_dependencies(self):
+        """Check whether or not this member depends on anything.
+
+        Returns:
+            bool: True if there this item has at least one dependency, False
+                otherwise.
+        """
+        return bool(self.dependencies)
+
+    @abc.abstractmethod
+    def begin(self):
+        """Perform some action before waiting for this member.
+
+        This method may be overridden to customize behavior.
+        """
+
+    def add_dependency(self, dependency):
+        """Add an item that this item depends on.
+
+        This detects whether a cycle is created by adding this dependency.
+        E.g., if item A depends on item B, and item B depends on C:
+
+            A ---depends---> B ---depends---> C
+
+        Then an attempt to add a dependency of item C on item A would
+        introduce a cycle, or circular dependency.
+
+        Args:
+            dependency (DependencyGroupMember): an item upon which this item
+                depends
+
+        Raises:
+            DependencyCycleError: if adding this dependency introduces a cycle
+        """
+        cycle_members = dependency.depends_on(self)
+        if cycle_members:
+            raise DependencyCycleError(cycle_members)
+
+        # self depends on dependency
+        self.dependencies.add(dependency)
+        # dependency has self as a dependent
+        dependency.dependents.add(self)
+
+    def depends_on(self, other, dependency_chain=None):
+        """Return a chain of dependencies if this item depends on the other item.
+
+        Args:
+            other (DependencyGroupMember): the other item to check if this item
+                depends on.
+            dependency_chain (list of DependencyGroupMember): the list of items
+                traversed so far to reach this item
+
+        Returns:
+            list of DependencyGroupMember: the items in the dependency chain or
+                the empty list if this item does not depend on the other item
+        """
+        # Add this item to the dependency chain being constructed
+        dependency_chain = (dependency_chain or []) + [self]
+
+        # Base case of recursion: an item depends on itself
+        if self == other:
+            return dependency_chain
+
+        for dependency in self.dependencies:
+            # Find out if this dependency depends on the other item
+            possible_dependency_chain = dependency.depends_on(other, dependency_chain)
+            if possible_dependency_chain:
+                return possible_dependency_chain
+
+        # There is no chain of dependencies that leads to other
+        return []
+
+    def full_dependencies(self):
+        """Get the full set of dependencies which must be fulfilled for this item.
+
+        This is equivalent to the transitive closure of this node in the
+        dependency graph. It is assumed the dependency graph was constructed
+        using add_dependency() and thus is acyclic.
+
+        Returns:
+            Set[Self]: all recursive dependencies of this item
+        """
+        deps = set()
+        todo = list(self.dependencies)
+        while todo:
+            dep = todo.pop()
+            if dep not in deps:
+                deps.add(dep)
+                todo.extend(dep.dependencies)
+        return deps
+
+
+class DependencyGroupWaiter(GroupWaiter, abc.ABC):
+    """A specialized GroupWaiter which can reason about dependencies between members."""
+
+    def __init__(self, members, timeout, poll_interval=1, retries=0):
+        super().__init__(members, timeout, poll_interval, retries)
+
+        for member in self.members:
+            if not isinstance(member, DependencyGroupMember):
+                raise TypeError(f'{member} (type {type(member).__name__}) '
+                                'is not a subclass of DependencyGroupMember')
+
+        self.begun = set()
+        self.pending = set(member for member in self.members
+                           if not member.has_dependencies())
+
+    def _begin_member(self, member):
+        """Helper function to begin waiting for a member.
+
+        Args:
+            member (DependencyGroupMember): the member to begin waiting for.
+
+        Returns:
+            None.
+        """
+        if member in self.begun:
+            return
+
+        try:
+            member.begin()
+            self.begun.add(member)
+        except WaitingFailure as err:
+            LOGGER.error(str(err))
+            self.failed.add(member)
+
+    def pre_wait_action(self):
+        for member in self.pending:
+            self._begin_member(member)
+        self.pending -= self.failed
+
+    def _wait_polling_loop(self):
+        start_time = time.monotonic()
+        while self.pending and time.monotonic() - start_time < self.timeout:
+            completed = set()
+            for member in self.pending:
+                try:
+                    if self.member_has_completed(member):
+                        completed.add(member)
+                except WaitingFailure as err:
+                    LOGGER.error('Failed to wait for condition "%s" for member %s: %s',
+                                 self.condition_name(), str(member), err)
+                    self.failed.add(member)
+
+            self.pending -= (completed | self.failed)
+            for member in completed:
+                for dependent in member.dependents:
+                    # TODO: full_dependencies() runs in linear time based on the
+                    # size of the dependency graph, so this could be
+                    # accidentally quadratic resulting in slow performance for
+                    # large graphs. Dynamic programming would solve this.
+                    if not dependent.full_dependencies().intersection(self.pending | self.failed):
+                        self.pending.add(dependent)
+                        self._begin_member(dependent)
 
             time.sleep(self.poll_interval)
 

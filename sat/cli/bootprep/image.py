@@ -26,11 +26,16 @@ import logging
 import math
 
 from sat.apiclient import APIError, CFSClient, IMSClient
-from sat.cli.bootprep.errors import ImageCreateCycleError, ImageCreateError
+from sat.cli.bootprep.errors import ImageCreateError
 from sat.cli.bootprep.public_key import get_ims_public_key_id
 from sat.session import SATSession
 from sat.util import pester_choices
-from sat.waiting import GroupWaiter, WaitingFailure
+from sat.waiting import (
+    DependencyCycleError,
+    DependencyGroupWaiter,
+    WaitingFailure
+)
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -203,7 +208,7 @@ def find_image_dependencies(input_images):
                         f'which will also be created by this command.')
             try:
                 image.add_dependency(input_images_by_name[base_image_name])
-            except ImageCreateCycleError as err:
+            except DependencyCycleError as err:
                 LOGGER.error(str(err))
                 cycles_exist = True
 
@@ -278,7 +283,7 @@ def validate_image_configurations(input_images, cfs_client, input_config_names, 
                                f'input images')
 
 
-class ImageCreationGroupWaiter(GroupWaiter):
+class ImageCreationGroupWaiter(DependencyGroupWaiter):
     """Kicks off image creation in IMS and waits for jobs to complete
 
     This will also handle creating jobs for dependent images once their
@@ -303,15 +308,6 @@ class ImageCreationGroupWaiter(GroupWaiter):
         """str: the name of the condition being waited for"""
         return 'creation of IMS images'
 
-    def pre_wait_action(self):
-        """Before beginning to wait, start the image builds"""
-        for image in self.members:
-            try:
-                image.begin_image_create()
-            except ImageCreateError as err:
-                LOGGER.error(str(err))
-                self.failed.add(image)
-
     def member_has_completed(self, member):
         """Check whether the given IMSImage member has been created and/or configured
 
@@ -327,13 +323,10 @@ class ImageCreationGroupWaiter(GroupWaiter):
         # and an error message will be logged that mentions which member failed
         try:
             if member.has_completed:
-                if member.completed_successfully:
-                    for dependent in member.dependent_images:
-                        dependent.begin_image_create()
-                        self.pending.add(dependent)
-                    return True
-                else:
+                if not member.completed_successfully:
                     raise WaitingFailure(f'creation failed')
+                return True
+
             return False
         except ImageCreateError as err:
             raise WaitingFailure(f'status check failed: {err}')
@@ -391,7 +384,7 @@ def create_images(instance, args):
     find_image_dependencies(images_to_create)
 
     images_without_dependencies = [image for image in images_to_create
-                                   if not image.has_dependencies]
+                                   if not image.has_dependencies()]
 
     verb = ("will be", "would be")[args.dry_run]
     LOGGER.info(f'Of the {len(images_to_create)} that {verb} created, '
@@ -406,7 +399,7 @@ def create_images(instance, args):
         return
 
     # Default to no timeout since it's unknown how long image creation could take
-    waiter = ImageCreationGroupWaiter(images_without_dependencies, math.inf)
+    waiter = ImageCreationGroupWaiter(images_to_create, math.inf)
     LOGGER.info('Creating images')
     waiter.wait_for_completion()
     if waiter.failed:
