@@ -23,6 +23,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 from abc import ABC, abstractmethod
 import logging
+from urllib.parse import urlparse, urlunparse
 import warnings
 
 import yaml
@@ -34,6 +35,7 @@ from yaml import YAMLLoadWarning, YAMLError
 from sat.apiclient.vcs import VCSError, VCSRepo
 from sat.cached_property import cached_property
 from sat.cli.bootprep.errors import ConfigurationCreateError
+from sat.config import get_config_value
 
 # This value is used to specify that the latest version of a product is desired
 LATEST_VERSION_VALUE = 'latest'
@@ -249,10 +251,26 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
             raise ConfigurationCreateError(f'No match found for version {self.product_version} '
                                            f'of product {self.product_name} in product catalog')
 
+    @staticmethod
+    def substitute_url_hostname(url):
+        """Substitute the hostname in a URL with the configured API gateway hostname.
+
+        Args:
+            url (str): The URL to substitute.
+
+        Returns:
+            str: The URL with the hostname portion replaced.
+        """
+        return urlunparse(urlparse(url)._replace(
+            netloc=get_config_value('api_gateway.host')
+        ))
+
     @cached_property
     def clone_url(self):
         try:
-            return self.product_version_data['configuration']['clone_url']
+            return self.substitute_url_hostname(
+                self.product_version_data['configuration']['clone_url']
+            )
         except KeyError as err:
             raise ConfigurationCreateError(f'No clone URL present for product {self.product_name}; '
                                            f'missing key: {err}')

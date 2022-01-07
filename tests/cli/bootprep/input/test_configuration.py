@@ -24,6 +24,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 import logging
 from copy import deepcopy
 from textwrap import dedent
+from urllib.parse import urlparse
 import unittest
 from unittest.mock import patch, Mock
 
@@ -273,6 +274,11 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
         self.mock_vcs_repo = patch(f'{self.module_path}.VCSRepo').start()
         self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = self.branch_head_commit
 
+        self.mock_sat_config = {
+            'api_gateway.host': 'api_gateway.nmn'
+        }
+        patch_configuration('get_config_value', side_effect=self.mock_sat_config.get).start()
+
     def tearDown(self):
         patch.stopall()
 
@@ -378,7 +384,13 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
 
     def test_clone_url_present(self):
         """Test clone_url when present in product catalog data"""
-        self.assertEqual(self.old_url, self.version_layer.clone_url)
+        old_url_parsed = urlparse(self.old_url)
+        new_url_parsed = urlparse(self.version_layer.clone_url)
+        # All parts of the URL should be unchanged, except for the 'netloc' which should
+        # be replaced with what is in the configuration.
+        for attr in ('scheme', 'path', 'params', 'query', 'fragment'):
+            self.assertEqual(getattr(old_url_parsed, attr), getattr(new_url_parsed, attr))
+        self.assertEqual(new_url_parsed.netloc, self.mock_sat_config['api_gateway.host'])
 
     def test_clone_url_configuration_key_not_present(self):
         """Test clone_url when the 'configuration' key is missing in product catalog data"""
