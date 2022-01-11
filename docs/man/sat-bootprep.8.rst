@@ -13,7 +13,7 @@ Prepare to boot nodes with images and configurations
 SYNOPSIS
 ========
 
-**sat** [global-opts] **bootprep** INPUT_FILE [options]
+**sat** [global-opts] **bootprep** ACTION [options]
 
 DESCRIPTION
 ===========
@@ -25,7 +25,16 @@ then be used to boot nodes in the system, such as compute and application nodes.
 ARGUMENTS
 =========
 
-**--input-file INPUT_FILE**
+**ACTION**
+        Specify the action for sat bootprep to execute. This should be ``run``,
+        ``generate-docs``, or ``view-schema``.
+
+RUN ARGUMENTS
+-------------
+
+This argument only applies to the ``run`` action.
+
+**INPUT_FILE**
         The path to a YAML input file that defines the CFS configuration(s) to
         create, the IMS image(s) to build and/or customize, and the BOS session
         templates to create.
@@ -33,36 +42,29 @@ ARGUMENTS
         For full details on the schema for the bootprep input file, see the
         FILES section below.
 
-**--view-input-schema**
-        View the input file schema in json-schema format.
-
-        By default, the input file schema is written to stdout. If the
-        `SAT_PAGER` environment variable is set, then the input file schema will
-        be written to the stdin of the given executable.
-
-**--generate-schema-docs**
-        Create a tarball containing documentation for the input file schema in
-        HTML format. The documentation is written to a file named
-        **bootprep-schema-docs.tar.gz** in the directory specified by the path
-        given by **--output-dir**. The documentation is viewable by using a web
-        browser to open `index.html` found in the tarball.
-
 OPTIONS
 =======
 
-These options must be specified after the subcommand.
+These options apply to multiple actions.
 
 **-h, --help**
         Print the help message for 'sat bootprep'.
 
+**--output-dir OUTPUT_DIR, -o OUTPUT_DIR**
+        The directory to which created files should be written. Files are
+        created by the ``--save-files`` option in the ``run`` action and by the
+        ``generate-docs`` action. If not specified, then the working directory
+        is used. This option is not valid with the ``view-schema`` action.
+
+
+RUN OPTIONS
+-----------
+
+These options only apply to the ``run`` action.
+
 **-s, --save-files**
         Save files that could be passed to the CFS and BOS to create CFS
         configurations and BOS session templates, respectively.
-
-**--output-dir OUTPUT_DIR, -o OUTPUT_DIR**
-        The directory to which files created by the ``--save-files`` and
-        ``--generate-schema-docs`` options should be written. If not specified,
-        then the current working directory is used.
 
 **--no-resolve-branches**
         Do not look up the HEAD commits of branches name before creating CFS
@@ -119,19 +121,19 @@ session templates as described in the configuration file, ``bootprep_input.yaml`
 
 ::
 
-        # sat bootprep --input-file bootprep_input.yaml
+        # sat bootprep run bootprep_input.yaml
 
 View the exact input file schema specification:
 
 ::
 
-        # sat bootprep --view-input-schema
+        # sat bootprep view-schema
 
-Browse documentation for the input file schema:
+Generate HTML documentation for the input file schema:
 
 ::
 
-        # sat bootprep --generate-schema-docs
+        # sat bootprep generate-docs
 
 SEE ALSO
 ========

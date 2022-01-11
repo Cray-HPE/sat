@@ -43,6 +43,9 @@ def add_skip_and_overwrite_options(parser, short_item, long_item):
             option strings, e.g. 'config'
         long_item (str): the long name for the item that will be used in the
             help information for the options
+
+    Returns:
+        None
     """
     group = parser.add_mutually_exclusive_group()
     plural_short_item = inflector.plural(short_item)
@@ -57,6 +60,23 @@ def add_skip_and_overwrite_options(parser, short_item, long_item):
         f'--overwrite-{plural_short_item}', action='store_true',
         help=f'Overwrite any {plural_long_item} for which {inflector.a(long_item)} '
              f'with the same name already exists.'
+    )
+
+
+def add_output_dir_option(parser):
+    """Add the --output-dir option.
+
+    Args:
+        parser (argparse.ArgumentParser): the parser to which options should
+            be added
+
+    Returns:
+        None
+    """
+    parser.add_argument(
+        '--output-dir', '-o', default='.',
+        help='The directory to which files output by the "--save-files" option '
+             'or the "generate-docs" action should be output.'
     )
 
 
@@ -78,33 +98,90 @@ def add_bootprep_subparser(subparsers):
                     'system.'
     )
 
-    bootprep_parser.add_argument(
+    actions_subparsers = bootprep_parser.add_subparsers(
+        metavar='action', dest='action', help='The action to execute.'
+    )
+    _add_bootprep_run_subparser(actions_subparsers)
+    _add_bootprep_generate_docs_subparser(actions_subparsers)
+    _add_bootprep_view_schema_subparser(actions_subparsers)
+
+
+def _add_bootprep_generate_docs_subparser(subparsers):
+    """Add the options for 'sat bootprep generate-docs'.
+
+    Args:
+        subparsers: The argparse.ArgumentParser object returned by the
+            add_subparsers method.
+
+    Returns:
+        None
+    """
+    docs_subparser = subparsers.add_parser(
+        'generate-docs', help='Generate bootprep schema documentation.',
+        description='Generate human-readable HTML documentation from the '
+                    'bootprep input file schema.'
+    )
+    add_output_dir_option(docs_subparser)
+
+
+def _add_bootprep_view_schema_subparser(subparsers):
+    """Add the options for 'sat bootprep view-schema'.
+
+    Args:
+        subparsers: The argparse.ArgumentParser object returned by the
+            add_subparsers method.
+
+    Returns:
+        None
+    """
+    subparsers.add_parser(
+        'view-schema', help='View bootprep input file schema.',
+        description='View the bootprep input file jsonschema schema in '
+                    'raw YAML format.'
+    )
+
+
+def _add_bootprep_run_subparser(subparsers):
+    """Add the options for 'sat bootprep run'
+
+    Args:
+        subparsers: The argparse.ArgumentParser object returned by the
+            add_subparsers method.
+
+    Returns:
+        None
+    """
+    run_subparser = subparsers.add_parser(
+        'run', help='Run sat bootprep.',
+        description='Create images, configurations and session templates.'
+    )
+    run_subparser.add_argument(
+        'input_file',
+        help='Path to the input YAML file that defines the configurations, '
+             'images, and session templates to create.')
+    run_subparser.add_argument(
         '--dry-run', '-d', action='store_true',
         help='Do a dry-run. Do not actually create CFS configurations, '
              'build images, customize images, or create BOS session templates, '
              'but walk through all the other steps.'
     )
-    bootprep_parser.add_argument(
+    run_subparser.add_argument(
         '--save-files', '-s', action='store_true',
         help='Save files that could be passed to the CFS and BOS to create CFS '
              'configurations and BOS session templates, respectively.'
     )
-    bootprep_parser.add_argument(
-        '--output-dir', '-o', default='.',
-        help='The directory to which files output by the "--save-files" option '
-             'should be output.'
-    )
-    bootprep_parser.add_argument(
+    run_subparser.add_argument(
         '--no-resolve-branches', action='store_false', dest='resolve_branches',
         help='Do not resolve branch names to corresponding commit hashes before '
              'creating CFS configurations.'
     )
 
-    add_skip_and_overwrite_options(bootprep_parser, 'config', 'configuration')
-    add_skip_and_overwrite_options(bootprep_parser, 'image', 'image')
-    add_skip_and_overwrite_options(bootprep_parser, 'template', 'session template')
+    add_skip_and_overwrite_options(run_subparser, 'config', 'configuration')
+    add_skip_and_overwrite_options(run_subparser, 'image', 'image')
+    add_skip_and_overwrite_options(run_subparser, 'template', 'session template')
+    add_output_dir_option(run_subparser)
 
-    public_key_group = bootprep_parser.add_mutually_exclusive_group()
+    public_key_group = run_subparser.add_mutually_exclusive_group()
     public_key_file_option = '--public-key-file-path'
     public_key_id_option = '--public-key-id'
     default_behavior = (f'If neither {public_key_file_option} nor {public_key_id_option} is specified, '
@@ -118,18 +195,4 @@ def add_bootprep_subparser(subparsers):
         public_key_id_option,
         help=f'The id of the SSH public key stored in IMS to use when building images '
              f'with IMS. {default_behavior}'
-    )
-
-    action_group = bootprep_parser.add_mutually_exclusive_group(required=True)
-    action_group.add_argument(
-        '--input-file', help='Path to the input YAML file that defines the '
-                             'configurations, images, and session templates '
-                             'to create.')
-    action_group.add_argument(
-        '--view-input-schema', action='store_true',
-        help='View the bootprep input file schema in json-schema format.'
-    )
-    action_group.add_argument(
-        '--generate-schema-docs', action='store_true',
-        help='Generate human-readable HTML documentation for the input file schema.'
     )

@@ -53,8 +53,9 @@ from sat.session import SATSession
 LOGGER = logging.getLogger(__name__)
 
 
-def do_bootprep(args):
-    """Main entry point for bootprep command.
+def do_bootprep_docs(args):
+    """Generate bootprep documentation.
+
 
     Args:
         args: The argparse.Namespace object containing the parsed arguments
@@ -62,27 +63,53 @@ def do_bootprep(args):
 
     Returns:
         None
+
+    Raises:
+        SystemExit: If a fatal error is encountered.
     """
 
-    LOGGER.info(f'Loading schema file')
     try:
-        schema_contents, schema_validator = load_and_validate_schema()
-    except BootPrepInternalError as err:
-        LOGGER.error(f'Internal error while loading schema: {err}')
-        raise SystemExit(1)
-
-    try:
-        if args.view_input_schema:
-            display_schema(schema_contents)
-            return
-        elif args.generate_schema_docs:
-            schema_path = resource_absolute_path(SCHEMA_FILE_RELATIVE_PATH)
-            generate_docs_tarball(schema_path, args.output_dir)
-            return
+        schema_path = resource_absolute_path(SCHEMA_FILE_RELATIVE_PATH)
+        generate_docs_tarball(schema_path, args.output_dir)
     except BootPrepDocsError as err:
-        LOGGER.error('Could not perform bootprep schema documentation action: %s', err)
+        LOGGER.error(f'Could not perform bootprep schema documentation action: {err}')
         raise SystemExit(1)
 
+
+def do_bootprep_schema(schema_file_contents):
+    """Display the bootprep schema in raw format.
+
+    Args:
+        schema_file_contents (bytes): the schema file contents as bytes.
+
+    Returns:
+        None
+
+    Raises:
+        SystemExit: If a fatal error is encountered.
+    """
+    try:
+        display_schema(schema_file_contents)
+    except BootPrepDocsError as err:
+        LOGGER.error(f'Internal error while displaying schema: {err}')
+        raise SystemExit(1)
+
+
+def do_bootprep_run(schema_validator, args):
+    """Create images, configurations, and/or session templates.
+
+    Args:
+        schema_validator: the schema validator object from the jsonschema
+            library used to validate the input instance.
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this subcommand.
+
+    Returns:
+        None
+
+    Raises:
+        SystemExit: If a fatal error is encountered.
+    """
     LOGGER.info(f'Validating given input file {args.input_file}')
     try:
         instance_data = load_and_validate_instance(args.input_file, schema_validator)
@@ -147,3 +174,27 @@ def do_bootprep(args):
         except InputItemCreateError as err:
             LOGGER.error(str(err))
             raise SystemExit(1)
+
+
+def do_bootprep(args):
+    """Main entry point for bootprep command.
+
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this subcommand.
+
+    Returns:
+        None
+    """
+    try:
+        schema_file_contents, schema_validator = load_and_validate_schema()
+    except BootPrepInternalError as err:
+        LOGGER.error(f'Internal error while loading schema: {err}')
+        raise SystemExit(1)
+
+    if args.action == 'run':
+        do_bootprep_run(schema_validator, args)
+    elif args.action == 'generate-docs':
+        do_bootprep_docs(args)
+    elif args.action == 'view-schema':
+        do_bootprep_schema(schema_file_contents)
