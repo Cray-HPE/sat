@@ -58,6 +58,33 @@ from sat.software_inventory.products import ProductCatalog, SoftwareInventoryErr
 LOGGER = logging.getLogger(__name__)
 
 
+def ensure_output_directory(args):
+    """Ensure the output directory exists if necessary.
+
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this subcommand.
+
+    Returns:
+        None
+
+    Raises:
+        SystemExit: If a fatal error is encountered.
+    """
+    must_create_output_dir = (
+        (args.action == 'run' and args.save_files
+         or args.action in ('generate-docs', 'generate-example'))
+        and args.output_dir != '.'
+    )
+    if must_create_output_dir:
+        try:
+            os.makedirs(args.output_dir, exist_ok=True)
+        except OSError as err:
+            LOGGER.error(f'Unable to ensure output directory {args.output_dir} '
+                         f'exists: {err}')
+            raise SystemExit(1)
+
+
 def do_bootprep_docs(args):
     """Generate bootprep documentation.
 
@@ -236,6 +263,8 @@ def do_bootprep(args):
     except BootPrepInternalError as err:
         LOGGER.error(f'Internal error while loading schema: {err}')
         raise SystemExit(1)
+
+    ensure_output_directory(args)
 
     if args.action == 'run':
         do_bootprep_run(schema_validator, args)

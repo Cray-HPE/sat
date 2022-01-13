@@ -241,6 +241,7 @@ class TestDoBootprep(unittest.TestCase):
         self.mock_load_and_validate_schema = patch(
             'sat.cli.bootprep.main.load_and_validate_schema',
             return_value=(self.mock_schema_file, self.mock_validator_cls)).start()
+        self.mock_ensure_output_directory = patch('sat.cli.bootprep.main.ensure_output_directory').start()
 
     def tearDown(self):
         patch.stopall()
