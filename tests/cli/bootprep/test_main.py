@@ -28,30 +28,91 @@ from unittest.mock import MagicMock, patch
 
 from sat.cli.bootprep.errors import (
     BootPrepInternalError,
+    BootPrepDocsError,
     BootPrepValidationError,
     ConfigurationCreateError,
     ImageCreateError,
     ValidationErrorCollection
 )
-from sat.cli.bootprep.main import do_bootprep
+from sat.cli.bootprep.main import (
+    do_bootprep,
+    do_bootprep_run,
+    do_bootprep_docs,
+    do_bootprep_schema
+)
+from sat.cli.bootprep.validate import SCHEMA_FILE_RELATIVE_PATH
 
 
-class TestDoBootprep(unittest.TestCase):
-    """Tests for the do_bootprep function."""
+class TestDoBootprepDocs(unittest.TestCase):
+    """Tests for the do_bootprep_docs function."""
+    def setUp(self):
+        """Mock functions called by do_bootprep_docs"""
+        self.mock_resource_path = patch('sat.cli.bootprep.main.resource_absolute_path').start()
+        self.mock_generate_docs_tarball = patch('sat.cli.bootprep.main.generate_docs_tarball').start()
+        self.args = Namespace(output_dir='./output/')
+
+    def tearDown(self):
+        patch.stopall()
+
+    def test_do_bootprep_docs_success(self):
+        """Test a successful call to do_bootprep_docs."""
+        do_bootprep_docs(self.args)
+        self.mock_resource_path.assert_called_once_with(SCHEMA_FILE_RELATIVE_PATH)
+        self.mock_generate_docs_tarball.assert_called_once_with(
+            self.mock_resource_path.return_value, self.args.output_dir
+        )
+
+    def test_do_bootprep_docs_failure(self):
+        """Test a failed call to do_bootprep_docs when generating documentation fails."""
+        self.mock_generate_docs_tarball.side_effect = BootPrepDocsError('docs failed')
+        with self.assertRaises(SystemExit) as raises_cm:
+            with self.assertLogs(level=logging.ERROR) as logs_cm:
+                do_bootprep_docs(self.args)
+        self.assertEqual(1, raises_cm.exception.code)
+        self.assertEqual(1, len(logs_cm.records))
+
+
+class TestDoBootprepSchema(unittest.TestCase):
+    """Tests for the do_bootprep_schema function."""
 
     def setUp(self):
-        """Mock functions called by do_bootprep"""
+        """Mock functions called by do_bootprep_schema"""
+        self.mock_schema_file = MagicMock()
+        self.mock_display_schema = patch('sat.cli.bootprep.main.display_schema').start()
+
+    def tearDown(self):
+        patch.stopall()
+
+    def test_do_bootprep_schema_success(self):
+        """Test a successful call to do_bootprep_schema."""
+        do_bootprep_schema(self.mock_schema_file)
+        self.mock_display_schema.assert_called_once_with(self.mock_schema_file)
+
+    def test_do_bootprep_schema_failure(self):
+        """Test a failed call to do_bootprep_schema when generating documentation fails."""
+        self.mock_display_schema.side_effect = BootPrepDocsError('could not display')
+        with self.assertRaises(SystemExit) as raises_cm:
+            with self.assertLogs(level=logging.ERROR) as logs_cm:
+                do_bootprep_schema(self.mock_schema_file)
+        self.assertEqual(1, raises_cm.exception.code)
+        self.assertEqual(1, len(logs_cm.records))
+
+
+class TestDoBootprepRun(unittest.TestCase):
+    """Tests for the do_bootprep_run function."""
+
+    def setUp(self):
+        """Mock functions called by do_bootprep_run"""
         self.input_file = 'input.yaml'
         self.overwrite_templates = False
         self.skip_existing_templates = False
         self.dry_run = False
-        self.args = Namespace(input_file=self.input_file, overwrite_templates=self.overwrite_templates,
+        self.args = Namespace(action='run', input_file=self.input_file,
+                              overwrite_templates=self.overwrite_templates,
                               skip_existing_templates=self.skip_existing_templates, dry_run=self.dry_run,
                               view_input_schema=False, generate_schema_docs=False)
         self.schema_file = 'schema.yaml'
         self.mock_validator_cls = MagicMock()
-        self.mock_load_and_validate_schema = patch('sat.cli.bootprep.main.load_and_validate_schema',
-                                                   return_value=(self.schema_file, self.mock_validator_cls)).start()
         self.mock_load_and_validate_instance = patch('sat.cli.bootprep.main.load_and_validate_instance').start()
         self.validated_data = self.mock_load_and_validate_instance.return_value
         self.mock_input_instance_cls = patch('sat.cli.bootprep.main.InputInstance').start()
@@ -67,12 +128,11 @@ class TestDoBootprep(unittest.TestCase):
     def tearDown(self):
         patch.stopall()
 
-    def test_do_bootprep_success(self):
-        """Test do_bootprep in the successful case"""
+    def test_do_bootprep_run_success(self):
+        """Test do_bootprep_run in the successful case"""
         with self.assertLogs(level=logging.INFO) as cm:
-            do_bootprep(self.args)
+            do_bootprep_run(self.mock_validator_cls, self.args)
 
-        self.mock_load_and_validate_schema.assert_called_once_with()
         self.mock_load_and_validate_instance.assert_called_once_with(
             self.input_file, self.mock_validator_cls)
         self.mock_input_instance_cls.assert_called_once_with(
@@ -86,33 +146,18 @@ class TestDoBootprep(unittest.TestCase):
         self.mock_session_templates.create_items.assert_called_once_with()
         info_msgs = [r.msg for r in cm.records]
         expected_msgs = [
-            'Loading schema file',
             f'Validating given input file {self.input_file}',
             'Input file successfully validated against schema'
         ]
         self.assertEqual(expected_msgs, info_msgs)
 
-    def test_do_bootprep_schema_error(self):
-        """Test do_bootprep when an error occurs validating the schema itself"""
-        internal_err_msg = 'bad schema'
-        self.mock_load_and_validate_schema.side_effect = BootPrepInternalError(internal_err_msg)
-        with self.assertRaises(SystemExit) as raises_cm:
-            with self.assertLogs(level=logging.ERROR) as logs_cm:
-                do_bootprep(self.args)
-
-        self.assertEqual(1, raises_cm.exception.code)
-        self.assertEqual(1, len(logs_cm.records))
-        self.assertEqual(f'Internal error while loading schema: {internal_err_msg}',
-                         logs_cm.records[0].msg)
-        self.mock_load_and_validate_instance.assert_not_called()
-
-    def test_do_bootprep_validation_error(self):
-        """Test do_bootprep when an error occurs loading the input file"""
+    def test_do_bootprep_run_validation_error(self):
+        """Test do_bootprep_run when an error occurs loading the input file"""
         validation_err_msg = 'failed to load instance'
         self.mock_load_and_validate_instance.side_effect = BootPrepValidationError(validation_err_msg)
         with self.assertRaises(SystemExit) as raises_cm:
             with self.assertLogs(level=logging.ERROR) as logs_cm:
-                do_bootprep(self.args)
+                do_bootprep_run(self.mock_validator_cls, self.args)
 
         self.assertEqual(1, raises_cm.exception.code)
         self.assertEqual(1, len(logs_cm.records))
@@ -120,12 +165,12 @@ class TestDoBootprep(unittest.TestCase):
         self.mock_load_and_validate_instance.assert_called_once_with(
             self.input_file, self.mock_validator_cls)
 
-    def test_do_bootprep_validation_error_collection(self):
-        """Test do_bootprep when an error occurs validating the input against the schema"""
+    def test_do_bootprep_run_validation_error_collection(self):
+        """Test do_bootprep_run when an error occurs validating the input against the schema"""
         self.mock_load_and_validate_instance.side_effect = ValidationErrorCollection([])
         with self.assertRaises(SystemExit) as raises_cm:
             with self.assertLogs(level=logging.ERROR) as logs_cm:
-                do_bootprep(self.args)
+                do_bootprep_run(self.mock_validator_cls, self.args)
 
         self.assertEqual(1, raises_cm.exception.code)
         self.assertEqual(1, len(logs_cm.records))
@@ -134,13 +179,13 @@ class TestDoBootprep(unittest.TestCase):
         self.mock_load_and_validate_instance.assert_called_once_with(
             self.input_file, self.mock_validator_cls)
 
-    def test_do_bootprep_configuration_create_error(self):
-        """Test do_bootprep when an error occurs creating a configuration"""
+    def test_do_bootprep_run_configuration_create_error(self):
+        """Test do_bootprep_run when an error occurs creating a configuration"""
         create_err_msg = 'Failed to create a configuration'
         self.mock_create_configurations.side_effect = ConfigurationCreateError(create_err_msg)
         with self.assertRaises(SystemExit) as raises_cm:
             with self.assertLogs(level=logging.ERROR) as logs_cm:
-                do_bootprep(self.args)
+                do_bootprep_run(self.mock_validator_cls, self.args)
 
         self.assertEqual(1, raises_cm.exception.code)
         self.assertEqual(1, len(logs_cm.records))
@@ -155,13 +200,13 @@ class TestDoBootprep(unittest.TestCase):
         self.mock_session_templates.validate.assert_not_called()
         self.mock_session_templates.create_items.assert_not_called()
 
-    def test_do_bootprep_image_create_error(self):
-        """Test do_bootprep when an error occurs creating an image"""
+    def test_do_bootprep_run_image_create_error(self):
+        """Test do_bootprep_run when an error occurs creating an image"""
         create_err_msg = 'Failed to create an image'
         self.mock_create_images.side_effect = ImageCreateError(create_err_msg)
         with self.assertRaises(SystemExit) as raises_cm:
             with self.assertLogs(level=logging.ERROR) as logs_cm:
-                do_bootprep(self.args)
+                do_bootprep_run(self.mock_validator_cls, self.args)
 
         self.assertEqual(1, raises_cm.exception.code)
         self.assertEqual(1, len(logs_cm.records))
@@ -175,6 +220,52 @@ class TestDoBootprep(unittest.TestCase):
         self.mock_session_templates.handle_existing_items.assert_not_called()
         self.mock_session_templates.validate.assert_not_called()
         self.mock_session_templates.create_items.assert_not_called()
+
+
+class TestDoBootprep(unittest.TestCase):
+    """Tests for the do_bootprep function."""
+
+    def setUp(self):
+        """Mock functions called by do_bootprep."""
+        self.args = Namespace()
+        self.mock_do_bootprep_run = patch('sat.cli.bootprep.main.do_bootprep_run').start()
+        self.mock_do_bootprep_docs = patch('sat.cli.bootprep.main.do_bootprep_docs').start()
+        self.mock_do_bootprep_schema = patch('sat.cli.bootprep.main.do_bootprep_schema').start()
+        self.mock_validator_cls = MagicMock()
+        self.mock_schema_file = MagicMock()
+        self.mock_load_and_validate_schema = patch(
+            'sat.cli.bootprep.main.load_and_validate_schema',
+            return_value=(self.mock_schema_file, self.mock_validator_cls)).start()
+
+    def tearDown(self):
+        patch.stopall()
+
+    def test_do_bootprep_run(self):
+        """Test the run action calls do_bootprep_run."""
+        self.args.action = 'run'
+        do_bootprep(self.args)
+        self.mock_do_bootprep_run.assert_called_once_with(self.mock_validator_cls, self.args)
+
+    def test_do_bootprep_generate_docs(self):
+        """Test the generate-docs action calls do_bootprep_docs."""
+        self.args.action = 'generate-docs'
+        do_bootprep(self.args)
+        self.mock_do_bootprep_docs.assert_called_once_with(self.args)
+
+    def test_do_bootprep_view_schema(self):
+        """Test the view-schema action calls do_bootprep_schema."""
+        self.args.action = 'view-schema'
+        do_bootprep(self.args)
+        self.mock_do_bootprep_schema.assert_called_once_with(self.mock_schema_file)
+
+    def test_do_bootprep_bad_schema(self):
+        """Test a failed call to do_bootprep when the schema is not valid."""
+        self.mock_load_and_validate_schema.side_effect = BootPrepInternalError('bad schema')
+        with self.assertRaises(SystemExit) as raises_cm:
+            with self.assertLogs(level=logging.ERROR) as logs_cm:
+                do_bootprep(self.args)
+        self.assertEqual(1, raises_cm.exception.code)
+        self.assertEqual(1, len(logs_cm.records))
 
 
 if __name__ == '__main__':
