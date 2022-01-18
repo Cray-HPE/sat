@@ -251,23 +251,6 @@ class TestBMCCredsMain(ExtendedTestCase):
             len(self.bmccreds.set_bmc_passwords.mock_calls), 5
         )
 
-    def test_weak_password(self):
-        """Test that a weak password will be flagged by the strength check."""
-        self.cli_args = ['bmccreds', '--password', 'password']
-        self.assert_exits_with_error(
-            do_bmccreds, self.parse_args(),
-            'Please supply a stronger password.'
-        )
-        self.assertEqual(
-            '\n'.join(self.mock_print_output),
-            dedent("""\
-                Bad password. Possible improvements:
-                 - Use a good mix of numbers and letters
-                 - Use a good mix of UPPER case and lower case letters
-                 - Avoid using one of the ten thousand most common passwords
-                 - Passphrases (e.g. an obfuscated sentence) are better than passwords""")
-        )
-
     def test_abort_at_prompt(self):
         """Test that we don't set passwords when the user does not confirm."""
         self.cli_args = ['bmccreds']
@@ -282,14 +265,9 @@ class TestBMCCredsMain(ExtendedTestCase):
         do_bmccreds(self.parse_args())
         self.mock_pester.assert_not_called()
 
-    def test_no_pw_strength_check(self):
-        """Test that a weak password can be set by overriding the strength check."""
-        self.cli_args = ['bmccreds', '--password', 'password', '--no-pw-strength-check']
-        do_bmccreds(self.parse_args())
-
     def test_too_long_password(self):
         """Test that a password that is too long can never be set."""
-        self.cli_args = ['bmccreds', '--password', 'passwordpassword', '--no-pw-strength-check']
+        self.cli_args = ['bmccreds', '--password', 'passwordpassword']
         self.assert_exits_with_error(
             do_bmccreds, self.parse_args(),
             f'Password must be less than or equal to {USER_PASSWORD_MAX_LENGTH} characters.'
@@ -297,7 +275,7 @@ class TestBMCCredsMain(ExtendedTestCase):
 
     def test_with_illegal_characters(self):
         """Test that a password with disallowed characters can never be set."""
-        self.cli_args = ['bmccreds', '--password', 'pas$word', '--no-pw-strength-check']
+        self.cli_args = ['bmccreds', '--password', 'pas$word']
         self.assert_exits_with_error(
             do_bmccreds, self.parse_args(),
             'Password may only contain letters, numbers and underscores.'

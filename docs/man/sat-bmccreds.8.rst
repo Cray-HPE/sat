@@ -22,16 +22,12 @@ The bmccreds subcommand sets BMC Redfish access passwords to user-defined or
 randomly generated values.
 
 When providing a user-defined password, the bmccreds subcommand will check
-the password against several criteria:
+the password against the following criteria:
 
 - The password is a maximum of 8 characters (this is due to BMC manufacturer
   limitations).
 - The password consists only of letters, numbers and underscores (this is due
   to BMC manufacturer limitations).
-- The password meets a minimum threshold for "strength", i.e. it uses a good
-  mix of letters and numbers and is not an easily guessable password. This
-  check uses the Python ``passwordmeter`` library and can be optionally
-  disabled.
 
 When generating random passwords, the bmccreds subcommand can set components
 within the same chassis, cabinet or entire system to the same randomly-generated
@@ -107,9 +103,6 @@ OPTIONS
     ChassisBMC, and RouterBMC. More than one of these can be specified. The
     default is all BMC types. Types not specified will be excluded from
     consideration.
-
-**--no-pw-strength-check**
-    Skip checking password strength for user-supplied passwords.
 
 .. include:: _sat-xname-opts.rst
 .. include:: _sat-format-opts.rst
