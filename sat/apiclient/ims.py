@@ -555,11 +555,13 @@ class IMSClient(APIGatewayClient):
 
         return new_image_id
 
-    def delete_image(self, image_id):
+    def delete_image(self, image_id, permanent=False):
         """Delete an image.
 
         Args:
             image_id (str): the id of the image to delete
+            permanent (bool): if True, permanently delete the image by deleting
+                it from /deleted/images/ as well.
 
         Raises:
             APIError: if the request to delete the image failed
@@ -568,6 +570,14 @@ class IMSClient(APIGatewayClient):
             self.delete('images', image_id)
         except APIError as err:
             raise APIError(f'Failed to delete image with id {image_id}: {err}')
+
+        if not permanent:
+            return
+
+        try:
+            self.delete('deleted', 'images', image_id)
+        except APIError as err:
+            raise APIError(f'Failed to permanently delete image with id {image_id}: {err}')
 
     # TODO (CRAYSAT-1267): Once CASMCMS-7634 is resolved, simplify this to be a PATCH request
     def rename_image(self, image_id, new_name):
@@ -594,8 +604,7 @@ class IMSClient(APIGatewayClient):
         """
         new_image_id = self.copy_image(image_id, new_name)
         try:
-            # TODO (CRAYSAT-1268): Delete the image permanently to avoid leaving cruft
-            self.delete_image(image_id)
+            self.delete_image(image_id, permanent=True)
         except APIError as err:
             raise APIError(f'Failed to delete old image with id {image_id} after '
                            f'it was copied to a new image with id {new_image_id}: {err}')
