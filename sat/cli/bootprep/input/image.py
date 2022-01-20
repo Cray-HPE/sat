@@ -486,6 +486,12 @@ class InputImage:
         if self.completed_successfully:
             LOGGER.info(f'{log_msg}: ID {self.final_image_id}')
         else:
+            debug_command = self.image_configure_session.get_suggested_debug_command()
+            if debug_command and not self.image_configure_success:
+                LOGGER.info('Logs from the failed image configuration K8s container '
+                            'for image %s may be viewed with \'%s\'.',
+                            self.name, debug_command)
+
             LOGGER.error(log_msg)
 
     @property
