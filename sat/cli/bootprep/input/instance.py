@@ -32,7 +32,7 @@ class InputInstance:
     """A representation of the instance loaded from the provided input file.
     """
 
-    def __init__(self, instance_dict, cfs_client, ims_client, bos_client):
+    def __init__(self, instance_dict, cfs_client, ims_client, bos_client, product_catalog):
         """Create a new InputInstance from the validated contents of an input file.
 
         Args:
@@ -44,16 +44,19 @@ class InputInstance:
                 requests to the IMS API
             bos_client (sat.apiclient.BOSClient): the BOS API client to make
                 requests to the BOS API
+            product_catalog (sat.software_inventory.products.ProductCatalog):
+                the product catalog object
         """
         self.instance_dict = instance_dict
         self.cfs_client = cfs_client
         self.ims_client = ims_client
         self.bos_client = bos_client
+        self.product_catalog = product_catalog
 
     @cached_property
     def input_configurations(self):
         """list of InputConfiguration: the configurations in the input instance"""
-        return [InputConfiguration(configuration)
+        return [InputConfiguration(configuration, self.product_catalog)
                 for configuration in self.instance_dict.get('configurations', [])]
 
     @cached_property

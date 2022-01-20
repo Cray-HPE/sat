@@ -24,18 +24,12 @@ OTHER DEALINGS IN THE SOFTWARE.
 from abc import ABC, abstractmethod
 import logging
 from urllib.parse import urlparse, urlunparse
-import warnings
-
-import yaml
-from kubernetes.client import CoreV1Api, ApiException
-from kubernetes.config import load_kube_config, ConfigException
-from pkg_resources import parse_version
-from yaml import YAMLLoadWarning, YAMLError
 
 from sat.apiclient.vcs import VCSError, VCSRepo
 from sat.cached_property import cached_property
 from sat.cli.bootprep.errors import ConfigurationCreateError
 from sat.config import get_config_value
+from sat.software_inventory.products import SoftwareInventoryError
 
 # This value is used to specify that the latest version of a product is desired
 LATEST_VERSION_VALUE = 'latest'
@@ -65,7 +59,11 @@ class InputConfigurationLayer(ABC):
     resolve_branches = True
 
     def __init__(self, layer_data):
-        """Create a new configuration layer."""
+        """Create a new configuration layer.
+
+        Args:
+            layer_data (dict): the layer data from the input instance
+        """
         self.layer_data = layer_data
 
     @property
@@ -121,12 +119,14 @@ class InputConfigurationLayer(ABC):
         return cfs_layer_data
 
     @staticmethod
-    def get_configuration_layer(layer_data):
+    def get_configuration_layer(layer_data, product_catalog):
         """Get and return a new InputConfigurationLayer for the given layer data.
 
         Args:
             layer_data (dict): The data for a layer, already validated against
                 the bootprep input file schema.
+            product_catalog (sat.software_inventory.products.ProductCatalog):
+                the product catalog object
 
         Raises:
             ValueError: if neither 'git' nor 'product' keys are present in the
@@ -136,7 +136,7 @@ class InputConfigurationLayer(ABC):
         if 'git' in layer_data:
             return GitInputConfigurationLayer(layer_data)
         elif 'product' in layer_data:
-            return ProductInputConfigurationLayer(layer_data)
+            return ProductInputConfigurationLayer(layer_data, product_catalog)
         else:
             raise ValueError('Unrecognized type of configuration layer')
 
@@ -194,19 +194,16 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
     A configuration layer that is defined with the name of a product
     and the version or branch.
     """
-    @cached_property
-    def k8s_api(self):
-        """kubernetes.client.CoreV1Api: a kubernetes core API client"""
-        try:
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=YAMLLoadWarning)
-                load_kube_config()
-        # Earlier versions: FileNotFoundError; later versions: ConfigException
-        except (FileNotFoundError, ConfigException) as err:
-            raise ConfigurationCreateError(f'Failed to load Kubernetes config which is required '
-                                           f'to read product catalog data: {err}')
+    def __init__(self, layer_data, product_catalog):
+        """Create a new ProductInputConfigurationLayer.
 
-        return CoreV1Api()
+        Args:
+            layer_data (dict): the layer data from the input instance
+            product_catalog (sat.software_inventory.products.ProductCatalog or None):
+                the product catalog object
+        """
+        super().__init__(layer_data)
+        self.product_catalog = product_catalog
 
     @property
     def product_name(self):
@@ -221,35 +218,15 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
         return self.layer_data['product'].get('version', LATEST_VERSION_VALUE)
 
     @cached_property
-    def product_version_data(self):
-        """dict: the data for the given version of the product from the product catalog"""
-        k8s_api = self.k8s_api
-        try:
-            response = k8s_api.read_namespaced_config_map('cray-product-catalog', 'services')
-        except ApiException as err:
-            raise ConfigurationCreateError(f'Failed to read Kubernetes ConfigMap '
-                                           f'cray-product-catalog in services namespace: {err}')
-
-        config_map_data = response.data or {}
-        try:
-            product_data = yaml.safe_load(config_map_data[self.product_name])
-        except KeyError:
-            raise ConfigurationCreateError(f'Product {self.product_name} not present in product '
-                                           f'catalog')
-        except YAMLError:
-            raise ConfigurationCreateError(f'Product {self.product_name} data not in valid YAML '
-                                           f'format in product catalog')
-
-        if self.product_version == LATEST_VERSION_VALUE:
-            latest_version = sorted(product_data.keys(), key=parse_version)[-1]
-            LOGGER.info(f'Using latest version ({latest_version}) of product {self.product_name}')
-            return product_data[latest_version]
+    def matching_product(self):
+        """sat.software_inventory.products.InstalledProductVersion: the matching installed product"""
+        if self.product_catalog is None:
+            raise ConfigurationCreateError(f'Product catalog data is not available.')
 
         try:
-            return product_data[self.product_version]
-        except KeyError:
-            raise ConfigurationCreateError(f'No match found for version {self.product_version} '
-                                           f'of product {self.product_name} in product catalog')
+            return self.product_catalog.get_product(self.product_name, self.product_version)
+        except SoftwareInventoryError as err:
+            raise ConfigurationCreateError(f'Unable to get product data from product catalog: {err}')
 
     @staticmethod
     def substitute_url_hostname(url):
@@ -267,13 +244,10 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
 
     @cached_property
     def clone_url(self):
-        try:
-            return self.substitute_url_hostname(
-                self.product_version_data['configuration']['clone_url']
-            )
-        except KeyError as err:
-            raise ConfigurationCreateError(f'No clone URL present for product {self.product_name}; '
-                                           f'missing key: {err}')
+        if self.matching_product.clone_url is None:
+            raise ConfigurationCreateError(f'No clone URL present for version {self.product_version} '
+                                           f'of product {self.product_name}')
+        return self.substitute_url_hostname(self.matching_product.clone_url)
 
     @cached_property
     def branch(self):
@@ -291,22 +265,23 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
             return None
 
         # If no branch is specified get the commit from the product catalog
-        try:
-            return self.product_version_data['configuration']['commit']
-        except KeyError as err:
-            raise ConfigurationCreateError(f'No commit present for product {self.product_name}; '
-                                           f'missing key: {err}')
+        if self.matching_product.commit is None:
+            raise ConfigurationCreateError(f'No commit present for version {self.product_version} '
+                                           f'of product {self.product_name}')
+        return self.matching_product.commit
 
 
 class InputConfiguration:
     """A CFS Configuration from a bootprep input file."""
 
-    def __init__(self, configuration_data):
+    def __init__(self, configuration_data, product_catalog):
         """Create a new InputConfiguration.
 
         Args:
             configuration_data (dict): The data for a configuration, already
                 validated against the bootprep input file schema.
+            product_catalog (sat.software_inventory.products.ProductCatalog):
+                the product catalog object
 
         Raises:
             ValueError: if any of the layers in the given `configuration_data`
@@ -315,7 +290,7 @@ class InputConfiguration:
         """
         self.configuration_data = configuration_data
         # The 'layers' property is required and must be a list, but it can be empty
-        self.layers = [InputConfigurationLayer.get_configuration_layer(layer_data)
+        self.layers = [InputConfigurationLayer.get_configuration_layer(layer_data, product_catalog)
                        for layer_data in self.configuration_data['layers']]
 
     @property

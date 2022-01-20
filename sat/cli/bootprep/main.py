@@ -48,6 +48,7 @@ from sat.cli.bootprep.validate import (
     SCHEMA_FILE_RELATIVE_PATH,
 )
 from sat.session import SATSession
+from sat.software_inventory.products import ProductCatalog, SoftwareInventoryError
 
 
 LOGGER = logging.getLogger(__name__)
@@ -124,7 +125,16 @@ def do_bootprep_run(schema_validator, args):
     ims_client = IMSClient(session)
     bos_client = BOSClient(session)
 
-    instance = InputInstance(instance_data, cfs_client, ims_client, bos_client)
+    try:
+        product_catalog = ProductCatalog()
+    except SoftwareInventoryError as err:
+        LOGGER.warning('Failed to load product catalog data. Creation of any input items '
+                       'that require data from the product catalog will fail.')
+        # Any item from the InputInstance that needs to access product catalog
+        # data will fail. Otherwise, this is not a problem.
+        product_catalog = None
+
+    instance = InputInstance(instance_data, cfs_client, ims_client, bos_client, product_catalog)
 
     # TODO (CRAYSAT-1277): Refactor images to use BaseInputItemCollection
     # TODO (CRAYSAT-1278): Refactor configurations to use BaseInputItemCollection
