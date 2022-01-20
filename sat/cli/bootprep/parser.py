@@ -23,8 +23,9 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 from inflect import engine
 
-from sat.cli.bootprep.constants import DEFAULT_PUBLIC_KEY_FILE
+from sat.cli.bootprep.constants import DEFAULT_PUBLIC_KEY_FILE, DOCS_ARCHIVE_FILE_NAME
 
+OUTPUT_DIR_OPTION = '--output-dir'
 
 inflector = engine()
 
@@ -74,9 +75,9 @@ def add_output_dir_option(parser):
         None
     """
     parser.add_argument(
-        '--output-dir', '-o', default='.',
+        OUTPUT_DIR_OPTION, '-o', default='.',
         help='The directory to which files output by the "--save-files" option '
-             'or the "generate-docs" action should be output.'
+             'to the run action or by the "generate-docs" action should be output.'
     )
 
 
@@ -118,8 +119,10 @@ def _add_bootprep_generate_docs_subparser(subparsers):
     """
     docs_subparser = subparsers.add_parser(
         'generate-docs', help='Generate bootprep schema documentation.',
-        description='Generate human-readable HTML documentation from the '
-                    'bootprep input file schema.'
+        description=f'Generate human-readable HTML documentation from the '
+                    f'bootprep input file schema and save it to a file named '
+                    f'{DOCS_ARCHIVE_FILE_NAME} in the directory specified by '
+                    f'{OUTPUT_DIR_OPTION}.'
     )
     add_output_dir_option(docs_subparser)
 

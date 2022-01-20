@@ -30,10 +30,10 @@ from unittest.mock import patch
 from sat.cli.bootprep.documentation import (
     BootPrepDocsError,
     DEFAULT_TAR_MODE,
-    DOCS_ARCHIVE_NAME,
     display_schema,
     generate_docs_tarball,
 )
+from sat.cli.bootprep.constants import DOCS_ARCHIVE_FILE_NAME, DOCS_ARCHIVE_NAME
 
 
 class TestGenerateTarball(unittest.TestCase):
@@ -41,7 +41,7 @@ class TestGenerateTarball(unittest.TestCase):
     def setUp(self):
         self.schema_path = 'path/to/schema'
         self.output_dir = '/some/output/dir'
-        self.output_path = os.path.join(self.output_dir, f'{DOCS_ARCHIVE_NAME}.tar.gz')
+        self.output_path = os.path.join(self.output_dir, DOCS_ARCHIVE_FILE_NAME)
         self.temp_dir = '/some/tmp/dir'
 
         self.mock_cwd = patch('sat.cli.bootprep.documentation.cwd').start()
