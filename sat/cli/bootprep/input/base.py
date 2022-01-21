@@ -114,7 +114,7 @@ class BaseInputItem(Validatable, ABC):
     # The description for the input item, to be overridden by each subclass
     description = 'base input item'
 
-    def __init__(self, data, instance, **kwargs):
+    def __init__(self, data, instance, **_):
         """Create a new BaseInputItem.
 
         Args:
@@ -337,8 +337,12 @@ class BaseInputItemCollection(ABC, Validatable):
         """
         pass
 
-    def create_items(self):
+    def create_items(self, dumper=None):
         """Create the items in this collection of items.
+
+        Args:
+            dumper (None or sat.cli.bootprep.output.RequestDumper):
+                a dumper object to dump API request data.
 
         Raises:
             InputItemCreateError: if there is a failure to create one or more items
@@ -352,7 +356,7 @@ class BaseInputItemCollection(ABC, Validatable):
         failed_items = []
         for item in self.items_to_create:
             try:
-                item.create()
+                item.create(dumper=dumper)
             except InputItemCreateError as err:
                 failed_items.append(item)
                 LOGGER.error(f'Failed to create {item}: {err}')

@@ -25,7 +25,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [3.13.1] - 2022-01-26
+
+### Added
+- When ``--save-files`` is passed to ``sat bootprep``, BOS session template API
+  request bodies will now be saved in addition to CFS configuration API request
+  bodies.
 
 ### Fixed
 - Improved ``sat bootprep`` to wait properly on CFS image configuration sessions

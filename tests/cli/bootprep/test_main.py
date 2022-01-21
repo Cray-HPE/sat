@@ -126,6 +126,7 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_session_templates = self.mock_input_instance.input_session_templates
         self.mock_product_catalog_cls = patch('sat.cli.bootprep.main.ProductCatalog').start()
         self.mock_product_catalog = self.mock_product_catalog_cls.return_value
+        self.mock_request_dumper = patch('sat.cli.bootprep.main.RequestDumper').start()
 
     def tearDown(self):
         patch.stopall()
@@ -146,7 +147,8 @@ class TestDoBootprepRun(unittest.TestCase):
             self.overwrite_templates, self.skip_existing_templates, self.dry_run
         )
         self.mock_session_templates.validate.assert_called_once_with(dry_run=self.dry_run)
-        self.mock_session_templates.create_items.assert_called_once_with()
+        self.mock_session_templates.create_items.assert_called_once_with(
+            dumper=self.mock_request_dumper.return_value)
         info_msgs = [r.msg for r in cm.records]
         expected_msgs = [
             f'Validating given input file {self.input_file}',

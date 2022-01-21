@@ -46,6 +46,7 @@ from sat.cli.bootprep.documentation import (
 )
 from sat.cli.bootprep.example import BootprepExampleError, get_example_cos_and_uan_data
 from sat.cli.bootprep.image import create_images
+from sat.cli.bootprep.output import ensure_output_directory, RequestDumper
 from sat.cli.bootprep.validate import (
     load_and_validate_instance,
     load_and_validate_schema,
@@ -56,33 +57,6 @@ from sat.software_inventory.products import ProductCatalog, SoftwareInventoryErr
 
 
 LOGGER = logging.getLogger(__name__)
-
-
-def ensure_output_directory(args):
-    """Ensure the output directory exists if necessary.
-
-    Args:
-        args: The argparse.Namespace object containing the parsed arguments
-            passed to this subcommand.
-
-    Returns:
-        None
-
-    Raises:
-        SystemExit: If a fatal error is encountered.
-    """
-    must_create_output_dir = (
-        (args.action == 'run' and args.save_files
-         or args.action in ('generate-docs', 'generate-example'))
-        and args.output_dir != '.'
-    )
-    if must_create_output_dir:
-        try:
-            os.makedirs(args.output_dir, exist_ok=True)
-        except OSError as err:
-            LOGGER.error(f'Unable to ensure output directory {args.output_dir} '
-                         f'exists: {err}')
-            raise SystemExit(1)
 
 
 def do_bootprep_docs(args):
@@ -190,8 +164,8 @@ def do_bootprep_run(schema_validator, args):
     try:
         product_catalog = ProductCatalog()
     except SoftwareInventoryError as err:
-        LOGGER.warning('Failed to load product catalog data. Creation of any input items '
-                       'that require data from the product catalog will fail.')
+        LOGGER.warning(f'Failed to load product catalog data. Creation of any input items '
+                       f'that require data from the product catalog will fail. ({err})')
         # Any item from the InputInstance that needs to access product catalog
         # data will fail. Otherwise, this is not a problem.
         product_catalog = None
@@ -242,7 +216,8 @@ def do_bootprep_run(schema_validator, args):
 
     if not args.dry_run:
         try:
-            instance.input_session_templates.create_items()
+            request_dumper = RequestDumper('BOS session template', args)
+            instance.input_session_templates.create_items(dumper=request_dumper)
         except InputItemCreateError as err:
             LOGGER.error(str(err))
             raise SystemExit(1)
