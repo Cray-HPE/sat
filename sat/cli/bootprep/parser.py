@@ -23,8 +23,9 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 from inflect import engine
 
-from sat.cli.bootprep.constants import DEFAULT_PUBLIC_KEY_FILE
+from sat.cli.bootprep.constants import DEFAULT_PUBLIC_KEY_FILE, DOCS_ARCHIVE_FILE_NAME, EXAMPLE_FILE_NAME
 
+OUTPUT_DIR_OPTION = '--output-dir'
 
 inflector = engine()
 
@@ -74,9 +75,10 @@ def add_output_dir_option(parser):
         None
     """
     parser.add_argument(
-        '--output-dir', '-o', default='.',
+        OUTPUT_DIR_OPTION, '-o', default='.',
         help='The directory to which files output by the "--save-files" option '
-             'or the "generate-docs" action should be output.'
+             'to the run action or by the "generate-docs" or "generate-example" '
+             'actions should be output.'
     )
 
 
@@ -104,6 +106,7 @@ def add_bootprep_subparser(subparsers):
     _add_bootprep_run_subparser(actions_subparsers)
     _add_bootprep_generate_docs_subparser(actions_subparsers)
     _add_bootprep_view_schema_subparser(actions_subparsers)
+    _add_bootprep_example_subparser(actions_subparsers)
 
 
 def _add_bootprep_generate_docs_subparser(subparsers):
@@ -118,8 +121,10 @@ def _add_bootprep_generate_docs_subparser(subparsers):
     """
     docs_subparser = subparsers.add_parser(
         'generate-docs', help='Generate bootprep schema documentation.',
-        description='Generate human-readable HTML documentation from the '
-                    'bootprep input file schema.'
+        description=f'Generate human-readable HTML documentation from the '
+                    f'bootprep input file schema and save it to a file named '
+                    f'{DOCS_ARCHIVE_FILE_NAME} in the directory specified by '
+                    f'{OUTPUT_DIR_OPTION}.'
     )
     add_output_dir_option(docs_subparser)
 
@@ -139,6 +144,26 @@ def _add_bootprep_view_schema_subparser(subparsers):
         description='View the bootprep input file jsonschema schema in '
                     'raw YAML format.'
     )
+
+
+def _add_bootprep_example_subparser(subparsers):
+    """Add the options for 'sat bootprep generate-example'.
+
+    Args:
+        subparsers: The argparse.ArgumentParser object returned by the
+            add_subparsers method.
+
+    Returns:
+        None
+    """
+    example_subparser = subparsers.add_parser(
+        'generate-example', help='Generate an example bootprep input file.',
+        description='Generate an example bootprep input file using product '
+                    'catalog data. The output will be saved to a file named '
+                    f'{EXAMPLE_FILE_NAME} in the directory specified by '
+                    f'{OUTPUT_DIR_OPTION}.'
+    )
+    add_output_dir_option(example_subparser)
 
 
 def _add_bootprep_run_subparser(subparsers):

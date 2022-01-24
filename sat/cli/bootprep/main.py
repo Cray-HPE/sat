@@ -22,6 +22,8 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 import logging
+import os
+import yaml
 
 from sat.apiclient import BOSClient, CFSClient, IMSClient
 from sat.cli.bootprep.errors import (
@@ -36,11 +38,13 @@ from sat.cli.bootprep.errors import (
 )
 from sat.cli.bootprep.input.instance import InputInstance
 from sat.cli.bootprep.configuration import create_configurations
+from sat.cli.bootprep.constants import EXAMPLE_FILE_NAME
 from sat.cli.bootprep.documentation import (
     display_schema,
     generate_docs_tarball,
     resource_absolute_path,
 )
+from sat.cli.bootprep.example import BootprepExampleError, get_example_cos_and_uan_data
 from sat.cli.bootprep.image import create_images
 from sat.cli.bootprep.validate import (
     load_and_validate_instance,
@@ -48,9 +52,37 @@ from sat.cli.bootprep.validate import (
     SCHEMA_FILE_RELATIVE_PATH,
 )
 from sat.session import SATSession
+from sat.software_inventory.products import ProductCatalog, SoftwareInventoryError
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def ensure_output_directory(args):
+    """Ensure the output directory exists if necessary.
+
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this subcommand.
+
+    Returns:
+        None
+
+    Raises:
+        SystemExit: If a fatal error is encountered.
+    """
+    must_create_output_dir = (
+        (args.action == 'run' and args.save_files
+         or args.action in ('generate-docs', 'generate-example'))
+        and args.output_dir != '.'
+    )
+    if must_create_output_dir:
+        try:
+            os.makedirs(args.output_dir, exist_ok=True)
+        except OSError as err:
+            LOGGER.error(f'Unable to ensure output directory {args.output_dir} '
+                         f'exists: {err}')
+            raise SystemExit(1)
 
 
 def do_bootprep_docs(args):
@@ -95,6 +127,37 @@ def do_bootprep_schema(schema_file_contents):
         raise SystemExit(1)
 
 
+def do_bootprep_example(args):
+    """Generate an example bootprep input file.
+
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this subcommand.
+
+    Returns:
+        None
+
+    Raises:
+        SystemExit: If a fatal error is encountered.
+    """
+    full_example_file_path = os.path.join(args.output_dir, EXAMPLE_FILE_NAME)
+
+    try:
+        example_data = get_example_cos_and_uan_data()
+    except BootprepExampleError as err:
+        LOGGER.error(str(err))
+        raise SystemExit(1)
+
+    try:
+        with open(full_example_file_path, 'w') as f:
+            yaml.dump(example_data, f, sort_keys=False)
+    except OSError as err:
+        LOGGER.error(f'Failed to write example data to file {full_example_file_path}: {err}')
+        raise SystemExit(1)
+
+    LOGGER.info(f'Wrote example bootprep input file to {full_example_file_path}.')
+
+
 def do_bootprep_run(schema_validator, args):
     """Create images, configurations, and/or session templates.
 
@@ -124,7 +187,16 @@ def do_bootprep_run(schema_validator, args):
     ims_client = IMSClient(session)
     bos_client = BOSClient(session)
 
-    instance = InputInstance(instance_data, cfs_client, ims_client, bos_client)
+    try:
+        product_catalog = ProductCatalog()
+    except SoftwareInventoryError as err:
+        LOGGER.warning('Failed to load product catalog data. Creation of any input items '
+                       'that require data from the product catalog will fail.')
+        # Any item from the InputInstance that needs to access product catalog
+        # data will fail. Otherwise, this is not a problem.
+        product_catalog = None
+
+    instance = InputInstance(instance_data, cfs_client, ims_client, bos_client, product_catalog)
 
     # TODO (CRAYSAT-1277): Refactor images to use BaseInputItemCollection
     # TODO (CRAYSAT-1278): Refactor configurations to use BaseInputItemCollection
@@ -192,9 +264,13 @@ def do_bootprep(args):
         LOGGER.error(f'Internal error while loading schema: {err}')
         raise SystemExit(1)
 
+    ensure_output_directory(args)
+
     if args.action == 'run':
         do_bootprep_run(schema_validator, args)
     elif args.action == 'generate-docs':
         do_bootprep_docs(args)
     elif args.action == 'view-schema':
         do_bootprep_schema(schema_file_contents)
+    elif args.action == 'generate-example':
+        do_bootprep_example(args)

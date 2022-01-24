@@ -33,13 +33,13 @@ import tempfile
 
 from json_schema_for_humans.generate import generate_from_filename
 
+from sat.cli.bootprep.constants import DOCS_ARCHIVE_FILE_NAME, DOCS_ARCHIVE_NAME
 from sat.cli.bootprep.errors import BootPrepDocsError
 
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_HTML_INDEX = 'index.html'
 DEFAULT_TAR_MODE = 'w:gz'  # Writable archive with transparent gzip
-DOCS_ARCHIVE_NAME = 'bootprep-schema-docs'  # Name of the top-level directory within the docs tarball
 
 
 @contextlib.contextmanager
@@ -116,8 +116,7 @@ def generate_docs_tarball(schema_path, output_dir):
                 docs_output_path = os.path.join(tempdir, DEFAULT_HTML_INDEX)
                 generate_from_filename(schema_path, docs_output_path)
 
-            tarball_name = f'{DOCS_ARCHIVE_NAME}.tar.gz'
-            tarball_output_path = os.path.join(output_dir, tarball_name)
+            tarball_output_path = os.path.join(output_dir, DOCS_ARCHIVE_FILE_NAME)
             with tarfile.open(name=tarball_output_path, mode=DEFAULT_TAR_MODE) as output_tar:
                 output_tar.add(tempdir, arcname=DOCS_ARCHIVE_NAME)
     except OSError as err:

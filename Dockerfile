@@ -17,6 +17,8 @@ COPY tools /sat/tools
 COPY docker_scripts/docker_entrypoint.sh /docker_entrypoint.sh
 COPY docker_scripts/sat_container_prompt.sh /etc/profile.d/sat_container_prompt.sh
 
+ARG PIP_EXTRA_INDEX_URL="https://arti.dev.cray.com/artifactory/csm-python-modules-remote/simple"
+
 RUN apk update && \
     apk add --no-cache python3-dev py3-pip bash openssl-dev libffi-dev \
         openssh curl musl-dev git make gcc mandoc ipmitool ceph-common rust cargo && \

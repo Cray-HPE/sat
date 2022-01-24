@@ -27,7 +27,36 @@ ARGUMENTS
 
 **ACTION**
         Specify the action for sat bootprep to execute. This should be ``run``,
-        ``generate-docs``, or ``view-schema``.
+        ``generate-docs``, ``generate-example``, or ``view-schema``.
+
+        **run**
+                Process an input file, creating CFS configurations, building and
+                customizing IMS images, and creating BOS session templates as
+                specified in the input file.
+
+        **generate-docs**
+                Generate HTML documentation describing the input file schema and
+                save it to a gzipped tar file.
+
+        **generate-example**
+                Generate an example input file which is an appropriate starting
+                point for creating CFS configurations, IMS images, and BOS
+                session templates for booting compute nodes and UANs in the
+                system.
+
+                The example is generated using hard-coded information about
+                which products are expected to provide CFS configuration layers
+                and IMS image recipes along with information from the
+                cray-product-catalog Kubernetes ConfigMap in the services
+                namespace.
+
+                The example can be modified, and the file can be renamed to more
+                accurately reflect its contents.
+
+        **view-schema**
+                Print the raw JSON Schema definition which is used to validate
+                the schema of input files given to the ``run`` action.
+    
 
 RUN ARGUMENTS
 -------------
@@ -53,8 +82,9 @@ These options apply to multiple actions.
 **--output-dir OUTPUT_DIR, -o OUTPUT_DIR**
         The directory to which created files should be written. Files are
         created by the ``--save-files`` option in the ``run`` action and by the
-        ``generate-docs`` action. If not specified, then the working directory
-        is used. This option is not valid with the ``view-schema`` action.
+        ``generate-docs`` and ``generate-examples`` actions. If not specified,
+        then the working directory is used. This option is not valid with the
+        ``view-schema`` action.
 
 
 RUN OPTIONS
@@ -134,6 +164,12 @@ Generate HTML documentation for the input file schema:
 ::
 
         # sat bootprep generate-docs
+
+Generate an example bootprep input file:
+
+::
+
+        # sat bootprep generate-example
 
 SEE ALSO
 ========
