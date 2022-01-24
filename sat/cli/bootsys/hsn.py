@@ -30,7 +30,7 @@ import inflect
 from sat.apiclient import FabricControllerClient
 from sat.cached_property import cached_property
 from sat.cli.bootsys.state_recorder import HSNStateRecorder, StateError
-from sat.cli.bootsys.waiting import GroupWaiter
+from sat.waiting import GroupWaiter
 from sat.config import get_config_value
 from sat.session import SATSession
 from sat.util import BeginEndLogger

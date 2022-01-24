@@ -549,7 +549,7 @@ class TestRemoteServiceWaiter(unittest.TestCase):
         # make it appear as though time has passed.
         self.waiter.timeout = 2
         self.waiter.poll_interval = 0
-        with mock.patch('sat.cli.bootsys.waiting.time.monotonic', side_effect=range(5)):
+        with mock.patch('sat.waiting.time.monotonic', side_effect=range(5)):
             with self.assertLogs(level=logging.ERROR):
                 self.assertFalse(self.waiter.wait_for_completion())
 
@@ -561,7 +561,7 @@ class TestRemoteServiceWaiter(unittest.TestCase):
         # make it appear as though time has passed.
         self.waiter.timeout = 2
         self.waiter.poll_interval = 0
-        with mock.patch('sat.cli.bootsys.waiting.time.monotonic', side_effect=range(5)):
+        with mock.patch('sat.waiting.time.monotonic', side_effect=range(5)):
             with self.assertLogs(level=logging.ERROR):
                 self.assertFalse(self.waiter.wait_for_completion())
 
@@ -579,7 +579,7 @@ class TestRemoteServiceWaiter(unittest.TestCase):
         # make it appear as though time has passed.
         self.waiter.timeout = 2
         self.waiter.poll_interval = 0
-        with mock.patch('sat.cli.bootsys.waiting.time.monotonic', side_effect=range(5)):
+        with mock.patch('sat.waiting.time.monotonic', side_effect=range(5)):
             with self.assertLogs(level=logging.ERROR):
                 self.assertFalse(self.waiter.wait_for_completion())
 
@@ -592,7 +592,7 @@ class TestRemoteServiceWaiter(unittest.TestCase):
         # make it appear as though time has passed.
         self.waiter.timeout = 2
         self.waiter.poll_interval = 0
-        with mock.patch('sat.cli.bootsys.waiting.time.monotonic', side_effect=range(5)):
+        with mock.patch('sat.waiting.time.monotonic', side_effect=range(5)):
             with self.assertLogs(level=logging.ERROR):
                 self.assertFalse(self.waiter.wait_for_completion())
 

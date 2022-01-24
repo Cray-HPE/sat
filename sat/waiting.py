@@ -350,7 +350,7 @@ class GroupWaiter(Waiter):
                     if self.member_has_completed(member):
                         completed.add(member)
                 except WaitingFailure as err:
-                    LOGGER.error('Could not wait for condition "%s" for member %s: %s',
+                    LOGGER.error('Failed to wait for condition "%s" for member %s: %s',
                                  self.condition_name(), str(member), err)
                     self.failed.add(member)
 

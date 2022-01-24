@@ -255,6 +255,13 @@ class TestGetValByPath(unittest.TestCase):
         self.assertEqual('bat', util.get_val_by_path(d, 'foo.bar.baz'))
         self.assertEqual(None, util.get_val_by_path(d, 'does.not.exist'))
 
+    def test_nonetype_value(self):
+        """Test getting a value when an intermediate value is None."""
+        d = {
+            'foo': None
+        }
+        self.assertIsNone(util.get_val_by_path(d, 'foo.bar'))
+
 
 class TestGetNewOrderedDict(unittest.TestCase):
     """Test the get_new_ordered_dict function."""

@@ -27,7 +27,7 @@ from inflect import engine
 
 from sat.apiclient import APIError, CAPMCClient, CAPMCError, HSMClient
 from sat.session import SATSession
-from sat.cli.bootsys.waiting import GroupWaiter
+from sat.waiting import GroupWaiter
 
 LOGGER = logging.getLogger(__name__)
 

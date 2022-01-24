@@ -119,9 +119,11 @@ class APIGatewayClient:
                 r = requester.post(url, data=req_param, verify=self.cert_verify,
                                    json=json, timeout=self.timeout)
             elif req_type == 'PUT':
-                r = requester.put(url, data=req_param, verify=self.cert_verify, timeout=self.timeout)
+                r = requester.put(url, data=req_param, verify=self.cert_verify,
+                                  json=json, timeout=self.timeout)
             elif req_type == 'PATCH':
-                r = requester.patch(url, data=req_param, verify=self.cert_verify, timeout=self.timeout)
+                r = requester.patch(url, data=req_param, verify=self.cert_verify,
+                                    json=json, timeout=self.timeout)
             elif req_type == 'DELETE':
                 r = requester.delete(url, verify=self.cert_verify, timeout=self.timeout)
             else:
@@ -218,13 +220,14 @@ class APIGatewayClient:
 
         return r
 
-    def put(self, *args, payload):
+    def put(self, *args, payload=None, json=None):
         """Issue an HTTP PUT request to resource given in `args`.
 
         Args:
             *args: Variable length list of path components used to construct
                 the path to PUT target.
-            payload: JSON data to put.
+            payload: The encoded data to send as the PUT body.
+            json: The data dict to encode as JSON and send as the PUT body.
 
         Returns:
             The requests.models.Response object if the request was successful.
@@ -234,17 +237,18 @@ class APIGatewayClient:
                 raises a RequestException of any kind.
         """
 
-        r = self._make_req(*args, req_type='PUT', req_param=payload)
+        r = self._make_req(*args, req_type='PUT', req_param=payload, json=json)
 
         return r
 
-    def patch(self, *args, payload):
+    def patch(self, *args, payload=None, json=None):
         """Issue an HTTP PATCH request to resource given in `args`.
 
         Args:
             *args: Variable length list of path components used to construct
                 the path to PATCH target.
-            payload: JSON data to put.
+            payload: The encoded data to send as the PATCH body.
+            json: The data dict to encode as JSON and send as the PATCH body.
 
         Returns:
             The requests.models.Response object if the request was successful.
@@ -254,7 +258,7 @@ class APIGatewayClient:
                 raises a RequestException of any kind.
         """
 
-        r = self._make_req(*args, req_type='PATCH', req_param=payload)
+        r = self._make_req(*args, req_type='PATCH', req_param=payload, json=json)
 
         return r
 

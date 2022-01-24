@@ -1,0 +1,355 @@
+---
+# Schema definition for the file taken as input to `sat bootprep`
+#
+# (C) Copyright 2021 Hewlett Packard Enterprise Development LP.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+
+# TODO (CRAYSAT-1130): Update this to use 2020-12 once official release of jsonschema supports it
+$schema: "https://json-schema.org/draft-07/schema"
+title: Bootprep Input File
+description: >
+  A description of the set of CFS configurations to create, the set of IMS
+  images to create and optionally customize with the defined CFS configurations,
+  and the set of BOS session templates to create that reference the defined
+  images and configurations.
+type: object
+additionalProperties: false
+properties:
+  configurations:
+    description: The set of CFS configurations to create.
+    type: array
+    items:
+      description: An individual CFS configuration to create.
+      type: object
+      required: ['name', 'layers']
+      additionalProperties: false
+      properties:
+        name:
+          description: >
+            The name of the CFS configuration. This name must be unique
+            in CFS.
+          type: string
+        description:
+          description: >
+            The description of the CFS configuration. This is optional.
+            CFS does not support this yet, but CASMCMS-7456 will add support.
+          type: string
+        layers:
+          description: The layers of the CFS configuration
+          type: array
+          items:
+            oneOf:
+            - description: >
+                A layer of the CFS configuration defined using an explicit git
+                repository URL and commit hash or branch name.
+              type: object
+              required: ['git']
+              additionalProperties: false
+              properties:
+                name:
+                  $ref: '#/$defs/CFSLayerName'
+                playbook:
+                  $ref: '#/$defs/CFSLayerPlaybook'
+                git:
+                  oneOf:
+                  - description: >
+                      Git repository URL and commit hash to use.
+                    type: object
+                    required: ['url', 'commit']
+                    additionalProperties: false
+                    properties:
+                      url:
+                        $ref: '#/$defs/CFSLayerGitURL'
+                      commit:
+                        description: The commit hash in the git repository.
+                        type: string
+                  - description: >
+                      Git repository URL and branch to use.
+                    type: object
+                    required: ['url', 'branch']
+                    additionalProperties: false
+                    properties:
+                      url:
+                        $ref: '#/$defs/CFSLayerGitURL'
+                      branch:
+                        description: >
+                          The branch of the git repository. This can be either
+                          converted to a commit hash before creating the
+                          configurations, or it can optionally be passed
+                          directly to CFS by passing the `--no-resolve-branches`
+                          option to `sat bootprep`. In the latter instance, when
+                          the CFS configuration is created, CFS determines the
+                          commit hash for the HEAD of this branch and stores
+                          both the branch name and commit hash in the layer of
+                          the configuration. CFS can use the branch name to
+                          update the commit hash to the latest HEAD of the
+                          branch if requested.
+                        type: string
+
+            - description: >
+                A layer of the CFS configuration defined using a product's
+                configuration management repository.
+              type: object
+              required: ['product']
+              additionalProperties: false
+              properties:
+                name:
+                  $ref: '#/$defs/CFSLayerName'
+                playbook:
+                  $ref: '#/$defs/CFSLayerPlaybook'
+                product:
+                  oneOf:
+                  - description: >
+                      Product name and version to define a CFS layer.
+                    type: object
+                    required: ['name', 'version']
+                    additionalProperties: false
+                    properties:
+                      name:
+                        $ref: '#/$defs/CFSLayerProductName'
+                      version:
+                        $ref: '#/$defs/CFSLayerProductVersion'
+                  - description: >
+                      Product name and branch to define a CFS layer.
+                    type: object
+                    required: ['name', 'branch']
+                    additionalProperties: false
+                    properties:
+                      name:
+                        $ref: '#/$defs/CFSLayerProductName'
+                      version:
+                        $ref: '#/$defs/CFSLayerProductVersion'
+                      branch:
+                        description: >
+                          The branch of the product's config management git
+                          repository to use.
+                        type: string
+
+  images:
+    description: The images to create and customize.
+    type: array
+    items:
+      description: An image to create and customize.
+      type: object
+      required: ['name', 'ims']
+      # TODO (CRAYSAT-1130): Update this to use "dependentRequired" once jsonschema supports 2020-12 JSON Schema
+      # Using "dependencies" for compatibility with draft-07 schema
+      dependencies:
+        configuration: ['configuration_group_names']
+      additionalProperties: false
+      properties:
+        name:
+          description: >
+            The name of the image that will be created in IMS. The image name
+            must be unique in IMS even though IMS does not enforce unique names.
+            This is required to allow reference to the image by name in the
+            session_templates section.
+
+            If the image name is not unique in IMS, this command will fail and
+            will not create another IMS image with this name.
+          type: string
+        description:
+          description: >
+            The description of the image. This is optional and is not currently
+            stored in the resulting IMS image.
+          type: string
+        ims:
+          oneOf:
+          - description: An IMS image or image recipe specified by name.
+            type: object
+            required: ['is_recipe', 'name']
+            additionalProperties: false
+            properties:
+              is_recipe:
+                $ref: '#/$defs/IMSIsRecipe'
+              name:
+                description: >
+                  The name of the image or recipe depending on the value of
+                  is_recipe above. Note that IMS does not ensure names of
+                  images or recipes are unique. If the given name is not
+                  unique, an error will be reported to the user, and they
+                  will have to specify it by id instead.
+                type: string
+          - description: An IMS image or image recipe specified by id.
+            type: object
+            required: ['is_recipe', 'id']
+            additionalProperties: false
+            properties:
+              is_recipe:
+                $ref: '#/$defs/IMSIsRecipe'
+              id:
+                description: >
+                  The id of the image or recipe depending on the value of
+                  is_recipe above. IMS does ensure that this id is unique.
+                type: string
+        configuration:
+          description: >
+            The name of the configuration to use for customizing the image
+            prior to boot. This is optional. If omitted, the image will
+            not be customized. If present, a value must be provided for
+            configuration_group_names.
+          type: string
+        configuration_group_names:
+          description: >
+            The name of the Ansible groups to set up in the CFS session when
+            customizing the image. Required if the "configuration" field is
+            present.
+          type: array
+          items:
+            description: >
+              The name of the Ansible group to create within the CFS image
+              customization session. The group will have as its member the
+              IMS image customization container for the given IMS image.
+            type: string
+
+  session_templates:
+    description: The BOS session templates to create.
+    type: array
+    items:
+      description: A BOS session template to create.
+      type: object
+      required: ['name', 'image', 'configuration', 'bos_parameters']
+      additionalProperties: false
+      properties:
+        name:
+          description: >
+            The name of the session template to create. This is the name
+            the session template will have in BOS.
+          type: string
+        image:
+          description: >
+            The image to use from IMS. This will first be treated as the name
+            of an IMS image. If multiple images with this name exist, then an
+            error will be reported. If it is not the name of an IMS image, and
+            it takes the form of a UUID, then it will be treated as an IMS
+            image ID. If it is neither a valid IMS image name nor a valid IMS
+            image ID, then an error will be reported.
+
+            This image will be used to boot the nodes in this session template.
+            The s3 path to the manifest.json file will be determined from the
+            IMS image, and it will be populated in the "path" key in the boot
+            set(s) within the session template.
+          type: string
+        configuration:
+          description: >
+            The name of the CFS configuration that will be applied to the
+            nodes in this session template after they have been booted.
+          type: string
+        bos_parameters:
+          description: >
+            The parameters specified here will be passed through to BOS.
+          required: ['boot_sets']
+          type: object
+          properties:
+            boot_sets:
+              description: >
+                BOS boot sets are defined here and support all the same
+                properties as in BOS itself. The main difference is that
+                some properties of the BOS boot sets are automatically
+                populated, including the etag, path, and type, which are
+                all determined from the built IMS image.
+              type: object
+              # There should be at least one boot_set defined
+              minProperties: 1
+              # This will apply the following schema to the values of all
+              # possible properties within this boot_sets object, which will
+              # be the individual boot sets.
+              additionalProperties:
+                description: A boot set within the session template.
+                type: object
+                properties:
+                  kernel_parameters:
+                    description: >
+                      Starting in CSM 1.0, which is to be released in Shasta v1.5,
+                      kernel parameters can be specified in the IMS image. They are
+                      stored in a file listed in the image manifest. Kernel parameters
+                      specified in the BOS session template will be appended to the
+                      list of kernel parameters from the image.
+                    type: string
+                  network:
+                    description: The network over which the nodes will boot.
+                    type: string
+                    default: "nmn"
+                  node_list:
+                    description: Individual nodes to boot in the boot set.
+                    type: array
+                    items:
+                      description: A node xname.
+                      type: string
+                  node_roles_groups:
+                    description: Roles to boot in the boot set.
+                    type: array
+                    items:
+                      description: A node role.
+                      type: string
+                  node_groups:
+                    description: Groups to boot in the boot set.
+                    type: array
+                    items:
+                      description: A node group name.
+                      type: string
+                  rootfs_provider:
+                    description: >
+                      The root file system provider.
+                    type: string
+                    example: cpss3
+                  rootfs_provider_passthrough:
+                    description: >
+                      Additional parameters that will be appended to the
+                      'rootfs=<protocol>' kernel parameter.
+                    type: string
+
+# Definitions that are used elsewhere in this schema.
+$defs:
+  CFSLayerName:
+    description: >
+      The name of this layer. CFS does not require that each layer
+      of a configuration have a name, so this is optional.
+    type: string
+  CFSLayerPlaybook:
+    description: >
+      The name of the playbook file to execute in this layer. This
+      is optional. If omitted, the playbook will not be specified
+      in the CFS configuration layer, and CFS will default to looking
+      for a playbook named site.yml.
+    type: string
+    # Note that there is no default. Instead we let CFS provide the default
+  CFSLayerGitURL:
+    description: >
+      The URL to the git repository which contains the Ansible content
+      for a CFS layer.
+    type: string
+  CFSLayerProductName:
+    description: >
+      The name of the product supplying the config management
+      git repository.
+    type: string
+  CFSLayerProductVersion:
+    description: >
+      The version of the product supplying the git repo. If the
+      user specifies the special value "latest", then the latest
+      version will be used.
+    type: string
+  IMSIsRecipe:
+    description: >
+      If true, then this is an IMS recipe to be built into an IMS image.
+      If false, then this is a IMS image that has already been built.
+    type: boolean
+    default: true

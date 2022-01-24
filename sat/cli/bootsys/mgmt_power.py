@@ -33,7 +33,7 @@ from paramiko.ssh_exception import BadHostKeyException, AuthenticationException,
 
 from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger, ConsoleLoggingError
 from sat.cli.bootsys.util import get_and_verify_ncn_groups, get_ssh_client, FatalBootsysError
-from sat.cli.bootsys.waiting import GroupWaiter, WaitingFailure
+from sat.waiting import GroupWaiter, WaitingFailure
 from sat.config import get_config_value
 from sat.util import BeginEndLogger, get_username_and_password_interactively, prompt_continue
 

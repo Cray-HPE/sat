@@ -1,6 +1,6 @@
 # Changelog
 
-(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.13.0] - 2022-01-24
+
+### Added
+- Added a new subcommand, ``sat bootprep`` that automates creating CFS
+  configurations, building and customizing IMS images, and creating BOS session
+  templates which can be used to boot nodes in the system.
 
 ### Removed
 - Removed password complexity checking from ``sat bmccreds`` due to incompatible

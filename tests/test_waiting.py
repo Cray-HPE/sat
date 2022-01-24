@@ -1,5 +1,5 @@
 """
-Unit tests for the sat.cli.bootsys.waiting module.
+Unit tests for the sat.waiting module.
 
 (C) Copyright 2020 Hewlett Packard Enterprise Development LP.
 
@@ -25,7 +25,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 import itertools
 from unittest.mock import Mock, patch
 
-from sat.cli.bootsys.waiting import (
+from sat.waiting import (
     GroupWaiter,
     SimultaneousWaiter,
     Waiter,
@@ -103,11 +103,11 @@ SuccessfulWaiter = get_mock_waiter(True)
 class WaiterTestCase(ExtendedTestCase):
     """Common test class for (Group)Waiter classes."""
     def setUp(self):
-        self.mock_time_monotonic = patch('sat.cli.bootsys.waiting.time.monotonic',
+        self.mock_time_monotonic = patch('sat.waiting.time.monotonic',
                                          side_effect=itertools.count(0, 1)).start()
-        self.mock_time_sleep = patch('sat.cli.bootsys.waiting.time.sleep').start()
+        self.mock_time_sleep = patch('sat.waiting.time.sleep').start()
 
-        self.mock_thread_patcher = patch('sat.cli.bootsys.waiting.Thread')
+        self.mock_thread_patcher = patch('sat.waiting.Thread')
         self.mock_thread = self.mock_thread_patcher.start()
         self.mock_thread.return_value.is_alive.side_effect = [True, False]
 
@@ -156,7 +156,7 @@ class TestWaiter(WaiterTestCase):
             instance.wait_for_completion()
         self.assert_in_element(errmsg, cm.output)
 
-    @patch('sat.cli.bootsys.waiting.Waiter.on_retry_action')
+    @patch('sat.waiting.Waiter.on_retry_action')
     def test_raising_waitingfailure_prevents_retries(self, mock_on_retry_action):
         """Test that retries do not occur when a failure occurs"""
         # The fact that we pass a WaitingFailure instance to the mock waiter
@@ -170,9 +170,9 @@ class TestWaiter(WaiterTestCase):
             mock_on_retry_action.assert_not_called()
             mock_has_completed.assert_called_once()
 
-    @patch('sat.cli.bootsys.waiting.Waiter.pre_wait_action')
-    @patch('sat.cli.bootsys.waiting.Waiter.post_wait_action')
-    @patch('sat.cli.bootsys.waiting.Waiter.on_retry_action')
+    @patch('sat.waiting.Waiter.pre_wait_action')
+    @patch('sat.waiting.Waiter.post_wait_action')
+    @patch('sat.waiting.Waiter.on_retry_action')
     def test_pre_post_hooks_are_called(self, mock_on_retry, mock_post_wait, mock_pre_wait):
         """Check that user-defined pre/post hooks are always called"""
         instance = SuccessfulWaiter(10)
@@ -182,9 +182,9 @@ class TestWaiter(WaiterTestCase):
         mock_post_wait.assert_called_once()
         mock_on_retry.assert_not_called()
 
-    @patch('sat.cli.bootsys.waiting.Waiter.pre_wait_action')
-    @patch('sat.cli.bootsys.waiting.Waiter.post_wait_action')
-    @patch('sat.cli.bootsys.waiting.Waiter.on_retry_action')
+    @patch('sat.waiting.Waiter.pre_wait_action')
+    @patch('sat.waiting.Waiter.post_wait_action')
+    @patch('sat.waiting.Waiter.on_retry_action')
     def test_on_retry_hooks_are_called(self, mock_on_retry, mock_post_wait, mock_pre_wait):
         """Check that user-defined on-retry hook is called on retry"""
         NotQuiteReadyWaiter = get_mock_waiter([False, True])
@@ -295,10 +295,10 @@ class TestGroupWaiter(GroupWaiterTestCase):
         instance = SometimesFailingWaiter(self.members, 10)
         self.assertEqual(len(instance.wait_for_completion()), 1)
 
-    @patch('sat.cli.bootsys.waiting.GroupWaiter.pre_wait_action')
-    @patch('sat.cli.bootsys.waiting.GroupWaiter.post_wait_action')
-    @patch('sat.cli.bootsys.waiting.GroupWaiter.on_check_action')
-    @patch('sat.cli.bootsys.waiting.GroupWaiter.on_retry_action')
+    @patch('sat.waiting.GroupWaiter.pre_wait_action')
+    @patch('sat.waiting.GroupWaiter.post_wait_action')
+    @patch('sat.waiting.GroupWaiter.on_check_action')
+    @patch('sat.waiting.GroupWaiter.on_retry_action')
     def test_hooks_are_called(self, mock_on_retry, mock_on_check, mock_post_wait, mock_pre_wait):
         """Check that all user-defined hooks are always called"""
         SuccessfulWaiter = get_mock_group_waiter(True)
@@ -310,7 +310,7 @@ class TestGroupWaiter(GroupWaiterTestCase):
         mock_post_wait.assert_called_once()
         mock_on_retry.assert_not_called()
 
-    @patch('sat.cli.bootsys.waiting.GroupWaiter.on_retry_action')
+    @patch('sat.waiting.GroupWaiter.on_retry_action')
     def test_on_retry_hook_is_called(self, mock_on_retry):
         """Check that waiting is retried if some members time out"""
         TimeoutWaiter = get_mock_group_waiter(False)

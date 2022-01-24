@@ -29,7 +29,7 @@ import subprocess
 from paramiko import SSHException
 
 from sat.cli.bootsys.util import get_ssh_client
-from sat.cli.bootsys.waiting import Waiter
+from sat.waiting import Waiter
 
 LOGGER = logging.getLogger(__name__)
 
