@@ -21,7 +21,7 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-import copy
+from copy import deepcopy
 import logging
 import os
 import unittest
@@ -38,68 +38,73 @@ from tests.test_util import ExtendedTestCase
 
 SAMPLES_DIR = os.path.join(os.path.dirname(__file__), 'samples')
 
-MOCK_CONFIG_MAP = {
-    'cos': safe_dump({
-        '1.4.0': {
-            'configuration': {
-                'clone_url': 'https://vcs.fakesystem.dev.cray.com/vcs/cray/cos-config-management.git',
-                'commit': 'bbc306f48ca5505df7e0ed0ca632ee7e40babd72',
-                'import_branch': 'cray/cos/1.4.0',
-                'ssh_url': 'git@vcs.fakesystem.dev.cray.com:cray/cos-config-management.git',
-            },
-            'images': {
-                'cray-shasta-compute-sles15sp1.x86_64-1.4.23': {
-                    'id': '51c9e0af-21a8-4bd1-b446-6d38a6914f2d'
-                }
-            },
-            'recipes': {
-                'cray-shasta-compute-sles15sp1.x86_64-1.4.23': {
-                    'id': 'a89a1013-f1dd-4ef9-b0f8-ed2b1311c98a'
-                }
+COS_VERSIONS = {
+    '1.4.0': {
+        'configuration': {
+            'clone_url': 'https://vcs.fakesystem.dev.cray.com/vcs/cray/cos-config-management.git',
+            'commit': 'bbc306f48ca5505df7e0ed0ca632ee7e40babd72',
+            'import_branch': 'cray/cos/1.4.0',
+            'ssh_url': 'git@vcs.fakesystem.dev.cray.com:cray/cos-config-management.git',
+        },
+        'images': {
+            'cray-shasta-compute-sles15sp1.x86_64-1.4.23': {
+                'id': '51c9e0af-21a8-4bd1-b446-6d38a6914f2d'
+            }
+        },
+        'recipes': {
+            'cray-shasta-compute-sles15sp1.x86_64-1.4.23': {
+                'id': 'a89a1013-f1dd-4ef9-b0f8-ed2b1311c98a'
             }
         }
-    }),
-    'uan': safe_dump({
-        '2.0.0': {
-            'configuration': {
-                'clone_url': 'https://vcs.fakesystem.dev.cray.com/vcs/cray/uan-config-management.git',
-                'commit': '28bdb828b30fb23c30afe87f7e2414a504377b4c',
-                'import_branch': 'cray/uan/2.0.0',
-                'ssh_url': 'git@vcs.fakesystem.dev.cray.com:cray/pbs-config-management.git',
-            },
-            'images': {
-                'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0': {
-                    'id': '51c9e0af-21a8-4bd1-b446-6d38a6914f2d'
-                }
-            },
-            'recipes': {
-                'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0': {
-                    'id': 'a89a1013-f1dd-4ef9-b0f8-ed2b1311c98a'
-                }
+    }
+}
+
+UAN_VERSIONS = {
+    '2.0.0': {
+        'configuration': {
+            'clone_url': 'https://vcs.fakesystem.dev.cray.com/vcs/cray/uan-config-management.git',
+            'commit': '28bdb828b30fb23c30afe87f7e2414a504377b4c',
+            'import_branch': 'cray/uan/2.0.0',
+            'ssh_url': 'git@vcs.fakesystem.dev.cray.com:cray/pbs-config-management.git',
+        },
+        'images': {
+            'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0': {
+                'id': '51c9e0af-21a8-4bd1-b446-6d38a6914f2d'
+            }
+        },
+        'recipes': {
+            'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0': {
+                'id': 'a89a1013-f1dd-4ef9-b0f8-ed2b1311c98a'
             }
         }
-    }),
-    'pbs': safe_dump({
-        '0.1.0': {
-            'configuration': {
-                'clone_url': 'https://vcs.fakesystem.dev.cray.com/vcs/cray/pbs-config-management.git',
-                'commit': 'b7eee8434bf1d55f0ab88c8785f843aba3d02184',
-                'import_branch': 'cray/pbs/0.1.0',
-                'ssh_url': 'git@vcs.fakesystem.dev.cray.com:cray/pbs-config-management.git',
-            },
-        }
-    })
+    }
+}
+
+PBS_VERSIONS = {
+    '0.1.0': {
+        'configuration': {
+            'clone_url': 'https://vcs.fakesystem.dev.cray.com/vcs/cray/pbs-config-management.git',
+            'commit': 'b7eee8434bf1d55f0ab88c8785f843aba3d02184',
+            'import_branch': 'cray/pbs/0.1.0',
+            'ssh_url': 'git@vcs.fakesystem.dev.cray.com:cray/pbs-config-management.git',
+        },
+    }
 }
 
 
 class TestGetProducts(ExtendedTestCase):
+    """Tests for getting product revision information."""
 
     def setUp(self):
         """Sets up patches."""
         self.mock_get_config = patch('sat.cli.showrev.products.load_kube_config').start()
         self.mock_corev1_api = patch('sat.cli.showrev.products.CoreV1Api').start().return_value
-        self.mock_config_map = copy.deepcopy(MOCK_CONFIG_MAP)
-        self.mock_corev1_api.read_namespaced_config_map.return_value.data = self.mock_config_map
+        self.mock_corev1_api.read_namespaced_config_map.return_value.data = {
+            'cos': safe_dump(deepcopy(COS_VERSIONS)),
+            'uan': safe_dump(deepcopy(UAN_VERSIONS)),
+            'pbs': safe_dump(deepcopy(PBS_VERSIONS))
+        }
+        self.expected_headers = ['product_name', 'product_version', 'active', 'images', 'image_recipes']
 
     def tearDown(self):
         """Stops all patches"""
@@ -107,13 +112,12 @@ class TestGetProducts(ExtendedTestCase):
 
     def test_get_product_versions(self):
         """Test a basic invocation of get_product_versions."""
-        expected_headers = ['product_name', 'product_version', 'images', 'image_recipes']
         expected_fields = [
-            ['cos', '1.4.0', 'cray-shasta-compute-sles15sp1.x86_64-1.4.23',
+            ['cos', '1.4.0', 'N/A', 'cray-shasta-compute-sles15sp1.x86_64-1.4.23',
              'cray-shasta-compute-sles15sp1.x86_64-1.4.23'],
-            ['uan', '2.0.0', 'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0',
+            ['uan', '2.0.0', 'N/A', 'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0',
              'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0'],
-            ['pbs', '0.1.0', '-', '-']
+            ['pbs', '0.1.0', 'N/A', '-', '-']
         ]
         actual_headers, actual_fields = get_product_versions()
         self.mock_get_config.assert_called_once_with()
@@ -121,30 +125,13 @@ class TestGetProducts(ExtendedTestCase):
             name='cray-product-catalog',
             namespace='services'
         )
-        self.assertEqual(expected_headers, actual_headers)
+        self.assertEqual(self.expected_headers, actual_headers)
         self.assertEqual(expected_fields, actual_fields)
 
     def test_get_product_versions_multiple_versions(self):
         """Test an invocation of get_product_versions with multiple of one product."""
-        self.mock_config_map['uan'] = safe_dump({
-            '2.0.0': {
-                'configuration': {
-                    'clone_url': 'https://vcs.fakesystem.dev.cray.com/vcs/cray/uan-config-management.git',
-                    'commit': '28bdb828b30fb23c30afe87f7e2414a504377b4c',
-                    'import_branch': 'cray/uan/2.0.0',
-                    'ssh_url': 'git@vcs.fakesystem.dev.cray.com:cray/pbs-config-management.git',
-                },
-                'images': {
-                    'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0': {
-                        'id': '51c9e0af-21a8-4bd1-b446-6d38a6914f2d'
-                    }
-                },
-                'recipes': {
-                    'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0': {
-                        'id': 'a89a1013-f1dd-4ef9-b0f8-ed2b1311c98a'
-                    }
-                }
-            },
+        uan_versions = deepcopy(UAN_VERSIONS)
+        uan_versions.update({
             '2.0.1': {
                 'configuration': {
                     'clone_url': 'https://vcs.fakesystem.dev.cray.com/vcs/cray/uan-config-management.git',
@@ -164,15 +151,19 @@ class TestGetProducts(ExtendedTestCase):
                 }
             }
         })
-        expected_headers = ['product_name', 'product_version', 'images', 'image_recipes']
+        self.mock_corev1_api.read_namespaced_config_map.return_value.data = {
+            'cos': safe_dump(deepcopy(COS_VERSIONS)),
+            'uan': safe_dump(uan_versions),
+            'pbs': safe_dump(deepcopy(PBS_VERSIONS))
+        }
         expected_fields = [
-            ['cos', '1.4.0', 'cray-shasta-compute-sles15sp1.x86_64-1.4.23',
+            ['cos', '1.4.0', 'N/A', 'cray-shasta-compute-sles15sp1.x86_64-1.4.23',
              'cray-shasta-compute-sles15sp1.x86_64-1.4.23'],
-            ['uan', '2.0.0', 'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0',
+            ['uan', '2.0.0', 'N/A', 'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0',
              'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0'],
-            ['uan', '2.0.1', 'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.1',
+            ['uan', '2.0.1', 'N/A', 'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.1',
              'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.1'],
-            ['pbs', '0.1.0', '-', '-']
+            ['pbs', '0.1.0', 'N/A', '-', '-']
         ]
         actual_headers, actual_fields = get_product_versions()
         self.mock_get_config.assert_called_once_with()
@@ -180,44 +171,42 @@ class TestGetProducts(ExtendedTestCase):
             name='cray-product-catalog',
             namespace='services'
         )
-        self.assertEqual(expected_headers, actual_headers)
+        self.assertEqual(self.expected_headers, actual_headers)
         self.assertEqual(expected_fields, actual_fields)
 
     def test_get_product_versions_multiple_images_recipes(self):
         """Test an invocation of get_product_versions where products have multiple images and recipes."""
-        self.mock_config_map['uan'] = safe_dump({
-            '2.0.0': {
-                'configuration': {
-                    'clone_url': 'https://vcs.fakesystem.dev.cray.com/vcs/cray/uan-config-management.git',
-                    'commit': '28bdb828b30fb23c30afe87f7e2414a504377b4c',
-                    'import_branch': 'cray/uan/2.0.0',
-                    'ssh_url': 'git@vcs.fakesystem.dev.cray.com:cray/pbs-config-management.git',
-                },
-                'images': {
-                    'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0': {
-                        'id': '51c9e0af-21a8-4bd1-b446-6d38a6914f2d'
-                    },
-                    'cray-shasta-uan-cos-sles15sp1.aarch64-2.0.0': {
-                        'id': '00d35ab0-ca81-4530-9daa-63a6bdec7681'
-                    }
-                },
-                'recipes': {
-                    'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0': {
-                        'id': 'a89a1013-f1dd-4ef9-b0f8-ed2b1311c98a'
-                    },
-                    'cray-shasta-uan-cos-sles15sp1.aarch64-2.0.0': {
-                        'id': '0aee952d-6b84-45e0-937b-23119ed09149'
-                    }
-                }
+        uan_versions = deepcopy(UAN_VERSIONS)
+        uan_versions['2.0.0']['images'] = {
+            'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0': {
+                'id': '51c9e0af-21a8-4bd1-b446-6d38a6914f2d'
+            },
+            'cray-shasta-uan-cos-sles15sp1.aarch64-2.0.0': {
+                'id': '00d35ab0-ca81-4530-9daa-63a6bdec7681'
             }
-        })
-        expected_headers = ['product_name', 'product_version', 'images', 'image_recipes']
+        }
+        uan_versions['2.0.0']['recipes'] = {
+            'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0': {
+                'id': 'a89a1013-f1dd-4ef9-b0f8-ed2b1311c98a'
+            },
+            'cray-shasta-uan-cos-sles15sp1.aarch64-2.0.0': {
+                'id': '0aee952d-6b84-45e0-937b-23119ed09149'
+            }
+        }
+
+        self.mock_corev1_api.read_namespaced_config_map.return_value.data = {
+            'cos': safe_dump(deepcopy(COS_VERSIONS)),
+            'uan': safe_dump(uan_versions),
+            'pbs': safe_dump(deepcopy(PBS_VERSIONS))
+        }
+
         expected_fields = [
-            ['cos', '1.4.0', 'cray-shasta-compute-sles15sp1.x86_64-1.4.23',
+            ['cos', '1.4.0', 'N/A', 'cray-shasta-compute-sles15sp1.x86_64-1.4.23',
              'cray-shasta-compute-sles15sp1.x86_64-1.4.23'],
-            ['uan', '2.0.0', 'cray-shasta-uan-cos-sles15sp1.aarch64-2.0.0\ncray-shasta-uan-cos-sles15sp1.x86_64-2.0.0',
+            ['uan', '2.0.0', 'N/A',
+             'cray-shasta-uan-cos-sles15sp1.aarch64-2.0.0\ncray-shasta-uan-cos-sles15sp1.x86_64-2.0.0',
              'cray-shasta-uan-cos-sles15sp1.aarch64-2.0.0\ncray-shasta-uan-cos-sles15sp1.x86_64-2.0.0'],
-            ['pbs', '0.1.0', '-', '-']
+            ['pbs', '0.1.0', 'N/A', '-', '-']
         ]
         actual_headers, actual_fields = get_product_versions()
         self.mock_get_config.assert_called_once_with()
@@ -225,7 +214,7 @@ class TestGetProducts(ExtendedTestCase):
             name='cray-product-catalog',
             namespace='services'
         )
-        self.assertEqual(expected_headers, actual_headers)
+        self.assertEqual(self.expected_headers, actual_headers)
         self.assertEqual(expected_fields, actual_fields)
 
     def test_get_product_versions_no_product_catalog(self):
@@ -261,8 +250,29 @@ class TestGetProducts(ExtendedTestCase):
             self.assertEqual(get_product_versions(), ([], []))
         self.assert_in_element('No product information found in cray-product-catalog configuration map', logs.output)
 
+    def test_get_product_versions_active_version(self):
+        """Test the case when the product catalog has a product version that is designated as 'active'."""
+        uan_versions = deepcopy(UAN_VERSIONS)
+        uan_versions['2.0.0']['active'] = True
+        self.mock_corev1_api.read_namespaced_config_map.return_value.data = {
+            'cos': safe_dump(deepcopy(COS_VERSIONS)),
+            'uan': safe_dump(uan_versions),
+            'pbs': safe_dump(deepcopy(PBS_VERSIONS))
+        }
+        expected_fields = [
+            ['cos', '1.4.0', 'N/A', 'cray-shasta-compute-sles15sp1.x86_64-1.4.23',
+             'cray-shasta-compute-sles15sp1.x86_64-1.4.23'],
+            ['uan', '2.0.0', True, 'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0',
+             'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0'],
+            ['pbs', '0.1.0', 'N/A', '-', '-']
+        ]
+        actual_headers, actual_fields = get_product_versions()
+        self.assertEqual(self.expected_headers, actual_headers)
+        self.assertEqual(expected_fields, actual_fields)
+
 
 class TestReleaseFiles(unittest.TestCase):
+    """Tests for getting local release files."""
 
     def test_get_release_file_versions_good(self):
         """Test get_release_file_versions with a good release directory."""

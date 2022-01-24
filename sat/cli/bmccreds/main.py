@@ -24,14 +24,11 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import logging
 
-import passwordmeter
-
 from sat.apiclient import APIError, HSMClient
 from sat.cli.bmccreds.creds_manager import BMCCredsManager, BMCCredsException
 from sat.cli.bmccreds.constants import (
     BMC_USERNAME,
     MAX_XNAMES_TO_DISPLAY,
-    MINIMUM_PASSWORD_STRENGTH,
     USER_PASSWORD_MAX_LENGTH,
     VALID_BMC_PASSWORD_CHARACTERS
 )
@@ -64,16 +61,14 @@ def validate_args(args):
         raise SystemExit(1)
 
 
-def check_password_requirements(password, check_strength=True):
-    """Check password complexity.
+def check_password_requirements(password):
+    """Check password requirements.
 
     Check password is not longer than the maximum length and is
-    only comprised of allowed characters. Next, optionally check
-    that password meets a minimum strength threshold.
+    only comprised of allowed characters.
 
     Args:
         password (str): the password to check.
-        check_strength (bool): if True, check password strength.
 
     Returns:
         None
@@ -89,16 +84,6 @@ def check_password_requirements(password, check_strength=True):
         raise ValueError(
             f'Password may only contain letters, numbers and underscores.'
         )
-    if check_strength:
-        password_strength, reasons = passwordmeter.test(password)
-        # The default suggestion for 'charmix' suggests using symbols, which are not allowed
-        if 'charmix' in reasons:
-            reasons['charmix'] = 'Use a good mix of numbers and letters'
-        if password_strength < MINIMUM_PASSWORD_STRENGTH:
-            print(f'Bad password.{" Possible improvements:" if reasons else ""}')
-            for reason in reasons.values():
-                print(f' - {reason}')
-            raise ValueError(f'Please supply a stronger password.')
 
 
 def set_creds_with_retry(credentials_manager, retries, session):
@@ -181,7 +166,7 @@ def do_bmccreds(args):
         )[1]
         try:
             check_password_requirements(
-                user_password, check_strength=not args.no_pw_strength_check
+                user_password
             )
         except ValueError as err:
             LOGGER.error(err)

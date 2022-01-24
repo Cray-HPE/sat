@@ -84,9 +84,10 @@ def get_product_versions():
     """
     product_key = 'product_name'
     version_key = 'product_version'
+    active_key = 'active'
     image_key = 'images'
     recipe_key = 'image_recipes'
-    headers = [product_key, version_key, image_key, recipe_key]
+    headers = [product_key, version_key, active_key, image_key, recipe_key]
     # Load k8s configuration before trying to use API
     try:
         with warnings.catch_warnings():
@@ -118,9 +119,14 @@ def get_product_versions():
         # product_data is a multiline string in YAML format
         product_data = safe_load(product_data)
         for version in product_data:
+
             images = '\n'.join(sorted(product_data[version].get('images', {}).keys())) or '-'
             recipes = '\n'.join(sorted(product_data[version].get('recipes', {}).keys())) or '-'
-            products.append([product_name, version, images, recipes])
+            if active_key not in product_data[version]:
+                active = 'N/A'
+            else:
+                active = product_data[version].get(active_key)
+            products.append([product_name, version, active, images, recipes])
 
     return headers, products
 
