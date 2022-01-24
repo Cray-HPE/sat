@@ -33,7 +33,7 @@ from yaml import YAMLLoadWarning
 from sat.cached_property import cached_property
 from sat.cli.bootsys.state_recorder import PodStateRecorder, StateError
 from sat.cli.bootsys.util import k8s_pods_to_status_dict
-from sat.cli.bootsys.waiting import GroupWaiter, Waiter
+from sat.waiting import GroupWaiter, Waiter
 from sat.config import get_config_value
 from sat.report import Report
 from sat.util import BeginEndLogger

@@ -32,7 +32,7 @@ from sat.cli.bootsys.mgmt_power import (
     SSHAvailableWaiter,
     IPMIPowerStateWaiter,
 )
-from sat.cli.bootsys.waiting import WaitingFailure
+from sat.waiting import WaitingFailure
 
 
 class TestSSHAvailableWaiter(unittest.TestCase):

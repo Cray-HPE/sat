@@ -38,6 +38,3 @@ RANDOM_PASSWORD_LENGTH = 8
 
 # The set of valid BMC password characters
 VALID_BMC_PASSWORD_CHARACTERS = string.ascii_letters + string.digits + '_'
-
-# The minimum strength for passwords (see passwordmeter.test() documentation).
-MINIMUM_PASSWORD_STRENGTH = 0.3

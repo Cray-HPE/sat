@@ -142,8 +142,3 @@ def add_bmccreds_subparser(subparsers):
              'More than one of these types can be specified. The default is '
              'all BMC types. Types not specified will be excluded from consideration.'
     )
-
-    bmccreds_subparser.add_argument(
-        '--no-pw-strength-check', action='store_true',
-        help='Skip checking password strength for user-supplied passwords.'
-    )

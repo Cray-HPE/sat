@@ -263,6 +263,7 @@ SEE ALSO
 
 sat-auth(8),
 sat-bmccreds(8),
+sat-bootprep(8),
 sat-bootsys(8),
 sat-diag(8),
 sat-firmware(8),

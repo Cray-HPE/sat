@@ -25,7 +25,7 @@ import logging
 import re
 import sys
 
-from sat.cli.bootsys.waiting import Waiter
+from sat.waiting import Waiter
 from sat.config import get_config_value
 from sat.util import BeginEndLogger
 

@@ -432,7 +432,7 @@ def get_val_by_path(dict_val, dotted_path, default_value=None):
     """
     current_val = dict_val
     for key in dotted_path.split('.'):
-        if key in current_val:
+        if current_val and key in current_val:
             current_val = current_val[key]
         else:
             return default_value

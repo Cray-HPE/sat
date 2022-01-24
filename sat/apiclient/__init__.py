@@ -30,6 +30,7 @@ from sat.apiclient.fas import FASClient
 from sat.apiclient.fox import FoxClient
 from sat.apiclient.gateway import APIError, APIGatewayClient, ReadTimeout
 from sat.apiclient.hsm import HSMClient
+from sat.apiclient.ims import IMSClient
 from sat.apiclient.sls import SLSClient
 from sat.apiclient.telemetry import TelemetryAPIClient
 

@@ -46,7 +46,7 @@ setup(
     description="System Admin Toolkit",
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://stash.us.cray.com/projects/SAT/repos/sat',
+    url='https://github.hpe.com/hpe/hpc-sat',
     author='Hewlett Packard Enterprise Development LP',
     license='MIT',
     packages=find_packages(exclude=['tests', 'tests.*', 'tools', 'tools.*']),
@@ -60,4 +60,7 @@ setup(
             'sat=sat.main:main'
         ]
     },
+
+    # Include the schema file for the input to `sat bootprep` in the package
+    package_data={'sat': ['data/schema/bootprep_schema.yaml']}
 )
