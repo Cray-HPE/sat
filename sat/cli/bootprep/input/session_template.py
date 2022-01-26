@@ -196,10 +196,14 @@ class InputSessionTemplate(BaseInputItem):
 
         return api_data
 
-    def create(self):
+    def create(self, dumper=None):
         """Create the session template with a request to the BOS API."""
+        request_body = self.get_bos_api_data()
+        if dumper is not None:
+            dumper.write_request_body(self.name, request_body)
+
         try:
-            self.bos_client.create_session_template(self.get_bos_api_data())
+            self.bos_client.create_session_template(request_body)
         except APIError as err:
             raise SessionTemplateCreateError(f'Failed to create session template: {err}')
 

@@ -25,7 +25,7 @@ from argparse import Namespace
 import logging
 import os
 import unittest
-from unittest.mock import patch, MagicMock, Mock
+from unittest.mock import patch, Mock
 
 from sat.apiclient import APIError
 from sat.cli.bootprep.configuration import (
@@ -227,29 +227,10 @@ class TestCreateCFSConfigurations(unittest.TestCase):
             for config_name in self.config_names
         }
 
-        outer_self = self
-
-        class FakeOpenCM:
-            """Context manager to replace open to return correct mock file objects"""
-            def __init__(self, path, _):
-                self.path = path
-
-            def __enter__(self):
-                return outer_self.mock_file_objects[os.path.basename(self.path)]
-
-            def __exit__(self, *args):
-                # Nothing needed for fake context manager
-                pass
-
-        self.mock_open = patch('builtins.open').start()
-        self.mock_open.side_effect = FakeOpenCM
-
-        self.mock_makedirs = patch('os.makedirs').start()
-
-        self.mock_json_dump = patch('json.dump').start()
+        self.mock_req_dumper = patch('sat.cli.bootprep.configuration.RequestDumper').start()
 
         self.args = Namespace(dry_run=False, save_files=True, output_dir='output',
-                              resolve_branches=False)
+                              resolve_branches=False, action='run')
 
     def tearDown(self):
         patch.stopall()
@@ -278,15 +259,8 @@ class TestCreateCFSConfigurations(unittest.TestCase):
         Args:
             config (Mock): A Mock object representing a InputConfiguration
         """
-        expected_base_file_name = f'cfs-config-{config.name}.json'
-        self.mock_open.assert_any_call(
-            os.path.join(self.args.output_dir, expected_base_file_name),
-            'w'
-        )
-        self.mock_json_dump.assert_any_call(
-            config.get_cfs_api_data.return_value,
-            self.mock_file_objects[expected_base_file_name],
-            indent=4
+        self.mock_req_dumper.return_value.write_request_body.assert_any_call(
+            config.name, config.get_cfs_api_data.return_value
         )
 
     def assert_config_put_to_cfs(self, config):
@@ -322,8 +296,6 @@ class TestCreateCFSConfigurations(unittest.TestCase):
         for config in configs:
             expected_logs.append(f'{("Creating", "Would create")[dry_run]} '
                                  f'CFS configuration with name "{config.name}"')
-            expected_logs.append(f'Saving CFS config request body to '
-                                 f'{self.get_expected_file_path(config)}')
         return expected_logs
 
     def test_create_cfs_configurations_success(self):
@@ -335,7 +307,6 @@ class TestCreateCFSConfigurations(unittest.TestCase):
         self.mock_handle_existing_configs.assert_called_once_with(
             self.mock_cfs_client, self.mock_cfs_configs, self.args
         )
-        self.mock_makedirs.assert_called_once_with(self.args.output_dir, exist_ok=True)
         for config in self.mock_cfs_configs:
             self.assert_config_dumped_to_file(config)
             self.assert_config_put_to_cfs(config)
@@ -370,32 +341,8 @@ class TestCreateCFSConfigurations(unittest.TestCase):
         ] + self.get_expected_info_logs(self.mock_cfs_configs[1:])
         self.assertEqual(expected_logs, [rec.message for rec in logs_cm.records])
 
-    def test_create_cfs_configurations_output_dir_failure(self):
-        """Test create_configurations with a failure to create the output directory"""
-        os_err_msg = 'insufficient perms'
-        self.mock_makedirs.side_effect = OSError(os_err_msg)
-
-        with self.assertLogs(level=logging.WARNING) as logs_cm:
-            create_configurations(self.mock_instance, self.args)
-
-        self.assert_cfs_client_created()
-        self.mock_handle_existing_configs.assert_called_once_with(
-            self.mock_cfs_client, self.mock_cfs_configs, self.args
-        )
-        self.mock_makedirs.assert_called_once_with(self.args.output_dir, exist_ok=True)
-        self.mock_open.assert_not_called()
-        for config in self.mock_cfs_configs:
-            self.assert_config_put_to_cfs(config)
-        self.assertEqual(1, len(logs_cm.records))
-        self.assertEqual(f'Failed to create output directory {self.args.output_dir}: {os_err_msg}. '
-                         f'Files will not be saved.',
-                         logs_cm.records[0].message)
-
     def test_create_cfs_configurations_one_file_failure(self):
         """Test create_configurations when one fails to be written to a file"""
-        os_err_msg = 'insufficient permissions'
-        self.mock_open.side_effect = [OSError(os_err_msg), MagicMock()]
-
         with self.assertLogs(level=logging.INFO) as logs_cm:
             create_configurations(self.mock_instance, self.args)
 
@@ -411,13 +358,7 @@ class TestCreateCFSConfigurations(unittest.TestCase):
             f'Creating {len(self.mock_cfs_configs)} CFS configuration(s)',
         ] + self.get_expected_info_logs(self.mock_cfs_configs)
         info_logs = [rec.message for rec in logs_cm.records if rec.levelno == logging.INFO]
-        expected_warning_logs = [
-            f'Failed to write CFS config request body to '
-            f'{self.get_expected_file_path(self.mock_cfs_configs[0])}: {os_err_msg}'
-        ]
-        warning_logs = [rec.message for rec in logs_cm.records if rec.levelno == logging.WARNING]
         self.assertEqual(expected_info_logs, info_logs)
-        self.assertEqual(expected_warning_logs, warning_logs)
 
     def test_create_cfs_configurations_dry_run(self):
         """Test create_configurations in dry-run mode"""

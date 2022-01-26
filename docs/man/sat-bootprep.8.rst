@@ -94,7 +94,9 @@ These options only apply to the ``run`` action.
 
 **-s, --save-files**
         Save files that could be passed to the CFS and BOS to create CFS
-        configurations and BOS session templates, respectively.
+        configurations and BOS session templates, respectively. If
+        ``--dry-run`` is specified, then only files for CFS configurations will
+        be saved.
 
 **--no-resolve-branches**
         Do not look up the HEAD commits of branches name before creating CFS

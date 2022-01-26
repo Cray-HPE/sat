@@ -22,12 +22,11 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
-import json
 import logging
-import os
 
 from sat.apiclient import APIError, CFSClient
 from sat.cli.bootprep.input.configuration import InputConfigurationLayer
+from sat.cli.bootprep.output import RequestDumper
 from sat.cli.bootprep.errors import ConfigurationCreateError
 from sat.session import SATSession
 from sat.util import pester_choices
@@ -122,13 +121,7 @@ def create_configurations(instance, args):
     configs_to_create = handle_existing_configs(cfs_client, input_configs, args)
     failed_configs = []
 
-    if args.save_files and args.output_dir != '.':
-        try:
-            os.makedirs(args.output_dir, exist_ok=True)
-        except OSError as err:
-            LOGGER.warning(f'Failed to create output directory {args.output_dir}: {err}. '
-                           f'Files will not be saved.')
-            args.save_files = False
+    request_dumper = RequestDumper('CFS config', args)
 
     for cfs_configuration in configs_to_create:
         config_name = cfs_configuration.name
@@ -141,15 +134,7 @@ def create_configurations(instance, args):
             failed_configs.append(cfs_configuration)
             continue
 
-        if args.save_files:
-            file_name = os.path.join(args.output_dir, f'cfs-config-{config_name}.json')
-            LOGGER.info(f'Saving CFS config request body to {file_name}')
-
-            try:
-                with open(file_name, 'w') as f:
-                    json.dump(request_body, f, indent=4)
-            except OSError as err:
-                LOGGER.warning(f'Failed to write CFS config request body to {file_name}: {err}')
+        request_dumper.write_request_body(config_name, request_body)
 
         if not args.dry_run:
             try:
