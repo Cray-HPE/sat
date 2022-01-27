@@ -183,13 +183,15 @@ class CFSImageConfigurationSession:
             file. Currently only used for logging, but may be used when creating
             the session in the future if CASMCMS-7564 is resolved.
         pod (kubernetes.client.V1Pod): the pod associated with this session.
-            This is set and updated by update_pod_status.
+            It is set to None until the pod has been created and found by
+            update_pod_status. It is updated by each call to update_pod_status.
         init_container_status_by_name (dict): a mapping from init container name
             to status
         container_status_by_name (dict): a mapping from container name to status
     """
-    # Value reported by CFS in status.session.status when session is complete
+    # Values reported by CFS in status.session.status
     COMPLETE_VALUE = 'complete'
+    PENDING_VALUE = 'pending'
     # Value reported by CFS in status.session.succeeded when session has succeeded
     SUCCEEDED_VALUE = 'true'
     # Hardcode the namespace in which kuberenetes jobs are created since CFS
@@ -210,6 +212,9 @@ class CFSImageConfigurationSession:
         self.cfs_client = cfs_client
         self.image_name = image_name
 
+        self.logged_job_wait_msg = False
+        self.logged_pod_wait_msg = False
+
         # This is set to the V1Pod for this CFS session by update_pod_status
         self.pod = None
 
@@ -223,9 +228,17 @@ class CFSImageConfigurationSession:
         return self.data.get('name', '')
 
     @property
+    def session_status(self):
+        """str: the status of the session according to CFS
+
+        This will be one of 'pending', 'running', or 'complete'
+        """
+        return get_val_by_path(self.data, 'status.session.status')
+
+    @property
     def complete(self):
         """bool: True if the configuration session is complete, False otherwise"""
-        return get_val_by_path(self.data, 'status.session.status') == self.COMPLETE_VALUE
+        return self.session_status == self.COMPLETE_VALUE
 
     @property
     def succeeded(self):
@@ -240,7 +253,7 @@ class CFSImageConfigurationSession:
     @property
     def pod_name(self):
         """str: the name of the pod created by the K8s job for this CFS session"""
-        # Handle access to this property before update_pod_status is called
+        # Handle access to this property before update_pod_status has found the pod
         if self.pod is None:
             return ''
         return self.pod.metadata.name
@@ -423,6 +436,11 @@ class CFSImageConfigurationSession:
         """
         state_log_msgs = []
 
+        # This shouldn't happen since this is only called by update_pod_status
+        # after the pod is successfully found.
+        if self.pod is None:
+            return
+
         # Update both init_container_status_by_name and container_status_by_name
         for prefix in ('init_', ''):
             status_by_name = getattr(self, f'{prefix}container_status_by_name')
@@ -478,9 +496,11 @@ class CFSImageConfigurationSession:
         try:
             self.pod = pods.items[0]
         except IndexError:
-            raise APIError(f'Failed to find pod associated with session {self.name}')
-
-        self._update_container_status()
+            if not self.logged_pod_wait_msg:
+                LOGGER.info(f'Waiting for creation of Kubernetes pod associated with session {self.name}.')
+                self.logged_pod_wait_msg = True
+        else:
+            self._update_container_status()
 
     def update_status(self, kube_client):
         """Query the CFS and Kubernetes APIs to update the status of this CFS session
@@ -492,6 +512,10 @@ class CFSImageConfigurationSession:
             None. Updates the status stored in this object.
         """
         self.update_cfs_status()
-        # TODO (CRAYSAT-1266): Don't query for pod status while CFS session status is "pending"
-        if self.time_since_start.seconds > 10:
+
+        if self.session_status == self.PENDING_VALUE:
+            if not self.logged_job_wait_msg:
+                LOGGER.info(f'Waiting for CFS to create Kubernetes job associated with session {self.name}.')
+                self.logged_job_wait_msg = True
+        else:
             self.update_pod_status(kube_client)
