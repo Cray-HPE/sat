@@ -267,6 +267,18 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
         self.branch_layer = ProductInputConfigurationLayer(self.branch_layer_data,
                                                            self.mock_product_catalog)
 
+        self.commit = 'c07f317c4127d8667a4bd6c08d48e716b1d47da1'
+        self.commit_layer_data = {
+            'name': 'commit_layer',
+            'playbook': self.playbook,
+            'product': {
+                'name': self.product_name,
+                'commit': self.commit
+            }
+        }
+        self.commit_layer = ProductInputConfigurationLayer(self.commit_layer_data,
+                                                           self.mock_product_catalog)
+
         self.branch_head_commit = 'e6bfdb28d44669c4317d6dc021c22a75cebb3bfb'
         self.mock_vcs_repo = patch(f'{self.module_path}.VCSRepo').start()
         self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = self.branch_head_commit
@@ -374,6 +386,15 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
         with self.patch_resolve_branches(True):
             with self.assertRaises(ConfigurationCreateError):
                 _ = self.branch_layer.commit
+
+    def test_commit_property_when_commit_specified_in_input(self):
+        """Test the commit property when commit specified in the input file"""
+        self.assertEqual(self.commit_layer.commit, self.commit)
+
+    def test_commit_property_resolve_branches(self):
+        """Test the commit property when resolving branches and commit specified in the input file"""
+        with self.patch_resolve_branches(True):
+            self.assertEqual(self.commit_layer.commit, self.commit)
 
 
 class TestInputConfiguration(unittest.TestCase):
