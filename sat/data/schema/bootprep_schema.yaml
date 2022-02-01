@@ -21,8 +21,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-# TODO (CRAYSAT-1130): Update this to use 2020-12 once official release of jsonschema supports it
-$schema: "https://json-schema.org/draft-07/schema"
+$schema: "https://json-schema.org/draft/2020-12/schema"
 title: Bootprep Input File
 description: >
   A description of the set of CFS configurations to create, the set of IMS
@@ -162,9 +161,7 @@ properties:
       description: An image to create and customize.
       type: object
       required: ['name', 'ims']
-      # TODO (CRAYSAT-1130): Update this to use "dependentRequired" once jsonschema supports 2020-12 JSON Schema
-      # Using "dependencies" for compatibility with draft-07 schema
-      dependencies:
+      dependentRequired:
         configuration: ['configuration_group_names']
       additionalProperties: false
       properties:
