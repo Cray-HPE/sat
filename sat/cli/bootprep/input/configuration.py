@@ -256,15 +256,29 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
 
     @cached_property
     def commit(self):
-        # If branch is specified, no commit should be specified
+        # There are a few ways to determine the proper commit hash for a
+        # layer, if necessary. Their precedence is as follows.
+        #   1. If the commit for the product was specified explicitly in the
+        #      input file, that should be returned.
+        #   2. If a branch for the product was specified in the input file, the
+        #      branch needs to be resolved to a commit hash, and that commit hash
+        #      should be returned. If branch resolving is disabled (i.e. with
+        #      --no-resolve-branches), then presumably CFS supports branch names,
+        #      and so this property should be None in order for a branch name to
+        #      be passed to CFS.
+        #   3. If neither a commit nor a branch was specified, then consult the
+        #      product catalog for the an associated commit hash and return
+        #      that.
+
+        input_commit = self.layer_data['product'].get('commit')
+        if input_commit:
+            return input_commit
+
         if self.branch is not None:
-            # However, if CSM requires a commit hash, we can look it up
-            # dynamically from VCS and return it here for compatibility.
             if self.resolve_branches:
                 return self.resolve_commit_hash(self.branch)
             return None
 
-        # If no branch is specified get the commit from the product catalog
         if self.matching_product.commit is None:
             raise ConfigurationCreateError(f'No commit present for version {self.product_version} '
                                            f'of product {self.product_name}')
