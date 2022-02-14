@@ -40,6 +40,9 @@ fi
 register-python-argcomplete sat > /etc/bash_completion.d/sat-completion.bash
 echo "source /etc/bash_completion.d/sat-completion.bash" >> /root/.bash_login
 
+# Place the virtualenv at the beginning of the path
+echo "export PATH=$VIRTUAL_ENV:$PATH" >> /root/.bash_login
+
 # install kubectl using same version used in ncn image
 cd /sat
 git clone $NODE_IMAGE_KUBERNETES_REPO $NODE_IMAGE_KUBERNETES_DIR
