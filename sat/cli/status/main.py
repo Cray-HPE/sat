@@ -1,7 +1,7 @@
 """
 Entry point for the status subcommand.
 
-(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -31,10 +31,23 @@ from sat.report import Report
 from sat.session import SATSession
 from sat.xname import XName
 
-API_KEYS_TO_HEADERS = OrderedDict([
+
+# Fields common to all components
+COMMON_API_KEYS_TO_HEADERS = OrderedDict([
+    ('ID', 'xname'),
+    ('State', 'State'),
+    ('Flag', 'Flag'),
+    ('Enabled', 'Enabled'),
+    ('Arch', 'Arch'),
+    ('Class', 'Class'),
+    ('NetType', 'Net Type'),
+])
+
+
+# A superset of the previous fields, with additional fields specific to Nodes.
+NODE_API_KEYS_TO_HEADERS = OrderedDict([
     ('ID', 'xname'),
     ('Aliases', 'Aliases'),
-    ('Type', 'Type'),
     ('NID', 'NID'),
     ('State', 'State'),
     ('Flag', 'Flag'),
@@ -46,6 +59,7 @@ API_KEYS_TO_HEADERS = OrderedDict([
     ('NetType', 'Net Type'),
 ])
 
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -53,12 +67,14 @@ class UsageError(Exception):
     pass
 
 
-def make_raw_table(components):
+def make_raw_table(components, heading_mapping):
     """Obtains node status from a list of components.
 
     Args:
         components (list): A list of dictionaries representing the components
             in the system along with information about their state.
+        heading_mapping (dict): A dictionary mapping API keys from CSM services
+            to desired table headings.
 
     Returns:
         A list-of-lists table of strings, each row representing
@@ -74,7 +90,7 @@ def make_raw_table(components):
             value = 'None'
         return value
 
-    return [[get_component_value(component, api_key) for api_key in API_KEYS_TO_HEADERS]
+    return [[get_component_value(component, api_key) for api_key in heading_mapping]
             for component in components]
 
 
@@ -97,6 +113,75 @@ def get_component_aliases(sls_component_dicts):
             if 'Aliases' in component.get('ExtraProperties'):
                 xname_aliases[component['Xname']] = component.get('ExtraProperties').get('Aliases')
     return xname_aliases
+
+
+def group_dicts_by(key, dicts):
+    """Group dicts by a particular key.
+
+    To illustrate, consider the following group of dicts:
+
+    ```
+    dicts = [
+        {
+            "name": "Pepsi",
+            "type": "cola"
+        },
+        {
+            "name": "Coca-Cola",
+            "type": "cola"
+        },
+        {
+            "name": "Sprite",
+            "type": "lemon-lime"
+        }
+    ]
+    ```
+
+    Then if grouped by `"type"`, the following is the result:
+
+    ```
+    group_dicts_by("type", dicts) == {
+        "cola": [
+            {
+                "name": "Pepsi",
+                "type": "cola"
+            },
+            {
+                "name": "Coca-Cola",
+                "type": "cola"
+            }
+        ],
+        "lemon-lime": [
+            {
+                "name": "Sprite",
+                "type": "lemon-lime"
+            }
+        ]
+    }
+    ```
+
+    Args:
+        key (str): The key in the dictionaries passed in `dicts` to group by.
+        dicts ([dict]): A list of dicts to be grouped
+
+    Raises:
+        ValueError: if `key` is not present in all dictionaries in
+            `dicts`
+
+    Returns:
+        dict: a mapping from each unique value of the key from `dicts` to a list of
+        dicts with that value
+    """
+    try:
+        unique_attr_vals = set(d[key] for d in dicts)
+    except KeyError as err:
+        raise ValueError(f'The key "{key}" is not present in every '
+                         f'dictionary in the input') from err
+
+    grouped = {}
+    for unique_attr_val in unique_attr_vals:
+        grouped[unique_attr_val] = [d for d in dicts if d[key] == unique_attr_val]
+    return grouped
 
 
 def do_status(args):
@@ -156,16 +241,25 @@ def do_status(args):
         else:
             component['Aliases'] = MISSING_VALUE
 
-    raw_table = make_raw_table(components)
-    report = Report(
-        list(API_KEYS_TO_HEADERS.values()), None,
-        args.sort_by, args.reverse,
-        get_config_value('format.no_headings'),
-        get_config_value('format.no_borders'),
-        filter_strs=args.filter_strs,
-        display_headings=args.fields,
-        print_format=args.format)
+    multiple_reports = len(args.types) != 1
+    report_strings = []
 
-    report.add_rows(raw_table)
+    for component_type, components_by_type in group_dicts_by('Type', components).items():
+        title = f'{component_type} Status' if multiple_reports else None
+        heading_mapping = (COMMON_API_KEYS_TO_HEADERS, NODE_API_KEYS_TO_HEADERS)[component_type == 'Node']
 
-    print(report)
+        component_table_by_type = make_raw_table(components_by_type, heading_mapping)
+        report = Report(
+            list(heading_mapping.values()), title,
+            args.sort_by, args.reverse,
+            get_config_value('format.no_headings'),
+            get_config_value('format.no_borders'),
+            filter_strs=args.filter_strs,
+            display_headings=args.fields,
+            print_format=args.format
+        )
+
+        report.add_rows(component_table_by_type)
+        report_strings.append(str(report))
+
+    print('\n\n'.join(report_strings))

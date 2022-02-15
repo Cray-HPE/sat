@@ -1,7 +1,7 @@
 """
 Unit tests for sat.cli.status
 
-(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,13 @@ from copy import deepcopy
 
 import unittest
 
-from sat.cli.status.main import API_KEYS_TO_HEADERS, make_raw_table, get_component_aliases
+from sat.cli.status.main import (
+    COMMON_API_KEYS_TO_HEADERS,
+    get_component_aliases,
+    group_dicts_by,
+    make_raw_table,
+    NODE_API_KEYS_TO_HEADERS
+)
 from sat.constants import MISSING_VALUE
 from sat.xname import XName
 
@@ -54,7 +60,7 @@ class TestStatusBase(unittest.TestCase):
         make_raw_table() should return an empty table when the list of nodes
         is empty
         """
-        raw_table = make_raw_table([])
+        raw_table = make_raw_table([], COMMON_API_KEYS_TO_HEADERS)
         self.assertEqual(raw_table, [])
 
     def test_one(self):
@@ -63,9 +69,9 @@ class TestStatusBase(unittest.TestCase):
         make_raw_table() should return a table with a single row and the same
         number of columns as there are column headers
         """
-        raw_table = make_raw_table([row()])
+        raw_table = make_raw_table([row()], NODE_API_KEYS_TO_HEADERS)
         self.assertEqual(len(raw_table), 1)
-        self.assertEqual(len(raw_table[0]), len(API_KEYS_TO_HEADERS))
+        self.assertEqual(len(raw_table[0]), len(NODE_API_KEYS_TO_HEADERS))
 
     def test_many_default(self):
         """make_raw_table() with many nodes, default sorting
@@ -75,84 +81,71 @@ class TestStatusBase(unittest.TestCase):
         column headers.
         """
         nodes = sample_nodes()
-        raw_table = make_raw_table(deepcopy(nodes))
+        raw_table = make_raw_table(deepcopy(nodes), NODE_API_KEYS_TO_HEADERS)
         self.assertEqual(len(raw_table), len(nodes))
 
-        self.assertTrue(all(len(row) == len(API_KEYS_TO_HEADERS) for row in raw_table))
+        self.assertTrue(all(len(row) == len(NODE_API_KEYS_TO_HEADERS) for row in raw_table))
 
     def test_missing_xname(self):
         """Test that make_raw_table handles missing 'ID' key."""
         nodes = sample_nodes()
         key_to_delete = 'ID'
-        deleted_index = list(API_KEYS_TO_HEADERS).index(key_to_delete)
+        deleted_index = list(NODE_API_KEYS_TO_HEADERS).index(key_to_delete)
         for node in nodes:
             del node[key_to_delete]
 
-        raw_table = make_raw_table(deepcopy(nodes))
+        raw_table = make_raw_table(deepcopy(nodes), NODE_API_KEYS_TO_HEADERS)
         self.assertTrue(all(row[deleted_index] == MISSING_VALUE
                             for row in raw_table))
-        self.assertTrue(all(len(row) == len(API_KEYS_TO_HEADERS) for row in raw_table))
+        self.assertTrue(all(len(row) == len(NODE_API_KEYS_TO_HEADERS) for row in raw_table))
 
     def test_missing_flag_key(self):
         """Test that make_raw_table handles a different missing key."""
         nodes = sample_nodes()
         key_to_delete = 'Flag'
-        deleted_index = list(API_KEYS_TO_HEADERS).index(key_to_delete)
+        deleted_index = list(NODE_API_KEYS_TO_HEADERS).index(key_to_delete)
         for node in nodes:
             del node[key_to_delete]
 
-        raw_table = make_raw_table(deepcopy(nodes))
+        raw_table = make_raw_table(deepcopy(nodes), NODE_API_KEYS_TO_HEADERS)
         self.assertTrue(all(row[deleted_index] == MISSING_VALUE
                             for row in raw_table))
-        self.assertTrue(all(len(row) == len(API_KEYS_TO_HEADERS) for row in raw_table))
+        self.assertTrue(all(len(row) == len(NODE_API_KEYS_TO_HEADERS) for row in raw_table))
 
     def test_missing_subrole_key_from_compute_node(self):
         """Test that make_raw_table treats a compute node's missing subrole as 'None'."""
         nodes = [row(ID='ab', Role='Compute'), row(ID='cd', Role='Compute')]
         key_to_delete = 'SubRole'
-        deleted_index = list(API_KEYS_TO_HEADERS).index(key_to_delete)
+        deleted_index = list(NODE_API_KEYS_TO_HEADERS).index(key_to_delete)
         for node in nodes:
             del node[key_to_delete]
 
-        raw_table = make_raw_table(deepcopy(nodes))
+        raw_table = make_raw_table(deepcopy(nodes), NODE_API_KEYS_TO_HEADERS)
         self.assertTrue(all(row[deleted_index] == 'None'
                             for row in raw_table))
-        self.assertTrue(all(len(row) == len(API_KEYS_TO_HEADERS) for row in raw_table))
+        self.assertTrue(all(len(row) == len(NODE_API_KEYS_TO_HEADERS) for row in raw_table))
 
     def test_missing_subrole_key_from_application_node(self):
         """Test that make_raw_table treats an application node's missing subrole as MISSING."""
         nodes = sample_nodes()
         key_to_delete = 'SubRole'
-        deleted_index = list(API_KEYS_TO_HEADERS).index(key_to_delete)
+        deleted_index = list(NODE_API_KEYS_TO_HEADERS).index(key_to_delete)
         for node in nodes:
             del node[key_to_delete]
 
-        raw_table = make_raw_table(deepcopy(nodes))
+        raw_table = make_raw_table(deepcopy(nodes), NODE_API_KEYS_TO_HEADERS)
         self.assertTrue(all(row[deleted_index] == MISSING_VALUE
                             for row in raw_table))
-        self.assertTrue(all(len(row) == len(API_KEYS_TO_HEADERS) for row in raw_table))
-
-    def test_missing_subrole_key_from_non_node(self):
-        """Test that make_raw_table treats a non-node's missing subrole as MISSING."""
-        non_node_components = [row(ID='x1000c0r0b0', Type='RouterBMC', Role=None, SubRole=None)]
-        key_to_delete = 'SubRole'
-        deleted_index = list(API_KEYS_TO_HEADERS).index(key_to_delete)
-        for node in non_node_components:
-            del node[key_to_delete]
-
-        raw_table = make_raw_table(deepcopy(non_node_components))
-        self.assertTrue(all(row[deleted_index] == MISSING_VALUE
-                            for row in raw_table))
-        self.assertTrue(all(len(row) == len(API_KEYS_TO_HEADERS) for row in raw_table))
+        self.assertTrue(all(len(row) == len(NODE_API_KEYS_TO_HEADERS) for row in raw_table))
 
     def test_xname_conversion(self):
         """Test that make_raw_table converts the xname."""
         single_node = row()
         nodes = [single_node]
-        raw_table = make_raw_table(deepcopy(nodes))
+        raw_table = make_raw_table(deepcopy(nodes), NODE_API_KEYS_TO_HEADERS)
         self.assertIsInstance(raw_table[0][0], XName)
         self.assertEqual(raw_table[0][0], XName(single_node['ID']))
-        self.assertTrue(all(len(row) == len(API_KEYS_TO_HEADERS) for row in raw_table))
+        self.assertTrue(all(len(row) == len(NODE_API_KEYS_TO_HEADERS) for row in raw_table))
 
 
 class TestGetComponentAliases(unittest.TestCase):
@@ -228,6 +221,45 @@ class TestGetComponentAliases(unittest.TestCase):
             'x3000c0s5b0n0':  ['ncn-m003'],
         }
         self.assertEqual(get_component_aliases(self.sample_sls_response), correct_mapping)
+
+
+class TestGroupDictsBy(unittest.TestCase):
+    """Tests for grouping dicts by key."""
+    def setUp(self):
+        self.values = [
+            {
+                'name': 'Coca Cola',
+                'type': 'soda'
+            },
+            {
+                'name': 'Pepsi',
+                'type': 'soda'
+            },
+            {
+                'name': 'Monster',
+                'type': 'energy'
+            },
+        ]
+        self.group_by_attr = 'type'
+
+    def test_grouping_values_have_same_type(self):
+        """Test that grouped values all have the same value of the grouped attribute"""
+        for attr_value, items in group_dicts_by(self.group_by_attr, self.values).items():
+            for item in items:
+                self.assertEqual(item[self.group_by_attr], attr_value)
+
+    def test_all_values_grouped(self):
+        """Test that no values are excluded after grouping"""
+        grouped_items = set()
+        for items in group_dicts_by(self.group_by_attr, self.values).values():
+            grouped_items |= set(item['name'] for item in items)
+
+        self.assertEqual(grouped_items, set(item['name'] for item in self.values))
+
+    def test_valueerror_on_bad_attribute(self):
+        """Test that ValueError is raised when grouped by a non-existent attribute"""
+        with self.assertRaises(ValueError):
+            group_dicts_by('bad_attribute', self.values)
 
 
 if __name__ == '__main__':
