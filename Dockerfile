@@ -79,7 +79,7 @@ RUN apk update && \
     rm -r /var/cache/apk
 
 COPY --from=build $VIRTUAL_ENV $VIRTUAL_ENV
-COPY --from=build /usr/share/man/man8/sat-*.8 /usr/share/man/man8/
+COPY --from=build /usr/share/man/man8/sat*.8 /usr/share/man/man8/
 COPY --from=build /usr/bin/kubectl /usr/bin/kubectl
 COPY --from=build /etc/bash_completion.d/sat-completion.bash /etc/bash_completion.d/sat-completion.bash
 COPY --from=build /root/.bash_login /root/.bash_login
