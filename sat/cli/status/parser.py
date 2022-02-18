@@ -1,6 +1,6 @@
 """
 The parser for the status subcommand.
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -21,6 +21,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
+from sat.cli.status.constants import COMPONENT_TYPES, DEFAULT_TYPE
 import sat.parsergroups
 
 
@@ -38,28 +39,14 @@ def add_status_subparser(subparsers):
     format_options = sat.parsergroups.create_format_options()
     filter_options = sat.parsergroups.create_filter_options()
 
-    types = [
-        'all',
-        'Chassis',
-        'ChassisBMC',
-        'ComputeModule',
-        'HSNBoard',
-        'Node',
-        'NodeBMC',
-        'NodeEnclosure',
-        'RouterBMC',
-        'RouterModule',
-    ]
-
-    default_type = 'Node'
-
     status_parser = subparsers.add_parser(
         'status', help='Report node status.',
         description='Report node status.',
         parents=[format_options, filter_options])
 
+    type_choices = ['all', *COMPONENT_TYPES]
     status_parser.add_argument(
         '--types', metavar='TYPE', dest='types', nargs='+',
-        choices=types, default=[default_type],
+        choices=type_choices, default=[DEFAULT_TYPE],
         help=f"Specify which components should be queried. "
-        f"The default is \"{default_type}\". All types are: {', '.join(types)}")
+        f"The default is \"{DEFAULT_TYPE}\". All types are: {', '.join(type_choices)}")
