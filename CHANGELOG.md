@@ -25,11 +25,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.14.0] - 2022-02-24
+
+### Added
+- Added the ability to specify a commit hash in a product-based configuration
+  layer in a ``sat bootprep`` input file.
 
 ### Changed
 - The Dockerfile was reworked to leverage multistage builds and run unit tests
-  in the same environment as the production container.
+  in the same environment as the production container. The size of the container
+  image has been cut in half as a result.
+- Incremented the JSON Schema specification version for the ``sat bootprep``
+  input file from draft-07 to 2020-12.
 
 ## [3.13.1] - 2022-01-26
 
