@@ -36,6 +36,27 @@ These options must be specified after the subcommand.
 
         If "all" is specified, then all types will be queried.
 
+**--all-fields**
+        Display all fields. This is the default behavior when no other
+        --\*-fields options are specified.
+
+**--hsm-fields**
+        Only query and display information from HSM. The xname, Type, NID,
+        State, Flag, Enabled, Arch, Class, Role, Subrole, and Net Type fields
+        will be shown. May be combined with **--sls-fields** and
+        **--config-fields**.
+
+**--sls-fields**
+        Only query and display information from SLS about node IDs. The xname
+        and Aliases fields will be shown. May be combined with **--hsm-fields**
+        and **--config-fields**.
+
+**--cfs-fields**
+        Only query and display information from CFS about node configuration
+        status. The xname, Desired Config, Configuration Status, and Error
+        Count fields will be shown. May be combined with **--hsm-fields** and
+        **--sls-fields**.
+
 .. include:: _sat-format-opts.rst
 .. include:: _sat-filter-opts.rst
 

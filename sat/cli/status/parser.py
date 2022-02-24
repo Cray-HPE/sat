@@ -50,3 +50,28 @@ def add_status_subparser(subparsers):
         choices=type_choices, default=[DEFAULT_TYPE],
         help=f"Specify which components should be queried. "
         f"The default is \"{DEFAULT_TYPE}\". All types are: {', '.join(type_choices)}")
+
+    status_parser.add_argument(
+        '--all-fields', dest='status_module_names',
+        action='store_const', const=['SLSStatusModule', 'HSMStatusModule', 'CFSStatusModule'],
+        help='Display all status fields. This is the default behavior when no other '
+        '--*-fields options are specified.'
+    )
+
+    status_parser.add_argument(
+        '--hsm-fields', dest='status_module_names',
+        action='append_const', const='HSMStatusModule',
+        help='Display all fields for HSM component states.'
+    )
+
+    status_parser.add_argument(
+        '--sls-fields', dest='status_module_names',
+        action='append_const', const='SLSStatusModule',
+        help='Display all fields for SLS hostnames.'
+    )
+
+    status_parser.add_argument(
+        '--cfs-fields', dest='status_module_names',
+        action='append_const', const='CFSStatusModule',
+        help='Display all fields for CFS configuration state.'
+    )
