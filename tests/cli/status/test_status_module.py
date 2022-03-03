@@ -21,7 +21,7 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-
+from abc import ABC
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -29,43 +29,48 @@ from sat.cli.status.status_module import StatusModule, StatusModuleException
 from sat.constants import MISSING_VALUE
 
 
-class TestStatusModuleSubclassing(unittest.TestCase):
-    """Tests for the subclassing StatusModule."""
-    def test_status_modules_added(self):
-        """Test that StatusModule subclasses are registered"""
-        class TestStatusModule(StatusModule):
-            pass  # Don't need to define methods, no instances are created.
-
-        self.assertIn(TestStatusModule, StatusModule.modules)
-
-
 class BaseStatusModuleTestCase(unittest.TestCase):
     def setUp(self):
-        patch('sat.cli.status.status_module.StatusModule.__init_subclass__').start()
-        if hasattr(self, 'modules'):
-            patch('sat.cli.status.status_module.StatusModule.modules', self.modules).start()
+        self.modules = []
+        patch.object(StatusModule, 'modules', self.modules).start()
 
     def tearDown(self):
         patch.stopall()
 
 
+class TestStatusModuleSubclassing(BaseStatusModuleTestCase):
+    """Tests for the subclassing StatusModule."""
+
+    def test_status_modules_added(self):
+        """Test that StatusModule subclasses are registered"""
+        class TestStatusModule(StatusModule, ABC):
+            pass  # Don't need to define methods, no instances are created.
+
+        self.assertIn(TestStatusModule, StatusModule.modules)
+
+    def test_status_modules_class_attr_isolated(self):
+        """Test that we aren't accidentally modifying the real StatusModule.modules and impacting other tests."""
+        self.assertEqual(0, len(StatusModule.modules))
+        patch.stopall()
+        self.assertEqual(3, len(StatusModule.modules))
+
+
 class TestStatusModuleGettingModules(BaseStatusModuleTestCase):
     """Tests for retrieving specific modules"""
     def setUp(self):
-        class NodeTestModule(StatusModule):
+        super().setUp()
+
+        class NodeTestModule(StatusModule, ABC):
             component_types = {'Node'}
         self.NodeTestModule = NodeTestModule
 
-        class NodeBMCTestModule(StatusModule):
+        class NodeBMCTestModule(StatusModule, ABC):
             component_types = {'NodeBMC'}
         self.NodeBMCTestModule = NodeBMCTestModule
 
-        class PrimaryTestModule(StatusModule):
+        class PrimaryTestModule(StatusModule, ABC):
             primary = True
         self.PrimaryTestModule = PrimaryTestModule
-
-        self.modules = [NodeTestModule, NodeBMCTestModule, PrimaryTestModule]
-        super().setUp()
 
     def test_getting_relevant_modules(self):
         """Test that relevant modules are returned by get_relevant_modules()"""
@@ -90,9 +95,8 @@ class TestStatusModuleGettingModules(BaseStatusModuleTestCase):
 
     def test_can_only_get_one_primary_module(self):
         """Test that there can only be one primary module"""
-        class AnotherPrimaryModule(StatusModule):
+        class AnotherPrimaryModule(StatusModule, ABC):
             primary = True
-        self.modules.append(AnotherPrimaryModule)
 
         with self.assertRaises(ValueError):
             StatusModule.get_primary()
@@ -101,16 +105,15 @@ class TestStatusModuleGettingModules(BaseStatusModuleTestCase):
 class TestStatusModuleHeadings(BaseStatusModuleTestCase):
     """Tests for getting lists of table headings"""
     def setUp(self):
-        class SomeTestStatusModule(StatusModule):
+        super().setUp()
+
+        class SomeTestStatusModule(StatusModule, ABC):
             headings = ['xname', 'some_attribute']
         self.SomeTestStatusModule = SomeTestStatusModule
 
-        class AnotherTestStatusModule(StatusModule):
+        class AnotherTestStatusModule(StatusModule, ABC):
             headings = ['xname', 'another_attribute', 'one_more_attribute']
         self.AnotherTestStatusModule = AnotherTestStatusModule
-
-        self.modules = [SomeTestStatusModule, AnotherTestStatusModule]
-        super().setUp()
 
     def test_get_all_headings(self):
         """Test getting headings for all StatusModules"""
@@ -140,6 +143,7 @@ class TestStatusModuleHeadings(BaseStatusModuleTestCase):
 class TestGettingRows(BaseStatusModuleTestCase):
     """Tests for getting populated rows"""
     def setUp(self):
+        super().setUp()
         self.all_rows = [
             {'xname': 'x3000c0s1b0n0',
              'state': 'on',
@@ -150,25 +154,28 @@ class TestGettingRows(BaseStatusModuleTestCase):
         ]
         outer_self = self
 
-        class RowTestStatusModule(StatusModule):
-            source_name = 'test'
+        class TestStatusModuleOne(StatusModule):
+            primary = True
+            source_name = 'one'
+            headings = ['xname', 'state']
 
             @property
             def rows(self):
                 return [{key: row[key] for key in self.headings}
                         for row in outer_self.all_rows]
 
-        class TestStatusModuleOne(RowTestStatusModule):
-            primary = True
-            headings = ['xname', 'state']
         self.TestStatusModuleOne = TestStatusModuleOne
 
-        class TestStatusModuleTwo(RowTestStatusModule):
+        class TestStatusModuleTwo(StatusModule):
             headings = ['xname', 'config']
-        self.TestStatusModuleTwo = TestStatusModuleTwo
+            source_name = 'two'
 
-        self.modules = [TestStatusModuleOne, TestStatusModuleTwo]
-        super().setUp()
+            @property
+            def rows(self):
+                return [{key: row[key] for key in self.headings}
+                        for row in outer_self.all_rows]
+
+        self.TestStatusModuleTwo = TestStatusModuleTwo
 
     def test_getting_populated_rows(self):
         """Test getting rows in the successful case"""
@@ -187,7 +194,6 @@ class TestGettingRows(BaseStatusModuleTestCase):
             def rows(self):
                 raise StatusModuleException('Information is irrelevant!')
 
-        self.modules.append(TestStatusModuleFails)
         with self.assertLogs(level='WARNING'):
             rows = StatusModule.get_populated_rows(primary_key='xname', session=MagicMock())
 
