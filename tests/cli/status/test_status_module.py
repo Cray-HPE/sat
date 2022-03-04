@@ -22,9 +22,11 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 from abc import ABC
+import inspect
 import unittest
 from unittest.mock import MagicMock, patch
 
+import sat.cli.status.status_module as status_module_module
 from sat.cli.status.status_module import StatusModule, StatusModuleException
 from sat.constants import MISSING_VALUE
 
@@ -52,7 +54,11 @@ class TestStatusModuleSubclassing(BaseStatusModuleTestCase):
         """Test that we aren't accidentally modifying the real StatusModule.modules and impacting other tests."""
         self.assertEqual(0, len(StatusModule.modules))
         patch.stopall()
-        self.assertEqual(3, len(StatusModule.modules))
+        implemented_submodules = [
+            module for _, module in inspect.getmembers(status_module_module, inspect.isclass)
+            if issubclass(module, StatusModule) and module is not StatusModule
+        ]
+        self.assertEqual(len(implemented_submodules), len(StatusModule.modules))
 
 
 class TestStatusModuleGettingModules(BaseStatusModuleTestCase):
