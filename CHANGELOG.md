@@ -27,9 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+- Added information about nodes' CFS configuration status (desired
+  configuration, configuration status, and error count) to ``sat status``.
+
 ### Changed
 - Changed the output of ``sat status`` to split different component types into
-  different report tables, and removed the 'Type' column from the reports.
+  different report tables.
 
 ## [3.14.0] - 2022-02-24
 
