@@ -70,6 +70,28 @@ class BOSClient(APIGatewayClient):
             raise APIError(f'Failed to parse JSON in response from BOS when '
                            f'getting session templates: {err}')
 
+    def get_session_template(self, session_template_name):
+        """Get a specific BOS session template.
+
+        Args:
+            session_template_name (str): name of the session template to
+                retrieve
+
+        Returns:
+            dict: the session template
+
+        Raises:
+            APIError: if the GET request to retrieve the session template fails
+                or the response JSON cannot be parsed
+        """
+        try:
+            return self.get('sessiontemplate', session_template_name).json()
+        except APIError as err:
+            raise APIError(f'Failed to get BOS session template: {err}')
+        except ValueError as err:
+            raise APIError(f'Failed to parse JSON in response from BOS when '
+                           f'getting session template: {err}')
+
     def create_session_template(self, session_template_data):
         """Create a session template.
 

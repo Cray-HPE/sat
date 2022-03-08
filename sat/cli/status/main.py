@@ -23,10 +23,14 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 import logging
 
+from sat.apiclient.bos import BOSClient
+from sat.apiclient.gateway import APIError
+from sat.apiclient.hsm import HSMClient
 from sat.cli.status.constants import COMPONENT_TYPES
 import sat.cli.status.status_module
 from sat.cli.status.status_module import StatusModule
 from sat.config import get_config_value
+from sat.filtering import CustomFilter
 from sat.report import Report
 from sat.session import SATSession
 from sat.xname import XName
@@ -111,6 +115,51 @@ def group_dicts_by(key, dicts):
     return grouped
 
 
+def get_bos_template_filter_fn(bos_template, session):
+    """Get a function which filters nodes based on session template.
+
+    The returned filter function will filter xnames based on whether they are
+    listed directly in any of the session template's boot sets, or any node
+    groups or roles in those boot sets.
+
+    Args:
+        bos_template (str): the name of the BOS session template
+        session (SATSession): a SATSession object to connect to the API gateway
+
+    Returns:
+        A CustomFilter object which can filter rows based on nodes' belonging
+        to a BOS session template boot set.
+    """
+
+    skip_filter = False
+    hsm_client = HSMClient(session)
+    bos_client = BOSClient(session)
+
+    nodes = set()
+    roles = set()
+
+    try:
+        session_template = bos_client.get_session_template(bos_template)
+        for boot_set in session_template.get('boot_sets', {}).values():
+            roles |= set(boot_set.get('node_roles_groups', []))
+            nodes |= set(boot_set.get('node_list', []))
+            for node_group in boot_set.get('node_groups', []):
+                nodes |= set(hsm_client.get_component_xnames(params={
+                    'group': node_group
+                }))
+
+    except APIError as err:
+        LOGGER.warning('Could not get nodes from the given session template: %s', err)
+        skip_filter = True
+
+    def filter_fn(row):
+        return skip_filter or \
+            str(row.get('xname')) in nodes or \
+            row.get('Role') in roles
+
+    return CustomFilter(filter_fn, ['xname'])
+
+
 def do_status(args):
     """Displays node status.
 
@@ -163,12 +212,24 @@ def do_status(args):
                            component_type)
             continue
 
+        extra_filter_fns = []
+        if args.bos_template:
+            if component_type == 'Node':
+                extra_filter_fns.append(
+                    get_bos_template_filter_fn(args.bos_template, session)
+                )
+            else:
+                LOGGER.warning('%s components cannot be filtered by BOS session template; '
+                               'all components will be shown.',
+                               component_type)
+
         report = Report(
             list(headings), title,
             args.sort_by, args.reverse,
             get_config_value('format.no_headings'),
             get_config_value('format.no_borders'),
             filter_strs=args.filter_strs,
+            filter_fns=extra_filter_fns,
             display_headings=args.fields,
             print_format=args.format
         )

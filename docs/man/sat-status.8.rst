@@ -57,6 +57,11 @@ These options must be specified after the subcommand.
         Count fields will be shown. May be combined with **--hsm-fields** and
         **--sls-fields**.
 
+**--bos-template**
+        Specify a BOS session template. Only nodes specified in the node list,
+        node groups, and roles in this session template's boot sets will be
+        included in the status report.
+
 .. include:: _sat-format-opts.rst
 .. include:: _sat-filter-opts.rst
 

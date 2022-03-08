@@ -23,7 +23,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 
 from collections import OrderedDict
-from parsec import ParseError
 import copy
 from functools import wraps
 import os
@@ -31,6 +30,8 @@ import random
 import time
 from unittest import mock
 import unittest
+
+from parsec import ParseError
 
 from sat import filtering
 
@@ -144,8 +145,8 @@ class TestFilterQueryStrings(unittest.TestCase):
 
     def test_combined_filters(self):
         """Test composing filtering functions with boolean combinators."""
-        always_true = filtering.CustomFilter(mock.MagicMock(return_value=True))
-        always_false = filtering.CustomFilter(mock.MagicMock(return_value=False))
+        always_true = filtering.CustomFilter(mock.MagicMock(return_value=True), {'some_field'})
+        always_false = filtering.CustomFilter(mock.MagicMock(return_value=False), {'some_field'})
 
         fns = (always_true, always_false)
         true_fns = (always_true, always_true)
@@ -159,6 +160,21 @@ class TestFilterQueryStrings(unittest.TestCase):
         self.assertTrue(filtering.CombinedFilter(any, *fns)(val))
         self.assertTrue(filtering.CombinedFilter(any, *true_fns)(val))
         self.assertFalse(filtering.CombinedFilter(any, *false_fns)(val))
+
+    def test_custom_filters(self):
+        """Test that custom filters filter rows according to their given filter function."""
+        filter_result_cache = {}
+
+        # A filter function that randomly filters the given row, and saves the
+        # result of the filtering.
+        def filter_fn(row):
+            if row['num'] not in filter_result_cache:
+                filter_result_cache[row['num']] = bool(random.randint(0, 1))
+            return filter_result_cache[row['num']]
+
+        custom_filter = filtering.CustomFilter(filter_fn, {'num'})
+        for row in [{'num': i} for i in range(20)]:
+            self.assertEqual(filter_fn(row), custom_filter(row))
 
     def test_get_cmpr_fn_value_error(self):
         """Test _get_cmpr_fn raises a ValueError for a non-comparator."""
@@ -184,6 +200,87 @@ class TestGetFilteredFields(unittest.TestCase):
         fields = ['foo', 'bar']
         filter_fn = filtering.parse_query_string('baz = quux', fields)
         self.assertEqual(filter_fn.get_filtered_fields(), set())
+
+    def test_custom_filter_fields(self):
+        """Test that CustomFilter fields are collected properly when filter has no subfilters."""
+        only_fields = {'foo', 'bar'}
+        custom_filter = filtering.CustomFilter(None, only_fields)
+        self.assertEqual(custom_filter.get_filtered_fields(), only_fields)
+
+    def test_custom_filter_fields_children(self):
+        """Test that CustomFilter fields are collected properly when filter has subfilters."""
+        child_fields = {'baz'}
+        child_filter = filtering.CustomFilter(None, child_fields)
+
+        sibling_fields = {'baz', 'giblet'}
+        sibling_filter = filtering.CustomFilter(None, sibling_fields)
+
+        parent_fields = {'foo', 'bar'}
+        parent_filter = filtering.CustomFilter(None, parent_fields, children=[child_filter, sibling_filter])
+
+        self.assertEqual(parent_filter.get_filtered_fields(), child_fields | sibling_fields | parent_fields)
+
+
+class TestParseMultipleStrings(unittest.TestCase):
+    """Tests for the parse_multiple_query_strings() function"""
+    def test_parsing_no_filters(self):
+        """Test parse_multiple_query_strings with no strings passed"""
+        self.assertIsNone(filtering.parse_multiple_query_strings([], []))
+
+    def test_parsing_single_comparison_filter_gives_single_filter(self):
+        """Test that parsing a single filter returns just a simple filter function"""
+        self.assertTrue(isinstance(filtering.parse_multiple_query_strings(['foo=bar'], ['foo']),
+                                   filtering.ComparisonFilter))
+
+    def test_parsing_multiple_filters_produces_combined_filter(self):
+        """Test that parsing multiple filter functions produces a combined filter"""
+        filters = ['foo=bar', 'baz=quux']
+        compiled_filters = [filtering.parse_query_string(f, []) for f in filters]
+        combined_filter = filtering.parse_multiple_query_strings(filters, [])
+
+        for compiled_filter in compiled_filters:
+            self.assertIn(compiled_filter, combined_filter.filter_fns)
+
+    def test_parsing_just_custom_filters(self):
+        """Test that custom filters are passed through if just one"""
+        def rubber_stamp(_):
+            return True
+        custom_filter = filtering.CustomFilter(rubber_stamp, [])
+        parsed_filter = filtering.parse_multiple_query_strings([], [], filter_fns=[custom_filter])
+        self.assertTrue(parsed_filter is custom_filter)
+
+    def test_parsing_multiple_custom_filters(self):
+        """Test that multiple custom filters are combined"""
+        def rubber_stamp(_):
+            return True
+
+        def irritable_bureaucrat(_):
+            return False
+
+        filter_fns = [
+            filtering.CustomFilter(fn, [])
+            for fn in [rubber_stamp, irritable_bureaucrat]
+        ]
+
+        parsed_filter = filtering.parse_multiple_query_strings([], [], filter_fns=filter_fns)
+        self.assertTrue(all(fn in parsed_filter.filter_fns for fn in filter_fns))
+
+    def test_parsing_strs_with_custom_filters(self):
+        """Test that parsed filter strings are combined with custom filter functions"""
+        def rubber_stamp(_):
+            return True
+        custom_filter = filtering.CustomFilter(rubber_stamp, [])
+
+        filter_strs = ['foo=bar', 'baz=quux']
+        str_filters = [filtering.parse_query_string(s, []) for s in filter_strs]
+        combined_filter = filtering.parse_multiple_query_strings(
+            filter_strs, [],
+            filter_fns=[custom_filter]
+        )
+
+        for test_filter in str_filters:
+            self.assertIn(test_filter, combined_filter.filter_fns)
+        self.assertIn(custom_filter, combined_filter.filter_fns)
 
 
 class TestRemoveConstantValues(unittest.TestCase):
