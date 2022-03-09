@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+- Added a ``--delete-ims-jobs`` option to ``sat bootprep run`` which causes
+  successful IMS jobs to be deleted after ``sat bootprep`` is run. The default
+  behavior was also changed to not delete jobs.
 - Added information about nodes' CFS configuration status (desired
   configuration, configuration status, and error count) to ``sat status``.
 - Added options to ``sat status`` to limit the output columns by specified
