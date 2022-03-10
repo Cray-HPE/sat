@@ -36,7 +36,7 @@ RUN apk update && \
 COPY requirements.lock.txt requirements.txt
 ARG PIP_INDEX_URL="https://arti.dev.cray.com/artifactory/api/pypi/pypi-remote/simple"
 ARG PIP_EXTRA_INDEX_URL="https://arti.dev.cray.com/artifactory/csm-python-modules-remote/simple"
-RUN pip3 install --no-cache-dir 'pip < 22.0' && \
+RUN pip3 install --no-cache-dir -U pip && \
     pip3 install -r requirements.txt
 
 COPY CHANGELOG.md README.md setup.cfg setup.py ./
