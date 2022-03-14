@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Changed the output of ``sat status`` to split different component types into
   different report tables.
+- CFS image customization session container status logs in ``sat bootprep`` now
+  automatically adjust space padding based on container name lengths.
 
 ### Security
 - Updated urllib3 dependency to version 1.26.5 to mitigate CVE-2021-33503, and
