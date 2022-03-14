@@ -221,11 +221,55 @@ class TestGetFilteredFields(unittest.TestCase):
         self.assertEqual(parent_filter.get_filtered_fields(), child_fields | sibling_fields | parent_fields)
 
 
+class TestComparisonFilterEquality(unittest.TestCase):
+    """Tests for equality checking on ComparisonFilters."""
+    def setUp(self):
+        self.headings = ['foo', 'bar']
+
+    def test_parsed_filter_equality_different_key(self):
+        """Test that two parsed filters are not equal if they query on a different key."""
+        foo_filter = filtering.parse_query_string('foo=val', self.headings)
+        bar_filter = filtering.parse_query_string('bar=val', self.headings)
+
+        self.assertNotEqual(foo_filter, bar_filter)
+
+    def test_parsed_filter_equality_same_expanded_query_key(self):
+        """Test that two parsed filters are equal if they query on the same key with subsequence"""
+        foo_filter = filtering.parse_query_string('f=val', self.headings)
+        bar_filter = filtering.parse_query_string('foo=val', self.headings)
+
+        self.assertEqual(foo_filter, bar_filter)
+
+    def test_parsed_filter_inequality_different_values(self):
+        """Test that two parsed filters are not equal if they have different comparison values"""
+        foo_filter = filtering.parse_query_string('foo=some_val', self.headings)
+        bar_filter = filtering.parse_query_string('foo=different_val', self.headings)
+
+        self.assertNotEqual(foo_filter, bar_filter)
+
+    def test_parsed_filter_inequality_different_expanded_query_keys(self):
+        """Test that two parsed filters are not equal if they query on different keys with subsequence"""
+        foo_filter = filtering.parse_query_string('f=val', self.headings)
+        bar_filter = filtering.parse_query_string('b=val', self.headings)
+
+        self.assertNotEqual(foo_filter, bar_filter)
+
+    def test_parsed_filter_inequality_different_comparators(self):
+        """Test that two parsed filters are not equal if they use different comaprators"""
+        foo_filter = filtering.parse_query_string('foo=val', self.headings)
+        bar_filter = filtering.parse_query_string('foo>val', self.headings)
+
+        self.assertNotEqual(foo_filter, bar_filter)
+
+
 class TestParseMultipleStrings(unittest.TestCase):
     """Tests for the parse_multiple_query_strings() function"""
+    def setUp(self):
+        self.headings = ['foo', 'baz']
+
     def test_parsing_no_filters(self):
         """Test parse_multiple_query_strings with no strings passed"""
-        self.assertIsNone(filtering.parse_multiple_query_strings([], []))
+        self.assertIsNone(filtering.parse_multiple_query_strings([], self.headings))
 
     def test_parsing_single_comparison_filter_gives_single_filter(self):
         """Test that parsing a single filter returns just a simple filter function"""
@@ -235,18 +279,18 @@ class TestParseMultipleStrings(unittest.TestCase):
     def test_parsing_multiple_filters_produces_combined_filter(self):
         """Test that parsing multiple filter functions produces a combined filter"""
         filters = ['foo=bar', 'baz=quux']
-        compiled_filters = [filtering.parse_query_string(f, []) for f in filters]
-        combined_filter = filtering.parse_multiple_query_strings(filters, [])
+        compiled_filters = [filtering.parse_query_string(f, self.headings) for f in filters]
+        combined_filter = filtering.parse_multiple_query_strings(filters, self.headings)
 
         for compiled_filter in compiled_filters:
             self.assertIn(compiled_filter, combined_filter.filter_fns)
 
     def test_parsing_just_custom_filters(self):
-        """Test that custom filters are passed through if just one"""
+        """Test that custom filters are passed through if just one is given"""
         def rubber_stamp(_):
             return True
-        custom_filter = filtering.CustomFilter(rubber_stamp, [])
-        parsed_filter = filtering.parse_multiple_query_strings([], [], filter_fns=[custom_filter])
+        custom_filter = filtering.CustomFilter(rubber_stamp, self.headings)
+        parsed_filter = filtering.parse_multiple_query_strings([], self.headings, filter_fns=[custom_filter])
         self.assertTrue(parsed_filter is custom_filter)
 
     def test_parsing_multiple_custom_filters(self):
@@ -258,23 +302,23 @@ class TestParseMultipleStrings(unittest.TestCase):
             return False
 
         filter_fns = [
-            filtering.CustomFilter(fn, [])
+            filtering.CustomFilter(fn, self.headings)
             for fn in [rubber_stamp, irritable_bureaucrat]
         ]
 
-        parsed_filter = filtering.parse_multiple_query_strings([], [], filter_fns=filter_fns)
+        parsed_filter = filtering.parse_multiple_query_strings([], self.headings, filter_fns=filter_fns)
         self.assertTrue(all(fn in parsed_filter.filter_fns for fn in filter_fns))
 
     def test_parsing_strs_with_custom_filters(self):
         """Test that parsed filter strings are combined with custom filter functions"""
         def rubber_stamp(_):
             return True
-        custom_filter = filtering.CustomFilter(rubber_stamp, [])
+        custom_filter = filtering.CustomFilter(rubber_stamp, self.headings)
 
         filter_strs = ['foo=bar', 'baz=quux']
-        str_filters = [filtering.parse_query_string(s, []) for s in filter_strs]
+        str_filters = [filtering.parse_query_string(s, self.headings) for s in filter_strs]
         combined_filter = filtering.parse_multiple_query_strings(
-            filter_strs, [],
+            filter_strs, self.headings,
             filter_fns=[custom_filter]
         )
 
