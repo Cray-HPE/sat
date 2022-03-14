@@ -32,9 +32,9 @@ paramiko >= 2.4.2
 parsec == 3.5.0
 prettytable >= 0.7.2, < 1.0
 python-dateutil >= 2.7.3, < 3.0
-pyyaml >= 5.4.1
+pyyaml >= 5.4.1, < 6.0
 requests < 3.0
 requests-oauthlib
 sseclient-py >= 1.7
 toml == 0.10.0
-urllib3 >= 1.0, < 2.0
+urllib3 >= 1.26.5, < 2.0

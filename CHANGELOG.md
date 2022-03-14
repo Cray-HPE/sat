@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the output of ``sat status`` to split different component types into
   different report tables.
 
+### Security
+- Updated urllib3 dependency to version 1.26.5 to mitigate CVE-2021-33503, and
+  refreshed Python dependency versions.
+
 ## [3.14.0] - 2022-02-24
 
 ### Added
