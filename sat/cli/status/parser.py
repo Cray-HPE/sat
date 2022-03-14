@@ -75,3 +75,9 @@ def add_status_subparser(subparsers):
         action='append_const', const='CFSStatusModule',
         help='Display all fields for CFS configuration state.'
     )
+
+    status_parser.add_argument(
+        '--bos-template',
+        help='Only show nodes specified in the node list, roles, and groups in '
+             'the boot sets contained in the given BOS session template.'
+    )

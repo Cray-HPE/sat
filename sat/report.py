@@ -55,6 +55,7 @@ class Report:
                  sort_by=None, reverse=False,
                  no_headings=None, no_borders=None,
                  align='l', filter_strs=None,
+                 filter_fns=None,
                  show_empty=None, show_missing=None,
                  force_columns=None,
                  display_headings=None,
@@ -75,6 +76,9 @@ class Report:
             filter_strs: a list of strings against which the rows in the
                 report should be filtered. The queries are combined with a
                 boolean "and".
+            filter_fns: a list of boolean-valued predicate functions against which
+                the report should be filtered. The filter functions are combined
+                a boolean "and".
             show_empty: If True, then show values for columns for which every
                 row has the value EMPTY_VALUE.
             show_missing: If True, then show values for columns for which every
@@ -115,8 +119,8 @@ class Report:
         self.force_columns = set(force_columns if force_columns is not None else [])
 
         try:
-            if filter_strs:
-                self.filter_fn = parse_multiple_query_strings(filter_strs, self.headings)
+            if filter_strs or filter_fns:
+                self.filter_fn = parse_multiple_query_strings(filter_strs, self.headings, filter_fns)
                 self.force_columns |= self.filter_fn.get_filtered_fields()
             else:
                 self.filter_fn = None

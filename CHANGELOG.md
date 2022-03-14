@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added options to ``sat status`` to limit the output columns by specified
   CSM services. The added options are ``--hsm-fields``, ``--sls-fields``, and
   ``--cfs-fields``.
+- Added a ``--bos-template`` option to ``sat status`` which allows the status
+  report to be filtered by the specified session template's boot sets.
 
 ### Changed
 - Changed the output of ``sat status`` to split different component types into
