@@ -114,6 +114,7 @@ class ComparisonFilter(BaseFilterFunction):
 
     def __eq__(self, other):
         return self.fields == other.fields \
+            and self.query_key == other.query_key \
             and self.comparator == other.comparator \
             and self.cmpr_val == other.cmpr_val
 
