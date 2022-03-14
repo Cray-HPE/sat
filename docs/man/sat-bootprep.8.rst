@@ -110,6 +110,10 @@ These options only apply to the ``run`` action.
         branch name to update the commit hash to the latest HEAD of the branch
         if requested.
 
+**--delete-ims-jobs**
+        Delete IMS jobs after creating images. Note that deleting IMS jobs makes
+        determining image history impossible.
+
 **--skip-existing-configs**
         Skip creating any configurations for which a configuration with the same
         name already exists.

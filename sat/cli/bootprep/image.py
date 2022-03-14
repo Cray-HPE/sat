@@ -413,3 +413,7 @@ def create_images(instance, args):
         raise ImageCreateError(f'Creation of {len(waiter.failed)} images failed')
     else:
         LOGGER.info('Image creation completed successfully')
+
+    if args.delete_ims_jobs:
+        for image in images_to_create:
+            image.clean_up_image_create_job()

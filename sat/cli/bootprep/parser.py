@@ -200,6 +200,11 @@ def _add_bootprep_run_subparser(subparsers):
         help='Do not resolve branch names to corresponding commit hashes before '
              'creating CFS configurations.'
     )
+    run_subparser.add_argument(
+        '--delete-ims-jobs', '-D', action='store_true',
+        help='Delete IMS jobs after creating images. Note that deleting IMS jobs '
+             'makes determining image history impossible.'
+    )
 
     add_skip_and_overwrite_options(run_subparser, 'config', 'configuration')
     add_skip_and_overwrite_options(run_subparser, 'image', 'image')
