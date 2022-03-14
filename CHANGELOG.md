@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added information about nodes' CFS configuration status (desired
   configuration, configuration status, and error count) to ``sat status``.
+- Added options to ``sat status`` to limit the output columns by specified
+  CSM services. The added options are ``--hsm-fields``, ``--sls-fields``, and
+  ``--cfs-fields``.
 
 ### Changed
 - Changed the output of ``sat status`` to split different component types into

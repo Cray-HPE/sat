@@ -24,6 +24,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 import logging
 
 from sat.cli.status.constants import COMPONENT_TYPES
+import sat.cli.status.status_module
 from sat.cli.status.status_module import StatusModule
 from sat.config import get_config_value
 from sat.report import Report
@@ -127,6 +128,16 @@ def do_status(args):
     """
     session = SATSession()
 
+    modules = args.status_module_names
+    if modules is not None:
+        modules = []
+        seen_module_names = set()
+        for module_name in args.status_module_names:
+            if module_name in seen_module_names:
+                continue
+            modules.append(getattr(sat.cli.status.status_module, module_name))
+            seen_module_names.add(module_name)
+
     types = COMPONENT_TYPES if 'all' in args.types else args.types
     multiple_reports = len(types) != 1
     report_strings = []
@@ -134,6 +145,7 @@ def do_status(args):
     components = StatusModule.get_populated_rows(
         primary_key='xname',
         primary_key_type=XName,
+        limit_modules=modules,
         session=session,
         component_types=types,
     )
@@ -142,9 +154,14 @@ def do_status(args):
         title = f'{component_type} Status' if multiple_reports else None
         headings = StatusModule.get_all_headings(
             primary_key='xname',
+            limit_modules=modules,
             component_type=component_type,
             initial_headings=DEFAULT_HEADING_ORDER
         )
+        if not headings:
+            LOGGER.warning('None of the selected fields are relevant to component type %s; skipping.',
+                           component_type)
+            continue
 
         report = Report(
             list(headings), title,
