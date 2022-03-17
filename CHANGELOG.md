@@ -45,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CFS image customization session container status logs in ``sat bootprep`` now
   automatically adjust space padding based on container name lengths.
 
+### Fixed
+- Fixed ``sat bootprep`` to require the ``action`` positional argument.
+
 ### Security
 - Updated urllib3 dependency to version 1.26.5 to mitigate CVE-2021-33503, and
   refreshed Python dependency versions.
