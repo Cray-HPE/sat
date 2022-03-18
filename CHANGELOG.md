@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed ``sat bootprep`` to require the ``action`` positional argument.
+- Fixed invalid reference to a FILES section in man page for ``sat bootprep``.
 
 ### Security
 - Updated urllib3 dependency to version 1.26.5 to mitigate CVE-2021-33503, and
