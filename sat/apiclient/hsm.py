@@ -23,8 +23,9 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 import logging
 
-from sat.constants import BMC_TYPES
 from sat.apiclient.gateway import APIError, APIGatewayClient
+from sat.constants import BMC_TYPES
+from sat.xname import XName
 
 LOGGER = logging.getLogger(__name__)
 
@@ -187,20 +188,34 @@ class HSMClient(APIGatewayClient):
         except KeyError as err:
             raise APIError(f'{err_prefix} due to missing {err} key in list of components.')
 
-    def get_node_components(self):
+    def get_node_components(self, ancestor=None):
         """Get the components of Type=Node from HSM.
+
+        Args:
+            ancestor (str): a component xname, which, if specified, is the
+                ancestor of all node components returned by this function
 
         Returns:
             list of dictionaries of Node components.
 
         Raises:
             APIError: if there is a failure querying the HSM API or getting
-                the required information from the response.
+                the required information from the response, or if the ancestor
+                xname is invalid.
         """
 
         err_prefix = 'Failed to get Node components'
         try:
-            components = self.get('State', 'Components', params={'type': 'Node'}).json()['Components']
+            if ancestor:
+                ancestor = XName(ancestor)
+                if not ancestor.is_valid:
+                    raise APIError(f'Could not get descendants of {ancestor}: invalid xname')
+
+                components = self.get('State', 'Components', 'Query', str(ancestor), params={'type': 'Node'}).json()
+            else:
+                components = self.get('State', 'Components', params={'type': 'Node'}).json()
+
+            components = components['Components']
         except APIError as err:
             raise APIError(f'{err_prefix}: {err}')
         except ValueError as err:

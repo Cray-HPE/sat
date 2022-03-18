@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+- Added a ``--bos-limit`` option to the  ``bos-operations`` stage of ``sat
+  bootsys`` which passes the given limit string to the created BOS session.
+  Also added a ``--recursive`` option to ``sat bootsys`` in order to allow
+  specifying a slot or other higher-level component in the limit string.
 - Added a ``--delete-ims-jobs`` option to ``sat bootprep run`` which causes
   successful IMS jobs to be deleted after ``sat bootprep`` is run. The default
   behavior was also changed to not delete jobs.
