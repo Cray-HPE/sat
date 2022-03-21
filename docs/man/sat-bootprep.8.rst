@@ -68,8 +68,8 @@ This argument only applies to the ``run`` action.
         create, the IMS image(s) to build and/or customize, and the BOS session
         templates to create.
 
-        For full details on the schema for the bootprep input file, see the
-        FILES section below.
+        For full details on the schema for the bootprep input file, use the
+        ``generate-docs`` or ``view-schema`` actions.
 
 OPTIONS
 =======
