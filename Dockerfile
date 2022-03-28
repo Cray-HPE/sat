@@ -18,7 +18,7 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 FROM venv_base AS base
 
 RUN apk update && \
-    apk add --no-cache python3-dev py3-pip 
+    apk add --no-cache python3-dev py3-pip
 
 WORKDIR /sat
 
@@ -51,20 +51,30 @@ RUN pip3 install --no-cache-dir 'pip < 22.0' && \
     pip3 install --no-cache-dir --timeout=300 . && \
     ./config-docker-sat.sh
 
-# The testing stage runs tests in the container in the CI pipeline. This allows
-# us to use the same Python version in CI as we use in our production Docker
-# containers.
-FROM base AS testing
+FROM base as ci_base
 COPY --from=build $VIRTUAL_ENV $VIRTUAL_ENV
 COPY requirements-dev.lock.txt requirements-dev.lock.txt
 RUN pip3 install -r requirements-dev.lock.txt
 
+# The testing stage runs tests in the container in the CI pipeline. This allows
+# us to use the same Python version in CI as we use in our production Docker
+# containers.
+FROM ci_base as testing
 # The container overhead reduces performance such that performance tests fail
 # when they succeed natively, so disable those in CI.
 ENV SAT_SKIP_PERF_TESTS=1
 COPY tests tests
 COPY setup.cfg setup.cfg
 CMD nosetests
+
+# This stage runs pycodestyle in the container so we are again using the same
+# production environment to check our code style.
+FROM ci_base as codestyle
+WORKDIR /codestyle
+COPY sat sat
+COPY tests tests
+COPY pycodestyle.conf pycodestyle.conf
+CMD ["pycodestyle", "--config", "pycodestyle.conf", "sat", "tests"]
 
 # The production stage is our actual SAT image. We simply install runtime
 # dependencies, copy the whole virtualenv from the build stage, as well as the

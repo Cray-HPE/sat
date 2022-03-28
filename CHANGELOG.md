@@ -44,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   different report tables.
 - CFS image customization session container status logs in ``sat bootprep`` now
   automatically adjust space padding based on container name lengths.
+- Added a stage to the Docker container build which runs ``pycodestyle`` on the
+  SAT codebase and unit tests.
 
 ### Fixed
 - Fixed ``sat bootprep`` to require the ``action`` positional argument.
