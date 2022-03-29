@@ -64,6 +64,11 @@ class TestXName(unittest.TestCase):
             self.assertEqual(XName(given_xname).get_direct_parent(),
                              XName(parent))
 
+    def test_valid_xname(self):
+        """Test that valid xnames are detected"""
+        for given_xname, _, _, _ in self.examples[:-1]:
+            self.assertTrue(XName(given_xname).is_valid)
+
     def test_drive_get_node_parent(self):
         """Test getting the parent node xname of a drive xname."""
         drive_xname_str = 'x1000c3s5b0n1g1k1'

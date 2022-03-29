@@ -38,7 +38,8 @@ from sat.apiclient import APIError, BOSClient, HSMClient
 from sat.cli.bootsys.defaults import PARALLEL_CHECK_INTERVAL
 from sat.config import get_config_value
 from sat.session import SATSession
-from sat.util import get_val_by_path, prompt_continue
+from sat.util import get_val_by_path, pester, prompt_continue
+from sat.xname import XName
 
 LOGGER = logging.getLogger(__name__)
 
@@ -46,6 +47,83 @@ SHUTDOWN_OPERATION = 'shutdown'
 BOOT_OPERATION = 'boot'
 SUPPORTED_BOS_OPERATIONS = (SHUTDOWN_OPERATION, BOOT_OPERATION)
 INFLECTOR = engine()
+
+
+class BOSLimitString:
+    """A simple class to encapsulate a BOS limit string."""
+
+    def __init__(self, xnames, roles_groups):
+        """Constructor for BOSLimitString
+
+        Args:
+            xnames (Iterable[str]): node xnames to include in limit string
+            roles_groups (Iterable[str]): names of roles and groups to include
+                in limit string
+        """
+        self.xnames = set(xnames)
+        self.roles_groups = set(roles_groups)
+
+    @classmethod
+    def from_string(cls, limit, *, recursive):
+        """Construct a BOSLimitString from a raw limit string.
+
+        The rationale of the `recursive` argument to this function is that BOS
+        limit strings must include specific node xnames, and will not work
+        recursively -- giving a slot's xname, for instance, will result in a
+        silent no-op. If a user wishes to power off a single blade, however, it
+        is much simpler to use this recursive expander function instead of
+        specifying each node individually.
+
+        Args:
+            limit (str): a comma-separated list of xnames, roles, and groups which
+                can be passed to BOS in its limit parameter in the POST payload.
+            recursive (bool): if True, replace all non-node xnames in the limit
+                string with all node xnames under that xname. If False, leave all
+                xnames verbatim.
+
+        Returns:
+            BOSLimitString: a BOSLimitString representing the given limit string
+
+        Raises:
+            BOSFailure: if a non-node xname is supplied when recursive is False, or
+                a given xname is recursively expanded and no nodes are found
+                under it, or there is a problem querying HSM to recursively
+                expand an xname.
+        """
+        hsm_client = HSMClient(SATSession())
+        xnames = set()
+        roles_groups = set()
+
+        for limit_str in limit.split(','):
+            limit_xname = XName(limit_str)
+            if not limit_xname.is_valid:
+                roles_groups.add(limit_str)
+                continue
+
+            if limit_xname.get_type() == 'NODE':
+                xnames.add(limit_str)
+            else:
+                if not recursive:
+                    raise BOSFailure(f'xname {str(limit_xname)} refers to a component of type '
+                                     f'{limit_xname.get_type().lower()}, not a node. Limits for non-recursive '
+                                     f'BOS operations require node xnames.')
+
+                try:
+                    limit_node_xnames = hsm_client.get_node_components(ancestor=limit_str)
+                except APIError as err:
+                    raise BOSFailure(f'Could not retrieve node xnames from HSM: {err}') from err
+
+                if not limit_node_xnames:
+                    raise BOSFailure(f'Recursively expanding xname {limit_str} failed; '
+                                     f'no node xnames were found.')
+
+                for node_component in limit_node_xnames:
+                    xnames.add(node_component['ID'])
+
+        return cls(xnames, roles_groups)
+
+    def __str__(self):
+        return ','.join(self.xnames | self.roles_groups)
 
 
 class BOSFailure(Exception):
@@ -124,7 +202,7 @@ def boa_job_successful(boa_job_id):
 
 class BOSSessionThread(Thread):
 
-    def __init__(self, session_template, operation):
+    def __init__(self, session_template, operation, limit=None):
         """Create a new BOSSessionThread that creates and monitors a BOS session
 
         Args:
@@ -132,10 +210,13 @@ class BOSSessionThread(Thread):
                 create the session.
             operation (str): the operation to use when creating the session from the
                 session template.
+            limit (str): a limit string to pass through to BOS as the `limit`
+                parameter in the POST payload when creating the BOS session
         """
         super().__init__()
         self._stop_event = Event()
         self.session_template = session_template
+        self.limit = limit
         self.operation = operation
         self.session_id = None
         self.boa_job_id = None
@@ -195,7 +276,8 @@ class BOSSessionThread(Thread):
         """
         try:
             response = self.bos_client.create_session(self.session_template,
-                                                      self.operation).json()
+                                                      self.operation,
+                                                      limit=self.limit).json()
         except (APIError, ValueError) as err:
             self.mark_failed('Failed to create BOS session: {}'.format(str(err)))
             return
@@ -380,7 +462,7 @@ class BOSSessionThread(Thread):
         self.monitor_status_kubectl()
 
 
-def do_parallel_bos_operations(session_templates, operation, timeout):
+def do_parallel_bos_operations(session_templates, operation, timeout, limit=None):
     """Perform BOS operation against the session templates in parallel.
 
     Args:
@@ -389,6 +471,10 @@ def do_parallel_bos_operations(session_templates, operation, timeout):
         operation (str): The operation to perform on the given BOS session
             templates. Can be either 'shutdown' or 'boot'.
         timeout (int): The timeout for the BOS operation
+        limit (str): a string containing a comma-separated list of xnames,
+            roles, and groups to operate upon. This string will be passed
+            through verbatim to BOS in the POST payload when sessions are
+            created.
 
     Returns:
         None
@@ -402,7 +488,7 @@ def do_parallel_bos_operations(session_templates, operation, timeout):
     LOGGER.debug('Doing parallel %s with %s: %s', operation, template_plural,
                  ', '.join(session_templates))
 
-    bos_session_threads = [BOSSessionThread(session_template, operation)
+    bos_session_threads = [BOSSessionThread(session_template, operation, limit=limit)
                            for session_template in session_templates]
 
     start_time = monotonic()
@@ -684,13 +770,18 @@ def get_session_templates_deprecated():
     return session_templates
 
 
-def do_bos_operations(operation, timeout):
+def do_bos_operations(operation, timeout, limit=None, recursive=False):
     """Perform a BOS operation on the compute node and UAN session templates.
 
     Args:
         operation (str): The operation to perform on the compute node and UAN
             session templates. Valid operations are 'boot' and 'shutdown'.
         timeout (int): The timeout for the BOS operation.
+        limit (str): a limit string to pass through to BOS to limit the operation
+            to specific xnames.
+        recursive (bool): if True, expand non-node xnames in the limit string
+            to the set of all nodes contained in the given xname. If False, do not
+            expand xnames.
 
     Returns:
         None
@@ -702,6 +793,37 @@ def do_bos_operations(operation, timeout):
             failure action is 'abort'.
         ValueError: if given an invalid value for `operation`.
     """
+    if limit is not None:
+        bos_limit_str = BOSLimitString.from_string(limit, recursive=recursive)
+
+        # This prompting is inspired by the idea described here:
+        # https://rachelbythebay.com/w/2020/10/26/num/
+        #
+        # Essentially, the idea is that if we're going to end up targeting a bunch
+        # of nodes, the user should have an idea of the magnitude of their action.
+        # This should help prevent mistakes such as shutting down a whole cabinet
+        # instead of a single blade, for instance.
+        num_affected_xnames = len(bos_limit_str.xnames)
+        if recursive and num_affected_xnames:
+            try:
+                continue_ok = pester(
+                    f'The recursive BOS operation will affect {num_affected_xnames} nodes; '
+                    f'enter the number of affected nodes to continue',
+                    valid_answer=None,
+                    human_readable_valid='enter number to continue, anything else to abort',
+                    parse_answer=lambda answer: int(answer) == num_affected_xnames
+                )
+            except ValueError:
+                continue_ok = False
+
+            if not continue_ok:
+                LOGGER.info('Did not enter the correct number of nodes; aborting.')
+                return
+
+        LOGGER.debug('Using limit string for BOS %s operation: %s',
+                     operation, str(bos_limit_str))
+        limit = str(bos_limit_str)
+
     if operation not in SUPPORTED_BOS_OPERATIONS:
         raise ValueError(f"Invalid operation '{operation}' given. Valid "
                          f"operations: {', '.join(SUPPORTED_BOS_OPERATIONS)}")
@@ -723,7 +845,7 @@ def do_bos_operations(operation, timeout):
 
     if templates_to_use:
         # Let any exceptions raise to caller
-        do_parallel_bos_operations(templates_to_use, operation, timeout)
+        do_parallel_bos_operations(templates_to_use, operation, timeout, limit=limit)
 
 
 def do_bos_shutdowns(args):
@@ -738,7 +860,8 @@ def do_bos_shutdowns(args):
         prompt_continue('shutdown of compute nodes and UANs using BOS')
 
     try:
-        do_bos_operations('shutdown', get_config_value('bootsys.bos_shutdown_timeout'))
+        do_bos_operations('shutdown', get_config_value('bootsys.bos_shutdown_timeout'),
+                          limit=args.bos_limit, recursive=args.recursive)
     except BOSFailure as err:
         LOGGER.error(err)
         sys.exit(1)
@@ -754,7 +877,8 @@ def do_bos_boots(args):
     Returns: None
     """
     try:
-        do_bos_operations('boot', get_config_value('bootsys.bos_boot_timeout'))
+        do_bos_operations('boot', get_config_value('bootsys.bos_boot_timeout'),
+                          limit=args.bos_limit, recursive=args.recursive)
     except BOSFailure as err:
         LOGGER.error(err)
         sys.exit(1)

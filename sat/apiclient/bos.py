@@ -1,7 +1,7 @@
 """
 Client for querying the Boot Orchestration Service (BOS) API
 
-(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -31,7 +31,7 @@ LOGGER = logging.getLogger(__name__)
 class BOSClient(APIGatewayClient):
     base_resource_path = 'bos/v1/'
 
-    def create_session(self, session_template, operation):
+    def create_session(self, session_template, operation, limit=None):
         """Create a BOS session from a session template with an operation.
 
         Args:
@@ -39,6 +39,8 @@ class BOSClient(APIGatewayClient):
                 to create the session.
             operation (str): the operation to create the session with. Can be
                 one of boot, configure, reboot, shutdown.
+            limit (str): a limit string to pass through to BOS as the `limit`
+                parameter in the POST payload when creating the BOS session
 
         Returns:
             The response from the POST to 'session'.
@@ -50,6 +52,10 @@ class BOSClient(APIGatewayClient):
             'templateUuid': session_template,
             'operation': operation
         }
+
+        if limit:
+            request_body['limit'] = limit
+
         return self.post('session', json=request_body)
 
     def get_session_templates(self):

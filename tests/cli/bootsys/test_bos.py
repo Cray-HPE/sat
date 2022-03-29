@@ -32,6 +32,7 @@ from unittest.mock import Mock, call, patch
 
 from sat.cli.bootsys.bos import (
     BOSFailure,
+    BOSLimitString,
     BOSSessionThread,
     boa_job_successful,
     do_bos_shutdowns,
@@ -166,6 +167,63 @@ class TestBOAJobSuccessful(ExtendedTestCase):
                 with self.assertRaisesRegex(BOSFailure, 'failed to get logs of pod '
                                                         '{}'.format(self.boa_pods[-1])):
                     boa_job_successful(self.boa_job_id)
+
+
+class TestBOSLimitString(unittest.TestCase):
+    """Tests for the BOSLimitString class."""
+    def setUp(self):
+        self.blade_xname = 'x3000c0s0'
+        self.nodes_on_blade_xnames = [f'{self.blade_xname}b0n{node}' for node in range(4)]
+        self.mock_hsm_client = patch('sat.cli.bootsys.bos.HSMClient').start()
+        self.mock_get_node_components = self.mock_hsm_client.return_value.get_node_components
+        self.mock_get_node_components.return_value = [
+            {'ID': xname} for xname in self.nodes_on_blade_xnames
+        ]
+
+    def tearDown(self):
+        patch.stopall()
+
+    def test_constructing_limit_string_manually(self):
+        """Test the constructor of the BOSLimitString class"""
+        xnames = ['x3000c0s0b0n0']
+        roles = ['Application']
+        limit_str = BOSLimitString(xnames, roles)
+
+        for xname in xnames:
+            self.assertIn(xname, str(limit_str))
+
+        for role in roles:
+            self.assertIn(role, str(limit_str))
+
+    def test_expanding_a_limit_string(self):
+        """Test constructing a BOSLimitString non-recursively from an existing limit string"""
+        limit_str = BOSLimitString.from_string('x3000c0s0b0n0,Application', recursive=False)
+        for item in ['x3000c0s0b0n0', 'Application']:
+            self.assertIn(item, str(limit_str))
+
+        self.mock_get_node_components.assert_not_called()
+
+    def test_recursive_limit_string_expanding(self):
+        """Test expanding a limit string to its constituent xnames"""
+        blade_xname = 'x3000c0s0'
+        limit_str = BOSLimitString.from_string(f'{blade_xname},Application', recursive=True)
+        self.mock_get_node_components.assert_called_once_with(ancestor=blade_xname)
+        for xname in self.nodes_on_blade_xnames + ['Application']:
+            self.assertIn(xname, str(limit_str))
+
+    def test_expanding_empty_component(self):
+        """Test expanding component with no node descendants"""
+        blade_xname = 'x3000c0s0'
+        self.mock_get_node_components.return_value = []
+        with self.assertRaises(BOSFailure):
+            BOSLimitString.from_string(blade_xname, recursive=True)
+        self.mock_get_node_components.assert_called_once_with(ancestor=blade_xname)
+
+    def test_non_recursive_limit_string_with_non_node_xname(self):
+        """Test that creating a limit string non-recursively only works with nodes"""
+        blade_xname = 'x3000c0s0'
+        with self.assertRaises(BOSFailure):
+            BOSLimitString.from_string(blade_xname, recursive=False)
 
 
 class TestBOSSessionThread(unittest.TestCase):
@@ -350,7 +408,8 @@ class TestDoBosShutdowns(ExtendedTestCase):
         self.mock_do_bos_ops = patch('sat.cli.bootsys.bos.do_bos_operations').start()
         self.mock_get_config = patch('sat.cli.bootsys.bos.get_config_value', return_value=60).start()
 
-        self.args = Namespace()
+        self.limit = None
+        self.args = Namespace(bos_limit=self.limit, recursive=False)
         self.args.disruptive = False
 
     def tearDown(self):
@@ -360,7 +419,7 @@ class TestDoBosShutdowns(ExtendedTestCase):
         """Test running BOS shutdown with prompting to continue."""
         do_bos_shutdowns(self.args)
         self.mock_prompt.assert_called_once()
-        self.mock_do_bos_ops.assert_called_once_with('shutdown', 60)
+        self.mock_do_bos_ops.assert_called_once_with('shutdown', 60, limit=self.limit, recursive=False)
 
     def test_do_bos_shutdowns_without_prompt(self):
         """Test running BOS shutdown without prompting."""
@@ -368,7 +427,7 @@ class TestDoBosShutdowns(ExtendedTestCase):
         do_bos_shutdowns(self.args)
 
         self.mock_prompt.assert_not_called()
-        self.mock_do_bos_ops.assert_called_once_with('shutdown', 60)
+        self.mock_do_bos_ops.assert_called_once_with('shutdown', 60, limit=self.limit, recursive=False)
 
 
 if __name__ == '__main__':
