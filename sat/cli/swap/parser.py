@@ -1,7 +1,7 @@
 """
 The parser for the swap subcommand.
 
-(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,21 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 
 
+def _add_network_arguments(parser, component):
+    """Add arguments that are common to swap commands for networking components.
+
+    Args:
+        parser: an argparse ArgumentParser.
+        component (str): what component is being swapped, to fill in help text.
+
+    Returns:
+        None
+    """
+    parser.add_argument(
+        '--save-ports', '-s', action='store_true',
+        help=f'Save {component} ports JSON as <xname>-ports.json file in current directory.')
+
+
 def _add_common_arguments(parser, component):
     """Add arguments that are common to swap commands.
 
@@ -39,16 +54,43 @@ def _add_common_arguments(parser, component):
         help=f'Perform action to disable/enable the {component}. Required if not a dry run.')
 
     parser.add_argument(
-        '--save-ports', '-s', action='store_true',
-        help=f'Save {component} ports JSON as <xname>-ports.json file in current directory.')
-
-    parser.add_argument(
         '--disruptive', action='store_true',
         help='Do not ask whether to continue.')
 
     parser.add_argument(
         '--dry-run', action='store_true',
         help=f'Perform a dry run without enable/disable of the {component}.')
+
+
+def _add_swap_blade_subparser(subparsers):
+    """Add the swap blade subparser to the parent (swap) parser.
+
+    Args:
+        subpparsers: an argparse ArgumentParser object returned by the
+            add_subparsers method.
+
+    Returns:
+        None
+    """
+    swap_blade_parser = subparsers.add_parser(
+        'blade', help='Enable or disable a slot populated by a blade which will be swapped.',
+        description='Prepare blade for swap or prepare to bring up a blade after swapping'
+    )
+    swap_blade_parser.add_argument(
+        '--src-mapping',
+        help='Path to the file containing a mapping of component xnames, IP addresses, and MAC addresses '
+             'from the source system. This is only used when adding a blade to a system.'
+    )
+    swap_blade_parser.add_argument(
+        '--dst-mapping',
+        help='Path to the file containing a mapping of component xnames, IP addresses, and MAC addresses '
+             'from the destination system. This is only used when adding a blade to a system.'
+    )
+    swap_blade_parser.add_argument(
+        'xname',
+        help='The xname of the slot to be used in the blade swap procedure'
+    )
+    _add_common_arguments(swap_blade_parser, 'blade')
 
 
 def _add_swap_cable_subparser(subparsers):
@@ -69,6 +111,7 @@ def _add_swap_cable_subparser(subparsers):
     swap_cable_parser.add_argument('--force', '-f', action='store_true',
                                    help='Do not verify jack xnames are connected by a cable.')
     _add_common_arguments(swap_cable_parser, 'cable')
+    _add_network_arguments(swap_cable_parser, 'cable')
 
 
 def _add_swap_switch_subparser(subparsers):
@@ -87,6 +130,7 @@ def _add_swap_switch_subparser(subparsers):
 
     switch_parser.add_argument('xname', help='The xname of the switch.')
     _add_common_arguments(switch_parser, 'switch')
+    _add_network_arguments(switch_parser, 'switch')
 
 
 def add_swap_subparser(subparsers):
@@ -102,7 +146,12 @@ def add_swap_subparser(subparsers):
 
     swap_parser = subparsers.add_parser('swap', help='Disable/enable a component before/after replacement.')
 
-    target_subparsers = swap_parser.add_subparsers(metavar='target', dest='target', help='The component to swap.')
+    target_subparsers = swap_parser.add_subparsers(
+        metavar='target',
+        dest='target',
+        help='The component to swap.'
+    )
 
     _add_swap_switch_subparser(target_subparsers)
     _add_swap_cable_subparser(target_subparsers)
+    _add_swap_blade_subparser(target_subparsers)

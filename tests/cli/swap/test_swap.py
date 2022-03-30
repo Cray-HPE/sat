@@ -1,7 +1,7 @@
 """
 Unit tests for sat.cli.swap.swap
 
-(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -163,7 +163,6 @@ class TestCableSwapper(ExtendedTestCase):
         self.swap_args['action'] = 'enable'
         with self.assertLogs(level=logging.INFO) as logs_cm:
             self.run_swap_component()
-        self.mock_pester.assert_called_once()
         self.mock_port_manager.get_jack_port_data_list.assert_called_once()
         self.mock_output_json.assert_not_called()
         self.mock_port_manager.create_offline_port_policy.assert_not_called()
@@ -174,40 +173,6 @@ class TestCableSwapper(ExtendedTestCase):
                          "Cable has been enabled."]
         for msg in expected_logs:
             self.assert_in_element(msg, logs_cm.output)
-
-    def test_not_dry_without_action(self):
-        """Test swap_component not dry run without action"""
-        self.swap_args['disruptive'] = False
-        self.swap_args['dry_run'] = False
-        with self.assertRaises(SystemExit) as cm, \
-             self.assertLogs(level=logging.INFO) as logs_cm:
-            self.run_swap_component()
-        self.assertEqual(cm.exception.code, swap.ERR_INVALID_OPTIONS)
-        self.mock_pester.assert_not_called()
-        self.mock_port_manager.get_jack_port_data_list.assert_not_called()
-        self.mock_output_json.assert_not_called()
-        self.mock_port_manager.create_offline_port_policy.assert_not_called()
-        self.mock_port_manager.update_port_policy_link.assert_not_called()
-        self.assert_in_element(
-            'The action option is required if not a dry run, exiting.',
-            logs_cm.output)
-
-    def test_dry_run_and_action(self):
-        """Test action and dry run is invalid"""
-        self.swap_args['action'] = 'enable'
-        self.swap_args['dry_run'] = True
-        with self.assertRaises(SystemExit) as cm, \
-             self.assertLogs(level=logging.INFO) as logs_cm:
-            self.run_swap_component()
-        self.assertEqual(cm.exception.code, swap.ERR_INVALID_OPTIONS)
-        self.mock_pester.assert_not_called()
-        self.mock_port_manager.get_jack_port_data_list.assert_not_called()
-        self.mock_output_json.assert_not_called()
-        self.mock_port_manager.create_offline_port_policy.assert_not_called()
-        self.mock_port_manager.update_port_policy_link.assert_not_called()
-        self.assert_in_element(
-            'The action option is not valid with the dry run option.',
-            logs_cm.output)
 
     def test_get_ports_data_error(self):
         """Test swap_component error getting ports data"""
@@ -409,7 +374,6 @@ class TestSwitchSwapper(ExtendedTestCase):
         self.swap_args['action'] = 'enable'
         with self.assertLogs(level=logging.INFO) as logs_cm:
             self.run_swap_component()
-        self.mock_pester.assert_called_once()
         self.mock_port_manager.get_switch_port_data_list.assert_called_once()
         self.mock_output_json.assert_not_called()
         self.mock_port_manager.create_offline_port_policy.assert_not_called()
@@ -420,38 +384,6 @@ class TestSwitchSwapper(ExtendedTestCase):
                          'Switch has been enabled.']
         for msg in expected_logs:
             self.assert_in_element(msg, logs_cm.output)
-
-    def test_not_dry_without_action(self):
-        """Test swap_component not dry run without action"""
-        self.swap_args['disruptive'] = False
-        self.swap_args['dry_run'] = False
-        with self.assertRaises(SystemExit) as cm, \
-             self.assertLogs(level=logging.INFO) as logs_cm:
-            self.run_swap_component()
-        self.assertEqual(cm.exception.code, swap.ERR_INVALID_OPTIONS)
-        self.mock_pester.assert_not_called()
-        self.mock_port_manager.get_switch_port_data_list.assert_not_called()
-        self.mock_output_json.assert_not_called()
-        self.mock_port_manager.create_offline_port_policy.assert_not_called()
-        self.mock_port_manager.update_port_policy_link.assert_not_called()
-        self.assert_in_element('The action option is required if not a dry run, exiting.',
-                               logs_cm.output)
-
-    def test_dry_run_and_action(self):
-        """Test action and dry run is invalid"""
-        self.swap_args['action'] = 'enable'
-        self.swap_args['dry_run'] = True
-        with self.assertRaises(SystemExit) as cm, \
-                self.assertLogs(level=logging.INFO) as logs_cm:
-            self.run_swap_component()
-        self.assertEqual(cm.exception.code, swap.ERR_INVALID_OPTIONS)
-        self.mock_pester.assert_not_called()
-        self.mock_port_manager.get_switch_port_data_list.assert_not_called()
-        self.mock_output_json.assert_not_called()
-        self.mock_port_manager.create_offline_port_policy.assert_not_called()
-        self.mock_port_manager.update_port_policy_link.assert_not_called()
-        self.assert_in_element('The action option is not valid with the dry run option.',
-                               logs_cm.output)
 
     def test_get_ports_data_error(self):
         """Test swap_component error getting ports data"""

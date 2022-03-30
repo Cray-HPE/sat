@@ -22,15 +22,56 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 
+import itertools
 import unittest
 from unittest import mock
 from argparse import Namespace
 
-from sat.cli.swap.main import do_swap
+from sat.cli.swap.main import check_arguments, do_swap
 
 
-def set_options(namespace):
-    namespace.target = 'cable'
+def check_arguments_base():
+    options = {
+        'component_type': ['blade', 'switch', 'cable'],
+        'action': ['enable', 'disable'],
+        'dry_run': [True, False],
+        'disruptive': [True, False],
+        'pester': [True, False]
+    }
+    methods = {}
+
+    for product in itertools.product(*options.values()):
+        annotated_product = dict(zip(options.keys(), product))
+        method_name = '_'.join(f'{k}_{str(v).lower()}' for k, v in annotated_product.items())
+
+        def inner_test_method(self):
+            (component_type, action, dry_run, disruptive, pester_value) = product
+            self.mock_pester.return_value = pester_value
+            should_fail = (
+                not dry_run and not action or
+                dry_run and action or
+                (not disruptive and not dry_run and not pester_value)
+            )
+            if should_fail:
+                with self.assertRaises(SystemExit):
+                    check_arguments(component_type, action, dry_run, disruptive)
+            else:
+                check_arguments(component_type, action, dry_run, disruptive)
+
+        inner_test_method.__doc__ = \
+            f"Test check_arguments for {', '.join(f'{k}={str(v).lower()}' for k, v in annotated_product.items())}"
+        methods[method_name] = inner_test_method
+
+    cls = type('CheckArgumentsBase', (unittest.TestCase,), methods)
+    return cls
+
+
+class TestCheckArguments(check_arguments_base()):
+    def setUp(self):
+        self.mock_pester = mock.patch('sat.cli.swap.main.pester', return_value=True).start()
+
+    def tearDown(self):
+        mock.patch.stopall()
 
 
 class TestSwapMain(unittest.TestCase):
@@ -38,8 +79,12 @@ class TestSwapMain(unittest.TestCase):
     def setUp(self):
         self.fake_swap_cable = mock.patch('sat.cli.swap.main.swap_cable').start()
         self.fake_swap_switch = mock.patch('sat.cli.swap.main.swap_switch').start()
-        self.fake_args = Namespace()
-        set_options(self.fake_args)
+        self.fake_args = Namespace(
+            action='enable',
+            dry_run=False,
+            disruptive=True,
+            target='cable',
+        )
 
     def tearDown(self):
         mock.patch.stopall()
