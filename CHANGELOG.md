@@ -25,6 +25,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.15.0] - 2022-03-29
+
+### Added
+- Added a ``--bos-limit`` option to the  ``bos-operations`` stage of ``sat
+  bootsys`` which passes the given limit string to the created BOS session.
+  Also added a ``--recursive`` option to ``sat bootsys`` in order to allow
+  specifying a slot or other higher-level component in the limit string.
+- Added a ``--delete-ims-jobs`` option to ``sat bootprep run`` which causes
+  successful IMS jobs to be deleted after ``sat bootprep`` is run. The default
+  behavior was also changed to not delete jobs.
+- Added information about nodes' CFS configuration status (desired
+  configuration, configuration status, and error count) to ``sat status``.
+- Added options to ``sat status`` to limit the output columns by specified
+  CSM services. The added options are ``--hsm-fields``, ``--sls-fields``, and
+  ``--cfs-fields``.
+- Added a ``--bos-template`` option to ``sat status`` which allows the status
+  report to be filtered by the specified session template's boot sets.
+
+### Changed
+- Changed the output of ``sat status`` to split different component types into
+  different report tables.
+- CFS image customization session container status logs in ``sat bootprep`` now
+  automatically adjust space padding based on container name lengths.
+- Added a stage to the Docker container build which runs ``pycodestyle`` on the
+  SAT codebase and unit tests.
+
+### Fixed
+- Fixed ``sat bootprep`` to require the ``action`` positional argument.
+- Fixed invalid reference to a FILES section in man page for ``sat bootprep``.
+
+### Security
+- Updated urllib3 dependency to version 1.26.5 to mitigate CVE-2021-33503, and
+  refreshed Python dependency versions.
+
 ## [3.14.0] - 2022-02-24
 
 ### Added
@@ -37,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   image has been cut in half as a result.
 - Incremented the JSON Schema specification version for the ``sat bootprep``
   input file from draft-07 to 2020-12.
+  in the same environment as the production container.
 
 ## [3.13.1] - 2022-01-26
 

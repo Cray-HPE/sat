@@ -322,7 +322,6 @@ class InputImage:
             self.image_create_success = job_details.get('status') == 'success'
             self.finished_job_details = job_details
             self.log_created_image_info()
-            self.clean_up_image_create_job()
 
         return self._image_create_complete
 
@@ -367,6 +366,9 @@ class InputImage:
         Returns:
             None
         """
+        if not self.image_create_job:
+            return
+
         image_create_job_id = self.image_create_job.get('id')
         if not image_create_job_id:
             LOGGER.warning(f'Unable to clean up image create job for image '

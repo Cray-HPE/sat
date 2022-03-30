@@ -121,6 +121,21 @@ def _add_bos_template_options(subparser, action):
              f'equivalent bos_templates is specified.'
     )
 
+    subparser.add_argument(
+        '--bos-limit',
+        help=f'A comma-separated list of xnames, node groups, and roles which should be '
+             f'included in the BOS {action} action. If not specified, all components '
+             f'in the specified BOS session template\'s boot sets will be used.'
+    )
+
+    subparser.add_argument(
+        '--recursive', action='store_true',
+        help='If specified, then xnames listed in the limit string for --bos-limit '
+             'will be expanded recursively into their constituent node xnames. For '
+             'instance, if a slot xname is given as part of --bos-limit, then that '
+             'xname will be expanded into the node xnames for all nodes in that slot.'
+    )
+
 
 def _add_stage_options(subparser, action):
     """Add the --stage and --list-stages options appropriate to action.

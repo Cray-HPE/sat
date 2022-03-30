@@ -34,15 +34,16 @@ class TestHSMClient(unittest.TestCase):
     """Tests for the APIGatewayClient class: HSM client."""
 
     def setUp(self):
-        self.xnames = ['x1000c0s0b0n0', 'x1000c0s1b0n0', 'x1000c0s1b1n0', 'x1000c0s1b1n0']
+        self.xnames = ['x1000c0s0b0n0', 'x1000c0s0b0n1', 'x1000c0s1b0n0', 'x1000c0s1b0n1']
         self.states = ['On', 'Ready', 'Empty', 'Empty']
 
+        self.components = [
+            # There will be more fields than this, but we only care about these
+            {'ID': xname, 'State': state} for xname, state in zip(self.xnames, self.states)
+        ]
         self.mock_get = mock.patch.object(APIGatewayClient, 'get').start()
         self.mock_get.return_value.json.return_value = {
-            'Components': [
-                # There will be more fields than this, but we only care about these
-                {'ID': xname, 'State': state} for xname, state in zip(self.xnames, self.states)
-            ]
+            'Components': self.components
         }
 
         self.hsm_client = HSMClient()
@@ -103,6 +104,23 @@ class TestHSMClient(unittest.TestCase):
             self.hsm_client.get_node_components()
         self.mock_get.assert_called_once_with('State', 'Components',
                                               params=params)
+
+    def test_get_node_components_limit_by_ancestor(self):
+        """Test getting node components with a common ancestor"""
+        ancestor_xname = 'x1000c0s1'
+        self.mock_get.return_value.json.return_value = {
+            'Components': [
+                component_dict for component_dict in self.components
+                if component_dict['ID'].startswith(ancestor_xname)
+            ]
+        }
+        result = self.hsm_client.get_node_components(ancestor=ancestor_xname)
+        self.assertEqual({r['ID'] for r in result}, {'x1000c0s1b0n0', 'x1000c0s1b0n1'})
+
+    def test_get_node_components_bad_ancestor(self):
+        """Test getting node components with an invalid ancestor xname"""
+        with self.assertRaises(APIError):
+            self.hsm_client.get_node_components(ancestor='some-invalid-xname')
 
 
 class TestHSMClientRedfishEndpoints(ExtendedTestCase):

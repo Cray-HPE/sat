@@ -47,6 +47,11 @@ class XName:
         self.xname_str = xname_str
 
     @cached_property
+    def is_valid(self):
+        """bool: if this xname is valid or not"""
+        return bool(self.tokens)
+
+    @cached_property
     def tokens(self):
         """tuple: The tokenized form of the xname.
 
@@ -64,9 +69,9 @@ class XName:
 
         for i, tok in enumerate(toks):
             if i % 2 == 1:
-                toks[i] = int(toks[i])
+                toks[i] = int(tok)
             else:
-                toks[i] = toks[i].lower()
+                toks[i] = tok.lower()
 
         return tuple(toks)
 

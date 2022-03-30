@@ -103,6 +103,7 @@ def add_bootprep_subparser(subparsers):
     actions_subparsers = bootprep_parser.add_subparsers(
         metavar='action', dest='action', help='The action to execute.'
     )
+    actions_subparsers.required = True
     _add_bootprep_run_subparser(actions_subparsers)
     _add_bootprep_generate_docs_subparser(actions_subparsers)
     _add_bootprep_view_schema_subparser(actions_subparsers)
@@ -199,6 +200,11 @@ def _add_bootprep_run_subparser(subparsers):
         '--no-resolve-branches', action='store_false', dest='resolve_branches',
         help='Do not resolve branch names to corresponding commit hashes before '
              'creating CFS configurations.'
+    )
+    run_subparser.add_argument(
+        '--delete-ims-jobs', '-D', action='store_true',
+        help='Delete IMS jobs after creating images. Note that deleting IMS jobs '
+             'makes determining image history impossible.'
     )
 
     add_skip_and_overwrite_options(run_subparser, 'config', 'configuration')

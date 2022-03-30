@@ -68,8 +68,8 @@ This argument only applies to the ``run`` action.
         create, the IMS image(s) to build and/or customize, and the BOS session
         templates to create.
 
-        For full details on the schema for the bootprep input file, see the
-        FILES section below.
+        For full details on the schema for the bootprep input file, use the
+        ``generate-docs`` or ``view-schema`` actions.
 
 OPTIONS
 =======
@@ -109,6 +109,10 @@ These options only apply to the ``run`` action.
         name and commit hash in the layer of the configuration. CFS can use the
         branch name to update the commit hash to the latest HEAD of the branch
         if requested.
+
+**--delete-ims-jobs**
+        Delete IMS jobs after creating images. Note that deleting IMS jobs makes
+        determining image history impossible.
 
 **--skip-existing-configs**
         Skip creating any configurations for which a configuration with the same

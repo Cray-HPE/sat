@@ -1,7 +1,7 @@
 """
 Entry point for the status subcommand.
 
-(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -21,82 +21,143 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-from collections import OrderedDict
 import logging
 
-from sat.apiclient import APIError, HSMClient, SLSClient
+from sat.apiclient.bos import BOSClient
+from sat.apiclient.gateway import APIError
+from sat.apiclient.hsm import HSMClient
+from sat.cli.status.constants import COMPONENT_TYPES
+import sat.cli.status.status_module
+from sat.cli.status.status_module import StatusModule
 from sat.config import get_config_value
-from sat.constants import MISSING_VALUE
+from sat.filtering import CustomFilter
 from sat.report import Report
 from sat.session import SATSession
 from sat.xname import XName
 
-API_KEYS_TO_HEADERS = OrderedDict([
-    ('ID', 'xname'),
-    ('Aliases', 'Aliases'),
-    ('Type', 'Type'),
-    ('NID', 'NID'),
-    ('State', 'State'),
-    ('Flag', 'Flag'),
-    ('Enabled', 'Enabled'),
-    ('Arch', 'Arch'),
-    ('Class', 'Class'),
-    ('Role', 'Role'),
-    ('SubRole', 'Subrole'),
-    ('NetType', 'Net Type'),
-])
 
 LOGGER = logging.getLogger(__name__)
+
+# When possible, put Aliases right after xnames for ease of reading
+DEFAULT_HEADING_ORDER = ['xname', 'Aliases']
 
 
 class UsageError(Exception):
     pass
 
 
-def make_raw_table(components):
-    """Obtains node status from a list of components.
+def group_dicts_by(key, dicts):
+    """Group dicts by a particular key.
+
+    To illustrate, consider the following group of dicts:
+
+    ```
+    dicts = [
+        {
+            "name": "Pepsi",
+            "type": "cola"
+        },
+        {
+            "name": "Coca-Cola",
+            "type": "cola"
+        },
+        {
+            "name": "Sprite",
+            "type": "lemon-lime"
+        }
+    ]
+    ```
+
+    Then if grouped by `"type"`, the following is the result:
+
+    ```
+    group_dicts_by("type", dicts) == {
+        "cola": [
+            {
+                "name": "Pepsi",
+                "type": "cola"
+            },
+            {
+                "name": "Coca-Cola",
+                "type": "cola"
+            }
+        ],
+        "lemon-lime": [
+            {
+                "name": "Sprite",
+                "type": "lemon-lime"
+            }
+        ]
+    }
+    ```
 
     Args:
-        components (list): A list of dictionaries representing the components
-            in the system along with information about their state.
+        key (str): The key in the dictionaries passed in `dicts` to group by.
+        dicts ([dict]): A list of dicts to be grouped
+
+    Raises:
+        ValueError: if `key` is not present in all dictionaries in
+            `dicts`
 
     Returns:
-        A list-of-lists table of strings, each row representing
-        the status of a node.
+        dict: a mapping from each unique value of the key from `dicts` to a list of
+        dicts with that value
     """
-    def get_component_value(component, api_key):
-        value = component.get(api_key, MISSING_VALUE)
-        if api_key == 'ID' and value != MISSING_VALUE:
-            value = XName(value)
-        elif all([api_key == 'SubRole', value == MISSING_VALUE, component.get('Role') == 'Compute']):
-            # For SubRole, some types of nodes (specifically Compute nodes) are expected to
-            # not have a SubRole, so 'None' looks a little more appropriate.
-            value = 'None'
-        return value
+    try:
+        unique_attr_vals = set(d[key] for d in dicts)
+    except KeyError as err:
+        raise ValueError(f'The key "{key}" is not present in every '
+                         f'dictionary in the input') from err
 
-    return [[get_component_value(component, api_key) for api_key in API_KEYS_TO_HEADERS]
-            for component in components]
+    grouped = {}
+    for unique_attr_val in unique_attr_vals:
+        grouped[unique_attr_val] = [d for d in dicts if d[key] == unique_attr_val]
+    return grouped
 
 
-def get_component_aliases(sls_component_dicts):
-    """Extract component aliases from an SLS response payload.
+def get_bos_template_filter_fn(bos_template, session):
+    """Get a function which filters nodes based on session template.
+
+    The returned filter function will filter xnames based on whether they are
+    listed directly in any of the session template's boot sets, or any node
+    groups or roles in those boot sets.
 
     Args:
-        - sls_component_dicts ([dict]): a response payload
-             from SLS; essentially a list of dictionaries which
-             should at the minimum contain keys 'Xname' and
-             'ExtraProperties', and 'ExtraProperties' should be a
-             dict containing key 'Aliases'
+        bos_template (str): the name of the BOS session template
+        session (SATSession): a SATSession object to connect to the API gateway
 
     Returns:
-        A dictionary mapping xnames to a list of aliases (i.e. hostnames).
+        A CustomFilter object which can filter rows based on nodes' belonging
+        to a BOS session template boot set.
     """
-    xname_aliases = {}
-    for component in sls_component_dicts:
-        if {'Xname', 'ExtraProperties'}.issubset(set(component.keys())):
-            if 'Aliases' in component.get('ExtraProperties'):
-                xname_aliases[component['Xname']] = component.get('ExtraProperties').get('Aliases')
-    return xname_aliases
+
+    skip_filter = False
+    hsm_client = HSMClient(session)
+    bos_client = BOSClient(session)
+
+    nodes = set()
+    roles = set()
+
+    try:
+        session_template = bos_client.get_session_template(bos_template)
+        for boot_set in session_template.get('boot_sets', {}).values():
+            roles |= set(boot_set.get('node_roles_groups', []))
+            nodes |= set(boot_set.get('node_list', []))
+            for node_group in boot_set.get('node_groups', []):
+                nodes |= set(hsm_client.get_component_xnames(params={
+                    'group': node_group
+                }))
+
+    except APIError as err:
+        LOGGER.warning('Could not get nodes from the given session template: %s', err)
+        skip_filter = True
+
+    def filter_fn(row):
+        return skip_filter or \
+            str(row.get('xname')) in nodes or \
+            row.get('Role') in roles
+
+    return CustomFilter(filter_fn, ['xname'])
 
 
 def do_status(args):
@@ -113,59 +174,67 @@ def do_status(args):
 
     Returns:
         None
-
-    Raises:
-        UsageError: if an argument is invalid
     """
     session = SATSession()
-    hsm_client = HSMClient(session)
-    if 'all' in args.types:
-        args.types = []
 
-    try:
-        response = hsm_client.get('State', 'Components', params={'type': args.types})
-    except APIError as err:
-        LOGGER.error('Request to HSM API failed: %s', err)
-        raise SystemExit(1)
+    modules = args.status_module_names
+    if modules is not None:
+        modules = []
+        seen_module_names = set()
+        for module_name in args.status_module_names:
+            if module_name in seen_module_names:
+                continue
+            modules.append(getattr(sat.cli.status.status_module, module_name))
+            seen_module_names.add(module_name)
 
-    try:
-        response_json = response.json()
-    except ValueError as err:
-        LOGGER.error('Failed to parse JSON from component state response: %s', err)
-        raise SystemExit(1)
+    types = COMPONENT_TYPES if 'all' in args.types else args.types
+    multiple_reports = len(types) != 1
+    report_strings = []
 
-    try:
-        components = response_json['Components']
-    except KeyError as err:
-        LOGGER.error("Key '%s' not present in API response JSON.", err)
-        raise SystemExit(1)
+    components = StatusModule.get_populated_rows(
+        primary_key='xname',
+        primary_key_type=XName,
+        limit_modules=modules,
+        session=session,
+        component_types=types,
+    )
 
-    sls_client = SLSClient(session)
-    sls_component_aliases = {}
-    try:
-        sls_reponse = sls_client.get('hardware')
-        sls_component_aliases = get_component_aliases(sls_reponse.json())
-    except APIError as err:
-        LOGGER.error('Request to SLS API failed: %s', err)
-    except ValueError as err:
-        LOGGER.error('Failed to parse JSON from SLS: %s', err)
+    for component_type, components_by_type in group_dicts_by('Type', components).items():
+        title = f'{component_type} Status' if multiple_reports else None
+        headings = StatusModule.get_all_headings(
+            primary_key='xname',
+            limit_modules=modules,
+            component_type=component_type,
+            initial_headings=DEFAULT_HEADING_ORDER
+        )
+        if not headings:
+            LOGGER.warning('None of the selected fields are relevant to component type %s; skipping.',
+                           component_type)
+            continue
 
-    for component in components:
-        if component.get('ID') in sls_component_aliases:
-            component['Aliases'] = ', '.join(sls_component_aliases.get(component['ID']))
-        else:
-            component['Aliases'] = MISSING_VALUE
+        extra_filter_fns = []
+        if args.bos_template:
+            if component_type == 'Node':
+                extra_filter_fns.append(
+                    get_bos_template_filter_fn(args.bos_template, session)
+                )
+            else:
+                LOGGER.warning('%s components cannot be filtered by BOS session template; '
+                               'all components will be shown.',
+                               component_type)
 
-    raw_table = make_raw_table(components)
-    report = Report(
-        list(API_KEYS_TO_HEADERS.values()), None,
-        args.sort_by, args.reverse,
-        get_config_value('format.no_headings'),
-        get_config_value('format.no_borders'),
-        filter_strs=args.filter_strs,
-        display_headings=args.fields,
-        print_format=args.format)
+        report = Report(
+            list(headings), title,
+            args.sort_by, args.reverse,
+            get_config_value('format.no_headings'),
+            get_config_value('format.no_borders'),
+            filter_strs=args.filter_strs,
+            filter_fns=extra_filter_fns,
+            display_headings=args.fields,
+            print_format=args.format
+        )
 
-    report.add_rows(raw_table)
+        report.add_rows(components_by_type)
+        report_strings.append(str(report))
 
-    print(report)
+    print('\n\n'.join(report_strings))

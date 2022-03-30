@@ -75,7 +75,7 @@ class ComparisonFilter(BaseFilterFunction):
 
         Args:
             query_key (str): a subsequence of any of the field headings
-            fields ([str]): the field headings of each column
+            fields (Iterable[str]): the field headings of each column
             comparator (str): the comparison symbol (see COMPARATOR_RE above)
             cmpr_val (str|float): the value against which each column entry is
                 compared
@@ -112,6 +112,12 @@ class ComparisonFilter(BaseFilterFunction):
     def get_filtered_fields(self):
         return set() if self.query_key is None else {self.query_key}
 
+    def __eq__(self, other):
+        return self.fields == other.fields \
+            and self.query_key == other.query_key \
+            and self.comparator == other.comparator \
+            and self.cmpr_val == other.cmpr_val
+
 
 class CombinedFilter(BaseFilterFunction):
     def __init__(self, combinator, *filter_fns):
@@ -140,29 +146,32 @@ class CombinedFilter(BaseFilterFunction):
 
 
 class CustomFilter(BaseFilterFunction):
-    def __init__(self, filter_fn, children=None):
+    def __init__(self, filter_fn, fields, children=None):
         """Creates a simple filter function from some other function.
 
-        This is used in testing in order to wrap arbitrary functions within
-        the FilterFunction class.
+        This is used in order to wrap arbitrary functions within the
+        BaseFilterFunction class.
 
         Args:
             filter_fn (dict -> bool): a function, which given some row, returns a
                 boolean.
+            fields (Iterable[str]): fields against which this filter function filters.
             children ([FilterFunction]): Any FilterFunctions that are children
                 of this filter.
 
         Returns:
-            A FilterFunction which runs fn on its input and returns the result.
+            A BaseFilterFunction which runs filter_fn() on its input and
+            returns the result.
         """
         self.filter_fn = filter_fn
         self.children = children or []
+        self.fields = set(fields)
 
     def __call__(self, row):
         return self.filter_fn(row)
 
     def get_filtered_fields(self):
-        return set.union(*(child.get_filtered_fields() for child in self.children))
+        return set.union(self.fields, *(child.get_filtered_fields() for child in self.children))
 
 
 def _str_eq_cmpr(name, pattern):
@@ -373,7 +382,7 @@ def parse_query_string(query_string, fields):
         lhs = yield (bool_and_expr ^ comparison)
         oper = yield (tok_or | tok_and | tok_end)
         if oper not in ['and', 'or']:
-            return CombinedFilter(all, lhs)
+            return lhs
         rhs = yield (bool_expr ^ comparison)
         return CombinedFilter(all if oper == 'and' else any, lhs, rhs)
 
@@ -384,9 +393,35 @@ def parse_query_string(query_string, fields):
     return expr.parse_strict(query_string)
 
 
-def parse_multiple_query_strings(query_strings, fields):
+def parse_multiple_query_strings(query_strings, fields, filter_fns=None):
+    """Helper function to parse and combine query strings and functions.
+
+    All filter functions passed in and built from the given query strings are
+    combined with a boolean "and".
+
+    Args:
+        query_strings ([str]): filter strings to be parsed and combined.
+        fields ([str]): fields the given filter strings and functions can
+            filter against.
+        filter_fns ([callable]): optional custom filter functions which should
+            be combined with the given filter strings
+
+    Returns:
+        an instance of BaseFilterFunction which takes a row dictionary as its
+        only positional argument and returns a boolean representing whether the
+        given row should be included in the output, or None if no strings or
+        filter functions are supplied.
+    """
+    if filter_fns is None:
+        filter_fns = []
+
     all_filter_fns = [parse_query_string(query_string, fields)
-                      for query_string in query_strings]
+                      for query_string in query_strings] + filter_fns
+
+    if not all_filter_fns:
+        return None
+    if len(all_filter_fns) == 1:
+        return all_filter_fns[0]
     return CombinedFilter(all, *all_filter_fns)
 
 

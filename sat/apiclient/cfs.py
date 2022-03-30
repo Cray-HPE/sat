@@ -23,6 +23,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 from datetime import datetime
 import fnmatch
+from itertools import chain
 import logging
 import re
 import uuid
@@ -197,6 +198,12 @@ class CFSImageConfigurationSession:
     # Hardcode the namespace in which kuberenetes jobs are created since CFS
     # sessions do not record this information
     KUBE_NAMESPACE = 'services'
+
+    # Hardcode the container status messages
+    CONTAINER_RUNNING_VALUE = 'running'
+    CONTAINER_WAITING_VALUE = 'waiting'
+    CONTAINER_SUCCEEDED_VALUE = 'succeeded'
+    CONTAINER_FAILED_VALUE = 'failed'
 
     def __init__(self, data, cfs_client, image_name):
         """Create a new CFSImageConfigurationSession
@@ -375,8 +382,7 @@ class CFSImageConfigurationSession:
         except KeyError as err:
             raise APIError(f'{fail_msg}: {err} key was missing in response from CFS.')
 
-    @staticmethod
-    def get_container_status_description(container_status):
+    def get_container_status_description(self, container_status):
         """Get a string representation of the container status
 
         Args:
@@ -390,17 +396,16 @@ class CFSImageConfigurationSession:
         # imply only one of these keys will be present, but in reality,
         # they are all present, and set to None if not the current state
         if container_status.state.running:
-            return 'running'
+            return self.CONTAINER_RUNNING_VALUE
         elif container_status.state.terminated:
             if container_status.state.terminated.exit_code == 0:
-                return 'succeeded'
+                return self.CONTAINER_SUCCEEDED_VALUE
             else:
-                return 'failed'
+                return self.CONTAINER_FAILED_VALUE
         else:
-            return 'waiting'
+            return self.CONTAINER_WAITING_VALUE
 
-    @staticmethod
-    def get_container_status_change_msg(container_name, new_status, old_status=None):
+    def get_container_status_change_msg(self, container_name, new_status, old_status=None):
         """Get a nicely formatted container status change message.
 
         Args:
@@ -411,9 +416,20 @@ class CFSImageConfigurationSession:
         Returns:
             str: the description of the container status change
         """
-        # TODO (CRAYSAT-1265): Compute these based on known possible values
-        container_name_width = 12
-        status_width = 9
+        container_name_width = max(
+            len(container_status.name)
+            for container_status in chain(
+                self.pod.status.init_container_statuses,
+                self.pod.status.container_statuses
+            )
+        )
+        status_width = max(len(status) for status in [
+                self.CONTAINER_RUNNING_VALUE,
+                self.CONTAINER_WAITING_VALUE,
+                self.CONTAINER_SUCCEEDED_VALUE,
+                self.CONTAINER_FAILED_VALUE
+            ]
+        )
 
         msg = (
             f'Container {container_name: <{container_name_width}} '
