@@ -29,11 +29,15 @@ from yaml import YAMLLoadWarning
 
 from sat.apiclient import APIError
 from sat.cached_property import cached_property
-from sat.cli.bootprep.errors import ImageCreateError, ImageCreateCycleError
+from sat.cli.bootprep.errors import ImageCreateError
 from sat.cli.bootprep.image import LOGGER
+from sat.waiting import (
+    DependencyGroupMember,
+    WaitingFailure
+)
 
 
-class InputImage:
+class InputImage(DependencyGroupMember):
     """An IMS image from a bootprep input file
 
     Attributes:
@@ -46,10 +50,6 @@ class InputImage:
             building the image
         image_ids_to_delete (list of str): ids of IMS images to delete after this
             image has been successfully created
-        dependent_images (list of InputImage): the images that depend on this
-            image before they can be created and customized
-        dependency_images (list of InputImage): the images that this image depends
-            on before it can be created and customized
         image_create_job (dict or None): the IMS job of type 'create' for
             creating the image from a recipe, if applicable.
         finished_job_details (dict or None): the IMS job record for the finished
@@ -75,6 +75,8 @@ class InputImage:
             cfs_client (sat.apiclient.CFSClient): the CFS API client to make
                 requests to the CFS API
         """
+        super().__init__()
+
         self.image_data = image_data
         self.ims_client = ims_client
         self.cfs_client = cfs_client
@@ -84,10 +86,6 @@ class InputImage:
 
         # Populated by add_images_to_delete method
         self.image_ids_to_delete = []
-
-        # These are populated later by add_dependent_image, which is called in find_image_dependencies
-        self.dependent_images = []
-        self.dependency_images = []
 
         # Set in begin_image_create and begin_image_configure
         self.image_create_job = None
@@ -158,63 +156,6 @@ class InputImage:
         # This shouldn't happen since schema requires 'id' or 'name'
         return self.base_resource_type
 
-    @property
-    def has_dependencies(self):
-        """bool: whether this image has dependencies or not"""
-        return len(self.dependency_images) > 0
-
-    def add_dependency(self, dependency):
-        """Add an image that this image depends on.
-
-        This detects whether a cycle is created by adding this dependency.
-        E.g., if image A depends on image B, and image B depends on C:
-
-            A ---depends---> B ---depends---> C
-
-        Then an attempt to add a dependency of image C on image A would
-        introduce a cycle, or circular dependency.
-
-        Raises:
-            ImageCreateCycleError: if adding this dependency introduces a cycle
-        """
-        cycle_members = dependency.depends_on(self)
-        if cycle_members:
-            raise ImageCreateCycleError(cycle_members)
-
-        # self depends on dependency
-        self.dependency_images.append(dependency)
-        # dependency has self as a dependent
-        dependency.dependent_images.append(self)
-
-    def depends_on(self, other_image, dependency_chain=None):
-        """Return a chain of dependencies if this image depends on the other image.
-
-        Args:
-            other_image (InputImage): the other image to check if this image
-                depends on.
-            dependency_chain (list of str): the list of image names traversed
-                so far to reach this image
-
-        Returns:
-            list of str: the list of image names in the dependency string or the empty
-                list if this image does not depend on the other image
-        """
-        # Add this image to the dependency chain being constructed
-        dependency_chain = (dependency_chain or []) + [self.name]
-
-        # Base case of recursion: an image depends on itself
-        if self == other_image:
-            return dependency_chain
-
-        for dependency in self.dependency_images:
-            # Find out if this dependency depends on the other image
-            possible_dependency_chain = dependency.depends_on(other_image, dependency_chain)
-            if possible_dependency_chain:
-                return possible_dependency_chain
-
-        # There is no chain of dependencies that leads to other_image
-        return []
-
     # TODO: Reduce duplication of code between here and ProductInputConfigurationLayer
     @cached_property
     def k8s_api(self):
@@ -278,7 +219,7 @@ class InputImage:
             None. Sets `self.image_create_job` for querying status of job.
 
         Raises:
-            ImageCreateError: if there is a failure to create the IMS job
+            WaitingFailure: if there is a failure to create the IMS job
         """
         if not self.base_is_recipe:
             LOGGER.info(f'Base for image with name {self.name} is a pre-built image.')
@@ -294,7 +235,7 @@ class InputImage:
             )
             LOGGER.info(f'Created IMS image creation job with ID {self.image_create_job.get("id")}')
         except APIError as err:
-            raise ImageCreateError(str(err))
+            raise WaitingFailure(str(err)) from err
 
     @property
     def image_create_complete(self):
@@ -533,3 +474,5 @@ class InputImage:
     def completed_successfully(self):
         """bool: whether this image was created and configured successfully"""
         return self.image_create_success and self.image_configure_success
+
+    begin = begin_image_create
