@@ -29,8 +29,8 @@ WORKDIR /sat
 FROM base as build
 
 RUN apk update && \
-    apk add bash openssl-dev libffi-dev openssh curl musl-dev git make \
-            gcc mandoc ipmitool ceph-common rust cargo && \
+    apk add bash bash-completion openssl-dev libffi-dev openssh curl musl-dev \
+            git make gcc mandoc ipmitool ceph-common rust cargo && \
     python3 -m venv $VIRTUAL_ENV
 
 COPY requirements.lock.txt requirements.txt
@@ -85,14 +85,15 @@ FROM venv_base AS production
 # --mount type=bind,src=/etc/pki/trust/anchors,target=/usr/local/share/ca-certificates,ro=true
 
 RUN apk update && \
-    apk add --no-cache python3 bash openssh curl git ipmitool ceph-common mandoc && \
+    apk add --no-cache python3 bash bash-completion openssh curl git ipmitool \
+        ceph-common mandoc && \
     rm -r /var/cache/apk
 
 COPY --from=build $VIRTUAL_ENV $VIRTUAL_ENV
 COPY --from=build /usr/share/man/man8/sat*.8 /usr/share/man/man8/
 COPY --from=build /usr/bin/kubectl /usr/bin/kubectl
-COPY --from=build /etc/bash_completion.d/sat-completion.bash /etc/bash_completion.d/sat-completion.bash
-COPY --from=build /root/.bash_login /root/.bash_login
+COPY --from=build /usr/share/bash-completion/completions/sat /usr/share/bash-completion/completions/sat
+COPY --from=build /etc/profile.d/sat_path.sh /etc/profile.d/sat_path.sh
 
 COPY docker_scripts/sat_container_prompt.sh /etc/profile.d/sat_container_prompt.sh
 COPY docker_scripts/docker_entrypoint.sh /docker_entrypoint.sh
