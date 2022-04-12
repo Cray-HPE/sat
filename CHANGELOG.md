@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   report to be filtered by the specified session template's boot sets.
 - Added a ``sat swap blade`` subcommand which automates the procedure for
   swapping compute and UAN blades.
+- Added support for River blades to the ``sat swap blade`` subcommand.
 
 ### Changed
 - Changed the output of ``sat status`` to split different component types into

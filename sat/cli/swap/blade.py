@@ -72,12 +72,12 @@ def blade_swap_stage(stage_title):
             followed by the subject as the dependent clause. For example,
             "Disable the Redfish endpoints for the slot."
     """
-    verb, object = stage_title.split(' ', maxsplit=1)
+    verb, sentence_object = stage_title.split(' ', maxsplit=1)
 
     def _decorator(fn):
         @wraps(fn)
         def inner(*args, **kwargs):
-            LOGGER.info('%s %s', inf.present_participle(verb), object)
+            LOGGER.info('%s %s', inf.present_participle(verb), sentence_object)
             try:
                 fn(*args, **kwargs)
             except APIError as api_err:
@@ -104,6 +104,31 @@ class BladeSwapProcedure(abc.ABC):
         session = SATSession()
         self.hsm_client = HSMClient(session)
         self.capmc_client = CAPMCClient(session)
+
+    @cached_property
+    def blade_class(self):
+        """str: the class of the blade ("mountain" or "river")
+
+        Raises:
+            BladeSwapError: if there is a problem determining the slot class
+        """
+        try:
+            node_classes = set()
+            for node in self.hsm_client.get_node_components(ancestor=self.xname):
+                node_classes.add(node['Class'])
+
+            # These error cases shouldn't happen, but be defensive anyway.
+            if len(node_classes) > 1:
+                reason = f'multiple node classes on blade {self.xname}: {", ".join(node_classes)}'
+                raise BladeSwapError(f'Could not determine slot class: {reason}')
+            elif not node_classes:
+                reason = f'no nodes on blade {self.xname}'
+                raise BladeSwapError(f'Could not determine slot class: {reason}')
+            else:
+                return node_classes.pop().lower()
+
+        except KeyError as err:
+            raise BladeSwapError(f'Node {node["ID"]} is missing {err} field in HSM')
 
     @abc.abstractmethod
     def procedure(self):
@@ -290,20 +315,29 @@ class SwapOutProcedure(BladeSwapProcedure):
         # CRAYSAT-1373: Do this automatically with SCSD once CASMHMS-5447 is
         # completed.
         node_bmcs = self.hsm_client.query_components(self.xname, type='NodeBMC')
-        commands = []
-        for node_bmc in node_bmcs:
-            commands.append(
-                'curl -k -u root:PASSWORD -X POST -H \\\n'
-                '    \'Content-Type: application/json\' -d \'{"ResetType":"StatefulReset"}\' \\\n'
-                f'    https://{node_bmc["ID"]}/redfish/v1/Managers/BMC/Actions/Manager.Reset\n'
-            )
 
-        prompt_continue(
-            'blade removal procedure',
-            description='Before continuing, the following commands should be run to perform '
-                        'a stateful reset on the NodeBMCs on the blade if the blade is being '
-                        'swapped into another system: \n' + '\n'.join(commands)
-        )
+        if self.blade_class == 'mountain':
+            commands = []
+            for node_bmc in node_bmcs:
+                commands.append(
+                    'curl -k -u root:PASSWORD -X POST -H \\\n'
+                    '    \'Content-Type: application/json\' -d \'{"ResetType":"StatefulReset"}\' \\\n'
+                    f'    https://{node_bmc["ID"]}/redfish/v1/Managers/BMC/Actions/Manager.Reset\n'
+                )
+            prompt_continue(
+                'blade removal procedure',
+                description='Before continuing, the following commands should be run to perform '
+                            'a stateful reset on the NodeBMCs on the blade if the blade is being '
+                            'swapped into another system:\n' + '\n'.join(commands)
+            )
+        else:
+            prompt_continue(
+                'blade removal procedure',
+                description='Before continuing, the following NodeBMCs should be '
+                            'reset to factory settings if the blade is being swapped '
+                            'into another system:\n' + '\n'.join(f'  - {node_bmc["ID"]}'
+                                                                 for node_bmc in node_bmcs)
+            )
 
     @blade_swap_stage('Delete ethernet interfaces')
     def delete_ethernet_interfaces(self):
@@ -586,13 +620,14 @@ class SwapInProcedure(BladeSwapProcedure):
         if self.src_mapping and self.dst_mapping:
             self.map_ip_mac_addresses()
 
-        self.begin_slot_discovery()
-
-        self.wait_for_chassisbmc_endpoints()
-
         self.enable_slot()
         self.power_on_slot()
         self.resume_hms_discovery_cron_job()
+        self.begin_slot_discovery()
+
+        if self.blade_class == 'mountain':
+            self.wait_for_chassisbmc_endpoints()
+
         self.wait_for_nodebmc_endpoints()
         self.enable_nodes()
 
@@ -607,5 +642,9 @@ def swap_blade(args):
         procedure_cls = SwapOutProcedure
     elif args.action == 'enable':
         procedure_cls = SwapInProcedure
+    else:
+        # Should never happen, but be defensive if for some reason we get a weird action
+        raise ValueError(f'action {args.action} is not valid; '
+                         'only "disable" and "enable" are valid options')
 
     procedure_cls(args).run()

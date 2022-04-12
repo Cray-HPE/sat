@@ -134,6 +134,15 @@ class BaseBladeSwapProcedureTest(unittest.TestCase):
             for n in range(2)
         ]
 
+        patch('sat.cli.swap.blade.load_kube_config').start()
+        self.mock_k8s_api = patch('sat.cli.swap.blade.CoreV1Api').start()
+        self.pod_name = 'cray-dhcp-kea-123456789-cafe'
+        self.mock_pod = MagicMock()
+        self.mock_pod.metadata.name = self.pod_name
+        self.mock_k8s_api.return_value.list_namespaced_pod.return_value = [self.mock_pod]
+
+        self.mock_cron = patch('sat.cli.swap.blade.HMSDiscoveryCronJob').start()
+
     def tearDown(self):
         patch.stopall()
 
@@ -184,6 +193,25 @@ class TestPreSwapChecks(BaseBladeSwapProcedureTest):
             self.fail(f'BladeSwapError in pre_swap_checks: {err}')
 
 
+class TestDetermineBladeClass(BaseBladeSwapProcedureTest):
+    """Tests for determining the blade class"""
+
+    def setUp(self):
+        super().setUp()
+        self.mock_hsm_client.get_node_components.return_value = self.nodes
+
+    def test_detecting_mountain_blade(self):
+        """Test detecting a Mountain blade"""
+        self.assertEqual(self.swap_out.blade_class, 'mountain')
+
+    def test_detecting_river_blade(self):
+        """Test detecting a River blade"""
+        for node in self.nodes:
+            node['Class'] = 'River'
+
+        self.assertEqual(self.swap_out.blade_class, 'river')
+
+
 class TestDisablingRedfishEndpoints(BaseBladeSwapProcedureTest):
     def test_node_bmcs_disabled(self):
         """Test that NodeBMCs Redfish endpoints are disabled properly"""
@@ -206,10 +234,6 @@ class TestDisablingSlot(BaseBladeSwapProcedureTest):
 
 class TestSuspendHMSDiscoveryCronJob(BaseBladeSwapProcedureTest):
     """Tests for suspending the hms-discovery cron job"""
-
-    def setUp(self):
-        super().setUp()
-        self.mock_cron = patch('sat.cli.swap.blade.HMSDiscoveryCronJob').start()
 
     def test_suspend_stage(self):
         """Test suspending the hms-discovery cron job"""
@@ -234,20 +258,8 @@ class TestPromptUserClearBMC(BaseBladeSwapProcedureTest):
         self.mock_pester_choices = patch('sat.util.pester_choices', return_value='yes').start()
         self.mock_print = patch('builtins.print').start()
 
-        self.bmc_entries = [
-            {
-                'ID': f'{self.blade_xname}b{n}',
-                'Type': 'NodeBMC',
-                'State': 'Off',
-                'Flag': 'OK',
-                'Enabled': True,
-                'NetType': 'Sling',
-                'Arch': 'X86',
-                'Class': 'Mountain'
-            }
-            for n in range(4)
-        ]
-        self.mock_hsm_client.query_components.return_value = self.bmc_entries
+        self.mock_hsm_client.query_components.return_value = self.node_bmcs
+        self.mock_hsm_client.get_node_components.return_value = self.nodes
 
     def test_user_prompted_to_continue(self):
         """Test that the user the swap procedure continues if the user selects yes"""
@@ -257,7 +269,7 @@ class TestPromptUserClearBMC(BaseBladeSwapProcedureTest):
         """Test that the user is prompted to reset all given BMCs"""
         self.swap_out.prompt_clear_node_controller_settings()
         self.mock_print.assert_called()
-        for bmc in self.bmc_entries:
+        for bmc in self.node_bmcs:
             self.assertIn(bmc['ID'], self.mock_print.mock_calls[0].args[0])
 
     def test_user_bails(self):
@@ -525,14 +537,6 @@ class TestMappingIpMacAddresses(BaseBladeSwapProcedureTest):
 
     def setUp(self):
         super().setUp()
-        self.mock_k8s_api = patch('sat.cli.swap.blade.CoreV1Api').start()
-        patch('sat.cli.swap.blade.load_kube_config').start()
-
-        self.pod_name = 'cray-dhcp-kea-123456789-cafe'
-        self.mock_pod = MagicMock()
-        self.mock_pod.metadata.name = self.pod_name
-
-        self.mock_k8s_api.return_value.list_namespaced_pod.return_value = [self.mock_pod]
 
         self.ethernet_interfaces = [
             {
@@ -697,6 +701,36 @@ class TestMergeInterfaceMappings(BaseBladeSwapProcedureTest):
         self.dst_mapping[0]['ComponentID'] = "x3000c0s0b0n9"
         with self.assertRaises(BladeSwapError):
             SwapInProcedure.merge_mappings(self.src_mapping, self.dst_mapping)
+
+
+class TestSwapOutProcedure(unittest.TestCase):
+    """Test that the swap out procedure calls the appropriate stages"""
+    def setUp(self):
+        self.mock_swapoutprocedure_obj = MagicMock()
+
+    def test_swap_out_user_prompted_on_other_system(self):
+        """Test that the user is prompted to reset BMCs when swapping"""
+        SwapOutProcedure.procedure(self.mock_swapoutprocedure_obj)
+        self.mock_swapoutprocedure_obj.prompt_clear_node_controller_settings.assert_called_once()
+
+
+class TestSwapInProcedure(unittest.TestCase):
+    """Test that the swap in procedure calls the appropriate stages"""
+    def setUp(self):
+        self.mock_swapinprocedure_obj = MagicMock()
+
+    def test_swap_in_mountain(self):
+        """Test swapping in a mountain blade discovers and waits for ChassisBMCs"""
+        self.mock_swapinprocedure_obj.blade_class = 'mountain'
+        SwapInProcedure.procedure(self.mock_swapinprocedure_obj)
+        self.mock_swapinprocedure_obj.begin_slot_discovery.assert_called()
+        self.mock_swapinprocedure_obj.wait_for_chassisbmc_endpoints.assert_called()
+
+    def test_swap_in_river(self):
+        """Test swapping in a river blade does not wait for ChassisBMCs"""
+        self.mock_swapinprocedure_obj.blade_class = 'river'
+        SwapInProcedure.procedure(self.mock_swapinprocedure_obj)
+        self.mock_swapinprocedure_obj.wait_for_chassisbmc_endpoints.assert_not_called()
 
 
 class TestSwapBladeEntrypoint(unittest.TestCase):
