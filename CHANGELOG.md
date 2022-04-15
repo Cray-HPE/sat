@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed tab completion in ``sat bash``.
 - Fixed a bug with the ``$PATH`` environment variable not including the ``sat``
   executable in ``sat bash``.
+- Fixed error reporting in ``sat firmware`` to treat responses containing the
+  key "error" but an empty string for a value as non-errors.
 
 ## [3.15.0] - 2022-03-29
 
