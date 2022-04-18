@@ -32,16 +32,10 @@ fi
 cp docs/man/*.8 $SATMANDIR
 
 # generate auto-completion script
-cd /sat
-if [ ! -d "/etc/bash_completion.d" ]; then
-    mkdir -p /etc/bash_completion.d
-    chmod 755 /etc/bash_completion.d
-fi
-register-python-argcomplete sat > /etc/bash_completion.d/sat-completion.bash
-echo "source /etc/bash_completion.d/sat-completion.bash" >> /root/.bash_login
+register-python-argcomplete sat > /usr/share/bash-completion/completions/sat
 
-# Place the virtualenv at the beginning of the path
-echo "export PATH=$VIRTUAL_ENV:$PATH" >> /root/.bash_login
+# /etc/profile sets $PATH to a static value on login, therefore $VIRTUAL_ENV/bin must be prepended.
+echo "export PATH=$VIRTUAL_ENV/bin:\$PATH" > /etc/profile.d/sat_path.sh
 
 # install kubectl using same version used in ncn image
 cd /sat

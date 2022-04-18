@@ -606,6 +606,62 @@ class TestFASClient(ExtendedTestCase):
         self.assert_in_element('Error getting firmware for x3000c0r15b0 target MISSING: firmware bad', logs.output)
         self.assertEqual(expected, result)
 
+    def test_make_fw_table_with_empty_error_on_target(self):
+        """When target has an empty string for an 'error' but targets look good, don't log an error"""
+        self.fas_firmware_devices['full_snap']['devices'][0]['targets'][0]['error'] = ''
+        expected = [[XName('x3000c0r15b0'), 'BMC', '', '1.00'],
+                    [XName('x3000c0r15b0'), 'FPGA0', '', '2.00'],
+                    [XName('x3000c0s17b1'), '8', 'BMC', '1.01'],
+                    [XName('x3000c0s17b1'), '10', 'FPGA0', '2.01']]
+        with patch('sat.apiclient.fas.LOGGER.error') as logs_error:
+            result = self.fas_client.make_fw_table(
+                self.fas_firmware_devices['full_snap']['devices']
+            )
+        logs_error.assert_not_called()
+        self.assertEqual(expected, result)
+
+    def test_make_fw_table_with_error_on_xname(self):
+        """When an xname has an 'error' but targets look good, log an error for the xname and display the row."""
+        self.fas_firmware_devices['full_snap']['devices'][0]['error'] = 'xname bad'
+        expected = [[XName('x3000c0r15b0'), 'BMC', '', '1.00'],
+                    [XName('x3000c0r15b0'), 'FPGA0', '', '2.00'],
+                    [XName('x3000c0s17b1'), '8', 'BMC', '1.01'],
+                    [XName('x3000c0s17b1'), '10', 'FPGA0', '2.01']]
+        with self.assertLogs(level=logging.ERROR) as logs:
+            result = self.fas_client.make_fw_table(
+                self.fas_firmware_devices['full_snap']['devices']
+            )
+        self.assert_in_element('Error getting firmware for x3000c0r15b0: xname bad', logs.output)
+        self.assertEqual(expected, result)
+
+    def test_make_fw_table_with_empty_error_on_xname(self):
+        """When an xname has an empty string for an 'error', don't log an error."""
+        self.fas_firmware_devices['full_snap']['devices'][0]['error'] = ''
+        expected = [[XName('x3000c0r15b0'), 'BMC', '', '1.00'],
+                    [XName('x3000c0r15b0'), 'FPGA0', '', '2.00'],
+                    [XName('x3000c0s17b1'), '8', 'BMC', '1.01'],
+                    [XName('x3000c0s17b1'), '10', 'FPGA0', '2.01']]
+        with patch('sat.apiclient.fas.LOGGER.error') as logs_error:
+            result = self.fas_client.make_fw_table(
+                self.fas_firmware_devices['full_snap']['devices']
+            )
+        logs_error.assert_not_called()
+        self.assertEqual(expected, result)
+
+    def test_make_fw_table_with_empty_error_on_xname_and_missing_targets(self):
+        """When an xname has an error and also no targets, make sure exactly one error is logged."""
+        self.fas_firmware_devices['full_snap']['devices'][0]['error'] = 'xname bad'
+        self.fas_firmware_devices['full_snap']['devices'][0]['targets'] = []
+        expected = [[XName('x3000c0s17b1'), '8', 'BMC', '1.01'],
+                    [XName('x3000c0s17b1'), '10', 'FPGA0', '2.01']]
+        with patch('sat.apiclient.fas.LOGGER') as logger:
+            result = self.fas_client.make_fw_table(
+                self.fas_firmware_devices['full_snap']['devices']
+            )
+        logger.warning.assert_not_called()
+        logger.error.assert_called_once()
+        self.assertEqual(expected, result)
+
 
 if __name__ == '__main__':
     unittest.main()

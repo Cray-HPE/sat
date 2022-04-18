@@ -26,6 +26,9 @@ import itertools
 from unittest.mock import Mock, patch
 
 from sat.waiting import (
+    DependencyCycleError,
+    DependencyGroupMember,
+    DependencyGroupWaiter,
     GroupWaiter,
     SimultaneousWaiter,
     Waiter,
@@ -71,8 +74,8 @@ def get_mock_waiter(complete_behavior):
     return MockWaiter
 
 
-def get_mock_group_waiter(member_complete_behavior):
-    """Get a GroupWaiter class which mocks out completion checking.
+def get_mock_group_waiter(member_complete_behavior, parent_cls=GroupWaiter):
+    """Get a GroupWaiter class or a subclass thereof which mocks out completion checking.
 
     This is a simple helper function for creating classes to test the
     GroupWaiter.wait_for_completion method.
@@ -83,8 +86,9 @@ def get_mock_group_waiter(member_complete_behavior):
             if a function, return the result of calling that function
                 against the given member.
     """
+    assert issubclass(parent_cls, GroupWaiter)
 
-    class MockGroupWaiter(GroupWaiter):
+    class MockGroupWaiter(parent_cls):
         def member_has_completed(self, member):
             if callable(member_complete_behavior):
                 return member_complete_behavior(member)
@@ -138,7 +142,7 @@ class TestWaiter(WaiterTestCase):
     def test_no_negative_retries(self):
         """Test that the number of retries cannot be negative"""
         with self.assertRaises(ValueError):
-            instance = SuccessfulWaiter(10, retries=-1)
+            _ = SuccessfulWaiter(10, retries=-1)
 
     def test_raising_waitingfailure_sets_failed_attr(self):
         """Test that raising WaitingFailure in a Waiter sets the `failed` attribute"""
@@ -341,3 +345,152 @@ class TestFailingGroupWaiter(GroupWaiterTestCase):
         """Test that failed members are not returned by wait_for_completion()"""
         instance = self.CatastrophicWaiter(self.members, 10)
         self.assertFalse(set(instance.wait_for_completion()).intersection(self.failed_members))
+
+
+class DependentTestMember(DependencyGroupMember):
+    def __init__(self, name, *, test_case):
+        super().__init__()
+        self.name = name
+
+        self.begin_calls = 0
+        self.test_case = test_case
+
+    def begin(self):
+        self.begin_calls += 1
+        self.test_case.begun_members.append(self)
+
+    def __repr__(self):
+        return f'<test dependent item: {self.name}>'
+
+
+class DependencyGroupTestCase(WaiterTestCase):
+    """Scaffolding for dependency group tests"""
+    def setUp(self):
+        super().setUp()
+        first = DependentTestMember('first', test_case=self)
+        second_1 = DependentTestMember('second_1', test_case=self)
+        second_2 = DependentTestMember('second_2', test_case=self)
+        third = DependentTestMember('third', test_case=self)
+
+        # Diamond dependency graph
+        second_1.add_dependency(first)
+        second_2.add_dependency(first)
+        third.add_dependency(second_1)
+        third.add_dependency(second_2)
+
+        self.members = [first, second_1, second_2, third]
+
+
+class TestDependencyGroupMember(DependencyGroupTestCase):
+    def test_full_dependencies(self):
+        """Test finding the full set of dependencies of an item"""
+        closure = self.members[-1].full_dependencies()
+        for member in self.members[:-1]:
+            with self.subTest(member=member):
+                self.assertIn(member, closure)
+        with self.subTest(member=self.members[-1]):
+            self.assertNotIn(self.members[-1], closure)
+
+    def test_cannot_create_dep_cycles(self):
+        """Test that adding cyclic dependencies is disallowed"""
+        n_members = 5
+        members = [DependentTestMember(f'member {n}', test_case=self)
+                   for n in range(n_members)]
+        with self.assertRaises(DependencyCycleError):
+            for idx, member in enumerate(members):
+                # Treat the member list like a ring buffer and make each member
+                # depend on the next member. This forms a simple circular
+                # dependency structure.
+                member.add_dependency(members[(idx + 1) % n_members])
+
+    def test_dep_chain(self):
+        """Test building a simple chain of dependencies"""
+        first = DependentTestMember('first', test_case=self)
+        second = DependentTestMember('second', test_case=self)
+        third = DependentTestMember('third', test_case=self)
+        second.add_dependency(first)
+        third.add_dependency(second)
+
+        self.assertEqual(third.depends_on(first), [third, second, first])
+
+    def test_dep_chain_when_no_chain_exists(self):
+        """Test that no dependencies are returned when no relationship exists"""
+        self.assertEqual(self.members[0].depends_on(self.members[-1]), [])
+
+    def test_complex_dep_chain(self):
+        """Test dependency chain with a more complex setup"""
+        chain = self.members[-1].depends_on(self.members[0])
+        for idx, member in enumerate(chain):
+            if idx - 1 > 0:
+                self.assertIn(member, chain[idx - 1].dependencies)
+
+
+class DependencyGroupWaiterTestCase(DependencyGroupTestCase):
+    def setUp(self):
+        super().setUp()
+        self.begun_members = []
+
+
+class TestSuccessfulDependencyGroupWaiter(DependencyGroupWaiterTestCase):
+    def setUp(self):
+        self.SuccessfulDepWaiter = get_mock_group_waiter(True, parent_cls=DependencyGroupWaiter)
+        super().setUp()
+
+    def test_all_members_are_awaited(self):
+        """Test that all dependent members are awaited in the successful case"""
+        self.SuccessfulDepWaiter(self.members, 10).wait_for_completion()
+        for member in self.members:
+            with self.subTest(member=member):
+                self.assertEqual(member.begin_calls, 1)
+
+    def test_members_awaited_in_correct_order(self):
+        """Test that dependent waiters are waited for in the proper order"""
+        self.SuccessfulDepWaiter(self.members, 10).wait_for_completion()
+
+        # To test that dependencies are started in the proper order, make sure
+        # that the index of each member recorded after start is strictly greater
+        # than that of each of its dependencies. This checks for topological
+        # sorting.
+        for member in self.members:
+            with self.subTest(member=member):
+                for dep in member.dependencies:
+                    self.assertGreater(self.begun_members.index(member), self.begun_members.index(dep))
+
+    def test_members_must_be_dep_group_member_subclasses(self):
+        """Test that all dependent group members subclass DependencyGroupMember"""
+        with self.assertRaises(TypeError):
+            _ = self.SuccessfulDepWaiter([object()], 10)
+
+
+class TestFailingDependencyGroupWaiter(DependencyGroupWaiterTestCase):
+    def setUp(self):
+        super().setUp()
+
+        def fail_conditionally(member):
+            if getattr(member, 'should_fail', False):
+                raise WaitingFailure('failed!')
+            return True
+
+        self.FailingDepWaiter = get_mock_group_waiter(fail_conditionally, parent_cls=DependencyGroupWaiter)
+
+    def test_members_not_started_after_dep_fails(self):
+        """Test that a failing dependency prevents beginning another member"""
+        self.members[1].should_fail = True
+        self.FailingDepWaiter(self.members, 10).wait_for_completion()
+        for member in self.members:
+            with self.subTest(member=member):
+                if any(getattr(dep, 'should_fail', False) for dep in member.full_dependencies()):
+                    self.assertNotIn(member, self.begun_members)
+                else:
+                    self.assertIn(member, self.begun_members)
+
+    def test_failing_members_started_only_once_on_retry(self):
+        """Test DependencyGroupWaiter only starts members once when retries >= 1"""
+        self.members[1].should_fail = True
+        self.FailingDepWaiter(self.members, 10, retries=2).wait_for_completion()
+        for member in self.members:
+            with self.subTest(member=member):
+                if any(getattr(dep, 'should_fail', False) for dep in member.full_dependencies()):
+                    self.assertEqual(member.begin_calls, 0)
+                else:
+                    self.assertEqual(member.begin_calls, 1)
