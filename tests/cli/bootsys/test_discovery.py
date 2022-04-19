@@ -1,7 +1,7 @@
 """
-Unit tests for the sat.cli.bootsys.discovery module.
+Unit tests for the sat.hms_discovery module.
 
-(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -30,7 +30,7 @@ from dateutil.tz import tzutc
 from kubernetes.config import ConfigException
 from kubernetes.client.rest import ApiException
 
-from sat.cli.bootsys.discovery import HMSDiscoveryCronJob, HMSDiscoveryError, HMSDiscoveryScheduledWaiter
+from sat.hms_discovery import HMSDiscoveryCronJob, HMSDiscoveryError, HMSDiscoveryScheduledWaiter
 
 
 class TestHMSDiscoveryCronJob(unittest.TestCase):
@@ -38,8 +38,8 @@ class TestHMSDiscoveryCronJob(unittest.TestCase):
 
     def setUp(self):
         """Set up some mocks."""
-        self.mock_load_config = patch('sat.cli.bootsys.discovery.load_kube_config').start()
-        self.mock_batch_api_cls = patch('sat.cli.bootsys.discovery.BatchV1beta1Api').start()
+        self.mock_load_config = patch('sat.hms_discovery.load_kube_config').start()
+        self.mock_batch_api_cls = patch('sat.hms_discovery.BatchV1beta1Api').start()
         self.mock_batch_api = self.mock_batch_api_cls.return_value
         self.hdcj = HMSDiscoveryCronJob()
 
@@ -104,7 +104,7 @@ class TestHMSDiscoveryCronJob(unittest.TestCase):
             self.hdcj.get_suspend_status()
         )
 
-    @patch('sat.cli.bootsys.discovery.HMSDiscoveryCronJob.get_suspend_status')
+    @patch('sat.hms_discovery.HMSDiscoveryCronJob.get_suspend_status')
     def test_suspend_already_suspended(self, mock_get_suspend_status):
         """Test suspending when already suspended."""
         mock_get_suspend_status.return_value = True
@@ -112,7 +112,7 @@ class TestHMSDiscoveryCronJob(unittest.TestCase):
 
         self.mock_batch_api.patch_namespaced_cron_job.assert_not_called()
 
-    @patch('sat.cli.bootsys.discovery.HMSDiscoveryCronJob.get_suspend_status')
+    @patch('sat.hms_discovery.HMSDiscoveryCronJob.get_suspend_status')
     def test_suspend_already_not_suspended(self, mock_get_suspend_status):
         """Test setting suspend status to False when already not suspended."""
         mock_get_suspend_status.return_value = False
@@ -120,7 +120,7 @@ class TestHMSDiscoveryCronJob(unittest.TestCase):
 
         self.mock_batch_api.patch_namespaced_cron_job.assert_not_called()
 
-    @patch('sat.cli.bootsys.discovery.HMSDiscoveryCronJob.get_suspend_status')
+    @patch('sat.hms_discovery.HMSDiscoveryCronJob.get_suspend_status')
     def test_suspend_when_not_suspended(self, mock_get_suspend_status):
         """Test suspending when not currently suspended."""
         mock_get_suspend_status.return_value = False
@@ -132,7 +132,7 @@ class TestHMSDiscoveryCronJob(unittest.TestCase):
             {'spec': {'suspend': True}}
         )
 
-    @patch('sat.cli.bootsys.discovery.HMSDiscoveryCronJob.get_suspend_status')
+    @patch('sat.hms_discovery.HMSDiscoveryCronJob.get_suspend_status')
     def test_resume_when_suspended(self, mock_get_suspend_status):
         """Test resuming when currently suspended."""
         mock_get_suspend_status.return_value = True
@@ -144,7 +144,7 @@ class TestHMSDiscoveryCronJob(unittest.TestCase):
             {'spec': {'suspend': False}}
         )
 
-    @patch('sat.cli.bootsys.discovery.HMSDiscoveryCronJob.get_suspend_status')
+    @patch('sat.hms_discovery.HMSDiscoveryCronJob.get_suspend_status')
     def test_set_suspend_api_exception(self, mock_get_suspend_status):
         """Test suspending when already suspended."""
         mock_get_suspend_status.return_value = False
@@ -166,7 +166,7 @@ class TestHMSDiscoveryCronJob(unittest.TestCase):
         self.mock_batch_api.read_namespaced_cron_job.return_value.spec = Mock(schedule='*/3 * * * *')
         expected = datetime(2020, 12, 31, 10, 3, 0)
 
-        with patch('sat.cli.bootsys.discovery.datetime', MockDateTime):
+        with patch('sat.hms_discovery.datetime', MockDateTime):
             # Call it twice to ensure it returns the same thing the second time
             # rather than the next expected schedule time.
             next_time = self.hdcj.get_latest_next_schedule_time()
@@ -181,7 +181,7 @@ class TestHMSDiscoveryScheduledWaiter(unittest.TestCase):
 
     def setUp(self):
         """Set up mocks."""
-        self.mock_datetime = patch('sat.cli.bootsys.discovery.datetime').start()
+        self.mock_datetime = patch('sat.hms_discovery.datetime').start()
 
         self.poll_interval = 5
         self.grace_period = 30
@@ -189,7 +189,7 @@ class TestHMSDiscoveryScheduledWaiter(unittest.TestCase):
         self.mock_datetime.now.return_value = self.start_time
 
         self.next_sched_time = datetime(2020, 10, 31, 8, 3, 0, tzinfo=tzutc())
-        self.mock_hd_cron_job = patch('sat.cli.bootsys.discovery.HMSDiscoveryCronJob').start().return_value
+        self.mock_hd_cron_job = patch('sat.hms_discovery.HMSDiscoveryCronJob').start().return_value
         self.mock_hd_cron_job.get_latest_next_schedule_time.return_value = self.next_sched_time
 
         self.hd_waiter = HMSDiscoveryScheduledWaiter(self.poll_interval, self.grace_period)

@@ -21,6 +21,7 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+from functools import wraps
 import logging
 import requests
 from urllib.parse import urlunparse
@@ -28,6 +29,28 @@ from urllib.parse import urlunparse
 from sat.config import get_config_value
 
 LOGGER = logging.getLogger(__name__)
+
+
+def handle_api_errors(fn):
+    """Decorator to handle common errors with API access.
+
+    This decorator handles APIErrors, ValueErrors, and KeyErrors, raising all
+    as APIErrors with appropriate prefixes determined from the name of the
+    decorated function.
+    """
+    err_prefix = f'Failed to {fn.__name__.replace("_", " ")}'
+
+    @wraps(fn)
+    def inner(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except APIError as err:
+            raise APIError(f'{err_prefix}: {err}') from err
+        except ValueError as err:
+            raise APIError(f'{err_prefix} due to bad JSON in response: {err}') from err
+        except KeyError as err:
+            raise APIError(f'{err_prefix} due to missing {err} key in response.') from err
+    return inner
 
 
 class APIError(Exception):

@@ -1,7 +1,7 @@
 """
 Contains the code for swapping components.
 
-(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,13 @@ import logging
 
 import inflect
 
+from sat.cli.swap.errors import (
+    ERR_GET_PORTS_FAIL,
+    ERR_INVALID_OPTIONS,
+    ERR_NO_PORTS_FOUND,
+    ERR_PORT_POLICY_CREATE_FAIL,
+    ERR_PORT_POLICY_TOGGLE_FAIL
+)
 from sat.cli.swap.ports import PortManager
 from sat.util import pester
 
@@ -37,12 +44,6 @@ INF = inflect.engine()
 
 # Prefix for offline port policy created.
 POL_PRE = 'sat-offline-'
-
-ERR_INVALID_OPTIONS = 1
-ERR_GET_PORTS_FAIL = 2
-ERR_NO_PORTS_FOUND = 3
-ERR_PORT_POLICY_CREATE_FAIL = 4
-ERR_PORT_POLICY_TOGGLE_FAIL = 5
 
 
 class Swapper(metaclass=abc.ABCMeta):
@@ -79,29 +80,6 @@ class Swapper(metaclass=abc.ABCMeta):
             The xname
         """
         return component_id
-
-    def _check_arguments(self, action, dry_run, disruptive):
-        """Check that given options are valid for a swap.
-
-        Args:
-            action (str): 'enable' or 'disable'
-            dry_run (bool): if True, skip applying configuration to ports
-            disruptive (bool): if True, do not confirm disable/enable
-
-        Raises:
-            SystemExit(1): if invalid options
-        """
-        if not dry_run and not action:
-            LOGGER.error('The action option is required if not a dry run, exiting.')
-            raise SystemExit(ERR_INVALID_OPTIONS)
-
-        if dry_run and action:
-            LOGGER.error('The action option is not valid with the dry run option.')
-            raise SystemExit(ERR_INVALID_OPTIONS)
-
-        if not (disruptive or dry_run or
-                pester(f'Enable/disable of {self.component_type} can impact system. Continue?')):
-            raise SystemExit(ERR_INVALID_OPTIONS)
 
     def get_and_check_ports(self, component_id, force):
         """Get list of dictionaries for ports for this swap and check result.
@@ -214,8 +192,6 @@ class Swapper(metaclass=abc.ABCMeta):
 
         # For a switch, this is the switch xname, and for a cable it is a comma-separated string of xnames
         component_name = self.component_name(component_id)
-
-        self._check_arguments(action, dry_run, disruptive)
 
         # Get the port data (xname, port_link, policy_link) to enable/disable for this swap
         port_data_list = self.get_and_check_ports(component_id, force)

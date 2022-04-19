@@ -1,7 +1,7 @@
 """
 Tests for the XName utility class.
 
-(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -123,6 +123,30 @@ class TestXName(unittest.TestCase):
         chassis_xname_str = bmc_xname_str[:7]
         self.assertEqual(XName(chassis_xname_str),
                          XName(bmc_xname_str).get_chassis())
+
+    def test_xname_positions_match(self):
+        """Test that xnames in the same position in different blades match"""
+        lhs = XName('x1000c0s0b0n0')
+        rhs = XName('x1000c0s1b0n0')
+        self.assertTrue(lhs.relative_node_positions_match(rhs))
+
+    def test_xname_positions_do_not_match(self):
+        """Test that xnames in different positions in different blades do not match"""
+        lhs = XName('x1000c0s0b0n0')
+        rhs = XName('x1000c0s9b0n3')
+        self.assertFalse(lhs.relative_node_positions_match(rhs))
+
+    def test_xnames_in_same_blade_diff_positions_do_not_match(self):
+        """Test that xnames in different positions in the same blade do not match"""
+        lhs = XName('x1000c0s0b0n0')
+        rhs = XName('x1000c0s0b0n3')
+        self.assertFalse(lhs.relative_node_positions_match(rhs))
+
+    def test_xnames_in_the_same_blade_same_positions_match(self):
+        """Test that xnames in the same position in the same blade match"""
+        lhs = XName('x1000c0s0b0n0')
+        rhs = XName('x1000c0s0b0n0')
+        self.assertTrue(lhs.relative_node_positions_match(rhs))
 
 
 class TestXNameContainsComponent(unittest.TestCase):

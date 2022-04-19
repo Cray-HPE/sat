@@ -1,7 +1,7 @@
 """
 Class for representing an xname.
 
-(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -167,6 +167,23 @@ class XName:
             An XName object that is the cabinet.
         """
         return XName.get_xname_from_tokens(self.tokens[:4])
+
+    def relative_node_positions_match(self, other):
+        """Check that two node xnames are in the same relative position on a blade.
+
+        Args:
+            other (XName): another node xname
+
+        Returns:
+            bool: whether or not this xname and the other share the same
+                NodeBMC and Node IDs
+        """
+        if not self.get_type() == other.get_type() == 'NODE':
+            return False
+
+        # Since we know both xnames are Node components, we can simply compare
+        # the last 4 tokens, those being the NodeBMC number and Node number.
+        return self.tokens[-4:] == other.tokens[-4:]
 
     def __lt__(self, other):
         return self.tokens < other.tokens
