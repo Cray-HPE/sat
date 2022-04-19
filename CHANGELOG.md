@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added a ``sat swap blade`` subcommand which automates the procedure for
+  swapping compute and UAN blades.
+- Added support for River blades to the ``sat swap blade`` subcommand.
+
 ### Fixed
 - Fixed tab completion in ``sat bash``.
 - Fixed a bug with the ``$PATH`` environment variable not including the ``sat``
@@ -49,9 +54,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ``--cfs-fields``.
 - Added a ``--bos-template`` option to ``sat status`` which allows the status
   report to be filtered by the specified session template's boot sets.
-- Added a ``sat swap blade`` subcommand which automates the procedure for
-  swapping compute and UAN blades.
-- Added support for River blades to the ``sat swap blade`` subcommand.
 
 ### Changed
 - Changed the output of ``sat status`` to split different component types into
