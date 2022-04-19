@@ -18,7 +18,7 @@
 // OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 // ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 // OTHER DEALINGS IN THE SOFTWARE.
-@Library('dst-shared@master') _
+@Library('dst-shared@release/sat-2.3') _
 
 dockerBuildPipeline {
   repository = "cray"
