@@ -1,24 +1,6 @@
-all: \
-	sat-auth.8 \
-	sat-bmccreds.8 \
-	sat-bootprep.8 \
-	sat-bootsys.8 \
-	sat-diag.8 \
-	sat-firmware.8 \
-	sat-hwinv.8 \
-	sat-hwmatch.8 \
-	sat-init.8 \
-	sat-k8s.8 \
-	sat-nid2xname.8 \
-	sat-sensors.8 \
-	sat-setrev.8 \
-	sat-showrev.8 \
-	sat-slscheck.8 \
-	sat-status.8 \
-	sat-swap.8 \
-	sat-switch.8 \
-	sat-xname2nid.8 \
-	sat.8
+RST_MAN_PAGES = $(wildcard *.8.rst)
+
+all: $(RST_MAN_PAGES:.rst=)
 
 %.8: %.8.rst
 	rst2man.py $< $@

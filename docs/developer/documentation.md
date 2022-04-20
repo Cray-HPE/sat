@@ -25,7 +25,8 @@ and should be located in ``docs/man/`` within this repository, where
 
 ### Man Page Makefile
 
-When creating a new man page, ensure it is added to the ``all`` target in
+As long as the man page rst file follows the naming convention mentioned above,
+it will be automatically recognized and built by the ``all`` target in
 ``docs/man/Makefile``.
 
 ### Man Page Headers
