@@ -36,7 +36,7 @@ class InputSessionTemplate(BaseInputItem):
     Attributes:
         data (dict): the data for a session template, already
             validated against the bootprep schema
-        bos_client (sat.apiclient.BOSClient): the BOS API client to make
+        bos_client (sat.apiclient.BOSClientCommon): the BOS API client to make
             requests to the BOS API
         ims_client (sat.apiclient.IMSClient): the IMS API client to make
             requests to the IMS API
@@ -53,7 +53,7 @@ class InputSessionTemplate(BaseInputItem):
                 validated by the bootprep schema.
             instance (sat.bootprep.input.InputInstance): a reference to the
                 full instance loaded from the config file
-            bos_client (sat.apiclient.BOSClient): the BOS API client
+            bos_client (sat.apiclient.BOSClientCommon): the BOS API client
             cfs_client (sat.apiclient.CFSClient): the CFS API client
             ims_client (sat.apiclient.IMSClient): the IMS API client
             **kwargs: additional keyword arguments
@@ -221,7 +221,7 @@ class InputSessionTemplateCollection(BaseInputItemCollection):
                 already validated by schema
             instance (sat.bootprep.input.InputInstance): a reference to the
                 full instance loaded from the config file
-            bos_client (sat.apiclient.BOSClient): the BOS API client
+            bos_client (sat.apiclient.BOSClientCommon): the BOS API client
             cfs_client (sat.apiclient.CFSClient): the CFS API client
             ims_client (sat.apiclient.IMSClient): the IMS API client
             **kwargs: additional keyword arguments

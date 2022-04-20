@@ -206,6 +206,11 @@ def _add_bootprep_run_subparser(subparsers):
         help='Delete IMS jobs after creating images. Note that deleting IMS jobs '
              'makes determining image history impossible.'
     )
+    run_subparser.add_argument(
+        '--bos-version',
+        choices=['v1'],  # TODO (CRAYSAT-1402): Add v2
+        help='The version of the BOS API to use for BOS operations',
+    )
 
     add_skip_and_overwrite_options(run_subparser, 'config', 'configuration')
     add_skip_and_overwrite_options(run_subparser, 'image', 'image')

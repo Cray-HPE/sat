@@ -25,6 +25,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+- Added client support for the BOS v2 API.
+- Added a `--bos-version` command line option and `bos.api_version`
+  configuration file option which can be used to specify which version of the
+  BOS API to use.
+
 ## [3.15.1] - 2022-04-18
 
 ### Fixed

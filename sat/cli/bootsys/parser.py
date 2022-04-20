@@ -29,6 +29,7 @@ from sat.cli.bootsys.stages import STAGES_BY_ACTION
 TimeoutSpec = namedtuple('TimeoutSpec', ['option_prefix', 'applicable_actions',
                                          'default', 'condition'])
 
+
 TIMEOUT_SPECS = [
     TimeoutSpec('capmc', ['shutdown'], 120,
                 'components reach powered off state after they are shutdown with CAPMC.'),
@@ -249,6 +250,12 @@ def add_bootsys_subparser(subparsers):
         description='Boot or shut down the entire system, including the '
                     'compute nodes, user access nodes, and non-compute '
                     'nodes running the management software.',
+    )
+
+    bootsys_parser.add_argument(
+        '--bos-version',
+        choices=['v1'],  # TODO (CRAYSAT-1404): Add v2
+        help='The version of the BOS API to use for BOS operations',
     )
 
     actions_subparsers = bootsys_parser.add_subparsers(

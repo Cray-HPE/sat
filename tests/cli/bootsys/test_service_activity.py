@@ -223,7 +223,7 @@ class TestBOSActivityChecker(ExtendedTestCase):
         def mock_bos_get(*args):
             def json():
                 if not args or args[0] != 'session':
-                    self.fail('Unexpected get to BOSClient with args: {}'.format(args))
+                    self.fail('Unexpected get to BOSV1Client with args: {}'.format(args))
                 elif len(args) == 1:
                     return self.bos_session_ids
                 else:
@@ -235,7 +235,7 @@ class TestBOSActivityChecker(ExtendedTestCase):
 
         patch('sat.cli.bootsys.service_activity.SATSession').start()
         self.mock_bos_client = patch(
-            'sat.cli.bootsys.service_activity.BOSClient').start()
+            'sat.cli.bootsys.service_activity.BOSClientCommon.get_bos_client').start()
         self.mock_bos_client.return_value.get = mock_bos_get
 
         # This can be overridden in test methods to test other scenarios.

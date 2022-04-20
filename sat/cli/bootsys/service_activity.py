@@ -38,11 +38,11 @@ from yaml import YAMLLoadWarning
 
 from sat.apiclient import (
     APIError,
-    BOSClient,
     CFSClient,
     CRUSClient,
     NMDClient
 )
+from sat.apiclient.bos import BOSClientCommon
 from sat.cli.bootsys.util import get_mgmt_ncn_groups, get_ssh_client
 from sat.constants import MISSING_VALUE
 from sat.apiclient import FASClient
@@ -257,7 +257,7 @@ class BOSActivityChecker(ServiceActivityChecker):
         active_sessions = []
         bos_session_fields = ['bos_launch', 'operation', 'stage',
                               'session_template_id']
-        bos_client = BOSClient(SATSession())
+        bos_client = BOSClientCommon.get_bos_client(SATSession())
         try:
             session_ids = bos_client.get('session').json()
         except (APIError, ValueError) as err:

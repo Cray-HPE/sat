@@ -110,7 +110,8 @@ class TestDoBootprepRun(unittest.TestCase):
         self.args = Namespace(action='run', input_file=self.input_file,
                               overwrite_templates=self.overwrite_templates,
                               skip_existing_templates=self.skip_existing_templates, dry_run=self.dry_run,
-                              view_input_schema=False, generate_schema_docs=False)
+                              view_input_schema=False, generate_schema_docs=False,
+                              bos_version='v1')
         self.schema_file = 'schema.yaml'
         self.mock_validator_cls = MagicMock()
         self.mock_load_and_validate_instance = patch('sat.cli.bootprep.main.load_and_validate_instance').start()
@@ -120,7 +121,7 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_sat_session = patch('sat.cli.bootprep.main.SATSession').start()
         self.mock_cfs_client = patch('sat.cli.bootprep.main.CFSClient').start().return_value
         self.mock_ims_client = patch('sat.cli.bootprep.main.IMSClient').start().return_value
-        self.mock_bos_client = patch('sat.cli.bootprep.main.BOSClient').start().return_value
+        self.mock_bos_client = patch('sat.cli.bootprep.main.BOSClientCommon.get_bos_client').start().return_value
         self.mock_create_configurations = patch('sat.cli.bootprep.main.create_configurations').start()
         self.mock_create_images = patch('sat.cli.bootprep.main.create_images').start()
         self.mock_session_templates = self.mock_input_instance.input_session_templates
