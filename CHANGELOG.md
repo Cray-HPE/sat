@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed missing ``sat-hwhist`` man page.
+- Fixed bug in ``sat status`` which caused a traceback when certain component
+  state fields were missing in HSM.
 
 ## [3.15.1] - 2022-04-18
 
