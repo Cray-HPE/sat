@@ -30,6 +30,7 @@ from sat.apiclient.cfs import CFSClient
 from sat.apiclient.gateway import APIError
 from sat.apiclient.hsm import HSMClient
 from sat.apiclient.sls import SLSClient
+from sat.constants import MISSING_VALUE
 from sat.util import get_val_by_path
 
 
@@ -282,12 +283,16 @@ class StatusModule(ABC):
             try:
                 for row in module_instance.rows:
                     mapped_row = {}
+
                     for heading, value in row.items():
                         mapped_heading = module_instance.map_heading(heading)
                         if mapped_heading == primary_key:
                             value = primary_key_type(value)
 
                         mapped_row[mapped_heading] = value
+
+                    for missing_heading in set(module.headings) - set(mapped_row.keys()):
+                        mapped_row[missing_heading] = MISSING_VALUE
 
                     if module.primary or mapped_row[primary_key] in items_by_primary_key:
                         items_by_primary_key[mapped_row[primary_key]].update(mapped_row)
