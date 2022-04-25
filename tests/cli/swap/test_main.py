@@ -33,7 +33,7 @@ from sat.cli.swap.main import check_arguments, do_swap
 def check_arguments_base():
     options = {
         'component_type': ['blade', 'switch', 'cable'],
-        'action': ['enable', 'disable'],
+        'action': ['enable', 'disable', None],
         'dry_run': [True, False],
         'disruptive': [True, False],
         'pester': [True, False]

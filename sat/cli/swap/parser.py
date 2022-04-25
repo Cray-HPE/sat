@@ -149,6 +149,7 @@ def add_swap_subparser(subparsers):
     target_subparsers = swap_parser.add_subparsers(
         metavar='target',
         dest='target',
+        required=True,
         help='The component to swap.'
     )
 
