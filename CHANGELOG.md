@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed missing ``sat-hwhist`` man page.
 - Fixed bug in ``sat status`` which caused a traceback when certain component
   state fields were missing in HSM.
+- Fixed bug in ``sat status`` which caused a traceback when components were
+  entirely missing from SLS.
 
 ## [3.15.1] - 2022-04-18
 
