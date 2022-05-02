@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Began using a separate ``cray_product_catalog`` package to query the product
   catalog in ``sat bootprep``.
+- Began using a separate ``cray_product_catalog`` package to query the product
+  catalog in ``sat showrev``.
 
 ### Fixed
 - Fixed missing ``sat-hwhist`` man page.
