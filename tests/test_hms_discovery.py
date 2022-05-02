@@ -30,7 +30,12 @@ from dateutil.tz import tzutc
 from kubernetes.config import ConfigException
 from kubernetes.client.rest import ApiException
 
-from sat.hms_discovery import HMSDiscoveryCronJob, HMSDiscoveryError, HMSDiscoveryScheduledWaiter
+from sat.hms_discovery import (
+    HMSDiscoveryCronJob,
+    HMSDiscoveryError,
+    HMSDiscoveryScheduledWaiter,
+    HMSDiscoverySuspendedWaiter,
+)
 
 
 class TestHMSDiscoveryCronJob(unittest.TestCase):
@@ -175,6 +180,19 @@ class TestHMSDiscoveryCronJob(unittest.TestCase):
         self.assertEqual(expected, next_time)
         self.assertEqual(expected, same_next_time)
 
+    def test_is_not_active_with_no_jobs(self):
+        """Test that the job is considered not active if there are not running jobs"""
+        self.mock_batch_api.read_namespaced_cron_job.return_value.status.active = []
+        self.assertFalse(self.hdcj.is_active())
+
+    def test_is_active_when_jobs_active(self):
+        """Test that the job is considered active if there are running jobs"""
+        self.mock_batch_api.read_namespaced_cron_job.return_value.status.active = [
+            Mock(name=f'discovery-job-{n}')
+            for n in range(5)
+        ]
+        self.assertTrue(self.hdcj.is_active())
+
 
 class TestHMSDiscoveryScheduledWaiter(unittest.TestCase):
     """Test the HMSDiscoveryScheduledWaiter class."""
@@ -241,6 +259,30 @@ class TestHMSDiscoveryScheduledWaiter(unittest.TestCase):
         self.assertEqual(logging.getLevelName(logging.WARNING), logs.records[0].levelname)
         self.assertEqual(f'Failed to get last schedule time: {msg}',
                          logs.records[0].message)
+
+
+class TestHMSDiscoverySuspendedWaiter(unittest.TestCase):
+    """Tests for the HMSDiscoverySuspendedWaiter class"""
+    def setUp(self):
+        self.mock_hd_cron_job = patch('sat.hms_discovery.HMSDiscoveryCronJob').start().return_value
+
+    def test_cron_job_is_suspended(self):
+        """Test that the cron job is suspended and has no running jobs"""
+        self.mock_hd_cron_job.get_suspend_status.return_value = True
+        self.mock_hd_cron_job.is_active.return_value = False
+        self.assertTrue(HMSDiscoverySuspendedWaiter(10).has_completed())
+
+    def test_cron_job_suspended_with_running_jobs(self):
+        """Test that the waiter continues waiting when the cron job is suspended and but has running jobs"""
+        self.mock_hd_cron_job.get_suspend_status.return_value = True
+        self.mock_hd_cron_job.is_active.return_value = True
+        self.assertFalse(HMSDiscoverySuspendedWaiter(10).has_completed())
+
+    def test_cron_job_not_suspended(self):
+        """Test that the waiter continues waiting when the cron job is not suspended"""
+        for is_active in [False, True]:
+            with self.subTest(is_active=is_active):
+                self.assertFalse(HMSDiscoverySuspendedWaiter(10).has_completed())
 
 
 if __name__ == '__main__':

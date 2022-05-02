@@ -44,6 +44,7 @@ from sat.hms_discovery import (
     HMSDiscoveryCronJob,
     HMSDiscoveryError,
     HMSDiscoveryScheduledWaiter,
+    HMSDiscoverySuspendedWaiter,
 )
 from sat.session import SATSession
 from sat.util import prompt_continue
@@ -70,6 +71,9 @@ def get_available_file(prefix, extension):
 
     Returns:
         file: a file object which does not overwrite existing files
+
+    Raises:
+        OSError: if a file with the given parameters cannot be opened
     """
     if extension.startswith('.'):
         extension = extension[1:]
@@ -396,6 +400,8 @@ class SwapOutProcedure(BladeSwapProcedure):
         """
         try:
             HMSDiscoveryCronJob().set_suspend_status(True)
+            if not HMSDiscoverySuspendedWaiter(timeout=180).wait_for_completion():
+                raise BladeSwapError('hms-discovery cron job was not suspended.')
         except HMSDiscoveryError as err:
             raise BladeSwapError(f'Could not suspend hms-discovery cron job: {err}') from err
 
@@ -544,7 +550,7 @@ class SwapInProcedure(BladeSwapProcedure):
             BladeSwapError: if there is a problem waiting for the components
                 to be discovered
         """
-        waiter = RedfishEndpointDiscoveryWaiter(xnames, self.hsm_client, timeout=300)
+        waiter = RedfishEndpointDiscoveryWaiter(xnames, self.hsm_client, timeout=600)
         waiter.wait_for_completion()
         if waiter.failed:
             raise BladeSwapError(f'BMCs were not discovered: {", ".join(waiter.failed)}')
@@ -590,7 +596,10 @@ class SwapInProcedure(BladeSwapProcedure):
         Raises:
             BladeSwapError: if the slot cannot be powered on
         """
-        self.capmc_client.set_xnames_power_state([self.xname], 'on', recursive=True, force=True)
+        params = {'recursive': True}
+        if self.blade_class == 'river':
+            params['force'] = True
+        self.capmc_client.set_xnames_power_state([self.xname], 'on', **params)
 
     @blade_swap_stage('Enable nodes')
     def enable_nodes(self):
@@ -612,7 +621,16 @@ class SwapInProcedure(BladeSwapProcedure):
         Raises:
             BladeSwapError: if HSM discovery cannot be started
         """
-        self.hsm_client.begin_discovery(self.xname)
+        chassis_xname = str(XName(self.xname).get_chassis())
+        try:
+            chassis_bmc = self.hsm_client.query_components(chassis_xname, type='ChassisBMC')[0]
+        except (APIError, IndexError):
+            LOGGER.warning('Could not locate ChassisBMC for chassis %s; waiting '
+                           'for hms-discovery to discover slot',
+                           chassis_xname)
+            return
+
+        self.hsm_client.begin_discovery([chassis_bmc['ID']], force=True)
 
     @blade_swap_stage('Resume hms-discovery cron job')
     def resume_hms_discovery_cron_job(self):
@@ -624,9 +642,10 @@ class SwapInProcedure(BladeSwapProcedure):
         """
         try:
             HMSDiscoveryCronJob().set_suspend_status(False)
-            HMSDiscoveryScheduledWaiter().wait_for_completion()
+            if not HMSDiscoveryScheduledWaiter().wait_for_completion():
+                raise BladeSwapError('Timed out waiting for hms-discovery cron job to resume')
         except HMSDiscoveryError as err:
-            raise BladeSwapError(f'Could not suspend hms-discovery cron job: {err}') from err
+            raise BladeSwapError(f'Could not resume hms-discovery cron job: {err}') from err
 
     @property
     def kea_pod_name(self):
@@ -742,7 +761,13 @@ class SwapInProcedure(BladeSwapProcedure):
         if self.src_mapping and self.dst_mapping:
             self.map_ip_mac_addresses()
 
+        if self.blade_class == 'mountain':
+            self.enable_slot()
+            self.power_on_slot()
+
         self.resume_hms_discovery_cron_job()
+        self.begin_slot_discovery()
+
         if self.blade_class == 'mountain':
             self.wait_for_chassisbmc_endpoints()
 

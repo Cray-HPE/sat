@@ -273,6 +273,9 @@ class TestDisablingSlot(BaseBladeSwapProcedureTest):
 
 class TestSuspendHMSDiscoveryCronJob(BaseBladeSwapProcedureTest):
     """Tests for suspending the hms-discovery cron job"""
+    def setUp(self):
+        super().setUp()
+        patch('sat.cli.swap.blade.HMSDiscoverySuspendedWaiter.wait_for_completion', return_value=True).start()
 
     def test_suspend_stage(self):
         """Test suspending the hms-discovery cron job"""
@@ -359,11 +362,27 @@ class TestDeletingRedfishEndpoints(BaseBladeSwapProcedureTest):
 class TestPowerOffSlot(BaseBladeSwapProcedureTest):
     """Tests for the powering off slot stage"""
 
-    def test_slot_power_off_command_sent(self):
-        """Test that the slot power off command is sent"""
+    def test_slot_power_off_command_sent_mountain_blades(self):
+        """Test that the slot power off command is sent properly for Mountain blades"""
         self.swap_out.power_off_slot()
         self.mock_capmc_client.set_xnames_power_state.assert_called_once_with(
             [self.blade_xname],
+            'off',
+            recursive=True,
+            force=True,
+        )
+
+    def test_slot_power_off_command_sent_river_blades(self):
+        """Test that the slot power off command is sent properly for River blades"""
+        self.mock_blade_class_patcher.stop()
+        patch('sat.cli.swap.blade.BladeSwapProcedure.blade_class', 'river').start()
+
+        node_xnames = [n['ID'] for n in self.nodes]
+        self.mock_capmc_client.get_xnames_power_state.return_value = {'on': node_xnames}
+
+        self.swap_out.power_off_slot()
+        self.mock_capmc_client.set_xnames_power_state.assert_called_once_with(
+            node_xnames,
             'off',
             recursive=True,
             force=True,
@@ -479,7 +498,7 @@ class TestWaitingForChassisBMCEndpoints(BaseBladeSwapProcedureTest):
         self.mock_endpoint_waiter_constructor.assert_called_once_with(
             [cbmc['ID'] for cbmc in self.chassis_bmcs],
             self.mock_hsm_client,
-            timeout=300
+            timeout=600
         )
         self.mock_endpoint_waiter.wait_for_completion.assert_called_once_with()
 
@@ -507,7 +526,7 @@ class TestWaitingForNodeBMCEndpoints(BaseBladeSwapProcedureTest):
         self.mock_endpoint_waiter_constructor.assert_called_once_with(
             [nbmc['ID'] for nbmc in self.node_bmcs],
             self.mock_hsm_client,
-            timeout=300
+            timeout=600
         )
         self.mock_endpoint_waiter.wait_for_completion.assert_called_once_with()
 
@@ -533,7 +552,6 @@ class TestPoweringOnSlot(BaseBladeSwapProcedureTest):
             [self.blade_xname],
             'on',
             recursive=True,
-            force=True,
         )
 
 
@@ -555,7 +573,7 @@ class TestBeginningSlotDiscovery(BaseBladeSwapProcedureTest):
     def test_begin_slot_discovery(self):
         """Test that slot discovery is begun"""
         self.swap_in.begin_slot_discovery()
-        self.mock_hsm_client.begin_discovery.assert_called_once_with(self.blade_xname)
+        self.mock_hsm_client.begin_discovery.assert_called_once()
 
 
 class TestResumeHMSDiscoveryCronJob(BaseBladeSwapProcedureTest):
