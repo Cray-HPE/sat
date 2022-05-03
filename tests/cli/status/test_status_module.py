@@ -172,6 +172,8 @@ class TestGettingRows(BaseStatusModuleTestCase):
 
         self.TestStatusModuleOne = TestStatusModuleOne
 
+        self.test_module_two_rows = {'x3000c0s1b0n0', 'x3000c0s1b0n1'}
+
         class TestStatusModuleTwo(StatusModule):
             headings = ['xname', 'config']
             source_name = 'two'
@@ -179,7 +181,8 @@ class TestGettingRows(BaseStatusModuleTestCase):
             @property
             def rows(self):
                 return [{key: row[key] for key in self.headings}
-                        for row in outer_self.all_rows]
+                        for row in outer_self.all_rows
+                        if row['xname'] in outer_self.test_module_two_rows]
 
         self.TestStatusModuleTwo = TestStatusModuleTwo
 
@@ -238,4 +241,19 @@ class TestGettingRows(BaseStatusModuleTestCase):
                 row_had_missing_state = True
 
         if not row_had_missing_state:
+            self.fail('Rows with missing "state" field were omitted')
+
+    def test_row_missing_from_module(self):
+        """Test that a module's fields are marked as MISSING if their primary key is missing in that module"""
+        missing_module_two_xname = 'x3000c0s1b0n1'
+        self.test_module_two_rows.remove(missing_module_two_xname)
+
+        rows = StatusModule.get_populated_rows(primary_key='xname', session=MagicMock())
+        row_had_missing_config = False
+        for row in rows:
+            if row['xname'] == missing_module_two_xname:
+                self.assertEqual(row['config'], MISSING_VALUE)
+                row_had_missing_config = True
+
+        if not row_had_missing_config:
             self.fail('Rows with missing "state" field were omitted')
