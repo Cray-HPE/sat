@@ -281,6 +281,18 @@ class StatusModule(ABC):
                                      **kwargs)
 
             try:
+                # By default, fill each existing row with 'MISSING' values
+                # under the headings supplied by this module before filling in
+                # data retrieved by the module. This covers the case where the
+                # module doesn't have any information on a primary key that
+                # already exists in the table, e.g. if SLS doesn't have a
+                # hostname for a given xname. Note that this only runs once the
+                # primary keys are populated from the primary module; missing
+                # fields in the primary module are handled below.
+                for row in items_by_primary_key.values():
+                    row.update({heading: MISSING_VALUE for heading in module.headings
+                                if heading != primary_key})
+
                 for row in module_instance.rows:
                     mapped_row = {}
 
@@ -291,11 +303,15 @@ class StatusModule(ABC):
 
                         mapped_row[mapped_heading] = value
 
+                    # If the module returned a row without all the proper
+                    # headings, fill in MISSING under each heading in the
+                    # missing columns.
                     for missing_heading in set(module.headings) - set(mapped_row.keys()):
                         mapped_row[missing_heading] = MISSING_VALUE
 
                     if module.primary or mapped_row[primary_key] in items_by_primary_key:
                         items_by_primary_key[mapped_row[primary_key]].update(mapped_row)
+
             except StatusModuleException as err:
                 LOGGER.warning('Could not retrieve status information from %s; %s',
                                module.source_name, err)
