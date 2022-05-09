@@ -110,6 +110,18 @@ class HMSDiscoveryCronJob:
         """
         return self.data.spec.suspend
 
+    def is_active(self):
+        """Returns whether there are any running jobs for this cron job.
+
+        Returns:
+            bool: True if there is a running job associated with this cron job, and False otherwise
+
+        Raises:
+            HMSDiscoveryError: if there is an error loading k8s config or querying
+                the k8s API for running jobs.
+        """
+        return bool(self.data.status.active)
+
     def set_suspend_status(self, suspend_status):
         """Set the suspend status of the hms-discovery cronjob.
 
@@ -213,3 +225,21 @@ class HMSDiscoveryScheduledWaiter(Waiter):
             return True
         else:
             return False
+
+
+class HMSDiscoverySuspendedWaiter(Waiter):
+    """Waiter for HMS discovery cronjob to be suspended and not running.
+
+    Specifically, the waiter checks if the the cron job is suspended, and if
+    there are any k8s jobs running that were launched by the cron job.
+    """
+
+    def __init__(self, timeout, poll_interval=1, retries=0):
+        self.hd_cron_job = HMSDiscoveryCronJob()
+        super().__init__(timeout, poll_interval=poll_interval, retries=retries)
+
+    def condition_name(self):
+        return "HMS Discovery Suspended"
+
+    def has_completed(self):
+        return self.hd_cron_job.get_suspend_status() and not self.hd_cron_job.is_active()

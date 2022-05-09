@@ -44,6 +44,7 @@ from sat.hms_discovery import (
     HMSDiscoveryCronJob,
     HMSDiscoveryError,
     HMSDiscoveryScheduledWaiter,
+    HMSDiscoverySuspendedWaiter,
 )
 from sat.session import SATSession
 from sat.util import prompt_continue
@@ -55,38 +56,94 @@ LOGGER = logging.getLogger(__name__)
 inf = inflect.engine()
 
 
+def get_available_file(prefix, extension):
+    """Get a file object which doesn't overwrite existing files
+
+    The returned file object will have the given prefix and extension. If any
+    file exists with the given prefix and extension, the prefix will be
+    appended with a numeric suffix. If files exist with the given prefix,
+    numeric suffix, and extension, the returned file object will be given the
+    first unused numeric suffix.
+
+    Args:
+        prefix (str): the filename prefix
+        extension (str): the extension to use with the filename
+
+    Returns:
+        file: a file object which does not overwrite existing files
+
+    Raises:
+        OSError: if a file with the given parameters cannot be opened
+    """
+    if extension.startswith('.'):
+        extension = extension[1:]
+
+    try:
+        return open(f'{prefix}.{extension}', 'x')
+    except FileExistsError:
+        suffix = 1
+        while True:
+            try:
+                return open(f'{prefix}-{suffix}.{extension}', 'x')
+            except FileExistsError:
+                suffix += 1
+
+
 class BladeSwapError(Exception):
     """Represents an exception which occurs during blade swapping."""
 
 
-def blade_swap_stage(stage_title):
+class blade_swap_stage:
     """A decorator which logs when entering and exiting a function.
 
     Decorated functions will log the name of the stage before execution, catch
     APIErrors and re-raise them as BladeSwapErrors, and pass through all other
     exceptions.
 
-    Args:
-        stage_title (str): a sentence describing what the stage doesself.
+    The `dry_run` class attribute may be set to True or False. If `dry_run` is
+    True and a given decorated function's `allow_in_dry_run` attribute is
+    False, then the stage's title will be logged, and the decorated function
+    will not be called. If `dry_run` is False or if both `dry_run` and
+    `allow_in_dry_run` are True, the stage's title will be logged, and the
+    decorated function will be called as normal.
+
+    Class Attributes:
+        dry_run (bool): if True, run any decorated function only if its
+            `allow_in_dry_run` parameter is True when it is called. If
+            `allow_in_dry_run` is False, never run the decorated function if
+            this attribute is True. If False, run any decorated function
+            regardless of its `allow_in_dry_run` value.
+
+    Attributes:
+        stage_title (str): a sentence describing what the stage does.
             The title should always begin with a verb in the imperative mood,
             followed by the subject as the dependent clause. For example,
-            "Disable the Redfish endpoints for the slot."
+            "Disable the Redfish endpoints for NodeBMCs."
+        allow_in_dry_run (bool): if True, allow this stage to run during a dry
+            run. Otherwise, skip this stage during a dry run.
     """
-    verb, sentence_object = stage_title.split(' ', maxsplit=1)
+    dry_run = False
 
-    def _decorator(fn):
+    def __init__(self, stage_title, allow_in_dry_run=False):
+        self.stage_title = stage_title
+        self.allow_in_dry_run = allow_in_dry_run
+
+    def __call__(self, fn):
+        verb, sentence_object = self.stage_title.split(' ', maxsplit=1)
+
         @wraps(fn)
         def inner(*args, **kwargs):
+            if self.dry_run and not self.allow_in_dry_run:
+                LOGGER.info('Would %s %s', verb.lower(), sentence_object)
+                return
+
             LOGGER.info('%s %s', inf.present_participle(verb), sentence_object)
             try:
-                fn(*args, **kwargs)
+                return fn(*args, **kwargs)
             except APIError as api_err:
                 raise BladeSwapError(f'Error accessing API: {api_err}') from api_err
-            except Exception:
-                raise
 
         return inner
-    return _decorator
 
 
 class BladeSwapProcedure(abc.ABC):
@@ -106,6 +163,16 @@ class BladeSwapProcedure(abc.ABC):
         self.capmc_client = CAPMCClient(session)
 
     @cached_property
+    def blade_nodes(self):
+        """list: metadata for the nodes on the blade retrieved from HSM"""
+        return self.hsm_client.get_node_components(ancestor=self.xname)
+
+    @cached_property
+    def blade_node_bmcs(self):
+        """list: metadata for the node BMCs on the blade retrieved from HSM"""
+        return self.hsm_client.query_components(component=self.xname, type='NodeBMC')
+
+    @cached_property
     def blade_class(self):
         """str: the class of the blade ("mountain" or "river")
 
@@ -114,7 +181,7 @@ class BladeSwapProcedure(abc.ABC):
         """
         try:
             node_classes = set()
-            for node in self.hsm_client.get_node_components(ancestor=self.xname):
+            for node in self.blade_nodes:
                 node_classes.add(node['Class'])
 
             # These error cases shouldn't happen, but be defensive anyway.
@@ -149,6 +216,11 @@ class BladeSwapProcedure(abc.ABC):
         Raises:
             SystemExit: if a BladeSwapError is raised during execution of the blade swap procedure
         """
+        if self.blade_class not in {'mountain', 'river'}:
+            LOGGER.error('Unsupported blade class "%s" for blade %s; aborting.',
+                         self.blade_class.title(), self.xname)
+            raise SystemExit(1)
+
         try:
             self.procedure()
         except BladeSwapError as err:
@@ -180,14 +252,19 @@ class RedfishEndpointDiscoveryWaiter(GroupWaiter):
                 raise WaitingFailure(f'No Redfish endpoint found for {member}')
             return endpoint['DiscoveryInfo']['LastDiscoveryStatus'] == 'DiscoverOK'
         except APIError as err:
-            raise WaitingFailure(f'Could not query Redfish endpoint for {member}: {err}')
+            # TODO: Should probably be a better way to determine cause of
+            # failure -- it is assumed that members are guaranteed to be valid
+            # RedfishEndpoints so if an invalid xname is given it will time out
+            # instead of giving a proper error
+            if not any('404' in arg for arg in err.args):
+                raise WaitingFailure(f'Could not query Redfish endpoint for {member}: {err}')
 
 
 class SwapOutProcedure(BladeSwapProcedure):
     """The blade removal portion of the blade swap procedure."""
     action_verb = 'remove'
 
-    @blade_swap_stage('Perform pre-swap checks')
+    @blade_swap_stage('Perform pre-swap checks', allow_in_dry_run=True)
     def pre_swap_checks(self):
         """Check if the given slot xnames are ready for blade swapping.
 
@@ -199,29 +276,26 @@ class SwapOutProcedure(BladeSwapProcedure):
         if xname.get_type() != 'SLOT':
             raise BladeSwapError(f'xname {xname} does not refer to a slot.')
 
-        blade_compute_nodes = self.hsm_client.get_node_components(ancestor=self.xname)
-
-        nodes_not_off = set(
-            compute_node['ID'] for compute_node in blade_compute_nodes
-            if compute_node['State'] != 'Off'
+        ready_nodes = set(
+            compute_node['ID'] for compute_node in self.blade_nodes
+            if compute_node['State'] == 'Ready'
         )
-        if nodes_not_off:
+        if ready_nodes:
             raise BladeSwapError(
-                f'Compute {inf.plural("node", count=len(nodes_not_off))} '
-                f'{inf.join(list(nodes_not_off))} {inf.plural_verb("is", count=len(nodes_not_off))}'
-                f' not off.'
+                f'{inf.plural("Node", count=len(ready_nodes))} '
+                f'{inf.join(list(ready_nodes))} {inf.plural_verb("is", count=len(ready_nodes))} '
+                f'in "Ready" state.'
             )
 
-    @blade_swap_stage('Disable Redfish endpoint for NodeBMC')
-    def disable_redfish_endpoint(self):
+    @blade_swap_stage('Disable Redfish endpoints for NodeBMC')
+    def disable_redfish_endpoints(self):
         """Disable redfish endpoints for NodeBMCs in slot.
 
         Raises:
             BladeSwapError: if there is a problem querying HSM or disabling
                 Redfish endpoints.
         """
-        node_bmcs = self.hsm_client.query_components(component=self.xname, type='NodeBMC')
-        for node_bmc in node_bmcs:
+        for node_bmc in self.blade_node_bmcs:
             self.hsm_client.set_redfish_endpoint_enabled(node_bmc['ID'], enabled=False)
 
     @blade_swap_stage('Disable slot')
@@ -240,9 +314,30 @@ class SwapOutProcedure(BladeSwapProcedure):
         Raises:
             BladeSwapError: if there is a problem powering off the slot with CAPMC
         """
-        self.capmc_client.set_xnames_power_state([self.xname], 'off', recursive=True)
+        if self.blade_class == 'river':
+            # Power off nodes on the blade individually on River blades
+            xnames_on = self.capmc_client.get_xnames_power_state(
+                [node['ID'] for node in self.blade_nodes]
+            ).get('on')
+            if xnames_on:
+                self.capmc_client.set_xnames_power_state(
+                    xnames_on, 'off',
+                    recursive=True,
+                    force=True,
+                )
+                LOGGER.info('Powered off nodes %s', inf.join(xnames_on))
+            else:
+                LOGGER.info('All nodes on River blade %s are already powered off, continuing', self.xname)
+        else:
+            # Power off the whole slot on Mountain
+            self.capmc_client.set_xnames_power_state(
+                [self.xname], 'off',
+                recursive=True,
+                force=True,
+            )
+            LOGGER.info('Powered off chassis slot %s', self.xname)
 
-    @blade_swap_stage('Collect ethernet interface information')
+    @blade_swap_stage('Collect ethernet interface information', allow_in_dry_run=True)
     def store_ip_mac_address_mapping(self):
         """Collect MAC and IP addresses of ethernet interfaces for the given xname
 
@@ -264,31 +359,35 @@ class SwapOutProcedure(BladeSwapProcedure):
         interface_addr_mappings = []
 
         try:
-            ethernet_interfaces = self.hsm_client.get_ethernet_interfaces(self.xname)
+            for node in self.blade_nodes:
+                ethernet_interfaces = self.hsm_client.get_ethernet_interfaces(node['ID'])
 
-            for interface in ethernet_interfaces:
-                interface_addr_mapping = {
-                    'Description': interface['Description'],
-                    'ComponentID': interface['ComponentID'],
-                    'MACAddress': interface['MACAddress'],
-                    'IPAddress': interface['IPAddresses'][0]['IPAddress'] if interface['IPAddresses'] else []
-                }
+                ifaces_added_for_node = False
+                for interface in ethernet_interfaces:
+                    if 'IPAddresses' in interface and interface['IPAddresses']:
+                        interface_addr_mapping = {
+                            'Description': interface['Description'],
+                            'ComponentID': interface['ComponentID'],
+                            'MACAddress': interface['MACAddress'],
+                            'IPAddress': interface['IPAddresses'][0]['IPAddress']
+                        }
 
-                interface_addr_mappings.append(interface_addr_mapping)
+                        interface_addr_mappings.append(interface_addr_mapping)
+                        ifaces_added_for_node = True
 
-            if not ethernet_interfaces:
-                LOGGER.warning('No ethernet interfaces detected for blade %s. '
-                               'Ethernet interface MAC/IP address mappings will not be saved.',
-                               self.xname)
-                return
+                if not ifaces_added_for_node:
+                    LOGGER.warning('No ethernet interfaces detected for node %s.', node['ID'])
 
-            addr_file_name = f'ethernet-interface-mappings-{self.xname}.json'
-            with open(addr_file_name, 'w') as addr_file:
-                json.dump(interface_addr_mappings, addr_file)
-            LOGGER.info('Stored ethernet interface mappings in %s', addr_file_name)
+            if interface_addr_mappings:
+                addr_file_prefix = f'ethernet-interface-mappings-{self.xname}'
+                with get_available_file(addr_file_prefix, 'json') as addr_file:
+                    json.dump(interface_addr_mappings, addr_file)
+                LOGGER.info('Stored ethernet interface mappings in %s', addr_file.name)
+            else:
+                LOGGER.warning('No ethernet interfaces were detected on any nodes on blade %s.', self.xname)
 
         except KeyError as err:
-            raise BladeSwapError(f'API repsonse missing "{err}" key') from err
+            raise BladeSwapError(f'API response missing "{err}" key') from err
         except OSError as err:
             raise BladeSwapError(f'Error writing ethernet interface mapping: {err}') from err
 
@@ -301,6 +400,8 @@ class SwapOutProcedure(BladeSwapProcedure):
         """
         try:
             HMSDiscoveryCronJob().set_suspend_status(True)
+            if not HMSDiscoverySuspendedWaiter(timeout=180).wait_for_completion():
+                raise BladeSwapError('hms-discovery cron job was not suspended.')
         except HMSDiscoveryError as err:
             raise BladeSwapError(f'Could not suspend hms-discovery cron job: {err}') from err
 
@@ -314,11 +415,10 @@ class SwapOutProcedure(BladeSwapProcedure):
         """
         # CRAYSAT-1373: Do this automatically with SCSD once CASMHMS-5447 is
         # completed.
-        node_bmcs = self.hsm_client.query_components(self.xname, type='NodeBMC')
 
         if self.blade_class == 'mountain':
             commands = []
-            for node_bmc in node_bmcs:
+            for node_bmc in self.blade_node_bmcs:
                 commands.append(
                     'curl -k -u root:PASSWORD -X POST -H \\\n'
                     '    \'Content-Type: application/json\' -d \'{"ResetType":"StatefulReset"}\' \\\n'
@@ -336,7 +436,7 @@ class SwapOutProcedure(BladeSwapProcedure):
                 description='Before continuing, the following NodeBMCs should be '
                             'reset to factory settings if the blade is being swapped '
                             'into another system:\n' + '\n'.join(f'  - {node_bmc["ID"]}'
-                                                                 for node_bmc in node_bmcs)
+                                                                 for node_bmc in self.blade_node_bmcs)
             )
 
     @blade_swap_stage('Delete ethernet interfaces')
@@ -346,9 +446,26 @@ class SwapOutProcedure(BladeSwapProcedure):
         Raises:
             APIError: if there is an issue deleting the ethernet interfaces from HSM.
         """
-        for blade_node in self.hsm_client.get_node_components(ancestor=self.xname):
-            for ethernet_interface in self.hsm_client.get_ethernet_interfaces(blade_node['ID']):
-                self.hsm_client.delete_ethernet_interface(ethernet_interface['ID'])
+        interface_ids_to_delete = set(
+            iface['ID']
+            for node in self.blade_nodes
+            for iface in self.hsm_client.get_ethernet_interfaces(node['ID'])
+        )
+
+        # River blades should have the NodeBMC ethernet interfaces deleted as
+        # well. Mountain blades should *only* have the node ethernet interfaces
+        # deleted.
+
+        if self.blade_class == 'river':
+            interface_ids_to_delete |= set(
+                iface['ID']
+                for node in self.blade_node_bmcs
+                for iface in self.hsm_client.get_ethernet_interfaces(node['ID'])
+            )
+
+        for ethernet_interface in interface_ids_to_delete:
+            self.hsm_client.delete_ethernet_interface(ethernet_interface)
+            LOGGER.info('Deleted ethernet interface %s', ethernet_interface)
 
     @blade_swap_stage('Delete Redfish endpoints')
     def delete_redfish_endpoints(self):
@@ -357,19 +474,32 @@ class SwapOutProcedure(BladeSwapProcedure):
         Raises:
             APIError: if there is an issue deleting the ethernet interfaces from HSM.
         """
-        for node_bmc in self.hsm_client.query_components(component=self.xname, type='NodeBMC'):
+        for node_bmc in self.blade_node_bmcs:
             self.hsm_client.delete_redfish_endpoint(node_bmc['ID'])
+            LOGGER.info('Deleted Redfish endpoint for NodeBMC %s', node_bmc['ID'])
+
+    def mountain_procedure(self):
+        self.disable_redfish_endpoints()
+        self.prompt_clear_node_controller_settings()
+        self.power_off_slot()
+
+    def river_procedure(self):
+        self.power_off_slot()
+        self.prompt_clear_node_controller_settings()
+        self.disable_redfish_endpoints()
 
     def procedure(self):
         self.pre_swap_checks()
         self.store_ip_mac_address_mapping()
 
-        self.disable_redfish_endpoint()
-        self.prompt_clear_node_controller_settings()
-        self.disable_slot()
         self.suspend_hms_discovery_cron_job()
-        self.power_off_slot()
 
+        if self.blade_class == 'mountain':
+            self.mountain_procedure()
+        else:
+            self.river_procedure()
+
+        self.disable_slot()
         self.delete_ethernet_interfaces()
         self.delete_redfish_endpoints()
 
@@ -420,10 +550,10 @@ class SwapInProcedure(BladeSwapProcedure):
             BladeSwapError: if there is a problem waiting for the components
                 to be discovered
         """
-        waiter = RedfishEndpointDiscoveryWaiter(xnames, self.hsm_client, timeout=300)
+        waiter = RedfishEndpointDiscoveryWaiter(xnames, self.hsm_client, timeout=600)
         waiter.wait_for_completion()
         if waiter.failed:
-            raise BladeSwapError(f'Chassis BMCs were not discovered: {", ".join(waiter.failed)}')
+            raise BladeSwapError(f'BMCs were not discovered: {", ".join(waiter.failed)}')
 
     @blade_swap_stage('Wait for ChassisBMC Redfish endpoint discovery')
     def wait_for_chassisbmc_endpoints(self):
@@ -447,10 +577,7 @@ class SwapInProcedure(BladeSwapProcedure):
         Raises:
             BladeSwapError: if there is a problem waiting for the NodeBMCs
         """
-        node_bmc_xnames = [
-            component['ID'] for component in
-            self.hsm_client.query_components(component=self.xname, type='NodeBMC')
-        ]
+        node_bmc_xnames = [component['ID'] for component in self.blade_node_bmcs]
         self.wait_for_endpoints(node_bmc_xnames)
 
     @blade_swap_stage('Enable slot')
@@ -469,7 +596,10 @@ class SwapInProcedure(BladeSwapProcedure):
         Raises:
             BladeSwapError: if the slot cannot be powered on
         """
-        self.capmc_client.set_xnames_power_state([self.xname], 'on', recursive=True)
+        params = {'recursive': True}
+        if self.blade_class == 'river':
+            params['force'] = True
+        self.capmc_client.set_xnames_power_state([self.xname], 'on', **params)
 
     @blade_swap_stage('Enable nodes')
     def enable_nodes(self):
@@ -480,7 +610,7 @@ class SwapInProcedure(BladeSwapProcedure):
         """
         node_xnames = [
             component['ID'] for component in
-            self.hsm_client.get_node_components(self.xname)
+            self.blade_nodes
         ]
         self.hsm_client.bulk_enable_components(node_xnames)
 
@@ -491,7 +621,16 @@ class SwapInProcedure(BladeSwapProcedure):
         Raises:
             BladeSwapError: if HSM discovery cannot be started
         """
-        self.hsm_client.begin_discovery(self.xname)
+        chassis_xname = str(XName(self.xname).get_chassis())
+        try:
+            chassis_bmc = self.hsm_client.query_components(chassis_xname, type='ChassisBMC')[0]
+        except (APIError, IndexError):
+            LOGGER.warning('Could not locate ChassisBMC for chassis %s; waiting '
+                           'for hms-discovery to discover slot',
+                           chassis_xname)
+            return
+
+        self.hsm_client.begin_discovery([chassis_bmc['ID']], force=True)
 
     @blade_swap_stage('Resume hms-discovery cron job')
     def resume_hms_discovery_cron_job(self):
@@ -503,9 +642,10 @@ class SwapInProcedure(BladeSwapProcedure):
         """
         try:
             HMSDiscoveryCronJob().set_suspend_status(False)
-            HMSDiscoveryScheduledWaiter().wait_for_completion()
+            if not HMSDiscoveryScheduledWaiter().wait_for_completion():
+                raise BladeSwapError('Timed out waiting for hms-discovery cron job to resume')
         except HMSDiscoveryError as err:
-            raise BladeSwapError(f'Could not suspend hms-discovery cron job: {err}') from err
+            raise BladeSwapError(f'Could not resume hms-discovery cron job: {err}') from err
 
     @property
     def kea_pod_name(self):
@@ -515,7 +655,7 @@ class SwapInProcedure(BladeSwapProcedure):
             BladeSwapError: if the name of the pod cannot be identified
         """
         try:
-            for pod in self.k8s_api.list_namespaced_pod('services'):
+            for pod in self.k8s_api.list_namespaced_pod('services').items:
                 if pod.metadata.name.startswith('cray-dhcp-kea'):
                     return pod.metadata.name
             raise BladeSwapError('cray-dhcp-kea pod not found in "services" namespace')
@@ -557,8 +697,11 @@ class SwapInProcedure(BladeSwapProcedure):
                 dst_xname = XName(dst_mapping['ComponentID'])
                 if src_xname.relative_node_positions_match(dst_xname):
                     merged_mappings.append({
+                        'Description': dst_mapping['Description'],
                         'ComponentID': dst_mapping['ComponentID'],
-                        'IPAddress':   dst_mapping['IPAddress'],
+                        'IPAddresses': [
+                            {'IPAddress': dst_mapping['IPAddress']},
+                        ],
                         'MACAddress':  src_mapping['MACAddress'],
                     })
                     break
@@ -577,8 +720,6 @@ class SwapInProcedure(BladeSwapProcedure):
                 or re-mapping the interfaces in HSM
         """
         try:
-            self.k8s_api.delete_namespaced_pod(self.kea_pod_name, 'services')
-
             with open(self.src_mapping) as src_mapping_file:
                 src_mapping = json.load(src_mapping_file)
 
@@ -588,19 +729,19 @@ class SwapInProcedure(BladeSwapProcedure):
                 mapping = self.merge_mappings(src_mapping, dst_mapping)
 
             for ethernet_interface in self.hsm_client.get_ethernet_interfaces(xname=self.xname):
-                if (ethernet_interface['Description'] == 'Node Management Network'
-                        and XName(ethernet_interface['ComponentID']).get_type() == 'NODE'):
+                if XName(ethernet_interface['ComponentID']).get_type().lower() == 'node':
                     self.hsm_client.delete_ethernet_interface(ethernet_interface['ID'])
 
             for ethernet_interface in mapping:
                 self.hsm_client.create_ethernet_interface(ethernet_interface)
 
+            self.k8s_api.delete_namespaced_pod(self.kea_pod_name, 'services')
         except ApiException as err:
             raise BladeSwapError(f'Could not delete cray-dhcp-kea pod: {err}') from err
         except OSError as err:
             raise BladeSwapError(f'Could not open mapping file: {err}') from err
 
-    @blade_swap_stage('Perform pre-swap checks')
+    @blade_swap_stage('Perform pre-swap checks', allow_in_dry_run=True)
     def pre_swap_checks(self):
         """Perform pre-swap checks before swapping in a blade.
 
@@ -620,8 +761,10 @@ class SwapInProcedure(BladeSwapProcedure):
         if self.src_mapping and self.dst_mapping:
             self.map_ip_mac_addresses()
 
-        self.enable_slot()
-        self.power_on_slot()
+        if self.blade_class == 'mountain':
+            self.enable_slot()
+            self.power_on_slot()
+
         self.resume_hms_discovery_cron_job()
         self.begin_slot_discovery()
 
@@ -638,7 +781,9 @@ def swap_blade(args):
     Args:
         args (argparse.Namespace): parsed command line arguments
     """
-    if args.action == 'disable':
+    blade_swap_stage.dry_run = args.dry_run
+
+    if args.action == 'disable' or args.action is None:
         procedure_cls = SwapOutProcedure
     elif args.action == 'enable':
         procedure_cls = SwapInProcedure

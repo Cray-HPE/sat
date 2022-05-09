@@ -68,7 +68,8 @@ def do_swap(args):
     Returns:
         None
     """
-    check_arguments(args.target, args.action, args.dry_run, args.disruptive)
+    action = getattr(args, 'action', None)
+    check_arguments(args.target, action, args.dry_run, args.disruptive)
 
     if args.target == 'cable':
         swap_cable(args)

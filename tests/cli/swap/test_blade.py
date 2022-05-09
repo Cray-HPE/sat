@@ -46,6 +46,11 @@ from sat.hms_discovery import HMSDiscoveryError
 
 class TestBladeSwapStage(unittest.TestCase):
     """Tests for the blade_swap_stage decorator"""
+    def setUp(self):
+        patch('sat.cli.swap.blade.blade_swap_stage.dry_run', False).start()
+
+    def tearDown(self):
+        patch.stopall()
 
     def test_logging_message(self):
         """Test that logging messages are printed for blade swap stages"""
@@ -55,7 +60,7 @@ class TestBladeSwapStage(unittest.TestCase):
         with self.assertLogs(level='INFO') as cm:
             stage_for_testing()
 
-        self.assertIn('Performing a test', cm.output[0])
+        self.assertTrue(any('Performing a test' in line for line in cm.output))
 
     def test_exceptions_flattened(self):
         """Test that unhandled non-BladeSwapError exceptions are passed through"""
@@ -82,6 +87,35 @@ class TestBladeSwapStage(unittest.TestCase):
         with self.assertRaisesRegex(BladeSwapError, 'Error accessing API'):
             do_api_error()
 
+    def test_dry_run_stage_not_allowed(self):
+        """Test that stages disallowed during dry runs are not called"""
+        blade_swap_stage.dry_run = True
+
+        class StageContainer:
+            @blade_swap_stage('Do not run this during dry run', allow_in_dry_run=False)
+            def disruptive_stage(self):
+                raise RuntimeError()  # Use this as a sentinel error
+
+        try:
+            StageContainer().disruptive_stage()
+        except RuntimeError:
+            self.fail('Stage disallowed in dry run was called')
+
+    def test_dry_run_stage_allowed(self):
+        """Test that stages allowed during dry runs are called"""
+        blade_swap_stage.dry_run = True
+
+        class StageContainer:
+            @blade_swap_stage('Run this during dry run', allow_in_dry_run=True)
+            def non_disruptive_stage(self):
+                raise RuntimeError()  # Use this as a sentinel error
+
+        try:
+            StageContainer().non_disruptive_stage()
+            self.fail('Non-disruptive stage was not called')
+        except RuntimeError:
+            pass
+
 
 class BaseBladeSwapProcedureTest(unittest.TestCase):
     def setUp(self):
@@ -96,6 +130,7 @@ class BaseBladeSwapProcedureTest(unittest.TestCase):
         self.blade_xname = 'x1000c0s1'
         self.args = Namespace(
             xname=self.blade_xname,
+            dry_run=False,
             src_mapping='src_mapping.json',
             dst_mapping='dst_mapping.json',
         )
@@ -139,9 +174,12 @@ class BaseBladeSwapProcedureTest(unittest.TestCase):
         self.pod_name = 'cray-dhcp-kea-123456789-cafe'
         self.mock_pod = MagicMock()
         self.mock_pod.metadata.name = self.pod_name
-        self.mock_k8s_api.return_value.list_namespaced_pod.return_value = [self.mock_pod]
+        self.mock_k8s_api.return_value.list_namespaced_pod.return_value.items = [self.mock_pod]
 
         self.mock_cron = patch('sat.cli.swap.blade.HMSDiscoveryCronJob').start()
+
+        self.mock_blade_class_patcher = patch('sat.cli.swap.blade.BladeSwapProcedure.blade_class', 'mountain')
+        self.mock_blade_class_patcher.start()
 
     def tearDown(self):
         patch.stopall()
@@ -199,6 +237,7 @@ class TestDetermineBladeClass(BaseBladeSwapProcedureTest):
     def setUp(self):
         super().setUp()
         self.mock_hsm_client.get_node_components.return_value = self.nodes
+        self.mock_blade_class_patcher.stop()
 
     def test_detecting_mountain_blade(self):
         """Test detecting a Mountain blade"""
@@ -216,7 +255,7 @@ class TestDisablingRedfishEndpoints(BaseBladeSwapProcedureTest):
     def test_node_bmcs_disabled(self):
         """Test that NodeBMCs Redfish endpoints are disabled properly"""
         self.mock_hsm_client.query_components.return_value = self.node_bmcs
-        self.swap_out.disable_redfish_endpoint()
+        self.swap_out.disable_redfish_endpoints()
         for node_bmc in self.node_bmcs:
             self.mock_hsm_client.set_redfish_endpoint_enabled.assert_any_call(
                 node_bmc['ID'], enabled=False
@@ -234,6 +273,9 @@ class TestDisablingSlot(BaseBladeSwapProcedureTest):
 
 class TestSuspendHMSDiscoveryCronJob(BaseBladeSwapProcedureTest):
     """Tests for suspending the hms-discovery cron job"""
+    def setUp(self):
+        super().setUp()
+        patch('sat.cli.swap.blade.HMSDiscoverySuspendedWaiter.wait_for_completion', return_value=True).start()
 
     def test_suspend_stage(self):
         """Test suspending the hms-discovery cron job"""
@@ -287,7 +329,7 @@ class TestDeletingEthernetInterfaces(BaseBladeSwapProcedureTest):
         self.ethernet_interfaces = [
             {
                 'ComponentID': f'{node["ID"]}',
-                'Description': 'Ethernet Interface Lan1',
+                'Description': 'Node Management Network',
                 'ID': f'b42e99be24e{chr(suffix)}',
                 'IPAddresses': [{'IPAddress': '10.0.0.1'}],
                 'LastUpdate': '2021-09-03T15:36:00.545019Z',
@@ -320,13 +362,30 @@ class TestDeletingRedfishEndpoints(BaseBladeSwapProcedureTest):
 class TestPowerOffSlot(BaseBladeSwapProcedureTest):
     """Tests for the powering off slot stage"""
 
-    def test_slot_power_off_command_sent(self):
-        """Test that the slot power off command is sent"""
+    def test_slot_power_off_command_sent_mountain_blades(self):
+        """Test that the slot power off command is sent properly for Mountain blades"""
         self.swap_out.power_off_slot()
         self.mock_capmc_client.set_xnames_power_state.assert_called_once_with(
             [self.blade_xname],
             'off',
             recursive=True,
+            force=True,
+        )
+
+    def test_slot_power_off_command_sent_river_blades(self):
+        """Test that the slot power off command is sent properly for River blades"""
+        self.mock_blade_class_patcher.stop()
+        patch('sat.cli.swap.blade.BladeSwapProcedure.blade_class', 'river').start()
+
+        node_xnames = [n['ID'] for n in self.nodes]
+        self.mock_capmc_client.get_xnames_power_state.return_value = {'on': node_xnames}
+
+        self.swap_out.power_off_slot()
+        self.mock_capmc_client.set_xnames_power_state.assert_called_once_with(
+            node_xnames,
+            'off',
+            recursive=True,
+            force=True,
         )
 
 
@@ -336,41 +395,49 @@ class TestStoreEthernetInterfaceMapping(BaseBladeSwapProcedureTest):
     def setUp(self):
         super().setUp()
         self.mock_file = io.StringIO()
+        self.mock_file.name = 'ethernet-interface-mapping.json'
         patch.object(self.mock_file, 'close').start()
         self.mock_open = patch('builtins.open', return_value=self.mock_file).start()
+
+        self.mac = "e1:3f:83:ca:31:db"
+        self.ip = "10.1.0.1"
 
         self.mock_hsm_client.get_ethernet_interfaces.return_value = [
             {
                 "ID": "a31e83fd84eb",
                 "Description": "Node Management Network",
-                "MACAddress": "e1:3f:83:ca:31:db",
+                "MACAddress": self.mac,
                 "LastUpdate": "2021-09-03T15:36:00.545019Z",
                 "ComponentID": "x1000c0s1b0n1",
                 "Type": "Node",
                 "IPAddresses": [
                     {
-                        "IPAddress": "10.1.0.1"
+                        "IPAddress": self.ip
                     }
                 ]
             },
         ]
 
+        self.mock_hsm_client.get_node_components.return_value = self.nodes
+
     def test_store_ethernet_interfaces(self):
         """Test storing ethernet interface MAC/IP address mapping"""
         self.swap_out.store_ip_mac_address_mapping()
-        self.mock_hsm_client.get_ethernet_interfaces.assert_called_once_with(self.blade_xname)
         self.mock_file.seek(0)
-        self.assertEqual(
-            json.load(self.mock_file),
-            [
-                {
-                    "Description": "Node Management Network",
-                    "ComponentID": "x1000c0s1b0n1",
-                    "MACAddress": "e1:3f:83:ca:31:db",
-                    "IPAddress": "10.1.0.1"
-                }
-            ]
-        )
+        for entry in json.load(self.mock_file):
+            self.assertIn(
+                entry,
+                [
+                    {
+                        "Description": "Node Management Network",
+                        "ComponentID": f"x1000c0s1b{b}n{n}",
+                        "MACAddress": self.mac,
+                        "IPAddress": self.ip
+                    }
+                    for b in range(2)
+                    for n in range(2)
+                ]
+            )
 
     def test_store_ethernet_interfaces_with_no_nmn_ethernet_ifaces(self):
         """Test that no mapping is written if no interfaces located"""
@@ -386,15 +453,16 @@ class TestStoreEthernetInterfaceMapping(BaseBladeSwapProcedureTest):
             self.swap_out.store_ip_mac_address_mapping()
 
     def test_bladeswaperror_on_malformed_api_response(self):
-        """Test that a BladeSwapError is thrown on bad API response for ethernet address querying"""
+        """Test that ethernet addresses without IP addrs are skipped"""
         self.mock_hsm_client.get_ethernet_interfaces.return_value.append(
             {
                 'Description': 'Node Management Network',
                 'ComponentID': 'x1000c0s1b1n0'
             }
         )
-        with self.assertRaises(BladeSwapError):
-            self.swap_out.store_ip_mac_address_mapping()
+        self.swap_out.store_ip_mac_address_mapping()
+        self.mock_file.seek(0)
+        self.assertFalse(any('x1000c0s1b1n0' in entry for entry in json.load(self.mock_file)))
 
 
 class TestWaitingForChassisBMCEndpoints(BaseBladeSwapProcedureTest):
@@ -430,7 +498,7 @@ class TestWaitingForChassisBMCEndpoints(BaseBladeSwapProcedureTest):
         self.mock_endpoint_waiter_constructor.assert_called_once_with(
             [cbmc['ID'] for cbmc in self.chassis_bmcs],
             self.mock_hsm_client,
-            timeout=300
+            timeout=600
         )
         self.mock_endpoint_waiter.wait_for_completion.assert_called_once_with()
 
@@ -458,7 +526,7 @@ class TestWaitingForNodeBMCEndpoints(BaseBladeSwapProcedureTest):
         self.mock_endpoint_waiter_constructor.assert_called_once_with(
             [nbmc['ID'] for nbmc in self.node_bmcs],
             self.mock_hsm_client,
-            timeout=300
+            timeout=600
         )
         self.mock_endpoint_waiter.wait_for_completion.assert_called_once_with()
 
@@ -483,7 +551,7 @@ class TestPoweringOnSlot(BaseBladeSwapProcedureTest):
         self.mock_capmc_client.set_xnames_power_state.assert_called_once_with(
             [self.blade_xname],
             'on',
-            recursive=True
+            recursive=True,
         )
 
 
@@ -505,7 +573,7 @@ class TestBeginningSlotDiscovery(BaseBladeSwapProcedureTest):
     def test_begin_slot_discovery(self):
         """Test that slot discovery is begun"""
         self.swap_in.begin_slot_discovery()
-        self.mock_hsm_client.begin_discovery.assert_called_once_with(self.blade_xname)
+        self.mock_hsm_client.begin_discovery.assert_called_once()
 
 
 class TestResumeHMSDiscoveryCronJob(BaseBladeSwapProcedureTest):
@@ -555,6 +623,7 @@ class TestMappingIpMacAddresses(BaseBladeSwapProcedureTest):
 
         self.mock_src_mapping = [
             {
+                'Description': 'Node Management Network',
                 'ComponentID': 'x1000c0s0b0n0',
                 'IPAddress': '10.0.1.1',
                 'MACAddress': 'ab:cd:ef:01:23:45'
@@ -562,6 +631,7 @@ class TestMappingIpMacAddresses(BaseBladeSwapProcedureTest):
         ]
         self.mock_dst_mapping = [
             {
+                'Description': 'Node Management Network',
                 'ComponentID': 'x3000c1s0b0n0',
                 'IPAddress': '10.0.1.10',
                 'MACAddress': '01:23:ab:cd:ef:45'
@@ -595,13 +665,6 @@ class TestMappingIpMacAddresses(BaseBladeSwapProcedureTest):
                 eth_iface['ID']
             )
 
-    def test_non_nmn_ethernet_ifaces_not_deleted(self):
-        """Test that ethernet interfaces not on the NMN are left alone"""
-        for eth_iface in self.ethernet_interfaces:
-            eth_iface['Description'] = 'not NMN'
-        self.swap_in.map_ip_mac_addresses()
-        self.mock_hsm_client.delete_ethernet_interface.assert_not_called()
-
     def test_non_node_ethernet_interfaces_not_mapped(self):
         """Test mapping IP and MAC addresses"""
         self.ethernet_interfaces = [
@@ -630,16 +693,19 @@ class TestMergeInterfaceMappings(BaseBladeSwapProcedureTest):
 
         self.src_mapping = [
             {
+                "Description": "Node Management Network",
                 "ComponentID": "x1000c0s0b0n0",
                 "IPAddress": "10.0.0.11",
                 "MACAddress": "ab:cd:ef:01:23:45",
             },
             {
+                "Description": "Node Management Network",
                 "ComponentID": "x1000c0s0b1n0",
                 "IPAddress": "10.0.0.12",
                 "MACAddress": "cd:ef:01:23:45:ab",
             },
             {
+                "Description": "Node Management Network",
                 "ComponentID": "x1000c0s0b1n1",
                 "IPAddress": "10.0.0.13",
                 "MACAddress": "ef:01:23:45:ab:cd",
@@ -648,16 +714,19 @@ class TestMergeInterfaceMappings(BaseBladeSwapProcedureTest):
 
         self.dst_mapping = [
             {
+                "Description": "Node Management Network",
                 "ComponentID": "x3000c0s0b0n0",
                 "IPAddress": "10.0.1.11",
                 "MACAddress": "23:45:ab:cd:ef:01",
             },
             {
+                "Description": "Node Management Network",
                 "ComponentID": "x3000c0s0b1n0",
                 "IPAddress": "10.0.1.12",
                 "MACAddress": "cd:ef:23:45:ab:01",
             },
             {
+                "Description": "Node Management Network",
                 "ComponentID": "x3000c0s0b1n1",
                 "IPAddress": "10.0.1.13",
                 "MACAddress": "23:45:ab:ef:01:cd",
@@ -670,18 +739,27 @@ class TestMergeInterfaceMappings(BaseBladeSwapProcedureTest):
         for elem in merged_mapping:
             self.assertIn(elem, [
                 {
+                    "Description": "Node Management Network",
                     "ComponentID": "x3000c0s0b0n0",
-                    "IPAddress": "10.0.1.11",
+                    "IPAddresses": [
+                        {"IPAddress": "10.0.1.11"},
+                    ],
                     "MACAddress": "ab:cd:ef:01:23:45",
                 },
                 {
+                    "Description": "Node Management Network",
                     "ComponentID": "x3000c0s0b1n0",
-                    "IPAddress": "10.0.1.12",
+                    "IPAddresses": [
+                        {"IPAddress": "10.0.1.12"},
+                    ],
                     "MACAddress": "cd:ef:01:23:45:ab",
                 },
                 {
+                    "Description": "Node Management Network",
                     "ComponentID": "x3000c0s0b1n1",
-                    "IPAddress": "10.0.1.13",
+                    "IPAddresses": [
+                        {"IPAddress": "10.0.1.13"},
+                    ],
                     "MACAddress": "ef:01:23:45:ab:cd",
                 },
             ])
@@ -689,6 +767,7 @@ class TestMergeInterfaceMappings(BaseBladeSwapProcedureTest):
     def test_merging_mappings_of_different_lengths(self):
         """Test merging mappings of different lengths"""
         self.dst_mapping.append({
+            "Description": "Node Management Network",
             "ComponentID": "x3000c0s0b2n0",
             "IPAddress": "10.0.1.17",
             "MACAddress": "ef:01:65:45:ef:cd",
@@ -703,17 +782,6 @@ class TestMergeInterfaceMappings(BaseBladeSwapProcedureTest):
             SwapInProcedure.merge_mappings(self.src_mapping, self.dst_mapping)
 
 
-class TestSwapOutProcedure(unittest.TestCase):
-    """Test that the swap out procedure calls the appropriate stages"""
-    def setUp(self):
-        self.mock_swapoutprocedure_obj = MagicMock()
-
-    def test_swap_out_user_prompted_on_other_system(self):
-        """Test that the user is prompted to reset BMCs when swapping"""
-        SwapOutProcedure.procedure(self.mock_swapoutprocedure_obj)
-        self.mock_swapoutprocedure_obj.prompt_clear_node_controller_settings.assert_called_once()
-
-
 class TestSwapInProcedure(unittest.TestCase):
     """Test that the swap in procedure calls the appropriate stages"""
     def setUp(self):
@@ -723,7 +791,6 @@ class TestSwapInProcedure(unittest.TestCase):
         """Test swapping in a mountain blade discovers and waits for ChassisBMCs"""
         self.mock_swapinprocedure_obj.blade_class = 'mountain'
         SwapInProcedure.procedure(self.mock_swapinprocedure_obj)
-        self.mock_swapinprocedure_obj.begin_slot_discovery.assert_called()
         self.mock_swapinprocedure_obj.wait_for_chassisbmc_endpoints.assert_called()
 
     def test_swap_in_river(self):
@@ -739,19 +806,19 @@ class TestSwapBladeEntrypoint(unittest.TestCase):
     def setUp(self):
         self.mock_swap_in_procedure = patch('sat.cli.swap.blade.SwapInProcedure').start()
         self.mock_swap_out_procedure = patch('sat.cli.swap.blade.SwapOutProcedure').start()
+        self.args = Namespace(action='enable', dry_run=False)
 
     def test_enable_blade(self):
         """Test that the correct procedure is used for swapping in a blade"""
-        args = Namespace(action='enable')
-        swap_blade(args)
-        self.mock_swap_in_procedure.assert_called_once_with(args)
+        swap_blade(self.args)
+        self.mock_swap_in_procedure.assert_called_once_with(self.args)
         self.mock_swap_in_procedure.return_value.run.assert_called_once()
         self.mock_swap_out_procedure.assert_not_called()
 
     def test_disable_blade(self):
         """Test that the correct procedure is used for swapping out a blade"""
-        args = Namespace(action='disable')
-        swap_blade(args)
-        self.mock_swap_out_procedure.assert_called_once_with(args)
+        self.args.action = 'disable'
+        swap_blade(self.args)
+        self.mock_swap_out_procedure.assert_called_once_with(self.args)
         self.mock_swap_out_procedure.return_value.run.assert_called_once()
         self.mock_swap_in_procedure.assert_not_called()

@@ -433,16 +433,17 @@ class HSMClient(APIGatewayClient):
         self.delete('Inventory', 'RedfishEndpoints', redfish_endpoint)
 
     @handle_api_errors
-    def begin_discovery(self, xnames):
+    def begin_discovery(self, xnames, force=False):
         """Kick off discovery of the given xname.
 
         Args:
             xnames (Iterable[str]): the xnames to discover
+            force (bool): if True, force discovery.
 
         Raises:
             APIError: if there is a problem discovering the given xnames
         """
-        self.post('Inventory', 'Discover', payload={'xnames': list(xnames)})
+        self.post('Inventory', 'Discover', json={'xnames': list(xnames), 'force': force})
 
     @handle_api_errors
     def get_redfish_endpoint_inventory(self, xname):
