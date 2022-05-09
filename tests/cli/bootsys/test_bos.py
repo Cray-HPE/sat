@@ -232,7 +232,7 @@ class TestBOSSessionThread(unittest.TestCase):
     def setUp(self):
         """Set up some mocks."""
         self.mock_bos_client = Mock()
-        patch('sat.cli.bootsys.bos.BOSClient', return_value=self.mock_bos_client).start()
+        patch('sat.cli.bootsys.bos.BOSClientCommon.get_bos_client', return_value=self.mock_bos_client).start()
         patch('sat.cli.bootsys.bos.SATSession').start()
 
         self.mock_session_id = '0123456789abcdef'

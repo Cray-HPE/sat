@@ -24,12 +24,20 @@ OTHER DEALINGS IN THE SOFTWARE.
 import logging
 
 from sat.apiclient.gateway import APIError, APIGatewayClient
+from sat.config import get_config_value
 
 LOGGER = logging.getLogger(__name__)
 
 
-class BOSClient(APIGatewayClient):
-    base_resource_path = 'bos/v1/'
+class BOSClientCommon(APIGatewayClient):
+    """Base class for BOS functionality common between v1 and v2.
+
+    This class should not be instantiated directly; instead, the
+    `BOSClientCommon.get_bos_client()` static method should be used to
+    dynamically create a client object for the correct BOS version.
+    """
+
+    base_resource_path = 'bos/'
 
     def create_session(self, session_template, operation, limit=None):
         """Create a BOS session from a session template with an operation.
@@ -111,3 +119,39 @@ class BOSClient(APIGatewayClient):
             APIError: if the POST request to create the session template fails
         """
         self.post('sessiontemplate', json=session_template_data)
+
+    @staticmethod
+    def get_bos_client(session, **kwargs):
+        """Instantiate a BOSVxClient for the given API version.
+
+        Args:
+            session (SATSession): session object to pass through to the client
+
+        Additional kwargs are passed through to the underlying BOSVxClient
+        constructor.
+
+        Returns:
+            An instance of a subclass of `BOSClientCommon`.
+
+        Raises:
+            ValueError: if the given version string is not valid
+        """
+        version = get_config_value('bos.api_version')
+
+        bos_client_cls = {
+            'v1': BOSV1Client,
+            'v2': BOSV2Client,
+        }.get(version)
+
+        if bos_client_cls is None:
+            raise ValueError(f'Invalid BOS API version "{version}"')
+
+        return bos_client_cls(session, **kwargs)
+
+
+class BOSV1Client(BOSClientCommon):
+    base_resource_path = 'bos/v1/'
+
+
+class BOSV2Client(BOSClientCommon):
+    base_resource_path = f'bos/v2/'

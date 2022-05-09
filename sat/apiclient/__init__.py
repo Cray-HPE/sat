@@ -22,7 +22,7 @@ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
 # Import these names so that they can still be imported from the apiclient package directly
-from sat.apiclient.bos import BOSClient
+from sat.apiclient.bos import BOSV1Client
 from sat.apiclient.capmc import CAPMCClient, CAPMCError
 from sat.apiclient.cfs import CFSClient
 from sat.apiclient.fabric import FabricControllerClient

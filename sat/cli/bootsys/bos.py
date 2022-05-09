@@ -34,7 +34,8 @@ from time import sleep, monotonic
 
 from inflect import engine
 
-from sat.apiclient import APIError, BOSClient, HSMClient
+from sat.apiclient import APIError, HSMClient
+from sat.apiclient.bos import BOSClientCommon
 from sat.cli.bootsys.defaults import PARALLEL_CHECK_INTERVAL
 from sat.config import get_config_value
 from sat.session import SATSession
@@ -223,7 +224,7 @@ class BOSSessionThread(Thread):
         self.complete = False
         self.failed = False
         self.fail_msg = ''
-        self.bos_client = BOSClient(SATSession())
+        self.bos_client = BOSClientCommon.get_bos_client(SATSession())
 
         # Keep track of how many times we fail to query status in a row.
         self.consec_stat_fails = 0
@@ -661,7 +662,7 @@ def get_templates_needing_operation(session_templates, operation):
     else:
         raise ValueError("Unknown operation '{}'".format(operation))
 
-    bos_client = BOSClient(SATSession())
+    bos_client = BOSClientCommon.get_bos_client(SATSession())
 
     needed_st = []
     failed_st = []
