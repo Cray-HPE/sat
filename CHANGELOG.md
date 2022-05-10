@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a `--bos-version` command line option and `bos.api_version`
   configuration file option which can be used to specify which version of the
   BOS API to use.
+- Added BOS v2 support to `sat bootprep`.
 
 ## [3.15.1] - 2022-04-18
 

@@ -293,10 +293,6 @@ properties:
                       specified in the BOS session template will be appended to the
                       list of kernel parameters from the image.
                     type: string
-                  network:
-                    description: The network over which the nodes will boot.
-                    type: string
-                    default: "nmn"
                   node_list:
                     description: Individual nodes to boot in the boot set.
                     type: array

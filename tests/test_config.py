@@ -75,12 +75,6 @@ class TestValidateBosApiVersion(unittest.TestCase):
         """Test that "v1" is a valid BOS API version"""
         validate_bos_api_version('v1')
 
-    def test_validate_bos_api_version_v2(self):
-        """Test that "v2" is not yet a valid BOS API version"""
-        # TODO (CRAYSAT-1431): Remove this test
-        with self.assertRaises(ConfigValidationError):
-            validate_bos_api_version('v2')
-
     def test_validate_invalid_bos_api_version(self):
         """Test that invalid BOS versions are not allowed"""
         for version in ['v3', 'foo', '', '1', '2']:

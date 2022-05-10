@@ -31,12 +31,18 @@ from sat.apiclient.bos import (
 )
 
 
-class TestBOSClientCommon(unittest.TestCase):
+class BOSClientTestCase(unittest.TestCase):
+    """Base test case for BOS client tests"""
+
     def setUp(self):
         self.mock_get_config = patch('sat.apiclient.bos.get_config_value').start()
 
     def tearDown(self):
         patch.stopall()
+
+
+class TestBOSClientCommon(BOSClientTestCase):
+    """Tests for the BOSClientCommon base class"""
 
     def test_get_bos_version_v1(self):
         """Test retrieving a BOSV1Client"""
@@ -56,3 +62,51 @@ class TestBOSClientCommon(unittest.TestCase):
             self.mock_get_config.return_value = invalid_bos_version
             with self.assertRaises(ValueError):
                 BOSClientCommon.get_bos_client(MagicMock())
+
+
+class TestBOSV1BaseBootSetData(BOSClientTestCase):
+    """Test BOSV1Client.get_base_boot_set_data() """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_get_config.return_value = 'v1'
+
+    def test_bos_v1_client_has_correct_keys(self):
+        """Test that the BOS v1 base boot set data has the correct keys"""
+        expected_keys = {
+            'rootfs_provider',
+            'rootfs_provider_passthrough'
+        }
+        actual_keys = set(
+            BOSClientCommon.get_bos_client(MagicMock())
+            .get_base_boot_set_data()
+            .keys()
+        )
+        self.assertTrue(expected_keys.issubset(actual_keys))
+
+
+class TestBOSV2BaseBootSetData(BOSClientTestCase):
+    """Test BOSV2Client.get_base_boot_set_data() """
+
+    def setUp(self):
+        super().setUp()
+        self.mock_get_config.return_value = 'v2'
+
+    def test_bos_v2_client_has_correct_keys(self):
+        """Test that the BOS v2 base boot set data has the correct keys"""
+        expected_keys = {
+            'rootfs_provider',
+            'rootfs_provider_passthrough'
+        }
+        removed_keys = {
+            'boot_ordinal',
+            'network',
+        }
+        actual_keys = set(
+            BOSClientCommon.get_bos_client(MagicMock())
+            .get_base_boot_set_data()
+            .keys()
+        )
+
+        self.assertTrue(expected_keys.issubset(actual_keys))
+        self.assertTrue(removed_keys.isdisjoint(actual_keys))
