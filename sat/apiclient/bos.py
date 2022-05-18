@@ -21,6 +21,7 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
+from abc import ABCMeta, abstractmethod
 import logging
 
 from sat.apiclient.gateway import APIError, APIGatewayClient
@@ -29,15 +30,18 @@ from sat.config import get_config_value
 LOGGER = logging.getLogger(__name__)
 
 
-class BOSClientCommon(APIGatewayClient):
+class BOSClientCommon(APIGatewayClient, metaclass=ABCMeta):
     """Base class for BOS functionality common between v1 and v2.
 
     This class should not be instantiated directly; instead, the
     `BOSClientCommon.get_bos_client()` static method should be used to
     dynamically create a client object for the correct BOS version.
-    """
 
-    base_resource_path = 'bos/'
+    All BOSClientCommon subclasses should have a `session_template_path` class
+    attribute, in addition to the standard `base_resource_path` class
+    attribute. `session_template_path` should point to the API endpoint for
+    querying session templates.
+    """
 
     def create_session(self, session_template, operation, limit=None):
         """Create a BOS session from a session template with an operation.
@@ -77,7 +81,7 @@ class BOSClientCommon(APIGatewayClient):
                 response cannot be parsed as JSON
         """
         try:
-            return self.get('sessiontemplate').json()
+            return self.get(self.session_template_path).json()
         except APIError as err:
             raise APIError(f'Failed to get BOS session templates: {err}')
         except ValueError as err:
@@ -99,13 +103,14 @@ class BOSClientCommon(APIGatewayClient):
                 or the response JSON cannot be parsed
         """
         try:
-            return self.get('sessiontemplate', session_template_name).json()
+            return self.get(self.session_template_path, session_template_name).json()
         except APIError as err:
             raise APIError(f'Failed to get BOS session template: {err}')
         except ValueError as err:
             raise APIError(f'Failed to parse JSON in response from BOS when '
                            f'getting session template: {err}')
 
+    @abstractmethod
     def create_session_template(self, session_template_data):
         """Create a session template.
 
@@ -116,9 +121,9 @@ class BOSClientCommon(APIGatewayClient):
             None
 
         Raises:
-            APIError: if the POST request to create the session template fails
+            APIError: if the request to create the session template fails,
+                or if session_template_data is invalid
         """
-        self.post('sessiontemplate', json=session_template_data)
 
     @staticmethod
     def get_bos_client(session, **kwargs):
@@ -148,10 +153,36 @@ class BOSClientCommon(APIGatewayClient):
 
         return bos_client_cls(session, **kwargs)
 
+    @staticmethod
+    def get_base_boot_set_data():
+        """Get the base boot set data to use as a starting point.
+
+        Returns:
+            dict: the base data to use as a starting point for a boot set
+        """
+        return {
+            'rootfs_provider': 'cpss3',
+            # TODO (CRAYSAT-898): update default hostname for authoritative DNS changes
+            'rootfs_provider_passthrough': 'dvs:api-gw-service-nmn.local:300:nmn0'
+        }
+
 
 class BOSV1Client(BOSClientCommon):
     base_resource_path = 'bos/v1/'
+    session_template_path = 'sessiontemplate'
+
+    def create_session_template(self, session_template_data):
+        self.post(self.session_template_path, json=session_template_data)
 
 
 class BOSV2Client(BOSClientCommon):
     base_resource_path = f'bos/v2/'
+    session_template_path = 'sessiontemplates'
+
+    def create_session_template(self, session_template_data):
+        name = session_template_data.get('name')
+        if not name:
+            raise APIError('"name" key missing from session template data')
+        del session_template_data['name']
+
+        self.put(self.session_template_path, name, json=session_template_data)

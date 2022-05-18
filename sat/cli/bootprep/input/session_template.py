@@ -153,24 +153,6 @@ class InputSessionTemplate(BaseInputItem):
         # Accessing the image_record queries IMS to find the image
         _ = self.image_record
 
-    @staticmethod
-    def get_base_boot_set_data():
-        """Get the base boot set data to use as a starting point.
-
-        Returns:
-            dict: the base data to use as a starting point for a boot set
-        """
-        return {
-            # This is not really used or documented anywhere, but the idea was
-            # to make it possible to order the boot sets in a session template
-            'boot_ordinal': 2,
-            # TODO: How much of this do we really want to provide defaults for?
-            'network': 'nmn',
-            'rootfs_provider': 'cpss3',
-            # TODO (CRAYSAT-898): update default hostname for authoritative DNS changes
-            'rootfs_provider_passthrough': 'dvs:api-gw-service-nmn.local:300:nmn0'
-        }
-
     def get_bos_api_data(self):
         """Get the data to pass to the BOS API to create this session template.
 
@@ -184,7 +166,7 @@ class InputSessionTemplate(BaseInputItem):
             'boot_sets': {}
         }
         for boot_set_name, boot_set_data in self.boot_sets.items():
-            boot_set_api_data = self.get_base_boot_set_data()
+            boot_set_api_data = self.bos_client.get_base_boot_set_data()
             image_record = self.image_record
             boot_set_api_data.update({
                 'etag': get_val_by_path(image_record, 'link.etag'),

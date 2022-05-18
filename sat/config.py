@@ -81,8 +81,7 @@ def validate_bos_api_version(version):
     Raises:
         ConfigValidationError: if `version` is not a valid BOS API version string
     """
-    # TODO (CRAYSAT-1431): Add 'v2'
-    valid_bos_api_versions = {'v1'}
+    valid_bos_api_versions = {'v1', 'v2'}
     if not version.lower() in valid_bos_api_versions:
         raise ConfigValidationError(
             f'BOS API Version "{version}" is not one of the valid '
