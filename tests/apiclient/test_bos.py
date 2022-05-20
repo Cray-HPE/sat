@@ -63,6 +63,25 @@ class TestBOSClientCommon(BOSClientTestCase):
             with self.assertRaises(ValueError):
                 BOSClientCommon.get_bos_client(MagicMock())
 
+    def test_get_bos_client_version_kwarg(self):
+        """Test getting a BOSVxClient using the version keyword argument"""
+        for version, client_cls in [('v1', BOSV1Client), ('v2', BOSV2Client)]:
+            with self.subTest(version=version):
+                self.assertIsInstance(
+                    BOSClientCommon.get_bos_client(MagicMock(), version=version),
+                    client_cls
+                )
+
+    def test_get_bos_client_version_kwarg_is_none(self):
+        """Test that the client version is read from config file when version kwarg is None"""
+        for version, client_cls in [('v1', BOSV1Client), ('v2', BOSV2Client)]:
+            self.mock_get_config.return_value = version
+            with self.subTest(version=version):
+                self.assertIsInstance(
+                    BOSClientCommon.get_bos_client(MagicMock(), version=None),
+                    client_cls
+                )
+
 
 class TestBOSV1BaseBootSetData(BOSClientTestCase):
     """Test BOSV1Client.get_base_boot_set_data() """
