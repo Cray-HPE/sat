@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a ``sat swap blade`` subcommand which automates the procedure for
   swapping compute and UAN blades.
 - Added support for River blades to the ``sat swap blade`` subcommand.
+- Updated the ``sat-swap(8)`` man page to document the new ``sat swap blade``
+  subcommand.
 
 ### Fixed
 - Fixed tab completion in ``sat bash``.
