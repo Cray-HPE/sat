@@ -24,6 +24,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 from argparse import Namespace
 import io
 import json
+import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -574,6 +575,29 @@ class TestBeginningSlotDiscovery(BaseBladeSwapProcedureTest):
         """Test that slot discovery is begun"""
         self.swap_in.begin_slot_discovery()
         self.mock_hsm_client.begin_discovery.assert_called_once()
+
+    def test_begin_slot_discovery_warns_if_mountain_blade(self):
+        """Test that slot discovery logs a warning if no ChassisBMC for Mountain blade"""
+        self.mock_hsm_client.query_components.return_value = []
+        with self.assertLogs(level='WARNING'):
+            self.swap_in.begin_slot_discovery()
+
+    def test_begin_slot_discovery_no_warning_if_river_blade(self):
+        """Test that slot discovery does not log a warning if no ChassisBMC for River blade"""
+        self.mock_hsm_client.query_components.return_value = []
+
+        self.mock_blade_class_patcher.stop()
+        patch('sat.cli.swap.blade.BladeSwapProcedure.blade_class', 'river').start()
+
+        with self.assertLogs(level='WARNING') as cm:
+            self.swap_in.begin_slot_discovery()
+
+            # Need this dummy log here since otherwise the assertLogs assertion
+            # will fail when since nothing should be logged.
+            logging.warning('Dummy')
+
+        self.assertEqual(len(cm.records), 1)
+        self.assertEqual(cm.records[0].message, 'Dummy')
 
 
 class TestResumeHMSDiscoveryCronJob(BaseBladeSwapProcedureTest):
