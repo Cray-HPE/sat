@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Incremented the base version of Alpine used in the container image from 3.13
+  to 3.15.
+- Made changes related to the open sourcing of sat.
+    - Update Jenkinsfile to use csm-shared-library.
+    - Add Makefile for building container image.
+    - Pull base container image from external location.
 - Began using a separate ``cray_product_catalog`` package to query the product
   catalog in ``sat bootprep``.
 - Began using a separate ``cray_product_catalog`` package to query the product
