@@ -21,7 +21,6 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-from abc import ABCMeta, abstractmethod
 import logging
 
 from sat.apiclient.gateway import APIError, APIGatewayClient
@@ -30,7 +29,7 @@ from sat.config import get_config_value
 LOGGER = logging.getLogger(__name__)
 
 
-class BOSClientCommon(APIGatewayClient, metaclass=ABCMeta):
+class BOSClientCommon(APIGatewayClient):
     """Base class for BOS functionality common between v1 and v2.
 
     This class should not be instantiated directly; instead, the
@@ -42,33 +41,6 @@ class BOSClientCommon(APIGatewayClient, metaclass=ABCMeta):
     attribute. `session_template_path` should point to the API endpoint for
     querying session templates.
     """
-
-    def create_session(self, session_template, operation, limit=None):
-        """Create a BOS session from a session template with an operation.
-
-        Args:
-            session_template (str): the name of the session template from which
-                to create the session.
-            operation (str): the operation to create the session with. Can be
-                one of boot, configure, reboot, shutdown.
-            limit (str): a limit string to pass through to BOS as the `limit`
-                parameter in the POST payload when creating the BOS session
-
-        Returns:
-            The response from the POST to 'session'.
-
-        Raises:
-            APIError: if the POST request to create the session fails.
-        """
-        request_body = {
-            'templateUuid': session_template,
-            'operation': operation
-        }
-
-        if limit:
-            request_body['limit'] = limit
-
-        return self.post('session', json=request_body)
 
     def get_session_templates(self):
         """Get the BOS session templates.
@@ -110,7 +82,6 @@ class BOSClientCommon(APIGatewayClient, metaclass=ABCMeta):
             raise APIError(f'Failed to parse JSON in response from BOS when '
                            f'getting session template: {err}')
 
-    @abstractmethod
     def create_session_template(self, session_template_data):
         """Create a session template.
 
@@ -124,13 +95,17 @@ class BOSClientCommon(APIGatewayClient, metaclass=ABCMeta):
             APIError: if the request to create the session template fails,
                 or if session_template_data is invalid
         """
+        self.post(self.session_template_path, json=session_template_data)
 
     @staticmethod
-    def get_bos_client(session, **kwargs):
+    def get_bos_client(session, version=None, **kwargs):
         """Instantiate a BOSVxClient for the given API version.
 
         Args:
             session (SATSession): session object to pass through to the client
+            version (Optional[str]): 'v1' or 'v2', or None. If None, the config
+                file and command line are consulted to determine the BOS version in
+                use.
 
         Additional kwargs are passed through to the underlying BOSVxClient
         constructor.
@@ -141,7 +116,7 @@ class BOSClientCommon(APIGatewayClient, metaclass=ABCMeta):
         Raises:
             ValueError: if the given version string is not valid
         """
-        version = get_config_value('bos.api_version')
+        version = version or get_config_value('bos.api_version')
 
         bos_client_cls = {
             'v1': BOSV1Client,
@@ -166,18 +141,112 @@ class BOSClientCommon(APIGatewayClient, metaclass=ABCMeta):
             'rootfs_provider_passthrough': 'dvs:api-gw-service-nmn.local:300:nmn0'
         }
 
+    def get_session_status(self, session_id):
+        """Get the status of a BOS session.
+
+        Args:
+            session_id (str): the ID of the session
+
+        Returns:
+            dict: the session status information from BOS
+
+        Raises:
+            APIError: if there is a problem retrieving session status BOS, or if
+                the returned JSON is invalid.
+        """
+        try:
+            return self.get(self.session_path, session_id, 'status').json()
+        except APIError as err:
+            raise APIError(f'Failed to get BOS session status for session {session_id}: '
+                           f'{err}')
+        except ValueError as err:
+            raise APIError(f'Failed to parse JSON in response from BOS when '
+                           f'getting session status for session {session_id}: '
+                           f'{err}')
+
+    def get_sessions(self):
+        """Get a list of all sessions.
+
+        Returns:
+            list of dict: session information for all sessions in BOS
+
+        Raises:
+            APIError: if there is a problem retrieving sessions from BOS, or if
+                the returned JSON is invalid.
+        """
+        try:
+            return self.get(self.session_path).json()
+        except APIError as err:
+            raise APIError(f'Failed to get BOS sessions: {err}')
+        except ValueError as err:
+            raise APIError(f'Failed to parse JSON in response from BOS when '
+                           f'getting sessions: {err}')
+
 
 class BOSV1Client(BOSClientCommon):
     base_resource_path = 'bos/v1/'
     session_template_path = 'sessiontemplate'
+    session_path = 'session'
 
-    def create_session_template(self, session_template_data):
-        self.post(self.session_template_path, json=session_template_data)
+    def create_session(self, session_template, operation, limit=None):
+        """Create a BOS session from a session template with an operation.
+
+        Args:
+            session_template (str): the name of the session template from which
+                to create the session.
+            operation (str): the operation to create the session with. Can be
+                one of boot, configure, reboot, shutdown.
+            limit (str): a limit string to pass through to BOS as the `limit`
+                parameter in the POST payload when creating the BOS session
+
+        Returns:
+            The response from the POST to 'session'.
+
+        Raises:
+            APIError: if the POST request to create the session fails.
+        """
+        request_body = {
+            'templateUuid': session_template,
+            'operation': operation
+        }
+
+        if limit:
+            request_body['limit'] = limit
+
+        return self.post(self.session_path, json=request_body)
 
 
 class BOSV2Client(BOSClientCommon):
-    base_resource_path = f'bos/v2/'
+    base_resource_path = 'bos/v2/'
     session_template_path = 'sessiontemplates'
+    session_path = 'sessions'
+
+    def create_session(self, session_template, operation, limit=None):
+        """Create a BOS session from a session template with an operation.
+
+        Args:
+            session_template (str): the name of the session template from which
+                to create the session.
+            operation (str): the operation to create the session with. Can be
+                one of boot, configure, reboot, shutdown.
+            limit (str): a limit string to pass through to BOS as the `limit`
+                parameter in the POST payload when creating the BOS session
+
+        Returns:
+            The response from the POST to 'sessions'.
+
+        Raises:
+            APIError: if the POST request to create the session fails.
+        """
+        request_body = {
+            'template_name': session_template,
+            'operation': operation
+        }
+
+        if limit:
+            request_body['limit'] = limit
+
+        return self.post(self.session_path, json=request_body)
 
     def create_session_template(self, session_template_data):
         name = session_template_data.get('name')

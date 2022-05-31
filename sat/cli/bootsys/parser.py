@@ -254,7 +254,7 @@ def add_bootsys_subparser(subparsers):
 
     bootsys_parser.add_argument(
         '--bos-version',
-        choices=['v1'],  # TODO (CRAYSAT-1404): Add v2
+        choices=['v1', 'v2'],
         help='The version of the BOS API to use for BOS operations',
     )
 
