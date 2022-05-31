@@ -625,9 +625,10 @@ class SwapInProcedure(BladeSwapProcedure):
         try:
             chassis_bmc = self.hsm_client.query_components(chassis_xname, type='ChassisBMC')[0]
         except (APIError, IndexError):
-            LOGGER.warning('Could not locate ChassisBMC for chassis %s; waiting '
-                           'for hms-discovery to discover slot',
-                           chassis_xname)
+            if self.blade_class == 'mountain':
+                LOGGER.warning('Could not locate ChassisBMC for chassis %s; waiting '
+                               'for hms-discovery to discover slot',
+                               chassis_xname)
             return
 
         self.hsm_client.begin_discovery([chassis_bmc['ID']], force=True)
