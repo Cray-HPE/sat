@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   BOS API to use.
 - Added BOS v2 support to `sat bootprep`.
 - Added BOS v2 support to `sat bootsys`.
+- Added BOS v2 support to `sat status`, and added fields to `sat status` output
+  listing the most recent BOS session, template, booted image, and boot status
+  for nodes when BOS v2 is in use. Added a `--bos-fields` option to limit
+  output to these fields.
 
 ## [3.16.1] - 2022-06-07
 

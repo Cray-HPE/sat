@@ -164,6 +164,28 @@ class BOSClientCommon(APIGatewayClient):
                            f'getting session status for session {session_id}: '
                            f'{err}')
 
+    def get_session(self, session_id):
+        """Get information about a given session.
+
+        Args:
+            session_id (str): the ID of the session
+
+        Returns:
+            dict: session information for the given session from BOS
+
+        Raises:
+            APIError: if there is a problem retrieving the session from BOS, or
+                if the returned JSON is invalid.
+        """
+
+        try:
+            return self.get(self.session_path, session_id).json()
+        except APIError as err:
+            raise APIError(f'Failed to get BOS session {session_id}: {err}')
+        except ValueError as err:
+            raise APIError(f'Failed to parse JSON in response from BOS when '
+                           f'getting session {session_id}: {err}')
+
     def get_sessions(self):
         """Get a list of all sessions.
 
@@ -255,3 +277,21 @@ class BOSV2Client(BOSClientCommon):
         del session_template_data['name']
 
         self.put(self.session_template_path, name, json=session_template_data)
+
+    def get_components(self):
+        """Get the full collection of components from BOS v2.
+
+        Returns:
+            list of dict: components managed by BOS v2
+
+        Raises:
+            APIError: if an error occurs while retrieving components from BOS
+                v2
+        """
+        try:
+            return self.get('components').json()
+        except APIError as err:
+            raise APIError(f'Failed to get BOS components: {err}')
+        except ValueError as err:
+            raise APIError(f'Failed to parse JSON in response from BOS when '
+                           f'getting components: {err}')
