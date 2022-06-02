@@ -69,6 +69,26 @@ def validate_log_level(level):
         )
 
 
+def validate_bos_api_version(version):
+    """Validates the given BOS API version string
+
+    Args:
+        version (str): the BOS API version string to validate
+
+    Returns:
+        None
+
+    Raises:
+        ConfigValidationError: if `version` is not a valid BOS API version string
+    """
+    valid_bos_api_versions = {'v1', 'v2'}
+    if not version.lower() in valid_bos_api_versions:
+        raise ConfigValidationError(
+            f'BOS API Version "{version}" is not one of the valid '
+            f'BOS API versions: {", ".join(valid_bos_api_versions)}'
+        )
+
+
 SAT_CONFIG_SPEC = {
     'api_gateway': {
         'host': OptionSpec(str, 'api-gw-service-nmn.local', None, None),
@@ -76,6 +96,9 @@ SAT_CONFIG_SPEC = {
         'username': OptionSpec(str, getpass.getuser, None, 'username'),
         'token_file': OptionSpec(str, '', None, 'token_file'),
         'api_timeout': OptionSpec(int, 60, None, 'api_timeout'),
+    },
+    'bos': {
+        'api_version': OptionSpec(str, 'v1', validate_bos_api_version, 'bos_version')
     },
     'bootsys': {
         'max_hsn_states': OptionSpec(int, 10, None, None),

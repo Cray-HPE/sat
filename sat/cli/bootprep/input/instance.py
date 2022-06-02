@@ -42,7 +42,7 @@ class InputInstance:
                 requests to the CFS API
             ims_client (sat.apiclient.IMSClient): the IMS API client to make
                 requests to the IMS API
-            bos_client (sat.apiclient.BOSClient): the BOS API client to make
+            bos_client (sat.apiclient.BOSClientCommon): the BOS API client to make
                 requests to the BOS API
             product_catalog (cray_product_catalog.query.ProductCatalog):
                 the product catalog object

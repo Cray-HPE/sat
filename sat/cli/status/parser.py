@@ -81,3 +81,9 @@ def add_status_subparser(subparsers):
         help='Only show nodes specified in the node list, roles, and groups in '
              'the boot sets contained in the given BOS session template.'
     )
+
+    status_parser.add_argument(
+        '--bos-version',
+        choices=['v1'],  # TODO (CRAYSAT-79): Add v2
+        help='The version of the BOS API to use for BOS operations',
+    )
