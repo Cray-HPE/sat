@@ -25,7 +25,8 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+
+## [Unreleased]
 
 ### Added
 - Added client support for the BOS v2 API.
@@ -34,6 +35,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   BOS API to use.
 - Added BOS v2 support to `sat bootprep`.
 - Added BOS v2 support to `sat bootsys`.
+
+### Changed
+- Began using a separate ``cray_product_catalog`` package to query the product
+  catalog in ``sat bootprep``.
+- Began using a separate ``cray_product_catalog`` package to query the product
+  catalog in ``sat showrev``.
+
+### Fixed
+- Fixed missing ``sat-hwhist`` man page.
+- Fixed bug in ``sat status`` which caused a traceback when certain component
+  state fields were missing in HSM.
+- Fixed bug in ``sat status`` which caused a traceback when components were
+  entirely missing from SLS.
 
 ## [3.15.1] - 2022-04-18
 

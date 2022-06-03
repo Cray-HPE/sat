@@ -8,7 +8,7 @@ certifi==2021.10.8
 cffi==1.15.0
 charset-normalizer==2.0.12
 click==8.0.4
-cray-product-catalog==1.3.2
+cray-product-catalog==1.6.0
 croniter==0.3.37
 cryptography==36.0.1
 dataclasses-json==0.5.6
