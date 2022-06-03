@@ -21,16 +21,13 @@ OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 """
-from copy import deepcopy
+import uuid
 import logging
 import os
 import unittest
-from unittest.mock import patch
-from urllib3.exceptions import MaxRetryError
-from yaml import safe_dump
+from unittest.mock import patch, Mock
 
-from kubernetes.client.rest import ApiException
-from kubernetes.config import ConfigException
+from cray_product_catalog.query import InstalledProductVersion, ProductCatalogError
 
 from sat.cli.showrev.products import get_product_versions, get_release_file_versions, RELEASE_FILE_COLUMN
 from sat.constants import MISSING_VALUE
@@ -38,58 +35,29 @@ from tests.test_util import ExtendedTestCase
 
 SAMPLES_DIR = os.path.join(os.path.dirname(__file__), 'samples')
 
-COS_VERSIONS = {
-    '1.4.0': {
-        'configuration': {
-            'clone_url': 'https://vcs.fakesystem.dev.cray.com/vcs/cray/cos-config-management.git',
-            'commit': 'bbc306f48ca5505df7e0ed0ca632ee7e40babd72',
-            'import_branch': 'cray/cos/1.4.0',
-            'ssh_url': 'git@vcs.fakesystem.dev.cray.com:cray/cos-config-management.git',
-        },
-        'images': {
-            'cray-shasta-compute-sles15sp1.x86_64-1.4.23': {
-                'id': '51c9e0af-21a8-4bd1-b446-6d38a6914f2d'
-            }
-        },
-        'recipes': {
-            'cray-shasta-compute-sles15sp1.x86_64-1.4.23': {
-                'id': 'a89a1013-f1dd-4ef9-b0f8-ed2b1311c98a'
-            }
-        }
-    }
-}
 
-UAN_VERSIONS = {
-    '2.0.0': {
-        'configuration': {
-            'clone_url': 'https://vcs.fakesystem.dev.cray.com/vcs/cray/uan-config-management.git',
-            'commit': '28bdb828b30fb23c30afe87f7e2414a504377b4c',
-            'import_branch': 'cray/uan/2.0.0',
-            'ssh_url': 'git@vcs.fakesystem.dev.cray.com:cray/pbs-config-management.git',
-        },
-        'images': {
-            'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0': {
-                'id': '51c9e0af-21a8-4bd1-b446-6d38a6914f2d'
-            }
-        },
-        'recipes': {
-            'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0': {
-                'id': 'a89a1013-f1dd-4ef9-b0f8-ed2b1311c98a'
-            }
-        }
-    }
-}
+def get_fake_ims_data(name, ims_id=None):
+    """Generate mock value InstalledProductVersion.{images,recipes}."""
+    return {'name': name, 'id': ims_id if ims_id else uuid.uuid4()}
 
-PBS_VERSIONS = {
-    '0.1.0': {
-        'configuration': {
-            'clone_url': 'https://vcs.fakesystem.dev.cray.com/vcs/cray/pbs-config-management.git',
-            'commit': 'b7eee8434bf1d55f0ab88c8785f843aba3d02184',
-            'import_branch': 'cray/pbs/0.1.0',
-            'ssh_url': 'git@vcs.fakesystem.dev.cray.com:cray/pbs-config-management.git',
-        },
-    }
-}
+
+def get_mock_installed_product_version(name, version, image_names=None, recipe_names=None,
+                                       supports_active=False, active=False):
+    """Generate a mock InstalledProductVersion object."""
+    mock_ipv = Mock(
+        spec=InstalledProductVersion,
+        version=version,
+        images=[get_fake_ims_data(image_name) for image_name in image_names] if image_names else [],
+        recipes=[get_fake_ims_data(recipe_name) for recipe_name in recipe_names] if recipe_names else [],
+        supports_active=supports_active,
+        active=active
+    )
+    mock_ipv.name = name
+    return mock_ipv
+
+
+COS_IMAGE_NAME = COS_RECIPE_NAME = 'cray-shasta-compute-sles15sp1.x86_64-1.4.23'
+UAN_IMAGE_NAME = UAN_RECIPE_NAME = 'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0'
 
 
 class TestGetProducts(ExtendedTestCase):
@@ -97,13 +65,20 @@ class TestGetProducts(ExtendedTestCase):
 
     def setUp(self):
         """Sets up patches."""
-        self.mock_get_config = patch('sat.cli.showrev.products.load_kube_config').start()
-        self.mock_corev1_api = patch('sat.cli.showrev.products.CoreV1Api').start().return_value
-        self.mock_corev1_api.read_namespaced_config_map.return_value.data = {
-            'cos': safe_dump(deepcopy(COS_VERSIONS)),
-            'uan': safe_dump(deepcopy(UAN_VERSIONS)),
-            'pbs': safe_dump(deepcopy(PBS_VERSIONS))
-        }
+        self.mock_product_catalog_cls = patch('sat.cli.showrev.products.ProductCatalog').start()
+        self.mock_product_catalog = self.mock_product_catalog_cls.return_value
+        self.mock_cos_product = get_mock_installed_product_version(
+            'cos', '1.4.0', image_names=[COS_IMAGE_NAME], recipe_names=[COS_RECIPE_NAME]
+        )
+        self.mock_uan_product = get_mock_installed_product_version(
+            'uan', '2.0.0', image_names=[UAN_IMAGE_NAME], recipe_names=[UAN_RECIPE_NAME]
+        )
+        self.mock_pbs_product = get_mock_installed_product_version('pbs', '0.1.0')
+
+        self.mock_product_catalog.products = [self.mock_cos_product,
+                                              self.mock_uan_product,
+                                              self.mock_pbs_product]
+
         self.expected_headers = ['product_name', 'product_version', 'active', 'images', 'image_recipes']
 
     def tearDown(self):
@@ -113,160 +88,79 @@ class TestGetProducts(ExtendedTestCase):
     def test_get_product_versions(self):
         """Test a basic invocation of get_product_versions."""
         expected_fields = [
-            ['cos', '1.4.0', 'N/A', 'cray-shasta-compute-sles15sp1.x86_64-1.4.23',
-             'cray-shasta-compute-sles15sp1.x86_64-1.4.23'],
-            ['uan', '2.0.0', 'N/A', 'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0',
-             'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0'],
+            ['cos', '1.4.0', 'N/A', COS_IMAGE_NAME, COS_RECIPE_NAME],
+            ['uan', '2.0.0', 'N/A', UAN_IMAGE_NAME, UAN_RECIPE_NAME],
             ['pbs', '0.1.0', 'N/A', '-', '-']
         ]
         actual_headers, actual_fields = get_product_versions()
-        self.mock_get_config.assert_called_once_with()
-        self.mock_corev1_api.read_namespaced_config_map.assert_called_once_with(
-            name='cray-product-catalog',
-            namespace='services'
-        )
+        self.mock_product_catalog_cls.assert_called_once_with()
         self.assertEqual(self.expected_headers, actual_headers)
         self.assertEqual(expected_fields, actual_fields)
 
     def test_get_product_versions_multiple_versions(self):
         """Test an invocation of get_product_versions with multiple of one product."""
-        uan_versions = deepcopy(UAN_VERSIONS)
-        uan_versions.update({
-            '2.0.1': {
-                'configuration': {
-                    'clone_url': 'https://vcs.fakesystem.dev.cray.com/vcs/cray/uan-config-management.git',
-                    'commit': 'a9e80009cd7bd4cf65d434f638afc4b53bd17091',
-                    'import_branch': 'cray/uan/2.0.1',
-                    'ssh_url': 'git@vcs.fakesystem.dev.cray.com:cray/pbs-config-management.git',
-                },
-                'images': {
-                    'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.1': {
-                        'id': 'b60de670-8a51-4ede-989d-cd02156d7da7'
-                    }
-                },
-                'recipes': {
-                    'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.1': {
-                        'id': '09dc015b-2a64-44a6-b428-8ff479501dde'
-                    }
-                }
-            }
-        })
-        self.mock_corev1_api.read_namespaced_config_map.return_value.data = {
-            'cos': safe_dump(deepcopy(COS_VERSIONS)),
-            'uan': safe_dump(uan_versions),
-            'pbs': safe_dump(deepcopy(PBS_VERSIONS))
-        }
+        new_uan_image_name = new_uan_recipe_name = 'new-uan-recipe-2.0.1'
+        new_uan_product = get_mock_installed_product_version('uan', '2.0.1',
+                                                             image_names=[new_uan_image_name],
+                                                             recipe_names=[new_uan_recipe_name])
+        self.mock_product_catalog.products.insert(2, new_uan_product)
+
         expected_fields = [
-            ['cos', '1.4.0', 'N/A', 'cray-shasta-compute-sles15sp1.x86_64-1.4.23',
-             'cray-shasta-compute-sles15sp1.x86_64-1.4.23'],
-            ['uan', '2.0.0', 'N/A', 'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0',
-             'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0'],
-            ['uan', '2.0.1', 'N/A', 'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.1',
-             'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.1'],
+            ['cos', '1.4.0', 'N/A', COS_IMAGE_NAME, COS_RECIPE_NAME],
+            ['uan', '2.0.0', 'N/A', UAN_IMAGE_NAME, UAN_RECIPE_NAME],
+            ['uan', '2.0.1', 'N/A', new_uan_image_name, new_uan_recipe_name],
             ['pbs', '0.1.0', 'N/A', '-', '-']
         ]
         actual_headers, actual_fields = get_product_versions()
-        self.mock_get_config.assert_called_once_with()
-        self.mock_corev1_api.read_namespaced_config_map.assert_called_once_with(
-            name='cray-product-catalog',
-            namespace='services'
-        )
+        self.mock_product_catalog_cls.assert_called_once_with()
         self.assertEqual(self.expected_headers, actual_headers)
         self.assertEqual(expected_fields, actual_fields)
 
     def test_get_product_versions_multiple_images_recipes(self):
         """Test an invocation of get_product_versions where products have multiple images and recipes."""
-        uan_versions = deepcopy(UAN_VERSIONS)
-        uan_versions['2.0.0']['images'] = {
-            'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0': {
-                'id': '51c9e0af-21a8-4bd1-b446-6d38a6914f2d'
-            },
-            'cray-shasta-uan-cos-sles15sp1.aarch64-2.0.0': {
-                'id': '00d35ab0-ca81-4530-9daa-63a6bdec7681'
-            }
-        }
-        uan_versions['2.0.0']['recipes'] = {
-            'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0': {
-                'id': 'a89a1013-f1dd-4ef9-b0f8-ed2b1311c98a'
-            },
-            'cray-shasta-uan-cos-sles15sp1.aarch64-2.0.0': {
-                'id': '0aee952d-6b84-45e0-937b-23119ed09149'
-            }
-        }
-
-        self.mock_corev1_api.read_namespaced_config_map.return_value.data = {
-            'cos': safe_dump(deepcopy(COS_VERSIONS)),
-            'uan': safe_dump(uan_versions),
-            'pbs': safe_dump(deepcopy(PBS_VERSIONS))
-        }
+        other_uan_image = other_uan_recipe = 'cray-shasta-uan-cos-sles15sp1.aarch64-2.0.0'
+        self.mock_uan_product.images.append(get_fake_ims_data(other_uan_image))
+        self.mock_uan_product.recipes.append(get_fake_ims_data(other_uan_recipe))
 
         expected_fields = [
-            ['cos', '1.4.0', 'N/A', 'cray-shasta-compute-sles15sp1.x86_64-1.4.23',
-             'cray-shasta-compute-sles15sp1.x86_64-1.4.23'],
-            ['uan', '2.0.0', 'N/A',
-             'cray-shasta-uan-cos-sles15sp1.aarch64-2.0.0\ncray-shasta-uan-cos-sles15sp1.x86_64-2.0.0',
-             'cray-shasta-uan-cos-sles15sp1.aarch64-2.0.0\ncray-shasta-uan-cos-sles15sp1.x86_64-2.0.0'],
+            ['cos', '1.4.0', 'N/A', COS_IMAGE_NAME, COS_RECIPE_NAME],
+            ['uan', '2.0.0', 'N/A', f'{other_uan_image}\n{UAN_IMAGE_NAME}', f'{other_uan_recipe}\n{UAN_RECIPE_NAME}'],
             ['pbs', '0.1.0', 'N/A', '-', '-']
         ]
         actual_headers, actual_fields = get_product_versions()
-        self.mock_get_config.assert_called_once_with()
-        self.mock_corev1_api.read_namespaced_config_map.assert_called_once_with(
-            name='cray-product-catalog',
-            namespace='services'
-        )
+        self.mock_product_catalog_cls.assert_called_once_with()
         self.assertEqual(self.expected_headers, actual_headers)
         self.assertEqual(expected_fields, actual_fields)
 
-    def test_get_product_versions_no_product_catalog(self):
-        """Test that the case when the product catalog configuration map does not exist is handled."""
-        # A 404 ApiException is raised when the config map is not found
-        self.mock_corev1_api.read_namespaced_config_map.side_effect = ApiException(reason='Not Found')
-        with self.assertLogs(level=logging.ERROR) as logs:
-            self.assertEqual(get_product_versions(), ([], []))
-        self.assert_in_element('Error reading cray-product-catalog configuration map: Not Found', logs.output)
+    def test_get_product_versions_product_catalog_error(self):
+        """Test when a ProductCatalogError occurs when loading the product catalog data"""
+        pc_err_msg = 'failed to load K8s config'
+        self.mock_product_catalog_cls.side_effect = ProductCatalogError(pc_err_msg)
 
-    def test_get_product_versions_connection_refused(self):
-        """Test that the case when connecting to kubernetes fails is handled."""
-        # A urllib3.exceptions.MaxRetryError is raised when we can't connect to the k8s API.
-        self.mock_corev1_api.read_namespaced_config_map.side_effect = MaxRetryError(url='', pool=None)
         with self.assertLogs(level=logging.ERROR) as logs:
             self.assertEqual(get_product_versions(), ([], []))
-        self.assert_in_element(
-            'Unable to connect to Kubernetes to read cray-product-catalog configuration map',
-            logs.output
-        )
 
-    def test_get_product_versions_config_exception(self):
-        """Test that the case when loading the kubernetes configuration fails is handled."""
-        self.mock_corev1_api.read_namespaced_config_map.side_effect = ConfigException('Bad config')
-        with self.assertLogs(level=logging.ERROR) as logs:
-            self.assertEqual(get_product_versions(), ([], []))
-        self.assert_in_element('Unable to load kubernetes configuration: Bad config', logs.output)
-
-    def test_get_product_versions_null_data(self):
-        """Test that the case when the product catalog has a null value for .data is handled."""
-        self.mock_corev1_api.read_namespaced_config_map.return_value.data = None
-        with self.assertLogs(level=logging.ERROR) as logs:
-            self.assertEqual(get_product_versions(), ([], []))
-        self.assert_in_element('No product information found in cray-product-catalog configuration map', logs.output)
+        self.assert_in_element(f'Unable to obtain product version information from '
+                               f'product catalog: {pc_err_msg}', logs.output)
 
     def test_get_product_versions_active_version(self):
-        """Test the case when the product catalog has a product version that is designated as 'active'."""
-        uan_versions = deepcopy(UAN_VERSIONS)
-        uan_versions['2.0.0']['active'] = True
-        self.mock_corev1_api.read_namespaced_config_map.return_value.data = {
-            'cos': safe_dump(deepcopy(COS_VERSIONS)),
-            'uan': safe_dump(uan_versions),
-            'pbs': safe_dump(deepcopy(PBS_VERSIONS))
-        }
+        """Test with two versions of a product, one of which is active, the other inactive"""
+        self.mock_uan_product.supports_active = True
+        self.mock_uan_product.active = False
+        new_uan_image_name = new_uan_recipe_name = 'new-uan-recipe-2.0.1'
+        new_uan_product = get_mock_installed_product_version('uan', '2.0.1',
+                                                             image_names=[new_uan_image_name],
+                                                             recipe_names=[new_uan_recipe_name],
+                                                             supports_active=True, active=True)
+        self.mock_product_catalog.products.insert(2, new_uan_product)
         expected_fields = [
-            ['cos', '1.4.0', 'N/A', 'cray-shasta-compute-sles15sp1.x86_64-1.4.23',
-             'cray-shasta-compute-sles15sp1.x86_64-1.4.23'],
-            ['uan', '2.0.0', True, 'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0',
-             'cray-shasta-uan-cos-sles15sp1.x86_64-2.0.0'],
+            ['cos', '1.4.0', 'N/A', COS_IMAGE_NAME, COS_RECIPE_NAME],
+            ['uan', '2.0.0', 'False', UAN_IMAGE_NAME, UAN_RECIPE_NAME],
+            ['uan', '2.0.1', 'True', new_uan_image_name, new_uan_recipe_name],
             ['pbs', '0.1.0', 'N/A', '-', '-']
         ]
         actual_headers, actual_fields = get_product_versions()
+        self.mock_product_catalog_cls.assert_called_once_with()
         self.assertEqual(self.expected_headers, actual_headers)
         self.assertEqual(expected_fields, actual_fields)
 

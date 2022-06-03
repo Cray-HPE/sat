@@ -1,7 +1,7 @@
 """
 Module for obtaining product version information.
 
-(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -24,13 +24,8 @@ OTHER DEALINGS IN THE SOFTWARE.
 from collections import OrderedDict
 import logging
 import os
-import warnings
-from urllib3.exceptions import MaxRetryError
-from yaml import safe_load, YAMLLoadWarning
 
-from kubernetes.client import CoreV1Api
-from kubernetes.client.rest import ApiException
-from kubernetes.config import load_kube_config, ConfigException
+from cray_product_catalog.query import ProductCatalog, ProductCatalogError
 
 from sat.constants import MISSING_VALUE
 
@@ -88,45 +83,19 @@ def get_product_versions():
     image_key = 'images'
     recipe_key = 'image_recipes'
     headers = [product_key, version_key, active_key, image_key, recipe_key]
-    # Load k8s configuration before trying to use API
+
     try:
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', category=YAMLLoadWarning)
-            load_kube_config()
-        config_map = CoreV1Api().read_namespaced_config_map(
-            name='cray-product-catalog',
-            namespace='services'
-        )
-    # Earlier versions: FileNotFoundError; later versions: ConfigException
-    except (FileNotFoundError, ConfigException) as err:
-        LOGGER.error('Unable to load kubernetes configuration: %s', err)
+        product_catalog = ProductCatalog()
+    except ProductCatalogError as err:
+        LOGGER.error(f'Unable to obtain product version information from product catalog: {err}')
         return [], []
-    except MaxRetryError as err:
-        LOGGER.error('Unable to connect to Kubernetes to read cray-product-catalog configuration map: %s', err)
-        return [], []
-    except ApiException as err:
-        # The full string representation of ApiException is very long, so just log err.reason.
-        LOGGER.error('Error reading cray-product-catalog configuration map: %s', err.reason)
-        return [], []
+
     products = []
-
-    # This should only happen if the config map is in an unexpected state.
-    if config_map.data is None:
-        LOGGER.error('No product information found in cray-product-catalog configuration map.')
-        return [], []
-
-    for product_name, product_data in config_map.data.items():
-        # product_data is a multiline string in YAML format
-        product_data = safe_load(product_data)
-        for version in product_data:
-
-            images = '\n'.join(sorted(product_data[version].get('images', {}).keys())) or '-'
-            recipes = '\n'.join(sorted(product_data[version].get('recipes', {}).keys())) or '-'
-            if active_key not in product_data[version]:
-                active = 'N/A'
-            else:
-                active = product_data[version].get(active_key)
-            products.append([product_name, version, active, images, recipes])
+    for product in product_catalog.products:
+        images = '\n'.join(sorted(image['name'] for image in product.images)) or '-'
+        recipes = '\n'.join(sorted(recipe['name'] for recipe in product.recipes)) or '-'
+        active = str(product.active) if product.supports_active else 'N/A'
+        products.append([product.name, product.version, active, images, recipes])
 
     return headers, products
 

@@ -24,11 +24,8 @@ OTHER DEALINGS IN THE SOFTWARE.
 from collections import namedtuple
 import logging
 
-from sat.software_inventory.products import (
-    LATEST_VERSION_STRING,
-    ProductCatalog,
-    SoftwareInventoryError
-)
+from cray_product_catalog.query import ProductCatalog, ProductCatalogError
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -71,7 +68,7 @@ def get_example_input_config_data(product_catalog, config_name, example_layers):
     data to the returned example input data.
 
     Args:
-        product_catalog (sat.software_inventory.products.ProductCatalog): the
+        product_catalog (cray_product_catalog.query.ProductCatalog): the
             product catalog used to query for product data
         config_name (str): the name of the configuration to create
         example_layers (list of ExampleConfigLayer): the list of example layers
@@ -84,9 +81,8 @@ def get_example_input_config_data(product_catalog, config_name, example_layers):
 
     for example_layer in example_layers:
         try:
-            product = product_catalog.get_product(example_layer.product_name,
-                                                  LATEST_VERSION_STRING)
-        except SoftwareInventoryError as err:
+            product = product_catalog.get_product(example_layer.product_name)
+        except ProductCatalogError as err:
             LOGGER.warning(f'Unable to determine latest version of product '
                            f'{example_layer.product_name}: {err}')
             product_version = 'latest'
@@ -110,7 +106,7 @@ def get_example_cos_and_uan_configs(product_catalog):
     """Get input data for example COS and UAN CFS configurations.
 
     Args:
-        product_catalog (sat.software_inventory.products.ProductCatalog): the
+        product_catalog (cray_product_catalog.query.ProductCatalog): the
             product catalog used to query for product data
 
     Returns:
@@ -125,7 +121,7 @@ def get_product_recipe_names(product_catalog, product_name):
     """Get the recipes provided by the given product.
 
     Args:
-        product_catalog (sat.software_inventory.products.ProductCatalog): the
+        product_catalog (cray_product_catalog.query.ProductCatalog): the
             product catalog used to query for product data
         product_name (str): the name of the product for which to get recipes
 
@@ -133,8 +129,8 @@ def get_product_recipe_names(product_catalog, product_name):
         list of str: list of recipe names provided by the given product
     """
     try:
-        product = product_catalog.get_product(product_name, LATEST_VERSION_STRING)
-    except SoftwareInventoryError as err:
+        product = product_catalog.get_product(product_name)
+    except ProductCatalogError as err:
         LOGGER.warning(f'Unable to find latest version of product {product_name} '
                        f'to find its image recipes: {err}')
         return []
@@ -202,7 +198,7 @@ def get_example_images_and_templates(product_catalog, product_name, config_name,
     """Get example image and session template data for a given product
 
     Args:
-        product_catalog (sat.software_inventory.products.ProductCatalog): the
+        product_catalog (cray_product_catalog.query.ProductCatalog): the
             product catalog used to query for product data
         product_name (str): the name of the product to query for recipes from
             which to construct example image and session template input data
@@ -234,7 +230,7 @@ def get_example_cos_and_uan_images_session_templates(product_catalog):
     """Get input data for example COS and UAN images and session templates.
 
     Args:
-        product_catalog (sat.software_inventory.products.ProductCatalog): the
+        product_catalog (cray_product_catalog.query.ProductCatalog): the
             product catalog used to query for product data
 
     Returns:
@@ -273,7 +269,7 @@ def get_example_cos_and_uan_data():
     """
     try:
         product_catalog = ProductCatalog()
-    except SoftwareInventoryError as err:
+    except ProductCatalogError as err:
         raise BootprepExampleError(f'Failed to query product catalog to generate example data: {err}')
 
     configurations = get_example_cos_and_uan_configs(product_catalog)
