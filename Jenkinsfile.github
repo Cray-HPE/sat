@@ -65,7 +65,12 @@ pipeline {
         stage('Publish') {
             steps {
                 script {
-                    publishCsmDockerImage(image: env.NAME, tag: env.VERSION, isStable: env.IS_STABLE)
+                    publishCsmDockerImage(
+                        artifactoryRepo: 'sat-docker',
+                        image: env.NAME,
+                        tag: env.VERSION,
+                        isStable: env.IS_STABLE
+                    )
                 }
             }
         }
