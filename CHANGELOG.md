@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.7.5] - 2021-12-13
 
+### Fixed
+- Fixed an issue in config-docker-sat.sh that was causing the builds to fail.
+
 ### Changed
 
 - Bumped minor version to validate SAT after migration to internal HPE GitHub
