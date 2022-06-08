@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.16.1] - 2022-06-07
 
+### Fixed
+- Fixed an issue in config-docker-sat.sh that was causing the builds to fail.
+
 ### Changed
 - Changed builds to publish to the ``sat-docker`` Artifactory repository.
 
