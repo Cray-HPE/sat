@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Fixed
+- Fixed an issue causing `sat init` to not print a message when a new config was created.
+
 ### Removed
 - Removed unused `docker` python package from requirements files.
 
