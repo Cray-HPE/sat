@@ -36,7 +36,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added BOS v2 support to `sat bootprep`.
 - Added BOS v2 support to `sat bootsys`.
 
+## [3.16.1] - 2022-06-07
+
+### Fixed
+- Fixed an issue in config-docker-sat.sh that was causing the builds to fail.
+
 ### Changed
+- Changed builds to publish to the ``sat-docker`` Artifactory repository.
+
+## [3.16.0] - 2022-05-31
+
+### Changed
+- Incremented the base version of Alpine used in the container image from 3.13
+  to 3.15.
+- Made changes related to the open sourcing of sat.
+    - Update Jenkinsfile to use csm-shared-library.
+    - Add Makefile for building container image.
+    - Pull base container image from external location.
 - Began using a separate ``cray_product_catalog`` package to query the product
   catalog in ``sat bootprep``.
 - Began using a separate ``cray_product_catalog`` package to query the product
