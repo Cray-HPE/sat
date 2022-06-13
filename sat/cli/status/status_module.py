@@ -25,11 +25,15 @@ OTHER DEALINGS IN THE SOFTWARE.
 from abc import ABC, abstractmethod
 from collections import defaultdict
 import logging
+from urllib.parse import urlparse
 
+from sat.apiclient.bos import BOSClientCommon
 from sat.apiclient.cfs import CFSClient
 from sat.apiclient.gateway import APIError
 from sat.apiclient.hsm import HSMClient
+from sat.apiclient.ims import IMSClient
 from sat.apiclient.sls import SLSClient
+from sat.config import get_config_value
 from sat.constants import MISSING_VALUE
 from sat.util import get_val_by_path
 
@@ -61,10 +65,10 @@ class StatusModule(ABC):
     component types.
     """
 
-    # The `modules` class attribute should not be set by subclasses; if it is,
+    # The `_modules` class attribute should not be set by subclasses; if it is,
     # then the child class will not be automatically added to the
-    # `StatusModule.modules` list.
-    modules = []
+    # `StatusModule._modules` list.
+    _modules = []
     primary = False
     component_types = set()
 
@@ -118,7 +122,23 @@ class StatusModule(ABC):
         """
 
     def __init_subclass__(cls):
-        cls.modules.append(cls)
+        cls._modules.append(cls)
+
+    @staticmethod
+    def can_use():
+        """Determines whether the given module can be used in the current context.
+
+        Returns:
+            Tuple[bool, Optional[str]]: the first member the tuple determines whether
+                the module may be used. If the first member is False, the
+                second member of the tuple is the reason the module may not be
+                used.
+        """
+        return True, None
+
+    @classmethod
+    def modules(cls):
+        return [m for m in cls._modules if m.can_use()[0]]
 
     @staticmethod
     def _module_index(module):
@@ -179,12 +199,12 @@ class StatusModule(ABC):
         Returns:
             list of relevant modules given the previous parameters.
         """
-        modules = cls.modules if limit_modules is None else limit_modules
+        modules = cls.modules() if limit_modules is None else limit_modules
 
         if component_type is not None:
             return [module for module in modules
-                    if not module.component_types or
-                    component_type in module.component_types]
+                    if module.can_use()[0] and
+                    (not module.component_types or component_type in module.component_types)]
         return modules
 
     @classmethod
@@ -240,7 +260,7 @@ class StatusModule(ABC):
             ValueError: if more than one module has its class attribute
                 `primary` set to `True`.
         """
-        primaries = [module for module in cls.modules if module.primary]
+        primaries = [module for module in cls._modules if module.primary]
         if len(primaries) != 1:
             raise ValueError('Must be exactly one primary StatusModule')
         return primaries.pop()
@@ -425,3 +445,113 @@ class CFSStatusModule(StatusModule):
             raise StatusModuleException(f'Failed to parse JSON from CFS component response: {err}') from err
 
         return cfs_response
+
+
+class BOSStatusModule(StatusModule):
+    """Module for retrieving boot status information from BOS"""
+    headings = ['xname', 'Boot Status', 'Most Recent BOS Session', 'Most Recent Session Template', 'Most Recent Image']
+    source_name = 'BOS'
+    component_types = {'Node'}
+
+    @staticmethod
+    def can_use():
+        if get_config_value('bos.api_version') != 'v2':
+            return (False, 'BOS v2 is required to retrieve component boot status')
+        return (True, None)
+
+    def get_image_for_component(self, raw_component):
+        """Helper function to query the image name given a component dict from BOS.
+
+        Args:
+            raw_component (dict): a component dictionary returned from BOS v2
+
+        Returns:
+            str: the name of the IMS image currently booted on the given
+                component, or MISSING_VALUE if it cannot be identified
+        """
+
+        # To get a human readable name for each booted image, IMS is
+        # queried for images based on the path to the actual booted kernel.
+        # This depends on the fact that the IMS image ID is part of the
+        # path to the booted kernel in S3.
+        #
+        # TODO: This seems a bit fragile but BOS doesn't appear to provide
+        # this information anywhere else.
+
+        ims_client = IMSClient(self.session)
+        booted_image = MISSING_VALUE
+
+        kernel_path = get_val_by_path(raw_component, 'actual_state.boot_artifacts.kernel')
+        if kernel_path:
+            img_id = urlparse(kernel_path).path.split('/')[1]
+            try:
+                booted_image = ims_client.get_image(img_id)['name']
+
+            except APIError as err:
+                LOGGER.warning('Could not retrieve image name for component %s: %s',
+                               raw_component['xname'], err)
+            except KeyError as err:
+                LOGGER.warning('Image %s missing "%s" field in IMS response',
+                               img_id, err)
+        return booted_image
+
+    @property
+    def rows(self):
+        bos_client = BOSClientCommon.get_bos_client(self.session, version='v2')
+
+        try:
+            raw_components = bos_client.get_components()
+        except APIError as err:
+            raise StatusModuleException(f'Failed to query BOS for component information: {err}') from err
+
+        headings_to_paths = {
+            'xname': 'id',
+            'Most Recent BOS Session': 'session',
+            'Boot Status': 'status.status',
+        }
+
+        components = []
+        for raw_component in raw_components:
+            if 'id' not in raw_component:
+                raise StatusModuleException('A component in BOS response is missing the "id" field')
+
+            component = {
+                heading: get_val_by_path(raw_component, path) or MISSING_VALUE
+                for heading, path in headings_to_paths.items()
+            }
+            component['Most Recent Image'] = self.get_image_for_component(raw_component)
+
+            # Another request to BOS is needed in order to retrieve the
+            # session template used with each session.
+            component_xname = component['xname']
+            try:
+                session_id = raw_component.get('session')
+                if not session_id:
+                    LOGGER.warning('"session" key missing from BOS response for component %s',
+                                   component_xname)
+                    continue
+
+                try:
+                    component_session = bos_client.get_session(session_id)
+                except APIError as err:
+                    LOGGER.warning('Could not retrieve BOS session for component %s: %s',
+                                   component_xname, err)
+                    continue
+
+                try:
+                    template_name = component_session['template_name']
+                    component['Most Recent Session Template'] = bos_client.get_session_template(template_name)['name']
+                except APIError as err:
+                    LOGGER.warning('Could not retrieve BOS session template for component %s with session %s: %s',
+                                   component_xname, session_id, err)
+
+                except KeyError as err:
+                    LOGGER.warning('"%s" key missing from BOS response for component %s',
+                                   err, component_xname)
+                    continue
+            finally:
+                # This finally block always runs regardless of whether the
+                # loop was prematurely `continue`d or not.
+                components.append(component)
+
+        return components

@@ -184,7 +184,14 @@ def do_status(args):
         for module_name in args.status_module_names:
             if module_name in seen_module_names:
                 continue
-            modules.append(getattr(sat.cli.status.status_module, module_name))
+
+            module_cls = getattr(sat.cli.status.status_module, module_name)
+            can_use, err_reason = module_cls.can_use()
+            if not can_use:
+                LOGGER.warning('Cannot retrieve status information from %s: %s',
+                               module_cls.source_name, err_reason)
+            else:
+                modules.append(module_cls)
             seen_module_names.add(module_name)
 
     types = COMPONENT_TYPES if 'all' in args.types else args.types
