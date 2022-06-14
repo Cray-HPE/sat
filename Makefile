@@ -1,5 +1,7 @@
-#!/bin/bash
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP.
+#
+# MIT License
+#
+# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -13,13 +15,29 @@
 #
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
+#
 
-base_dir=$(dirname "$0")
-rm -rf sat-venv && virtualenv -p $(which python3) ./sat-venv
-source sat-venv/bin/activate
-$base_dir/runBuildPrep.sh
+NAME ?= cray-sat
+VERSION ?= $(shell build_scripts/version.sh)
+DOCKER_BUILD = docker build . --pull $(DOCKER_ARGS)
+DEFAULT_TAG = '$(NAME):$(VERSION)'
+TEST_TAG = '$(NAME)-testing:$(VERSION)'
+CODESTYLE_TAG = '$(NAME)-codestyle:$(VERSION)'
+
+all : unittest codestyle image
+
+unittest:
+		$(DOCKER_BUILD) --target testing --tag $(TEST_TAG)
+		docker run $(TEST_TAG)
+
+codestyle:
+		$(DOCKER_BUILD) --target codestyle --tag $(CODESTYLE_TAG)
+		docker run $(CODESTYLE_TAG)
+
+image:
+		$(DOCKER_BUILD) --tag $(DEFAULT_TAG)

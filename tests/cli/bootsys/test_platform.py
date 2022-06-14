@@ -835,7 +835,9 @@ class TestDoCephUnfreeze(unittest.TestCase):
         do_ceph_unfreeze(self.ncn_groups)
         self.toggle_ceph_freeze_flags.assert_called_once_with(freeze=False)
         self.get_config_value.assert_called_once_with('bootsys.ceph_timeout')
-        self.ceph_waiter_cls.assert_called_once_with(self.get_config_value.return_value, self.ncn_groups['storage'], retries=1)
+        self.ceph_waiter_cls.assert_called_once_with(
+            self.get_config_value.return_value, self.ncn_groups['storage'], retries=1
+        )
         self.ceph_waiter.wait_for_completion.assert_called_once_with()
 
     def test_do_ceph_unfreeze_unhealthy(self):
@@ -846,7 +848,9 @@ class TestDoCephUnfreeze(unittest.TestCase):
             do_ceph_unfreeze(self.ncn_groups)
         self.toggle_ceph_freeze_flags.assert_called_once_with(freeze=False)
         self.get_config_value.assert_called_once_with('bootsys.ceph_timeout')
-        self.ceph_waiter_cls.assert_called_once_with(self.get_config_value.return_value, self.ncn_groups['storage'], retries=1)
+        self.ceph_waiter_cls.assert_called_once_with(
+            self.get_config_value.return_value, self.ncn_groups['storage'], retries=1
+        )
         self.ceph_waiter.wait_for_completion.assert_called_once_with()
 
 

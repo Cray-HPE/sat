@@ -1,6 +1,6 @@
 # Changelog
 
-(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.6] - 2022-06-13
+
+### Changed
+- Incremented the base version of Alpine used in the container image from 3.13
+  to 3.15.
+- Made changes related to the open sourcing of sat.
+    - Update Jenkinsfile to use csm-shared-library.
+    - Add Makefile for building container image.
+    - Pull base container image from external location.
+    - Updated the project URL in `setup.py` to external GitHub location.
+
 ## [3.7.5] - 2021-12-13
+
+### Fixed
+- Fixed an issue in config-docker-sat.sh that was causing the builds to fail.
 
 ### Changed
 
