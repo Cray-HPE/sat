@@ -32,7 +32,7 @@ keep all these files synchronized.
 
 ## Adding a production dependency
 
-Create a new Python virtual environment:
+Create and activate a new Python virtual environment:
 
     user@local-mbp sat $ python3 -m venv ./sat-venv
     user@local-mbp sat $ source sat-venv/bin/activate
@@ -77,7 +77,7 @@ This process should have modified ``requirements.txt``, ``requirements.lock.txt`
 
 ## Adding a development dependency
 
-Create a new Python virtual environment:
+Create and activate a new Python virtual environment:
 
     user@local-mbp sat $ python3 -m venv ./sat-venv
     user@local-mbp sat $ source sat-venv/bin/activate
@@ -113,14 +113,43 @@ This process should have modified ``requirements-dev.txt`` and
 ``requirements-dev.lock.txt``, but not ``requirements.txt`` or
 ``requirements.lock.txt``.
 
+## Removing a production dependency
+
+Create and activate a new Python virtual environment:
+
+    user@local-mbp sat $ python3 -m venv ./sat-venv
+    user@local-mbp sat $ source sat-venv/bin/activate
+
+Remove the dependency from `requirements.txt`.
+
+Install the base requirements using the locked requirements file as a
+constraints file:
+
+    (sat-venv) user@local-mbp sat $ pip install -r requirements.txt -c requirements.lock.txt
+
+Run `pip freeze` and save the output to `requirements.lock.txt`:
+
+    (sat-venv) user@local-mbp sat $ pip freeze > requirements.lock.txt
+
+Install the dev-only requirements using the locked dev requirements file as a
+constraints file:
+
+    (sat-venv) user@local-mbp sat $ pip install -r requirements-dev.txt -c requirements-dev.lock.txt
+
+Run `pip freeze` again and save the output to `requirements-dev.lock.txt`.
+
+    (sat-venv) user@local-mbp sat $ pip freeze > requirements-dev.lock.txt
+
+This process should have modified `requirements.txt`, `requirements.lock.txt` and
+`requirements-dev.lock.txt`, but not `requirements-dev.txt`.
+
 ## Re-generating the locked requirements files
 
 You may want to re-generate the locked requirements files to pull in newer
 versions of the various dependencies. This may be needed to address security
-issues, but it also is the easiest way to remove a dependency and guarantee
-that its sub-dependencies are also removed.
+issues.
 
-Create a new Python virtual environment:
+Create and activate a new Python virtual environment:
 
     user@local-mbp sat $ python3 -m venv ./sat-venv
     user@local-mbp sat $ source sat-venv/bin/activate
