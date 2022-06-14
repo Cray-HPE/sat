@@ -1,6 +1,6 @@
 """
 Loads configuration from a config file in INI format.
-(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -375,7 +375,7 @@ def process_toml_output(toml_str):
     """
     copyright_stmt = """\
         Default configuration file for SAT.
-        (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
+        (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
 
         Permission is hereby granted, free of charge, to any person obtaining a
         copy of this software and associated documentation files (the "Software"),
