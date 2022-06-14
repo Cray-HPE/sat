@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Update Jenkinsfile to use csm-shared-library.
     - Add Makefile for building container image.
     - Pull base container image from external location.
+    - Updated the project URL in `setup.py` to external GitHub location.
 
 ## [3.15.4] - 2022-05-03
 
