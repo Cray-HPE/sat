@@ -25,6 +25,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.14.1] - 2022-06-13
+
+### Fixed
+
+- Fixed an issue in config-docker-sat.sh that was causing the builds to fail.
+- Fixed tab completion in ``sat bash``.
+- Fixed a bug with the ``$PATH`` environment variable not including the ``sat``
+  executable in ``sat bash``.
+
+### Changed
+
+- Incremented the base version of Alpine used in the container image from 3.13
+  to 3.15.
+- Made changes related to the open sourcing of sat.
+    - Update Jenkinsfile to use csm-shared-library.
+    - Add Makefile for building container image.
+    - Pull base container image from external location.
+    - Updated the project URL in `setup.py` to external GitHub location.
+- Added a stage to the Docker container build which runs pycodestyle on the
+  SAT codebase and unit tests.
+
 ## [3.14.0] - 2022-02-24
 
 ### Added
