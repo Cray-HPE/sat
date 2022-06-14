@@ -27,7 +27,8 @@ import os
 from cray_product_catalog.query import ProductCatalog, ProductCatalogError
 import yaml
 
-from sat.apiclient import BOSClient, CFSClient, IMSClient
+from sat.apiclient import CFSClient, IMSClient
+from sat.apiclient.bos import BOSClientCommon
 from sat.cli.bootprep.errors import (
     BootPrepDocsError,
     BootPrepInternalError,
@@ -160,7 +161,7 @@ def do_bootprep_run(schema_validator, args):
     session = SATSession()
     cfs_client = CFSClient(session)
     ims_client = IMSClient(session)
-    bos_client = BOSClient(session)
+    bos_client = BOSClientCommon.get_bos_client(session)
 
     try:
         product_catalog = ProductCatalog()

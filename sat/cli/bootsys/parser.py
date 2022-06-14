@@ -1,7 +1,7 @@
 """
 The parser for the bootsys subcommand.
 
-(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@ from sat.cli.bootsys.stages import STAGES_BY_ACTION
 
 TimeoutSpec = namedtuple('TimeoutSpec', ['option_prefix', 'applicable_actions',
                                          'default', 'condition'])
+
 
 TIMEOUT_SPECS = [
     TimeoutSpec('capmc', ['shutdown'], 120,
@@ -249,6 +250,12 @@ def add_bootsys_subparser(subparsers):
         description='Boot or shut down the entire system, including the '
                     'compute nodes, user access nodes, and non-compute '
                     'nodes running the management software.',
+    )
+
+    bootsys_parser.add_argument(
+        '--bos-version',
+        choices=['v1', 'v2'],
+        help='The version of the BOS API to use for BOS operations',
     )
 
     actions_subparsers = bootsys_parser.add_subparsers(

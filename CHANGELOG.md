@@ -25,7 +25,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+
+## [Unreleased]
+
+### Added
+- Added client support for the BOS v2 API.
+- Added a `--bos-version` command line option and `bos.api_version`
+  configuration file option which can be used to specify which version of the
+  BOS API to use.
+- Added BOS v2 support to `sat bootprep`.
+- Added BOS v2 support to `sat bootsys`.
+- Added BOS v2 support to `sat status`, and added fields to `sat status` output
+  listing the most recent BOS session, template, booted image, and boot status
+  for nodes when BOS v2 is in use. Added a `--bos-fields` option to limit
+  output to these fields.
 
 ### Fixed
 - Fixed an issue causing `sat init` to not print a message when a new config was created.

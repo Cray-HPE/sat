@@ -1,7 +1,7 @@
 """
 The parser for the bootprep subcommand.
 
-(C) Copyright 2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -205,6 +205,11 @@ def _add_bootprep_run_subparser(subparsers):
         '--delete-ims-jobs', '-D', action='store_true',
         help='Delete IMS jobs after creating images. Note that deleting IMS jobs '
              'makes determining image history impossible.'
+    )
+    run_subparser.add_argument(
+        '--bos-version',
+        choices=['v1', 'v2'],
+        help='The version of the BOS API to use for BOS operations',
     )
 
     add_skip_and_overwrite_options(run_subparser, 'config', 'configuration')
