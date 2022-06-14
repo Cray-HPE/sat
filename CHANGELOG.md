@@ -40,6 +40,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for nodes when BOS v2 is in use. Added a `--bos-fields` option to limit
   output to these fields.
 
+### Fixed
+- Fixed an issue causing `sat init` to not print a message when a new config was created.
+
+### Removed
+- Removed unused `docker` python package from requirements files.
+
 ## [3.16.1] - 2022-06-07
 
 ### Fixed

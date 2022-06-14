@@ -1,7 +1,7 @@
 """
 Unit tests for sat.cli.init.main
 
-(C) Copyright 2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -46,19 +46,24 @@ class TestInitMain(ExtendedTestCase):
         self.mock_getenv = patch('sat.cli.init.main.os.getenv').start()
         self.mock_getenv.return_value = DEFAULT_CONFIG_PATH
 
+    def assert_info_printed(self, contents=None):
+        """Helper function to assert that a message beginning with "INFO:" with given contents was printed"""
+        prefix = 'INFO:'
+        if contents:
+            prefix += ' ' + str(contents)
+        self.assertTrue(self.mock_print.call_args.args[0].startswith(prefix))
+
     def tearDown(self):
         """Stop patches."""
         patch.stopall()
 
     def test_successful_init(self):
         """Test that a normal 'sat init' calls generate_default_config and logs a success message."""
-        with self.assertLogs(level=logging.INFO) as logs:
-            do_init(self.sat_init_args)
+        do_init(self.sat_init_args)
+        self.assert_info_printed(f'Configuration file "{DEFAULT_CONFIG_PATH}" generated.')
         self.mock_generate_default_config.assert_called_once_with(
             DEFAULT_CONFIG_PATH, username=self.sat_init_args.username, force=self.sat_init_args.force
         )
-        self.assert_in_element(f'Configuration file "{DEFAULT_CONFIG_PATH}" generated.',
-                               logs.output)
 
     def test_init_already_exists(self):
         """Test that a 'sat init' handles the ConfigFileExistsError correctly."""
@@ -80,25 +85,21 @@ class TestInitMain(ExtendedTestCase):
         """Test that giving the output option generates the config at the specified path."""
         mock_path = '/mock/path.toml'
         self.sat_init_args.output = mock_path
-        with self.assertLogs(level=logging.INFO) as logs:
-            do_init(self.sat_init_args)
+        do_init(self.sat_init_args)
+        self.assert_info_printed(f'Configuration file "{mock_path}" generated.')
         self.mock_generate_default_config.assert_called_once_with(
             mock_path, username=self.sat_init_args.username, force=self.sat_init_args.force
         )
-        self.assert_in_element(f'Configuration file "{mock_path}" generated.',
-                               logs.output)
 
     def test_init_config_file_environment_variable(self):
         """Test that giving the $SAT_CONFIG_FILE environment variable generates the config at the specified path."""
         mock_path = '/mock/path.toml'
         self.mock_getenv.return_value = mock_path
-        with self.assertLogs(level=logging.INFO) as logs:
-            do_init(self.sat_init_args)
+        do_init(self.sat_init_args)
+        self.assert_info_printed(f'Configuration file "{mock_path}" generated.',)
         self.mock_generate_default_config.assert_called_once_with(
             mock_path, username=self.sat_init_args.username, force=self.sat_init_args.force
         )
-        self.assert_in_element(f'Configuration file "{mock_path}" generated.',
-                               logs.output)
 
 
 if __name__ == '__main__':
