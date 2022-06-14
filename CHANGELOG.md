@@ -46,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed unused `docker` python package from requirements files.
 
+### Changed
+- Updated the project URL in `setup.py` to external GitHub location.
+
 ## [3.16.1] - 2022-06-07
 
 ### Fixed
