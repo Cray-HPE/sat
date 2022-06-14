@@ -46,7 +46,7 @@ setup(
     description="System Admin Toolkit",
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.hpe.com/hpe/hpc-sat',
+    url='https://github.com/Cray-HPE/sat',
     author='Hewlett Packard Enterprise Development LP',
     license='MIT',
     packages=find_packages(exclude=['tests', 'tests.*', 'tools', 'tools.*']),
