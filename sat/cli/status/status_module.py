@@ -527,8 +527,9 @@ class BOSStatusModule(StatusModule):
             try:
                 session_id = raw_component.get('session')
                 if not session_id:
-                    LOGGER.warning('"session" key missing from BOS response for component %s',
-                                   component_xname)
+                    if session_id is None:
+                        LOGGER.warning('"session" key missing from BOS response for component %s',
+                                       component_xname)
                     continue
 
                 try:
