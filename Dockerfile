@@ -25,7 +25,7 @@
 #
 # The multi-stage Dockerfile is somewhat more complex than the original
 # Dockerfile, but it provides significant reductions in image size and build time
-# when cached builds are present. 
+# when cached builds are present.
 
 
 # The venv_base sets up the environment variables for the virtualenv which are
@@ -51,7 +51,7 @@ FROM base as build
 
 RUN apk update && \
     apk add bash bash-completion openssl-dev libffi-dev openssh curl musl-dev \
-            git make gcc mandoc ipmitool ceph-common rust cargo && \
+            git make gcc mandoc ipmitool ceph-common && \
     python3 -m venv $VIRTUAL_ENV
 
 COPY requirements.lock.txt requirements.txt
@@ -67,7 +67,7 @@ COPY sat sat
 COPY docs/man docs/man
 COPY tools tools
 
-RUN pip3 install --no-cache-dir 'pip < 22.0' && \
+RUN pip3 install --no-cache-dir pip && \
     pip3 install --no-cache-dir --timeout=300 . && \
     ./config-docker-sat.sh
 
