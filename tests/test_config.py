@@ -214,7 +214,7 @@ class TestGenerateDefaultConfig(unittest.TestCase):
         generate_default_config('/etc/opt/cray/sat.toml')
         self.mock_open.assert_called_once_with('/etc/opt/cray/sat.toml', 'w')
         self.mock_output_stream.write.assert_called_once_with(self.expected_config)
-        self.mock_makedirs.assert_called_once_with('/etc/opt/cray', exist_ok=True)
+        self.mock_makedirs.assert_called_once_with('/etc/opt/cray', mode=0o700, exist_ok=True)
 
     def test_generate_with_username(self):
         """Test generating config with a username will write a config file with a username"""

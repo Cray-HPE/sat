@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -372,6 +372,31 @@ class SATEncoder(JSONEncoder):
 json_dump = partial(dumps, cls=SATEncoder, **JSON_FORMAT_PARAMS)
 
 
+def get_resource_section_path(section):
+    """Get the path to a section in the sat resource directory.
+
+    If the section subdirectory does not exist, it is created. If it cannot be
+    created, SystemExit is raised.
+
+    Args:
+        section (str): A subdirectory under the resource directory
+
+    Returns:
+        str: the path to the directory in the SAT resource directory
+
+    Raises:
+        SystemExit: if the given subdirectory does not exist and cannot be
+            created
+    """
+    resource_path = os.path.join(os.environ['HOME'], '.config', 'sat', section)
+    try:
+        os.makedirs(resource_path, exist_ok=True)
+    except OSError as err:
+        LOGGER.error("Unable to create resource directory '%s': %s", resource_path, err)
+        raise SystemExit(1)
+    return resource_path
+
+
 def get_resource_filename(name, section='.'):
     """Get the pathname to a resource file.
 
@@ -383,14 +408,7 @@ def get_resource_filename(name, section='.'):
         Full pathname to the resource file.
     """
 
-    resource_path = os.path.join(os.environ['HOME'], '.config', 'sat', section)
-
-    try:
-        os.makedirs(resource_path, exist_ok=True)
-    except OSError as err:
-        LOGGER.error("Unable to create resource directory '%s': %s", resource_path, err)
-        raise SystemExit(1)
-
+    resource_path = get_resource_section_path(section)
     return os.path.join(resource_path, name)
 
 
@@ -621,3 +639,32 @@ def match_query_key(query_key, headings):
                        f"Using first match: '{matching_keys[0]}' from {tuple(matching_keys)}.")
 
     return matching_keys[0]
+
+
+def ensure_permissions(path, file_mode=0o600, dir_mode=0o700):
+    """Lock down the file and directory permissions for a given path.
+
+    Specifically, if the given path points to a file, the file at the given
+    path will be given the mode `file_mode`, and the containing directory will
+    be given the mode `dir_mode`. If the given path points to a directory, it
+    will be given the mode `dir_mode`.
+
+    No action is taken for the given file or its containing directory if each
+    does not exist.
+
+    Args:
+        path (str): the path to the file or directory to have permissions set
+        file_mode (int): the mode of the file
+        dir_mode (int): the mode of the containing directory
+
+    Returns: None
+    """
+    if os.path.isdir(path):
+        os.chmod(path, dir_mode)
+        return
+    elif os.path.isfile(path):
+        os.chmod(path, file_mode)
+
+    dir_path = os.path.dirname(path)
+    if os.path.isdir(dir_path):
+        os.chmod(dir_path, dir_mode)
