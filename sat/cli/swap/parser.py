@@ -80,6 +80,11 @@ def _add_swap_blade_subparser(subparsers):
         description='Prepare blade for swap or prepare to bring up a blade after swapping'
     )
     swap_blade_parser.add_argument(
+        '--no-delete-node-interfaces', action='store_false', dest='delete_node_interfaces',
+        help='Do not delete ethernet interface mappings from HSM when performing the swap out procedure. '
+             'This is useful when swapping in a new replacement blade.'
+    )
+    swap_blade_parser.add_argument(
         '--src-mapping',
         help='Path to the file containing a mapping of component xnames, IP addresses, and MAC addresses '
              'from the source system. This is only used when adding a blade to a system.'

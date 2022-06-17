@@ -270,6 +270,10 @@ class SwapOutProcedure(BladeSwapProcedure):
     """The blade removal portion of the blade swap procedure."""
     action_verb = 'remove'
 
+    def __init__(self, args):
+        super().__init__(args)
+        self.delete_node_interfaces = args.delete_node_interfaces
+
     @blade_swap_stage('Perform pre-swap checks', allow_in_dry_run=True)
     def pre_swap_checks(self):
         """Check if the given slot xnames are ready for blade swapping.
@@ -452,11 +456,14 @@ class SwapOutProcedure(BladeSwapProcedure):
         Raises:
             APIError: if there is an issue deleting the ethernet interfaces from HSM.
         """
-        interface_ids_to_delete = set(
-            iface['ID']
-            for node in self.blade_nodes
-            for iface in self.hsm_client.get_ethernet_interfaces(node['ID'])
-        )
+        interface_ids_to_delete = set()
+
+        if self.delete_node_interfaces:
+            interface_ids_to_delete |= set(
+                iface['ID']
+                for node in self.blade_nodes
+                for iface in self.hsm_client.get_ethernet_interfaces(node['ID'])
+            )
 
         # River blades should have the NodeBMC ethernet interfaces deleted as
         # well. Mountain blades should *only* have the node ethernet interfaces
@@ -468,6 +475,11 @@ class SwapOutProcedure(BladeSwapProcedure):
                 for node in self.blade_node_bmcs
                 for iface in self.hsm_client.get_ethernet_interfaces(node['ID'])
             )
+
+        if not interface_ids_to_delete:
+            LOGGER.info('No ethernet interfaces need to be deleted for blade %s',
+                        self.xname)
+            return
 
         for ethernet_interface in interface_ids_to_delete:
             self.hsm_client.delete_ethernet_interface(ethernet_interface)

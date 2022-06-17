@@ -138,6 +138,7 @@ class BaseBladeSwapProcedureTest(unittest.TestCase):
             dry_run=False,
             src_mapping='src_mapping.json',
             dst_mapping='dst_mapping.json',
+            delete_node_interfaces=True,
         )
         self.swap_in = SwapInProcedure(self.args)
         self.swap_out = SwapOutProcedure(self.args)
