@@ -1,4 +1,4 @@
-"""""
+"""
 Functions to create the subparser for the diag command.
 
 (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
