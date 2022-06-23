@@ -58,6 +58,7 @@ from sat.cli.bootprep.validate import (
     load_and_validate_schema,
     SCHEMA_FILE_RELATIVE_PATH,
 )
+from sat.cli.bootprep.vars import VariableContext, VariableContextError
 from sat.session import SATSession
 
 
@@ -175,7 +176,14 @@ def do_bootprep_run(schema_validator, args):
         # data will fail. Otherwise, this is not a problem.
         product_catalog = None
 
-    instance = InputInstance(instance_data, cfs_client, ims_client, bos_client, product_catalog)
+    var_context = VariableContext(args.recipe_version, args.vars_file, args.vars)
+    try:
+        var_context.load_vars()
+    except VariableContextError as err:
+        LOGGER.error(str(err))
+        raise SystemExit(1)
+
+    instance = InputInstance(instance_data, cfs_client, ims_client, bos_client, var_context, product_catalog)
 
     # TODO (CRAYSAT-1277): Refactor images to use BaseInputItemCollection
     # TODO (CRAYSAT-1278): Refactor configurations to use BaseInputItemCollection

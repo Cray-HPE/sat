@@ -23,6 +23,7 @@ boto3
 cray-product-catalog >= 1.6.0
 croniter >= 0.3, < 1.0
 inflect >= 0.2.5, < 3.0
+Jinja2 >= 3.0, < 4.0
 json-schema-for-humans
 jsonschema >= 4.0, < 5.0
 kubernetes

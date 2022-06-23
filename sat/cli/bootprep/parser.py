@@ -26,7 +26,13 @@ The parser for the bootprep subcommand.
 """
 from inflect import engine
 
-from sat.cli.bootprep.constants import DEFAULT_PUBLIC_KEY_FILE, DOCS_ARCHIVE_FILE_NAME, EXAMPLE_FILE_NAME
+from sat.cli.bootprep.constants import (
+    DEFAULT_PUBLIC_KEY_FILE,
+    DOCS_ARCHIVE_FILE_NAME,
+    EXAMPLE_FILE_NAME,
+    LATEST_VERSION_VALUE
+)
+from sat.parsergroups import StoreNestedVariable
 
 OUTPUT_DIR_OPTION = '--output-dir'
 
@@ -213,6 +219,27 @@ def _add_bootprep_run_subparser(subparsers):
         '--bos-version',
         choices=['v1', 'v2'],
         help='The version of the BOS API to use for BOS operations',
+    )
+    # TODO (CASM-2920): With official recipe manifest, default to LATEST_VERSION_VALUE
+    run_subparser.add_argument(
+        '--recipe-version',
+        help='The HPC software recipe version, e.g. 22.03. This is used to '
+             'obtain the product versions which can be substituted for variables '
+             'specified in fields in the input file. If not specified, variables '
+             f'are not loaded from the HPC software recipe. If "{LATEST_VERSION_VALUE}" '
+             f'is specified, use the latest available HPC software recipe.'
+    )
+    run_subparser.add_argument(
+        '--vars-file',
+        help='A file containing variables that can be used in fields in the '
+             'input file. Values from this file take precedence over values '
+             'in the HPC Software Recipe defaults.'
+    )
+    run_subparser.add_argument(
+        '--vars', action=StoreNestedVariable,
+        help='Variables that can be used in fields in the input file. Values '
+             'specified here take precedence over values specified in any '
+             '--vars-file or in the HPC software recipe defaults.'
     )
 
     add_skip_and_overwrite_options(run_subparser, 'config', 'configuration')

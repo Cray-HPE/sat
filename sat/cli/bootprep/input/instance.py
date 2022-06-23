@@ -35,7 +35,7 @@ class InputInstance:
     """A representation of the instance loaded from the provided input file.
     """
 
-    def __init__(self, instance_dict, cfs_client, ims_client, bos_client, product_catalog):
+    def __init__(self, instance_dict, cfs_client, ims_client, bos_client, var_context, product_catalog):
         """Create a new InputInstance from the validated contents of an input file.
 
         Args:
@@ -47,6 +47,8 @@ class InputInstance:
                 requests to the IMS API
             bos_client (sat.apiclient.BOSClientCommon): the BOS API client to make
                 requests to the BOS API
+            var_context (sat.cli.bootprep.vars.VariableContext): the variables
+                to use for variable substitution in input instance.
             product_catalog (cray_product_catalog.query.ProductCatalog):
                 the product catalog object
         """
@@ -54,12 +56,13 @@ class InputInstance:
         self.cfs_client = cfs_client
         self.ims_client = ims_client
         self.bos_client = bos_client
+        self.var_context = var_context
         self.product_catalog = product_catalog
 
     @cached_property
     def input_configurations(self):
         """list of InputConfiguration: the configurations in the input instance"""
-        return [InputConfiguration(configuration, self.product_catalog)
+        return [InputConfiguration(configuration, self.var_context, self.product_catalog)
                 for configuration in self.instance_dict.get('configurations', [])]
 
     @cached_property

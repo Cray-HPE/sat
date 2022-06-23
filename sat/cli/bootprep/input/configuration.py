@@ -25,20 +25,46 @@
 Defines classes for configurations defined in the input file.
 """
 from abc import ABC, abstractmethod
+import functools
 import logging
 from urllib.parse import urlparse, urlunparse
 
 from cray_product_catalog.query import ProductCatalogError
+from jinja2 import Template, TemplateError
 
 from sat.apiclient.vcs import VCSError, VCSRepo
 from sat.cached_property import cached_property
+from sat.cli.bootprep.constants import LATEST_VERSION_VALUE
 from sat.cli.bootprep.errors import ConfigurationCreateError
 from sat.config import get_config_value
 
-# This value is used to specify that the latest version of a product is desired
-LATEST_VERSION_VALUE = 'latest'
-
 LOGGER = logging.getLogger(__name__)
+
+
+def render_template(func):
+    """Wrapper function to handle Jinja templates with variables stored in object.
+
+    This should be used to wrap instance methods which return content from the
+    InputInstance that may contain Jinja2 template content to be rendered.
+
+    This wrapper assumes the instance has a `var_context` attribute of type
+    `VariableContext` that should be used for rendering templates.
+    """
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        unrendered_result = func(self, *args, **kwargs)
+
+        # If the value is `None`, it was not specified by the user.
+        if unrendered_result is None:
+            return unrendered_result
+
+        try:
+            return Template(unrendered_result).render(self.var_context.vars)
+        except TemplateError as err:
+            raise ConfigurationCreateError(f'Failed to render Jinja2 template {unrendered_result} '
+                                           f'for value {func.__name__}: {err}')
+
+    return wrapper
 
 
 class InputConfigurationLayer(ABC):
@@ -62,13 +88,16 @@ class InputConfigurationLayer(ABC):
     # for both GitCFSConfigurationLayers and ProductCFSConfigurationLayers.
     resolve_branches = True
 
-    def __init__(self, layer_data):
+    def __init__(self, layer_data, var_context):
         """Create a new configuration layer.
 
         Args:
             layer_data (dict): the layer data from the input instance
+            var_context (sat.cli.bootprep.vars.VariableContext): the variables
+                to use for variable substitution in input instance.
         """
         self.layer_data = layer_data
+        self.var_context = var_context
 
     @property
     def playbook(self):
@@ -76,6 +105,7 @@ class InputConfigurationLayer(ABC):
         return self.layer_data.get('playbook')
 
     @property
+    @render_template
     def name(self):
         """str or None: the name specified for the layer"""
         return self.layer_data.get('name')
@@ -123,12 +153,14 @@ class InputConfigurationLayer(ABC):
         return cfs_layer_data
 
     @staticmethod
-    def get_configuration_layer(layer_data, product_catalog):
+    def get_configuration_layer(layer_data, var_context, product_catalog):
         """Get and return a new InputConfigurationLayer for the given layer data.
 
         Args:
             layer_data (dict): The data for a layer, already validated against
                 the bootprep input file schema.
+            var_context (sat.cli.bootprep.vars.VariableContext): the variables
+                to use for variable substitution in input instance.
             product_catalog (cray_product_catalog.query.ProductCatalog):
                 the product catalog object
 
@@ -138,9 +170,9 @@ class InputConfigurationLayer(ABC):
                 properly validated against the schema.
         """
         if 'git' in layer_data:
-            return GitInputConfigurationLayer(layer_data)
+            return GitInputConfigurationLayer(layer_data, var_context)
         elif 'product' in layer_data:
-            return ProductInputConfigurationLayer(layer_data, product_catalog)
+            return ProductInputConfigurationLayer(layer_data, var_context, product_catalog)
         else:
             raise ValueError('Unrecognized type of configuration layer')
 
@@ -180,6 +212,7 @@ class GitInputConfigurationLayer(InputConfigurationLayer):
         return self.layer_data['git']['url']
 
     @property
+    @render_template
     def branch(self):
         # The 'branch' property is optional
         return self.layer_data['git'].get('branch')
@@ -198,15 +231,17 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
     A configuration layer that is defined with the name of a product
     and the version or branch.
     """
-    def __init__(self, layer_data, product_catalog):
+    def __init__(self, layer_data, var_context, product_catalog):
         """Create a new ProductInputConfigurationLayer.
 
         Args:
             layer_data (dict): the layer data from the input instance
+            var_context (sat.cli.bootprep.vars.VariableContext): the variables
+                to use for variable substitution in input instance.
             product_catalog (cray_product_catalog.query.ProductCatalog or None):
                 the product catalog object
         """
-        super().__init__(layer_data)
+        super().__init__(layer_data, var_context)
         self.product_catalog = product_catalog
 
     @property
@@ -216,8 +251,9 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
         return self.layer_data['product']['name']
 
     @property
+    @render_template
     def product_version(self):
-        """str or None: the version specified for the product"""
+        """str: the version specified for the product"""
         # The 'version' property is optional. If not specified, assume latest
         return self.layer_data['product'].get('version', LATEST_VERSION_VALUE)
 
@@ -256,6 +292,7 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
         return self.substitute_url_hostname(self.matching_product.clone_url)
 
     @cached_property
+    @render_template
     def branch(self):
         # The 'branch' property is optional
         return self.layer_data['product'].get('branch')
@@ -294,12 +331,14 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
 class InputConfiguration:
     """A CFS Configuration from a bootprep input file."""
 
-    def __init__(self, configuration_data, product_catalog):
+    def __init__(self, configuration_data, var_context, product_catalog):
         """Create a new InputConfiguration.
 
         Args:
             configuration_data (dict): The data for a configuration, already
                 validated against the bootprep input file schema.
+            var_context (sat.cli.bootprep.vars.VariableContext): the variables
+                to use for variable substitution in input instance.
             product_catalog (cray_product_catalog.query.ProductCatalog):
                 the product catalog object
 
@@ -309,11 +348,13 @@ class InputConfiguration:
                 happen if the input is properly validated against the schema.
         """
         self.configuration_data = configuration_data
+        self.var_context = var_context
         # The 'layers' property is required and must be a list, but it can be empty
-        self.layers = [InputConfigurationLayer.get_configuration_layer(layer_data, product_catalog)
+        self.layers = [InputConfigurationLayer.get_configuration_layer(layer_data, var_context, product_catalog)
                        for layer_data in self.configuration_data['layers']]
 
     @property
+    @render_template
     def name(self):
         """The name of the CFS configuration."""
         # The 'name' property is required
