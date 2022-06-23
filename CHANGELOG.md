@@ -32,6 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file will be set to `0600`, and the permissions of the `~/.config/sat/tokens`
   and `~/.config/sat` directories will be set to `0700`.
 
+### Fixed
+- Fixed an issue where SAT crashed with a traceback if the file
+  `/etc/opt/cray/site.yaml` existed but was empty. A warning message will now be
+  logged instead.
+
 ## [3.17.0] - 2022-06-27
 
 ### Added
