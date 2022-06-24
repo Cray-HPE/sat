@@ -1,7 +1,7 @@
 """
 Bootsys operations that use the Boot Orchestration Service (BOS).
 
-(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 from collections import defaultdict
 import logging
+import math
 import posixpath
 from random import choices, randint
 import shlex
@@ -34,12 +35,14 @@ from time import sleep, monotonic
 
 from inflect import engine
 
-from sat.apiclient import APIError, BOSClient, HSMClient
+from sat.apiclient import APIError, HSMClient
+from sat.apiclient.bos import BOSClientCommon
 from sat.cli.bootsys.defaults import PARALLEL_CHECK_INTERVAL
 from sat.config import get_config_value
 from sat.session import SATSession
-from sat.util import get_val_by_path, pester, prompt_continue
+from sat.util import pester, prompt_continue
 from sat.xname import XName
+from sat.waiting import Waiter
 
 LOGGER = logging.getLogger(__name__)
 
@@ -200,6 +203,73 @@ def boa_job_successful(boa_job_id):
     return success
 
 
+class BOSV2SessionWaiter(Waiter):
+    """Waiter for monitoring the status of a BOS v2 session."""
+
+    def __init__(self, bos_session_thread, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bos_client = BOSClientCommon.get_bos_client(SATSession(),
+                                                         version='v2')
+        self.bos_session_thread = bos_session_thread
+
+        self.pct_successful = 0.0
+        self.pct_failed = 0.0
+        self.error_summary = {}
+
+    def condition_name(self):
+        return f'session {self.bos_session_thread.session_id} completed'
+
+    def has_completed(self):
+        if self.bos_session_thread.stopped():
+            return True
+
+        try:
+            LOGGER.info(
+                'Waiting for BOS session %s to complete. Session template: %s',
+                self.bos_session_thread.session_id, self.bos_session_thread.session_template
+            )
+
+            session_status = self.bos_client.get_session_status(
+                self.bos_session_thread.session_id
+            )
+
+            if (session_status['percent_successful'] != self.pct_successful
+                    or session_status['percent_failed'] != self.pct_failed):
+                # Only log progress update when components succeed or fail
+                self.pct_successful = float(session_status['percent_successful'])
+                self.pct_failed = float(session_status['percent_failed'])
+                LOGGER.info(
+                    'Session %s: %.0f%% components succeeded, %.0f%% components failed',
+                    self.bos_session_thread.session_id, self.pct_successful, self.pct_failed
+                )
+
+            if session_status['error_summary']:
+                self.error_summary = session_status['error_summary']
+
+            if session_status['status'] == 'complete':
+                if not session_status.get('managed_components_count'):
+                    LOGGER.warning(
+                        'Session %s does not manage any components; another session '
+                        'may have been started which targets the same components as '
+                        'this session.', self.bos_session_thread.session_id
+                    )
+                return True
+
+            return False
+
+        except APIError as err:
+            LOGGER.warning('Failed to query session status: %s', err)
+        except KeyError as err:
+            LOGGER.warning('BOS session status query response missing key %s', err)
+
+        return False
+
+    def post_wait_action(self):
+        if self.error_summary:
+            for err, summary in self.error_summary.items():
+                LOGGER.error('%s: %s', err, summary)
+
+
 class BOSSessionThread(Thread):
 
     def __init__(self, session_template, operation, limit=None):
@@ -223,7 +293,7 @@ class BOSSessionThread(Thread):
         self.complete = False
         self.failed = False
         self.fail_msg = ''
-        self.bos_client = BOSClient(SATSession())
+        self.bos_client = BOSClientCommon.get_bos_client(SATSession())
 
         # Keep track of how many times we fail to query status in a row.
         self.consec_stat_fails = 0
@@ -282,27 +352,35 @@ class BOSSessionThread(Thread):
             self.mark_failed('Failed to create BOS session: {}'.format(str(err)))
             return
 
-        msg_prefix = ('Unable to get BOS session ID and BOA job ID from '
-                      'response to session creation')
-        try:
-            link = response['links'][0]
-        except KeyError:
-            self.mark_failed(f"{msg_prefix} due to missing 'links' key.")
-        except IndexError:
-            self.mark_failed(f"{msg_prefix} due to empty 'links' array.")
+        msg_prefix = 'Unable to get BOS session ID '
+        if get_config_value('bos.api_version') == 'v2':
+            msg_prefix += 'from response to session creation'
+            try:
+                self.session_id = response['name']
+            except KeyError as err:
+                self.mark_failed(f'{msg_prefix} due to missing "{err}" key '
+                                 'in BOS response')
         else:
-            missing_keys = []
+            msg_prefix += 'and/or BOA job ID from response to session creation'
             try:
-                self.session_id = posixpath.basename(link['href'])
-            except KeyError as err:
-                missing_keys.append(str(err))
-            try:
-                self.boa_job_id = link['jobId']
-            except KeyError as err:
-                missing_keys.append(str(err))
-            if missing_keys:
-                self.mark_failed(f'{msg_prefix} due to missing key(s) in BOS '
-                                 f'response: {", ".join(missing_keys)}')
+                link = response['links'][0]
+            except KeyError:
+                self.mark_failed(f"{msg_prefix} due to missing 'links' key.")
+            except IndexError:
+                self.mark_failed(f"{msg_prefix} due to empty 'links' array.")
+            else:
+                missing_keys = []
+                try:
+                    self.session_id = posixpath.basename(link['href'])
+                except KeyError as err:
+                    missing_keys.append(str(err))
+                try:
+                    self.boa_job_id = link['jobId']
+                except KeyError as err:
+                    missing_keys.append(str(err))
+                if missing_keys:
+                    self.mark_failed(f'{msg_prefix} due to missing key(s) in BOS '
+                                     f'response: {", ".join(missing_keys)}')
 
     def monitor_status_kubectl(self):
         """Monitor the status of the BOS session using a 'kubectl wait' command.
@@ -374,10 +452,10 @@ class BOSSessionThread(Thread):
                 )
 
     def monitor_status(self):
-        """Monitor the status of the BOS session using a BOS status endpoint.
+        """Monitor the status of the BOS session using a BOS v2 status endpoint.
 
         This periodically issues a request to the session/{session_id}/status
-        endpoint of the BOS API and checks the response to determine if the
+        endpoint of the BOS v2 API and checks the response to determine if the
         BOS session is complete and successful or failed.
 
         Once the BOS session is reported to be complete, this method returns,
@@ -387,40 +465,20 @@ class BOSSessionThread(Thread):
         Returns:
             None
         """
-        while not self.complete and not self.stopped():
-            sleep(self.check_interval)
+        # Pass math.inf as the timeout since timeouts are handled by the
+        # `do_parallel_bos_operations()` function, independent of the waiter
+        # class here.
+        waiter = BOSV2SessionWaiter(self, math.inf,
+                                    poll_interval=PARALLEL_CHECK_INTERVAL)
 
-            LOGGER.debug("Querying status of BOS session with ID '%s'",
-                         self.session_id)
-            try:
-                session_status = self.bos_client.get('session', self.session_id,
-                                                     'status')
-                # Reset because we had a successful query.
-                self.consec_stat_fails = 0
-            except APIError as err:
-                LOGGER.warning('Failed to query session status: %s', err)
-                self.record_stat_failure()
-                continue
-
-            # TODO: Currently broken by CASMCMS-5532
-            complete = get_val_by_path(session_status, 'metadata.complete')
-            error_count = get_val_by_path(session_status, 'metadata.error_count')
-
-            if complete is None or error_count is None:
-                LOGGER.warning("Session status missing key 'metadata.complete' "
-                               "or 'metadata.error_count'.")
-                self.record_stat_failure()
-                continue
-
-            if complete:
-                if error_count == 0:
-                    self.complete = True
-                else:
-                    self.mark_failed(
-                        f'BOS session with id {self.session_id} and session '
-                        f'template {self.session_template} failed with '
-                        f'error_count={error_count}.'
-                    )
+        waiter.wait_for_completion()
+        if waiter.failed:
+            self.mark_failed(
+                'BOS session with id {} and session template {} '
+                'failed.'.format(self.session_id, self.session_template)
+            )
+        else:
+            self.complete = True
 
     def create_session_fake(self):
         """Fake the creation of a new BOS session.
@@ -454,12 +512,12 @@ class BOSSessionThread(Thread):
         """
         self.create_session()
 
-        # TODO: Use monitor_status instead of monitor_status_kubectl when
-        # CASMCMS-5532 is fixed
-        # self.monitor_status()
-
-        # Workaround that uses 'kubectl wait', 'kubectl get', and 'kubectl logs'
-        self.monitor_status_kubectl()
+        if get_config_value('bos.api_version') == 'v2':
+            self.monitor_status()
+        else:
+            # Use 'kubectl wait', 'kubectl get', and 'kubectl logs' for BOS v1
+            # due to initial trouble with status endpoint (CAMSCMS-5532).
+            self.monitor_status_kubectl()
 
 
 def do_parallel_bos_operations(session_templates, operation, timeout, limit=None):
@@ -661,7 +719,7 @@ def get_templates_needing_operation(session_templates, operation):
     else:
         raise ValueError("Unknown operation '{}'".format(operation))
 
-    bos_client = BOSClient(SATSession())
+    bos_client = BOSClientCommon.get_bos_client(SATSession())
 
     needed_st = []
     failed_st = []
@@ -669,7 +727,7 @@ def get_templates_needing_operation(session_templates, operation):
         LOGGER.debug("Checking whether nodes in session template '%s' need "
                      "operation '%s' performed.", session_template, operation)
         try:
-            st_data = bos_client.get('sessiontemplate', session_template).json()
+            st_data = bos_client.get_session_template(session_template)
         except (APIError, ValueError) as err:
             LOGGER.error("Failed to get info about session template '%s': "
                          "%s", session_template, err)

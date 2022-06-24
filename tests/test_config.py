@@ -1,7 +1,7 @@
 """
 Unit tests for sat.config
 
-(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -41,6 +41,7 @@ from sat.config import (
     get_config_value,
     load_config,
     read_config_value_file,
+    validate_bos_api_version,
     validate_log_level
 )
 from tests.common import ExtendedTestCase
@@ -65,6 +66,21 @@ class TestValidateLogLevel(unittest.TestCase):
         expected_msg = "Level '{}' is not one of the valid log levels".format(invalid_level)
         with self.assertRaisesRegex(ConfigValidationError, expected_msg):
             validate_log_level(invalid_level)
+
+
+class TestValidateBosApiVersion(unittest.TestCase):
+    """Tests for validate_bos_api_version function"""
+
+    def test_validate_bos_api_version_v1(self):
+        """Test that "v1" is a valid BOS API version"""
+        validate_bos_api_version('v1')
+
+    def test_validate_invalid_bos_api_version(self):
+        """Test that invalid BOS versions are not allowed"""
+        for version in ['v3', 'foo', '', '1', '2']:
+            with self.subTest(version=version):
+                with self.assertRaises(ConfigValidationError):
+                    validate_bos_api_version(version)
 
 
 class TestOptionValue(unittest.TestCase):
@@ -146,7 +162,7 @@ class TestGenerateDefaultConfig(unittest.TestCase):
 
         self.expected_config = dedent("""\
         # Default configuration file for SAT.
-        # (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
+        # (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
 
         # Permission is hereby granted, free of charge, to any person obtaining a
         # copy of this software and associated documentation files (the "Software"),

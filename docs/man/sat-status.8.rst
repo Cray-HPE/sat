@@ -28,7 +28,7 @@ OPTIONS
 These options must be specified after the subcommand.
 
 **--types** *type [type]...*
-        Specify a list of types to query. The default is for 'Node' only. 
+        Specify a list of types to query. The default is for 'Node' only.
         The types that may be specified are...
 
             all, Chassis, ChassisBMC, ComputeModule, HSNBoard, Node, NodeBMC,
@@ -58,9 +58,18 @@ These options must be specified after the subcommand.
         **--sls-fields**.
 
 **--bos-template**
-        Specify a BOS session template. Only nodes specified in the node list,
-        node groups, and roles in this session template's boot sets will be
-        included in the status report.
+        Specify a BOS session template to filter against. Only nodes specified
+        in the node list, node groups, and roles in this session template's
+        boot sets will be included in the status report.
+
+        Note that the output is filtered against the BOS session template's
+        state at the time the **sat status** command is invoked, not when the
+        BOS session was launched. For example, components may be added to or
+        removed from a session template's roles, groups, or node list, and such
+        changes would not be reflected in any running or completed BOS session.
+        Likewise, roles or groups may also be added to or removed from the
+        session template itself, and these changes would not be reflected in
+        any BOS running or completed session either.
 
 .. include:: _sat-format-opts.rst
 .. include:: _sat-filter-opts.rst
@@ -160,7 +169,7 @@ Possible Values
 | *Type*
 |
 |   Chassis, ChassisBMC, ComputeModule, HSNBoard, Node, NodeBMC, NodeEnclosure, RouterBMC, RouterModule
-| 
+|
 | *Flag*
 |
 |   OK, Warning, Alert

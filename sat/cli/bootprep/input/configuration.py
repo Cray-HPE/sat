@@ -1,7 +1,7 @@
 """
 Defines classes for configurations defined in the input file.
 
-(C) Copyright 2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -25,11 +25,12 @@ from abc import ABC, abstractmethod
 import logging
 from urllib.parse import urlparse, urlunparse
 
+from cray_product_catalog.query import ProductCatalogError
+
 from sat.apiclient.vcs import VCSError, VCSRepo
 from sat.cached_property import cached_property
 from sat.cli.bootprep.errors import ConfigurationCreateError
 from sat.config import get_config_value
-from sat.software_inventory.products import SoftwareInventoryError
 
 # This value is used to specify that the latest version of a product is desired
 LATEST_VERSION_VALUE = 'latest'
@@ -125,7 +126,7 @@ class InputConfigurationLayer(ABC):
         Args:
             layer_data (dict): The data for a layer, already validated against
                 the bootprep input file schema.
-            product_catalog (sat.software_inventory.products.ProductCatalog):
+            product_catalog (cray_product_catalog.query.ProductCatalog):
                 the product catalog object
 
         Raises:
@@ -199,7 +200,7 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
 
         Args:
             layer_data (dict): the layer data from the input instance
-            product_catalog (sat.software_inventory.products.ProductCatalog or None):
+            product_catalog (cray_product_catalog.query.ProductCatalog or None):
                 the product catalog object
         """
         super().__init__(layer_data)
@@ -224,8 +225,10 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
             raise ConfigurationCreateError(f'Product catalog data is not available.')
 
         try:
+            if self.product_version == LATEST_VERSION_VALUE:
+                return self.product_catalog.get_product(self.product_name)
             return self.product_catalog.get_product(self.product_name, self.product_version)
-        except SoftwareInventoryError as err:
+        except ProductCatalogError as err:
             raise ConfigurationCreateError(f'Unable to get product data from product catalog: {err}')
 
     @staticmethod
@@ -294,7 +297,7 @@ class InputConfiguration:
         Args:
             configuration_data (dict): The data for a configuration, already
                 validated against the bootprep input file schema.
-            product_catalog (sat.software_inventory.products.ProductCatalog):
+            product_catalog (cray_product_catalog.query.ProductCatalog):
                 the product catalog object
 
         Raises:

@@ -1,38 +1,43 @@
-# Top-level requirements for sat package to function.
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
-# 
+#
+# MIT License
+#
+# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+#
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
 # to deal in the Software without restriction, including without limitation
 # the rights to use, copy, modify, merge, publish, distribute, sublicense,
 # and/or sell copies of the Software, and to permit persons to whom the
 # Software is furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included
 # in all copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-argcomplete
-boto3
-cray-product-catalog >= 1.6.0
-croniter >= 0.3, < 1.0
-inflect >= 0.2.5, < 3.0
-json-schema-for-humans
-jsonschema >= 4.0, < 5.0
-kubernetes
-paramiko >= 2.4.2
-parsec == 3.5.0
-prettytable >= 0.7.2, < 1.0
-python-dateutil >= 2.7.3, < 3.0
-pyyaml >= 5.4.1, < 6.0
-requests < 3.0
-requests-oauthlib
-sseclient-py >= 1.7
-toml == 0.10.0
-urllib3 >= 1.26.5, < 2.0
+#
+
+NAME ?= cray-sat
+VERSION ?= $(shell build_scripts/version.sh)
+DOCKER_BUILD = docker build . --pull $(DOCKER_ARGS)
+DEFAULT_TAG = '$(NAME):$(VERSION)'
+TEST_TAG = '$(NAME)-testing:$(VERSION)'
+CODESTYLE_TAG = '$(NAME)-codestyle:$(VERSION)'
+
+all : unittest codestyle image
+
+unittest:
+		$(DOCKER_BUILD) --target testing --tag $(TEST_TAG)
+		docker run $(TEST_TAG)
+
+codestyle:
+		$(DOCKER_BUILD) --target codestyle --tag $(CODESTYLE_TAG)
+		docker run $(CODESTYLE_TAG)
+
+image:
+		$(DOCKER_BUILD) --tag $(DEFAULT_TAG)
