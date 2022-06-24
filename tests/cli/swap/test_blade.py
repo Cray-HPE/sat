@@ -353,6 +353,12 @@ class TestDeletingEthernetInterfaces(BaseBladeSwapProcedureTest):
         for eth_id in self.ethernet_interfaces:
             self.mock_hsm_client.delete_ethernet_interface.assert_any_call(eth_id['ID'])
 
+    def test_no_delete_node_interfaces(self):
+        """Test that nodes' ethernet interfaces are not deleted if --no-delete-node-interfaces passed"""
+        self.swap_out.delete_node_interfaces = False
+        self.swap_out.delete_ethernet_interfaces()
+        self.mock_hsm_client.delete_ethernet_interface.assert_not_called()
+
 
 class TestDeletingRedfishEndpoints(BaseBladeSwapProcedureTest):
     """Tests for deleting BMC Redfish endpoints"""

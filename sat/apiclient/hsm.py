@@ -405,10 +405,10 @@ class HSMClient(APIGatewayClient):
         all_interfaces = self.get('Inventory', 'EthernetInterfaces').json()
         if not xname:
             return all_interfaces
-        xname = XName(xname)
+
         return [
             interface for interface in all_interfaces
-            if xname.contains_component(XName(interface['ComponentID']))
+            if xname == interface['ComponentID']
         ]
 
     @handle_api_errors

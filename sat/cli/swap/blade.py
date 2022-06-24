@@ -472,8 +472,8 @@ class SwapOutProcedure(BladeSwapProcedure):
         if self.blade_class == 'river':
             interface_ids_to_delete |= set(
                 iface['ID']
-                for node in self.blade_node_bmcs
-                for iface in self.hsm_client.get_ethernet_interfaces(node['ID'])
+                for node_bmc in self.blade_node_bmcs
+                for iface in self.hsm_client.get_ethernet_interfaces(node_bmc['ID'])
             )
 
         if not interface_ids_to_delete:
