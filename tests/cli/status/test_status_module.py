@@ -26,15 +26,22 @@ import inspect
 import unittest
 from unittest.mock import MagicMock, patch
 
+from sat.apiclient.gateway import APIError
 import sat.cli.status.status_module as status_module_module
-from sat.cli.status.status_module import StatusModule, StatusModuleException
+from sat.cli.status.status_module import (
+    BOSStatusModule,
+    StatusModule,
+    StatusModuleException,
+)
 from sat.constants import MISSING_VALUE
 
 
 class BaseStatusModuleTestCase(unittest.TestCase):
     def setUp(self):
         self.modules = []
-        patch.object(StatusModule, 'modules', self.modules).start()
+        patch.object(StatusModule, '_modules', self.modules).start()
+
+        self.mock_get_config_value = patch('sat.cli.status.status_module.get_config_value').start()
 
     def tearDown(self):
         patch.stopall()
@@ -48,17 +55,17 @@ class TestStatusModuleSubclassing(BaseStatusModuleTestCase):
         class TestStatusModule(StatusModule, ABC):
             pass  # Don't need to define methods, no instances are created.
 
-        self.assertIn(TestStatusModule, StatusModule.modules)
+        self.assertIn(TestStatusModule, StatusModule._modules)
 
     def test_status_modules_class_attr_isolated(self):
-        """Test that we aren't accidentally modifying the real StatusModule.modules and impacting other tests."""
-        self.assertEqual(0, len(StatusModule.modules))
+        """Test that we aren't accidentally modifying the real StatusModule._modules and impacting other tests."""
+        self.assertEqual(0, len(StatusModule._modules))
         patch.stopall()
         implemented_submodules = [
             module for _, module in inspect.getmembers(status_module_module, inspect.isclass)
             if issubclass(module, StatusModule) and module is not StatusModule
         ]
-        self.assertEqual(len(implemented_submodules), len(StatusModule.modules))
+        self.assertCountEqual(implemented_submodules, StatusModule._modules)
 
 
 class TestStatusModuleGettingModules(BaseStatusModuleTestCase):
@@ -167,10 +174,12 @@ class TestGettingRows(BaseStatusModuleTestCase):
 
             @property
             def rows(self):
-                return [{key: row[key] for key in self.headings}
+                return [{key: row[key] for key in self.headings if key in row}
                         for row in outer_self.all_rows]
 
         self.TestStatusModuleOne = TestStatusModuleOne
+
+        self.test_module_two_rows = {'x3000c0s1b0n0', 'x3000c0s1b0n1'}
 
         class TestStatusModuleTwo(StatusModule):
             headings = ['xname', 'config']
@@ -179,7 +188,8 @@ class TestGettingRows(BaseStatusModuleTestCase):
             @property
             def rows(self):
                 return [{key: row[key] for key in self.headings}
-                        for row in outer_self.all_rows]
+                        for row in outer_self.all_rows
+                        if row['xname'] in outer_self.test_module_two_rows]
 
         self.TestStatusModuleTwo = TestStatusModuleTwo
 
@@ -218,3 +228,224 @@ class TestGettingRows(BaseStatusModuleTestCase):
             for heading in self.TestStatusModuleOne.headings:
                 self.assertEqual(populated_row[heading], original_row[heading])
             self.assertNotIn('config', populated_row)
+
+    def test_missing_column(self):
+        """Test that rows with missing input fields output the value 'MISSING' in those fields"""
+        missing_state_xname = 'x3000c0s1b0n2'
+        self.all_rows.append(
+            {
+                'xname': missing_state_xname,
+                'config': 'yet_another_config',
+            }
+        )
+        rows = StatusModule.get_populated_rows(primary_key='xname', session=MagicMock(),
+                                               limit_modules=[self.TestStatusModuleOne])
+
+        row_had_missing_state = False
+        for row in rows:
+            if row['xname'] == missing_state_xname:
+                self.assertEqual(row['state'], MISSING_VALUE)
+                row_had_missing_state = True
+
+        if not row_had_missing_state:
+            self.fail('Rows with missing "state" field were omitted')
+
+    def test_row_missing_from_module(self):
+        """Test that a module's fields are marked as MISSING if their primary key is missing in that module"""
+        missing_module_two_xname = 'x3000c0s1b0n1'
+        self.test_module_two_rows.remove(missing_module_two_xname)
+
+        rows = StatusModule.get_populated_rows(primary_key='xname', session=MagicMock())
+        row_had_missing_config = False
+        for row in rows:
+            if row['xname'] == missing_module_two_xname:
+                self.assertEqual(row['config'], MISSING_VALUE)
+                row_had_missing_config = True
+
+        if not row_had_missing_config:
+            self.fail('Rows with missing "state" field were omitted')
+
+
+class TestBOSStatusModule(BaseStatusModuleTestCase):
+    """Tests for the BOSStatusModule class"""
+
+    def setUp(self):
+        super().setUp()
+
+        self.xname = 'x1000c0s0b1n0'
+        self.img_id = '12345678-abcd-efef-abcd-1234567890ab'
+        self.img_name = 'some-image'
+        self.bos_session = 'abcdef01-abcd-abcd-abcd-12345abcdefa'
+        self.bos_sessiontemplate = 'some-session-template'
+        self.bos_component = {
+            'actual_state': {
+                'boot_artifacts': {
+                    'initrd': f's3://boot-images/{self.img_id}/initrd',
+                    'kernel': f's3://boot-images/{self.img_id}/kernel',
+                    'kernel_parameters': 'console=ttyS0'
+                },
+                'configuration': '',
+                'last_updated': '2022-01-01T00:00:00'
+            },
+            'desired_state': {
+                'boot_artifacts': {
+                    'initrd': 's3://boot-images/9c80b8fb-190c-4adc-bef6-895928f4f262/initrd',
+                    'kernel': 's3://boot-images/9c80b8fb-190c-4adc-bef6-895928f4f262/kernel',
+                    'kernel_parameters': 'console=ttyS0'
+                },
+                'configuration': '',
+                'last_updated': '2022-01-01T00:00:00'
+            },
+            'enabled': False,
+            'error': '',
+            'id': self.xname,
+            'last_action': {
+                'action': 'powering_on',
+                'last_updated': '2022-01-01T00:00:00',
+                'num_attempts': 1
+            },
+            'session': self.bos_session,
+            'staged_state': {
+                'last_updated': '2022-01-01T00:00:00'
+            },
+            'status': {
+                'phase': '',
+                'status': 'stable',
+                'status_override': ''
+            }
+        }
+
+        self.mock_bos_client = MagicMock()
+        self.mock_bos_client.get_session.return_value = {
+            'components': self.xname,
+            'limit': '',
+            'name': self.bos_session,
+            'operation': 'boot',
+            'stage': False,
+            'status': {
+                'end_time': '2022-01-01T00:00:00',
+                'error': None,
+                'start_time': '2022-01-01T00:01:00',
+                'status': 'complete',
+            },
+            'template_name': self.bos_sessiontemplate,
+        }
+        self.mock_bos_client.get_session_template.return_value = {
+            'name': self.bos_sessiontemplate
+        }
+
+        self.mock_bos_client.get_components.return_value = [self.bos_component]
+        patch('sat.cli.status.status_module.BOSClientCommon.get_bos_client',
+              return_value=self.mock_bos_client).start()
+
+        self.mock_ims_client = MagicMock()
+        self.mock_ims_client.get_image.return_value = {
+            'created': '2022-01-01T00:00:00',
+            'id': self.img_id,
+            'link': {
+                'etag': 'abcdef123456789abcdef12345678909',
+                'path': f's3://boot-images/{self.img_id}/manifest.json',
+                'type': 's3',
+            },
+            'name': self.img_name,
+        }
+        patch('sat.cli.status.status_module.IMSClient', return_value=self.mock_ims_client).start()
+
+        self.session = MagicMock()
+
+    def test_can_use_in_bos_v1(self):
+        """Test checking if BOSStatusModule can be used with BOS v1"""
+        self.mock_get_config_value.return_value = 'v1'
+        can_use, err_msg = BOSStatusModule.can_use()
+        self.assertFalse(can_use)
+        self.assertIsInstance(err_msg, str)
+
+    def test_can_use_in_bos_v2(self):
+        """Test checking if BOSStatusModule can be used with BOS v2"""
+        self.mock_get_config_value.return_value = 'v2'
+        can_use, err_msg = BOSStatusModule.can_use()
+        self.assertTrue(can_use)
+        self.assertIsNone(err_msg)
+
+    def test_retrieving_component_sessions_can_be_retrieved(self):
+        """Test that component status can be retrieved from BOS v2"""
+        rows = BOSStatusModule(session=self.session).rows
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0], {
+            'xname': self.xname,
+            'Boot Status': 'stable',
+            'Most Recent BOS Session': self.bos_session,
+            'Most Recent Image': self.img_name,
+            'Most Recent Session Template': self.bos_sessiontemplate,
+        })
+
+    def test_empty_session_for_component(self):
+        """Test retrieving component status if session field is empty"""
+        self.bos_component['session'] = ''
+        rows = BOSStatusModule(session=self.session).rows
+
+        self.assertEqual(rows[0], {
+            'xname': self.xname,
+            'Boot Status': 'stable',
+            'Most Recent BOS Session': MISSING_VALUE,
+            'Most Recent Image': self.img_name,
+        })
+
+    def test_no_session_key_for_component(self):
+        """Test retrieving component status if there is no "session" key"""
+        del self.bos_component['session']
+        rows = BOSStatusModule(session=self.session).rows
+
+        self.assertEqual(rows[0], {
+            'xname': self.xname,
+            'Boot Status': 'stable',
+            'Most Recent BOS Session': MISSING_VALUE,
+            'Most Recent Image': self.img_name,
+        })
+
+    def test_session_key_empty_string(self):
+        """Test retrieving component status the "session" key is empty"""
+        self.bos_component['session'] = ''
+        rows = BOSStatusModule(session=self.session).rows
+        self.assertEqual(rows[0], {
+            'xname': self.xname,
+            'Boot Status': 'stable',
+            'Most Recent BOS Session': MISSING_VALUE,
+            'Most Recent Image': self.img_name,
+        })
+
+    def test_get_session_apierror(self):
+        """Test retrieving component boot status when no session is found"""
+        self.mock_bos_client.get_session.side_effect = APIError
+        rows = BOSStatusModule(session=self.session).rows
+
+        self.assertEqual(rows[0], {
+            'xname': self.xname,
+            'Boot Status': 'stable',
+            'Most Recent BOS Session': self.bos_session,
+            'Most Recent Image': self.img_name,
+        })
+
+    def test_get_sessiontemplate_apierror(self):
+        """Test retrieving component boot status when no sessiontemplate found"""
+        self.mock_bos_client.get_session_template.side_effect = APIError
+        rows = BOSStatusModule(session=self.session).rows
+
+        self.assertEqual(rows[0], {
+            'xname': self.xname,
+            'Boot Status': 'stable',
+            'Most Recent BOS Session': self.bos_session,
+            'Most Recent Image': self.img_name,
+        })
+
+    def test_get_sessiontemplate_keyerror(self):
+        """Test retrieving component boot status when sessiontemplate missing "name" key"""
+        self.mock_bos_client.get_session_template.return_value = {}
+        rows = BOSStatusModule(session=self.session).rows
+        self.assertEqual(rows[0], {
+            'xname': self.xname,
+            'Boot Status': 'stable',
+            'Most Recent BOS Session': self.bos_session,
+            'Most Recent Image': self.img_name,
+        })

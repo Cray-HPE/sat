@@ -23,7 +23,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 import logging
 
-from sat.apiclient.bos import BOSClient
+from sat.apiclient.bos import BOSClientCommon
 from sat.apiclient.gateway import APIError
 from sat.apiclient.hsm import HSMClient
 from sat.cli.status.constants import COMPONENT_TYPES
@@ -133,7 +133,7 @@ def get_bos_template_filter_fn(bos_template, session):
 
     skip_filter = False
     hsm_client = HSMClient(session)
-    bos_client = BOSClient(session)
+    bos_client = BOSClientCommon.get_bos_client(session)
 
     nodes = set()
     roles = set()
@@ -184,7 +184,14 @@ def do_status(args):
         for module_name in args.status_module_names:
             if module_name in seen_module_names:
                 continue
-            modules.append(getattr(sat.cli.status.status_module, module_name))
+
+            module_cls = getattr(sat.cli.status.status_module, module_name)
+            can_use, err_reason = module_cls.can_use()
+            if not can_use:
+                LOGGER.warning('Cannot retrieve status information from %s: %s',
+                               module_cls.source_name, err_reason)
+            else:
+                modules.append(module_cls)
             seen_module_names.add(module_name)
 
     types = COMPONENT_TYPES if 'all' in args.types else args.types

@@ -53,7 +53,7 @@ def add_status_subparser(subparsers):
 
     status_parser.add_argument(
         '--all-fields', dest='status_module_names',
-        action='store_const', const=['SLSStatusModule', 'HSMStatusModule', 'CFSStatusModule'],
+        action='store_const', const=['SLSStatusModule', 'HSMStatusModule', 'CFSStatusModule', 'BOSStatusModule'],
         help='Display all status fields. This is the default behavior when no other '
         '--*-fields options are specified.'
     )
@@ -77,7 +77,19 @@ def add_status_subparser(subparsers):
     )
 
     status_parser.add_argument(
+        '--bos-fields', dest='status_module_names',
+        action='append_const', const='BOSStatusModule',
+        help='Display all fields for BOS boot state.'
+    )
+
+    status_parser.add_argument(
         '--bos-template',
         help='Only show nodes specified in the node list, roles, and groups in '
              'the boot sets contained in the given BOS session template.'
+    )
+
+    status_parser.add_argument(
+        '--bos-version',
+        choices=['v1', 'v2'],
+        help='The version of the BOS API to use for BOS operations',
     )

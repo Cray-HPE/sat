@@ -1,16 +1,37 @@
-# Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+#
+# MIT License
+#
+# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
 #
 # Dockerfile for SAT
 #
 # The multi-stage Dockerfile is somewhat more complex than the original
 # Dockerfile, but it provides significant reductions in image size and build time
-# when cached builds are present. 
+# when cached builds are present.
 
 
 # The venv_base sets up the environment variables for the virtualenv which are
 # used by every other stage. Anything that uses the SAT venv should derive from
 # this stage.
-FROM arti.dev.cray.com/baseos-docker-master-local/alpine:3.13.5 AS venv_base
+FROM artifactory.algol60.net/csm-docker/stable/docker.io/library/alpine:3.15 AS venv_base
 ENV VIRTUAL_ENV="/sat/venv"
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
@@ -30,12 +51,11 @@ FROM base as build
 
 RUN apk update && \
     apk add bash bash-completion openssl-dev libffi-dev openssh curl musl-dev \
-            git make gcc mandoc ipmitool ceph-common rust cargo && \
+            git make gcc mandoc ipmitool ceph-common && \
     python3 -m venv $VIRTUAL_ENV
 
 COPY requirements.lock.txt requirements.txt
-ARG PIP_INDEX_URL="https://arti.dev.cray.com/artifactory/api/pypi/pypi-remote/simple"
-ARG PIP_EXTRA_INDEX_URL="https://arti.dev.cray.com/artifactory/csm-python-modules-remote/simple"
+ARG PIP_EXTRA_INDEX_URL="https://artifactory.algol60.net/artifactory/csm-python-modules/simple"
 RUN pip3 install --no-cache-dir -U pip && \
     pip3 install -r requirements.txt
 
@@ -47,7 +67,7 @@ COPY sat sat
 COPY docs/man docs/man
 COPY tools tools
 
-RUN pip3 install --no-cache-dir 'pip < 22.0' && \
+RUN pip3 install --no-cache-dir pip && \
     pip3 install --no-cache-dir --timeout=300 . && \
     ./config-docker-sat.sh
 

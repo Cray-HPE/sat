@@ -1,7 +1,7 @@
 """
 Defines class for session templates defined in the input file.
 
-(C) Copyright 2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -36,7 +36,7 @@ class InputSessionTemplate(BaseInputItem):
     Attributes:
         data (dict): the data for a session template, already
             validated against the bootprep schema
-        bos_client (sat.apiclient.BOSClient): the BOS API client to make
+        bos_client (sat.apiclient.BOSClientCommon): the BOS API client to make
             requests to the BOS API
         ims_client (sat.apiclient.IMSClient): the IMS API client to make
             requests to the IMS API
@@ -53,7 +53,7 @@ class InputSessionTemplate(BaseInputItem):
                 validated by the bootprep schema.
             instance (sat.bootprep.input.InputInstance): a reference to the
                 full instance loaded from the config file
-            bos_client (sat.apiclient.BOSClient): the BOS API client
+            bos_client (sat.apiclient.BOSClientCommon): the BOS API client
             cfs_client (sat.apiclient.CFSClient): the CFS API client
             ims_client (sat.apiclient.IMSClient): the IMS API client
             **kwargs: additional keyword arguments
@@ -153,24 +153,6 @@ class InputSessionTemplate(BaseInputItem):
         # Accessing the image_record queries IMS to find the image
         _ = self.image_record
 
-    @staticmethod
-    def get_base_boot_set_data():
-        """Get the base boot set data to use as a starting point.
-
-        Returns:
-            dict: the base data to use as a starting point for a boot set
-        """
-        return {
-            # This is not really used or documented anywhere, but the idea was
-            # to make it possible to order the boot sets in a session template
-            'boot_ordinal': 2,
-            # TODO: How much of this do we really want to provide defaults for?
-            'network': 'nmn',
-            'rootfs_provider': 'cpss3',
-            # TODO (CRAYSAT-898): update default hostname for authoritative DNS changes
-            'rootfs_provider_passthrough': 'dvs:api-gw-service-nmn.local:300:nmn0'
-        }
-
     def get_bos_api_data(self):
         """Get the data to pass to the BOS API to create this session template.
 
@@ -184,7 +166,7 @@ class InputSessionTemplate(BaseInputItem):
             'boot_sets': {}
         }
         for boot_set_name, boot_set_data in self.boot_sets.items():
-            boot_set_api_data = self.get_base_boot_set_data()
+            boot_set_api_data = self.bos_client.get_base_boot_set_data()
             image_record = self.image_record
             boot_set_api_data.update({
                 'etag': get_val_by_path(image_record, 'link.etag'),
@@ -221,7 +203,7 @@ class InputSessionTemplateCollection(BaseInputItemCollection):
                 already validated by schema
             instance (sat.bootprep.input.InputInstance): a reference to the
                 full instance loaded from the config file
-            bos_client (sat.apiclient.BOSClient): the BOS API client
+            bos_client (sat.apiclient.BOSClientCommon): the BOS API client
             cfs_client (sat.apiclient.CFSClient): the CFS API client
             ims_client (sat.apiclient.IMSClient): the IMS API client
             **kwargs: additional keyword arguments

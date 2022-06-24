@@ -96,7 +96,7 @@ class FASClient(APIGatewayClient):
         """
         fw_dev_fields = [FASClient.name_field, FASClient.target_name_field, FASClient.version_field]
 
-        if 'error' in target:
+        if target.get('error'):  # Do not log an error if the error is just an empty string.
             if xname == MISSING_VALUE:
                 LOGGER.warning('FAS returned an error while retrieving firmware from an unknown device')
                 return None
@@ -134,17 +134,18 @@ class FASClient(APIGatewayClient):
         fw_table = []
         for fw_dev in fw_devs:
             xname = fw_dev.get('xname', MISSING_VALUE)
-            if 'error' in fw_dev:
+            targets = fw_dev.get('targets')
+            if fw_dev.get('error'):  # Do not log an error if the error is just an empty string.
                 LOGGER.error('Error getting firmware for %s: %s', xname, fw_dev['error'])
-            elif 'targets' in fw_dev and fw_dev['targets'] is not None:
-                targets = fw_dev['targets']
+            elif not targets:
+                # No error was logged, but there is no firmware for this xname
+                LOGGER.warning('No firmware found for: %s', xname)
+
+            if targets:
                 rows_to_add = [
                     FASClient._create_row_from_target(target, xname) for target in targets
                 ]
                 fw_table.extend([row for row in rows_to_add if row])
-            else:
-                # It is unclear whether this can actually occur.
-                LOGGER.warning('No firmware found for: %s', xname)
 
         return fw_table
 

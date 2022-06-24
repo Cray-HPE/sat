@@ -1,7 +1,7 @@
 """
 Tests for sat.cli.bootprep.input.configuration
 
-(C) Copyright 2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,8 @@ from urllib.parse import urlparse
 import unittest
 from unittest.mock import patch, Mock
 
+from cray_product_catalog.query import ProductCatalogError
+
 from sat.apiclient.vcs import VCSError
 from sat.cli.bootprep.errors import ConfigurationCreateError
 from sat.cli.bootprep.input.configuration import (
@@ -36,7 +38,6 @@ from sat.cli.bootprep.input.configuration import (
     InputConfiguration,
     LATEST_VERSION_VALUE
 )
-from sat.software_inventory.products import SoftwareInventoryError
 
 
 def patch_configuration(path, *args, **kwargs):
@@ -231,15 +232,15 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
         self.old_cos = Mock(clone_url=self.old_url, commit=self.old_commit)
         self.new_cos = Mock(clone_url=self.new_url, commit=self.new_commit)
 
-        def mock_get_product(product_name, product_version):
+        def mock_get_product(product_name, product_version=None):
             if product_name != self.product_name:
-                raise SoftwareInventoryError('Unknown product')
+                raise ProductCatalogError('Unknown product')
             elif product_version == self.product_version:
                 return self.old_cos
-            elif product_version == 'latest':
+            elif not product_version:
                 return self.new_cos
             else:
-                raise SoftwareInventoryError('Unknown version')
+                raise ProductCatalogError('Unknown version')
 
         self.mock_product_catalog = Mock()
         self.mock_product_catalog.get_product.side_effect = mock_get_product
@@ -328,7 +329,7 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
     def test_matching_product_software_inventory_error(self):
         """Test getting the matching InstalledProductVersion when there is software inventory failure."""
         sw_inv_err_msg = 'unable find configmap'
-        self.mock_product_catalog.get_product.side_effect = SoftwareInventoryError(sw_inv_err_msg)
+        self.mock_product_catalog.get_product.side_effect = ProductCatalogError(sw_inv_err_msg)
         err_regex = f'Unable to get product data from product catalog: {sw_inv_err_msg}'
         with self.assertRaisesRegex(ConfigurationCreateError, err_regex):
             _ = self.version_layer.matching_product

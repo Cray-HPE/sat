@@ -1,7 +1,7 @@
 """
 Entry point for the bootprep subcommand.
 
-(C) Copyright 2021 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP.
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -23,9 +23,12 @@ OTHER DEALINGS IN THE SOFTWARE.
 """
 import logging
 import os
+
+from cray_product_catalog.query import ProductCatalog, ProductCatalogError
 import yaml
 
-from sat.apiclient import BOSClient, CFSClient, IMSClient
+from sat.apiclient import CFSClient, IMSClient
+from sat.apiclient.bos import BOSClientCommon
 from sat.cli.bootprep.errors import (
     BootPrepDocsError,
     BootPrepInternalError,
@@ -53,7 +56,6 @@ from sat.cli.bootprep.validate import (
     SCHEMA_FILE_RELATIVE_PATH,
 )
 from sat.session import SATSession
-from sat.software_inventory.products import ProductCatalog, SoftwareInventoryError
 
 
 LOGGER = logging.getLogger(__name__)
@@ -159,11 +161,11 @@ def do_bootprep_run(schema_validator, args):
     session = SATSession()
     cfs_client = CFSClient(session)
     ims_client = IMSClient(session)
-    bos_client = BOSClient(session)
+    bos_client = BOSClientCommon.get_bos_client(session)
 
     try:
         product_catalog = ProductCatalog()
-    except SoftwareInventoryError as err:
+    except ProductCatalogError as err:
         LOGGER.warning(f'Failed to load product catalog data. Creation of any input items '
                        f'that require data from the product catalog will fail. ({err})')
         # Any item from the InputInstance that needs to access product catalog

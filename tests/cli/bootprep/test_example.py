@@ -25,6 +25,12 @@ import logging
 import unittest
 from unittest.mock import Mock, call, patch
 
+from cray_product_catalog.query import (
+    InstalledProductVersion,
+    ProductCatalog,
+    ProductCatalogError
+)
+
 from sat.cli.bootprep.example import (
     EXAMPLE_COS_CONFIG_NAME,
     EXAMPLE_UAN_CONFIG_NAME,
@@ -35,11 +41,6 @@ from sat.cli.bootprep.example import (
     get_example_input_config_data,
     get_example_images_and_templates,
     get_product_recipe_names,
-)
-from sat.software_inventory.products import (
-    InstalledProductVersion,
-    ProductCatalog,
-    SoftwareInventoryError
 )
 
 
@@ -67,7 +68,7 @@ class TestGetExampleInputConfigData(unittest.TestCase):
         mock_product_catalog = Mock(spec=ProductCatalog)
         mock_product_catalog.get_product.side_effect = [
             Mock(spec=InstalledProductVersion, version=cos_version),
-            SoftwareInventoryError(err_msg),
+            ProductCatalogError(err_msg),
             Mock(spec=InstalledProductVersion, version=analytics_version)
         ]
 
@@ -144,7 +145,7 @@ class TestGetProductRecipeNames(unittest.TestCase):
         """Test get_product_recipe_names when the product does not exist."""
         mock_product_catalog = Mock()
         err_msg = 'No installed products with name sat.'
-        mock_product_catalog.get_product.side_effect = SoftwareInventoryError(err_msg)
+        mock_product_catalog.get_product.side_effect = ProductCatalogError(err_msg)
         with self.assertLogs(level=logging.WARNING) as logs_cm:
             actual_recipe_names = get_product_recipe_names(mock_product_catalog, 'sat')
 

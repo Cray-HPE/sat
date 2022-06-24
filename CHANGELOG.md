@@ -25,9 +25,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
 ## [Unreleased]
 
 ### Added
+- Added client support for the BOS v2 API.
+- Added a `--bos-version` command line option and `bos.api_version`
+  configuration file option which can be used to specify which version of the
+  BOS API to use.
+- Added BOS v2 support to `sat bootprep`.
+- Added BOS v2 support to `sat bootsys`.
+- Added BOS v2 support to `sat status`, and added fields to `sat status` output
+  listing the most recent BOS session, template, booted image, and boot status
+  for nodes when BOS v2 is in use. Added a `--bos-fields` option to limit
+  output to these fields.
 - Added a ``sat swap blade`` subcommand which automates the procedure for
   swapping compute and UAN blades.
 - Added support for River blades to the ``sat swap blade`` subcommand.
@@ -35,9 +46,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   subcommand.
 
 ### Fixed
+- Fixed an issue causing `sat init` to not print a message when a new config was created.
+
+### Removed
+- Removed unused `docker` python package from requirements files.
+
+### Changed
+- Updated the project URL in `setup.py` to external GitHub location.
+
+## [3.16.1] - 2022-06-07
+
+### Fixed
+- Fixed an issue in config-docker-sat.sh that was causing the builds to fail.
+
+### Changed
+- Changed builds to publish to the ``sat-docker`` Artifactory repository.
+
+## [3.16.0] - 2022-05-31
+
+### Changed
+- Incremented the base version of Alpine used in the container image from 3.13
+  to 3.15.
+- Made changes related to the open sourcing of sat.
+    - Update Jenkinsfile to use csm-shared-library.
+    - Add Makefile for building container image.
+    - Pull base container image from external location.
+- Began using a separate ``cray_product_catalog`` package to query the product
+  catalog in ``sat bootprep``.
+- Began using a separate ``cray_product_catalog`` package to query the product
+  catalog in ``sat showrev``.
+
+### Fixed
+- Fixed missing ``sat-hwhist`` man page.
+- Fixed bug in ``sat status`` which caused a traceback when certain component
+  state fields were missing in HSM.
+- Fixed bug in ``sat status`` which caused a traceback when components were
+  entirely missing from SLS.
+
+## [3.15.1] - 2022-04-18
+
+### Fixed
 - Fixed tab completion in ``sat bash``.
 - Fixed a bug with the ``$PATH`` environment variable not including the ``sat``
   executable in ``sat bash``.
+- Fixed error reporting in ``sat firmware`` to treat responses containing the
+  key "error" but an empty string for a value as non-errors.
 
 ## [3.15.0] - 2022-03-29
 
