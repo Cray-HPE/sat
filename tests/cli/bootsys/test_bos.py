@@ -1,39 +1,44 @@
+#
+# MIT License
+#
+# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
 """
 Unit tests for the sat.cli.bootsys.bos module.
-
-(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
 """
 
 from argparse import Namespace
 import logging
+import math
 import shlex
 import subprocess
 from textwrap import indent
 import unittest
-from unittest.mock import Mock, call, patch
+from unittest.mock import MagicMock, Mock, call, patch
 
 from sat.cli.bootsys.bos import (
     BOSFailure,
     BOSLimitString,
     BOSSessionThread,
+    BOSV2SessionWaiter,
     boa_job_successful,
     do_bos_shutdowns,
     get_session_templates
@@ -226,13 +231,99 @@ class TestBOSLimitString(unittest.TestCase):
             BOSLimitString.from_string(blade_xname, recursive=False)
 
 
+class TestBOSV2SessionWaiter(unittest.TestCase):
+    """Test the BOSV2SessionWaiter class."""
+    def setUp(self):
+        self.session_id = 'abcdef-012345-678901-fdecba'
+
+        self.mock_bos_client = MagicMock()
+        self.mock_bos_client.get_session_status.return_value = {
+            'status': 'complete',
+            'managed_components_count': 10,
+            'phases': {
+                'percent_complete': 100.0,
+                'percent_powering_on': 0.0,
+                'percent_powering_off': 0.0,
+                'percent_configuring': 0.0,
+            },
+            'percent_successful': 100.0,
+            'percent_failed': 0.0,
+            'percent_staged': 0.0,
+            'error_summary': {},
+            'timing': {
+                'duration': '0:01:00',
+                'end_time': '2022-01-01T00:00:00',
+                'start_time': '2022-01-01T00:01:00',
+            },
+        }
+        patch('sat.cli.bootsys.bos.BOSClientCommon.get_bos_client', return_value=self.mock_bos_client).start()
+
+        self.mock_session_thread = MagicMock(session_id=self.session_id)
+        self.mock_session_thread.stopped.return_value = False
+
+        self.waiter = BOSV2SessionWaiter(self.mock_session_thread, math.inf)
+
+    def tearDown(self):
+        patch.stopall()
+
+    def test_session_is_completed(self):
+        """Test that the waiter detects a completed session"""
+        self.assertTrue(self.waiter.has_completed())
+
+    def test_session_not_completed(self):
+        """Test that the waiter detects a session that has not completed yet"""
+        self.mock_bos_client.get_session_status.return_value.update({
+            'status': 'running',
+            'phases': {
+                'percent_complete': 50.0,
+                'percent_powering_on': 20.0,
+                'percent_powering_off': 0.0,
+                'percent_configuring': 30.0,
+            },
+            'percent_successful': 50.0,
+        })
+        self.assertFalse(self.waiter.has_completed())
+
+    def test_session_failed(self):
+        """Test that the waiter detects when a session has failed"""
+        self.mock_bos_client.get_session_status.return_value.update({
+            'status': 'running',
+            'phases': {
+                'percent_complete': 50.0,
+                'percent_powering_on': 20.0,
+                'percent_powering_off': 0.0,
+                'percent_configuring': 30.0,
+            },
+            'percent_successful': 50.0,
+            'percent_failed': 50.0,
+        })
+        self.assertFalse(self.waiter.has_completed())
+
+    def test_session_superceded(self):
+        """Test when the waiter's session has its managed components taken by another session"""
+        self.mock_bos_client.get_session_status.return_value.update({
+            'status': 'complete',
+            'managed_components_count': 0,
+            'phases': {
+                'percent_complete': 0,
+                'percent_powering_on': 0,
+                'percent_powering_off': 0,
+                'percent_configuring': 0,
+            },
+            'percent_successful': 0,
+            'percent_failed': 0,
+        })
+        with self.assertLogs(level='WARNING'):
+            self.assertTrue(self.waiter.has_completed())
+
+
 class TestBOSSessionThread(unittest.TestCase):
     """Test the BOSSessionThread class."""
 
     def setUp(self):
         """Set up some mocks."""
         self.mock_bos_client = Mock()
-        patch('sat.cli.bootsys.bos.BOSClient', return_value=self.mock_bos_client).start()
+        patch('sat.cli.bootsys.bos.BOSClientCommon.get_bos_client', return_value=self.mock_bos_client).start()
         patch('sat.cli.bootsys.bos.SATSession').start()
 
         self.mock_session_id = '0123456789abcdef'

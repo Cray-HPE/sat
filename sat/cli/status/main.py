@@ -1,29 +1,32 @@
+#
+# MIT License
+#
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
 """
 Entry point for the status subcommand.
-
-(C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
 """
 import logging
 
-from sat.apiclient.bos import BOSClient
+from sat.apiclient.bos import BOSClientCommon
 from sat.apiclient.gateway import APIError
 from sat.apiclient.hsm import HSMClient
 from sat.cli.status.constants import COMPONENT_TYPES
@@ -133,7 +136,7 @@ def get_bos_template_filter_fn(bos_template, session):
 
     skip_filter = False
     hsm_client = HSMClient(session)
-    bos_client = BOSClient(session)
+    bos_client = BOSClientCommon.get_bos_client(session)
 
     nodes = set()
     roles = set()
@@ -184,7 +187,14 @@ def do_status(args):
         for module_name in args.status_module_names:
             if module_name in seen_module_names:
                 continue
-            modules.append(getattr(sat.cli.status.status_module, module_name))
+
+            module_cls = getattr(sat.cli.status.status_module, module_name)
+            can_use, err_reason = module_cls.can_use()
+            if not can_use:
+                LOGGER.warning('Cannot retrieve status information from %s: %s',
+                               module_cls.source_name, err_reason)
+            else:
+                modules.append(module_cls)
             seen_module_names.add(module_name)
 
     types = COMPONENT_TYPES if 'all' in args.types else args.types

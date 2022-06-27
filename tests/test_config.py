@@ -1,25 +1,28 @@
+#
+# MIT License
+#
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
 """
 Unit tests for sat.config
-
-(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
 """
 
 from collections import OrderedDict
@@ -41,6 +44,7 @@ from sat.config import (
     get_config_value,
     load_config,
     read_config_value_file,
+    validate_bos_api_version,
     validate_log_level
 )
 from tests.common import ExtendedTestCase
@@ -65,6 +69,21 @@ class TestValidateLogLevel(unittest.TestCase):
         expected_msg = "Level '{}' is not one of the valid log levels".format(invalid_level)
         with self.assertRaisesRegex(ConfigValidationError, expected_msg):
             validate_log_level(invalid_level)
+
+
+class TestValidateBosApiVersion(unittest.TestCase):
+    """Tests for validate_bos_api_version function"""
+
+    def test_validate_bos_api_version_v1(self):
+        """Test that "v1" is a valid BOS API version"""
+        validate_bos_api_version('v1')
+
+    def test_validate_invalid_bos_api_version(self):
+        """Test that invalid BOS versions are not allowed"""
+        for version in ['v3', 'foo', '', '1', '2']:
+            with self.subTest(version=version):
+                with self.assertRaises(ConfigValidationError):
+                    validate_bos_api_version(version)
 
 
 class TestOptionValue(unittest.TestCase):
@@ -146,7 +165,7 @@ class TestGenerateDefaultConfig(unittest.TestCase):
 
         self.expected_config = dedent("""\
         # Default configuration file for SAT.
-        # (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
+        # (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
 
         # Permission is hereby granted, free of charge, to any person obtaining a
         # copy of this software and associated documentation files (the "Software"),

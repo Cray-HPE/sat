@@ -1,25 +1,28 @@
+#
+# MIT License
+#
+# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
 """
 Unit tests for main bootprep module
-
-(C) Copyright 2021 Hewlett Packard Enterprise Development LP.
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
 """
 from argparse import Namespace
 import logging
@@ -110,7 +113,8 @@ class TestDoBootprepRun(unittest.TestCase):
         self.args = Namespace(action='run', input_file=self.input_file,
                               overwrite_templates=self.overwrite_templates,
                               skip_existing_templates=self.skip_existing_templates, dry_run=self.dry_run,
-                              view_input_schema=False, generate_schema_docs=False)
+                              view_input_schema=False, generate_schema_docs=False,
+                              bos_version='v1')
         self.schema_file = 'schema.yaml'
         self.mock_validator_cls = MagicMock()
         self.mock_load_and_validate_instance = patch('sat.cli.bootprep.main.load_and_validate_instance').start()
@@ -120,7 +124,7 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_sat_session = patch('sat.cli.bootprep.main.SATSession').start()
         self.mock_cfs_client = patch('sat.cli.bootprep.main.CFSClient').start().return_value
         self.mock_ims_client = patch('sat.cli.bootprep.main.IMSClient').start().return_value
-        self.mock_bos_client = patch('sat.cli.bootprep.main.BOSClient').start().return_value
+        self.mock_bos_client = patch('sat.cli.bootprep.main.BOSClientCommon.get_bos_client').start().return_value
         self.mock_create_configurations = patch('sat.cli.bootprep.main.create_configurations').start()
         self.mock_create_images = patch('sat.cli.bootprep.main.create_images').start()
         self.mock_session_templates = self.mock_input_instance.input_session_templates

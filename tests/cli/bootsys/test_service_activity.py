@@ -1,25 +1,28 @@
+#
+# MIT License
+#
+# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
 """
 Unit tests for the service_activity module.
-
-(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
 """
 from collections import OrderedDict
 from kubernetes.config.config_exception import ConfigException
@@ -37,7 +40,8 @@ from sat.cli.bootsys.service_activity import (
     ServiceActivityChecker,
     ServiceCheckError,
     SDUActivityChecker,
-    BOSActivityChecker,
+    BOSV1ActivityChecker,
+    BOSV2ActivityChecker,
     CFSActivityChecker,
     CRUSActivityChecker,
     FirmwareActivityChecker,
@@ -185,11 +189,16 @@ class TestSDUActivityChecker(ExtendedTestCase):
                           f"{returncode}")
 
 
-class TestBOSActivityChecker(ExtendedTestCase):
-    """Test the BOSActivityChecker class."""
+class TestBOSV1ActivityChecker(ExtendedTestCase):
+    """Test the BOSV1ActivityChecker class."""
 
     def setUp(self):
         """Set up mocks and sample BOS data."""
+        self.mock_get_config_value = patch(
+            'sat.cli.bootsys.service_activity.get_config_value',
+            return_value='v1',
+        ).start()
+
         self.session_template_id = 'cle-1.3.0'
         self.bos_session_details = {
             '1': {
@@ -223,7 +232,7 @@ class TestBOSActivityChecker(ExtendedTestCase):
         def mock_bos_get(*args):
             def json():
                 if not args or args[0] != 'session':
-                    self.fail('Unexpected get to BOSClient with args: {}'.format(args))
+                    self.fail('Unexpected get to BOSV1Client with args: {}'.format(args))
                 elif len(args) == 1:
                     return self.bos_session_ids
                 else:
@@ -235,7 +244,7 @@ class TestBOSActivityChecker(ExtendedTestCase):
 
         patch('sat.cli.bootsys.service_activity.SATSession').start()
         self.mock_bos_client = patch(
-            'sat.cli.bootsys.service_activity.BOSClient').start()
+            'sat.cli.bootsys.service_activity.BOSClientCommon.get_bos_client').start()
         self.mock_bos_client.return_value.get = mock_bos_get
 
         # This can be overridden in test methods to test other scenarios.
@@ -262,14 +271,14 @@ class TestBOSActivityChecker(ExtendedTestCase):
         patch('sat.cli.bootsys.service_activity.CoreV1Api',
               return_value=self.mock_kube_client).start()
 
-        self.bos_checker = BOSActivityChecker()
+        self.bos_checker = BOSV1ActivityChecker()
 
     def tearDown(self):
         """Stop mocks at the end of each unit test."""
         patch.stopall()
 
     def test_init(self):
-        """Test creation of a BOSActivityChecker."""
+        """Test creation of a BOSV1ActivityChecker."""
         self.assertEqual('BOS', self.bos_checker.service_name)
         self.assertEqual('session', self.bos_checker.session_name)
         self.assertEqual('bos v1 session describe', self.bos_checker.cray_cli_args)
@@ -394,6 +403,62 @@ class TestBOSActivityChecker(ExtendedTestCase):
 
         with self.assertRaisesRegex(ServiceCheckError, err_regex):
             self.bos_checker.get_active_sessions()
+
+
+class TestBOSV2ActivityChecker(unittest.TestCase):
+    """Test the BOSV2ActivityChecker class."""
+
+    def setUp(self):
+        self.mock_bos_client = MagicMock()
+        patch('sat.cli.bootsys.service_activity.BOSClientCommon.get_bos_client',
+              return_value=self.mock_bos_client).start()
+
+    def test_finding_no_sessions(self):
+        """Test that the BOSV2ServiceChecker returns no sessions when no sessions exist"""
+        self.mock_bos_client.get_sessions.return_value = []
+        self.assertEqual(len(BOSV2ActivityChecker().get_active_sessions()), 0)
+
+    def test_finding_only_complete_sessions(self):
+        """Test that the BOSV2ServiceChecker returns no sessions when all are complete"""
+        self.mock_bos_client.get_sessions.return_value = [
+            {
+                'name': f'abcdef-0123456-789098-fdebcda-{n}',
+                'operation': 'shutdown',
+                'template_name': 'some-session-template',
+                'status': {'status': 'complete'}
+            }
+            for n in range(10)
+        ]
+        self.assertEqual(len(BOSV2ActivityChecker().get_active_sessions()), 0)
+
+    def test_finding_incomplete_sessions(self):
+        """Test that the BOSV2ServiceChecker returns sessions which are not complete"""
+        num_sessions = 10
+        for status in ['running', 'pending']:
+            with self.subTest(status=status):
+                sessions = [
+                    {
+                        'name': f'abcdef-0123456-789098-fdebcda-{n}',
+                        'operation': ['boot', 'reboot', 'shutdown'][n % 3],
+                        'template_name': 'some-session-template',
+                        'status': {'status': status}
+                    }
+                    for n in range(num_sessions)
+                ]
+                self.mock_bos_client.get_sessions.return_value = sessions
+
+                active_sessions = BOSV2ActivityChecker().get_active_sessions()
+                self.assertEqual(len(active_sessions), num_sessions)
+
+                for active_session in active_sessions:
+                    self.assertTrue(any(session['name'] == active_session['name']
+                                        for session in sessions))
+
+    def test_api_error_when_querying_sessions(self):
+        """Test that a warning is logged and no sessions returned if APIError on session query"""
+        self.mock_bos_client.get_sessions.side_effect = APIError
+        with self.assertLogs(level='WARNING'), self.assertRaises(ServiceCheckError):
+            BOSV2ActivityChecker().get_active_sessions()
 
 
 class TestCFSActivityChecker(unittest.TestCase):
@@ -970,7 +1035,7 @@ class TestDoServiceActivityCheck(ExtendedTestCase):
 
     def setUp(self):
         """Set up some mocks."""
-        checkers_to_patch = ['BOS', 'CFS', 'CRUS', 'Firmware', 'NMD', 'SDU']
+        checkers_to_patch = ['BOSV1', 'BOSV2', 'CFS', 'CRUS', 'Firmware', 'NMD', 'SDU']
         self.checkers = []
         for checker in checkers_to_patch:
             path = 'sat.cli.bootsys.service_activity.{}ActivityChecker'.format(
@@ -980,6 +1045,9 @@ class TestDoServiceActivityCheck(ExtendedTestCase):
         self.mock_report_active_sessions = patch(
             'sat.cli.bootsys.service_activity._report_active_sessions'
         ).start()
+
+        self.mock_get_config_value = patch('sat.cli.bootsys.service_activity.get_config_value',
+                                           return_value='v1').start()
 
         self.mock_args = Mock()
 

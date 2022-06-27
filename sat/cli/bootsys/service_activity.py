@@ -1,25 +1,28 @@
+#
+# MIT License
+#
+# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
 """
 Various checks on system services to ensure idleness before shutdown.
-
-(C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
 """
 from abc import ABC, abstractmethod
 from collections import OrderedDict
@@ -38,12 +41,13 @@ from yaml import YAMLLoadWarning
 
 from sat.apiclient import (
     APIError,
-    BOSClient,
     CFSClient,
     CRUSClient,
     NMDClient
 )
+from sat.apiclient.bos import BOSClientCommon
 from sat.cli.bootsys.util import get_mgmt_ncn_groups, get_ssh_client
+from sat.config import get_config_value
 from sat.constants import MISSING_VALUE
 from sat.apiclient import FASClient
 from sat.report import Report
@@ -110,6 +114,11 @@ class ActivityChecker(ABC):
     @abstractmethod
     def get_active_sessions(self):
         """Get the active sessions (or equivalent) from the service.
+
+        Individual sessions are encoded as OrderedDicts, the keys of which
+        correspond to table headings with values corresponding to row values in
+        the table. The returned OrderedDicts are printed to stdout as a
+        prettytable.
 
         Returns:
             A list of OrderedDicts representing the active sessions.
@@ -234,12 +243,13 @@ class SDUActivityChecker(ActivityChecker):
             raise self.get_err(errmsg)
 
 
-class BOSActivityChecker(ServiceActivityChecker):
-    """A class that checks for active BOS sessions."""
+class BOSV1ActivityChecker(ServiceActivityChecker):
+    """A class that checks for active BOS sessions when BOS v1 is in use."""
 
     def __init__(self):
         """Create a new BOSActivityChecker."""
         super().__init__()
+
         self.service_name = 'BOS'
         self.session_name = 'session'
         self.cray_cli_args = 'bos v1 session describe'
@@ -254,10 +264,11 @@ class BOSActivityChecker(ServiceActivityChecker):
         Raises:
             ServiceCheckError: if unable to get the active BOS sessions.
         """
+        bos_client = BOSClientCommon.get_bos_client(SATSession(), version='v1')
+
         active_sessions = []
         bos_session_fields = ['bos_launch', 'operation', 'stage',
                               'session_template_id']
-        bos_client = BOSClient(SATSession())
         try:
             session_ids = bos_client.get('session').json()
         except (APIError, ValueError) as err:
@@ -317,6 +328,46 @@ class BOSActivityChecker(ServiceActivityChecker):
                     break
 
         return active_sessions
+
+
+class BOSV2ActivityChecker(ServiceActivityChecker):
+    """A class that checks for active BOS sessions when BOS v2 is in use."""
+
+    def __init__(self):
+        super().__init__()
+        self.service_name = 'BOS'
+        self.session_name = 'session'
+        self.cray_cli_args = 'bos v2 sessions describe'
+        self.id_field_name = 'name'
+
+    def get_active_sessions(self):
+        """Get any active BOS sessions.
+
+        Returns:
+            A list of OrderedDicts representing the active BOS sessions.
+
+        Raises:
+            ServiceCheckError: if unable to get the active BOS sessions.
+        """
+        # In BOS v2, BOA no longer exists, but we can query session status
+        # information.
+        bos_v2_paths = [
+            'name',
+            'operation',
+            'status.status',
+            'template_name',
+        ]
+        bos_client = BOSClientCommon.get_bos_client(SATSession(), version='v2')
+
+        try:
+            return [
+                get_new_ordered_dict(session, bos_v2_paths, MISSING_VALUE)
+                for session in bos_client.get_sessions()
+                if get_val_by_path(session, 'status.status') != 'complete'
+            ]
+        except APIError as err:
+            LOGGER.warning('Could not query BOS for sessions: %s', err)
+            raise self.get_err(str(err)) from err
 
 
 class CFSActivityChecker(ServiceActivityChecker):
@@ -547,8 +598,12 @@ def do_service_activity_check(args):
             or there was a failure to query one or more services for active
             sessions.
     """
+    bos_checker_cls = \
+        BOSV1ActivityChecker if get_config_value('bos.api_version') == 'v1' \
+        else BOSV2ActivityChecker
+
     service_activity_checkers = [
-        BOSActivityChecker(),
+        bos_checker_cls(),
         CFSActivityChecker(),
         CRUSActivityChecker(),
         FirmwareActivityChecker(),
