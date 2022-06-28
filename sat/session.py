@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -132,7 +132,7 @@ class SATSession:
             os.fchmod(f.fileno(), 0o600)
             json.dump(token, f)
 
-        LOGGER.info('Saved auth token to: %s', self.token_filename)
+        print(f'INFO: Saved auth token to: {self.token_filename}')
 
     @property
     def token_url(self):
@@ -157,10 +157,11 @@ class SATSession:
             self._token = self.session.fetch_token(token_url=self.token_url,
                                                    username=username, password=password, **opts)
         except (MissingTokenError, UnauthorizedClientError, InvalidGrantError) as err:
-            LOGGER.error("Authorization of user '%s' failed: %s.", username, err)
+            # Avoid recording the authenticated user in the log file
+            print(f"ERROR: Authorization of user '{username}' failed: {err}.")
             self._token = None
         else:
-            LOGGER.info("Acquired new auth token for user '%s'.", username)
+            print(f"INFO: Acquired new auth token for user '{username}'.")
 
     @cached_property
     def session_opts(self):
