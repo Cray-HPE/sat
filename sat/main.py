@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -35,6 +35,7 @@ import argcomplete
 from sat.config import ConfigFileExistsError, DEFAULT_CONFIG_PATH, generate_default_config, load_config
 from sat.logging import bootstrap_logging, configure_logging
 from sat.parser import create_parent_parser
+from sat.util import ensure_permissions, get_resource_section_path
 
 LOGGER = logging.getLogger(__name__)
 
@@ -65,6 +66,20 @@ def main():
         parser = create_parent_parser()
         argcomplete.autocomplete(parser)
         args = parser.parse_args()
+
+        # Set the permissions on config directory and token directory in case
+        # they have been modified or incorrectly set up
+        permissions = {
+            DEFAULT_CONFIG_PATH: {
+                'file_mode': 0o600,
+                'dir_mode': 0o700,
+            },
+            get_resource_section_path('tokens'): {
+                'dir_mode': 0o700,
+            }
+        }
+        for filename, permission_kwargs in permissions.items():
+            ensure_permissions(filename, **permission_kwargs)
 
         # Automatically create config file if it does not exist, except
         # in `sat init` where the subcommand will create it.  With

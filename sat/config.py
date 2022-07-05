@@ -35,6 +35,7 @@ import toml
 
 from sat.cli.bootsys.parser import TIMEOUT_SPECS
 
+
 DEFAULT_CONFIG_PATH = f'{os.getenv("HOME", "/root")}/.config/sat/sat.toml'
 LOGGER = logging.getLogger(__name__)
 CONFIG = None
@@ -434,7 +435,7 @@ def generate_default_config(path, username=None, force=False):
     config_file_dir = os.path.dirname(path)
     if not os.path.isdir(config_file_dir):
         try:
-            os.makedirs(config_file_dir, exist_ok=True)
+            os.makedirs(config_file_dir, mode=0o700, exist_ok=True)
         except OSError as e:
             LOGGER.error(f'Unable to create directory {config_file_dir}: {e}')
             raise SystemExit(1)
@@ -454,6 +455,8 @@ def generate_default_config(path, username=None, force=False):
 
     try:
         output_stream = open(path, 'w')
+        os.fchmod(output_stream.fileno(), 0o600)
+
         with output_stream:
             toml_str = toml.dumps(config_spec)
             output_stream.write(process_toml_output(toml_str))
