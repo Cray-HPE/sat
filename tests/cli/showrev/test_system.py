@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -44,6 +44,17 @@ samples = os.path.join(os.path.dirname(__file__), 'samples')
 
 class TestSystem(ExtendedTestCase):
 
+    def setUp(self):
+        self.sitefile = '/opt/cray/etc/site_info.yml'
+        self.mock_s3 = mock.patch('sat.cli.showrev.system.get_s3_resource').start().return_value
+        mock.patch('sat.cli.showrev.system.get_config_value', return_value='sat').start()
+
+        self.mock_open = mock.patch('builtins.open').start()
+        self.mock_file_obj = self.mock_open.return_value
+        self.mock_open.return_value.__enter__.return_value = self.mock_file_obj
+
+        self.mock_yaml_load = mock.patch('sat.cli.showrev.system.yaml.safe_load').start()
+
     def tearDown(self):
         mock.patch.stopall()
 
@@ -61,7 +72,7 @@ class TestSystem(ExtendedTestCase):
         self.assertEqual(expected, result)
 
     @mock.patch('sat.cli.showrev.system._get_hsm_components', side_effect=sat.cli.showrev.system.APIError)
-    def test_get_interconnects_error(self, mock_get_hsm_components):
+    def test_get_interconnects_error(self, _):
         """Error test case for get_interconnects.
 
         get_interconnects should return 'ERROR' if it could not retrieve a
@@ -147,19 +158,18 @@ class TestSystem(ExtendedTestCase):
 
     def test_get_site_data_from_s3(self):
         """Test get_site_data downloads from S3."""
-        sitefile = '/opt/cray/etc/site_info.yml'
-        mock_s3 = mock.patch('sat.cli.showrev.system.get_s3_resource').start().return_value
-        mock.patch('sat.cli.showrev.system.get_config_value', return_value='sat').start()
-        mock_open = mock.patch('builtins.open').start()
-        mock_yaml_load = mock.patch('sat.cli.showrev.system.yaml.safe_load').start()
-        sat.cli.showrev.system.get_site_data(sitefile)
-        mock_s3.Object.assert_called_once_with('sat', sitefile)
-        mock_s3.Object.return_value.download_file.assert_called_once_with(sitefile)
-        mock_open.assert_called_once_with(sitefile, 'r')
-        mock_open.return_value.__enter__.return_value.read.assert_called_once_with()
-        mock_yaml_load.assert_called_once_with(
-            mock_open.return_value.__enter__.return_value.read.return_value
-        )
+        sat.cli.showrev.system.get_site_data(self.sitefile)
+
+        self.mock_s3.Object.assert_called_once_with('sat', self.sitefile)
+        self.mock_s3.Object.return_value.download_file.assert_called_once_with(self.sitefile)
+        self.mock_open.assert_called_once_with(self.sitefile, 'r')
+        self.mock_yaml_load.assert_called_once_with(self.mock_file_obj)
+
+    def test_get_site_data_sitefile_empty(self):
+        """Test that an error is logged if the sitefile is empty."""
+        self.mock_yaml_load.return_value = None
+        with self.assertLogs(level='WARNING'):
+            sat.cli.showrev.system.get_site_data(self.sitefile)
 
     def test_get_system_version_null_values(self):
         """Test get_system_version does not return a row with a null Slurm version."""

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -82,7 +82,12 @@ def get_site_data(sitefile):
 
     try:
         with open(sitefile, 'r') as f:
-            data.update(yaml.safe_load(f.read()))
+            site_info = yaml.safe_load(f)
+            if site_info is None:
+                LOGGER.error('Site info file "%s" is empty; run `sat setrev` to populate.',
+                             sitefile)
+                return default
+            data.update(site_info)
     except FileNotFoundError:
         LOGGER.error('Site information file %s not found. '
                      'Run "sat setrev" to generate this file.', sitefile)
