@@ -284,6 +284,9 @@ class BaseInputItemCollection(ABC, Validatable):
             InputItemCreateError: if there is a failure to get existing items
             UserAbortException: if the user chooses to abort at any point
         """
+        if not self.items:
+            return
+
         existing_items_by_name = self.get_existing_items_by_name()
 
         existing_input_items = [input_item for input_item in self.items
