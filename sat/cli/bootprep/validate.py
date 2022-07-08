@@ -24,6 +24,7 @@
 """
 Validation functions for the bootprep input file based on the schema.
 """
+from distutils.version import StrictVersion
 import logging
 import pkgutil
 
@@ -31,6 +32,7 @@ from jsonschema import SchemaError
 from jsonschema.validators import validator_for
 from yaml import safe_load, YAMLError
 
+from sat.cli.bootprep.constants import DEFAULT_INPUT_SCHEMA_VERSION
 from sat.cli.bootprep.errors import BootPrepInternalError, BootPrepValidationError, ValidationErrorCollection
 
 LOGGER = logging.getLogger(__name__)
@@ -45,8 +47,8 @@ def load_and_validate_schema():
     """Load the bootprep input file schema and check its validity.
 
     Returns:
-        A two-tuple containing the schema file contents as bytes and the schema
-        validator object from the jsonschema library.
+        A two-tuple containing the schema file contents as bytes and the
+        jsonschema.protocols.Validator object
 
     Raises:
         BootPrepInternalError: if unable to open or read the schema file, load
@@ -81,8 +83,8 @@ def load_and_validate_schema():
 def load_bootprep_schema():
     """Helper function to load the schema and return only the validator.
 
-    Returns: the schema validator object from the jsonschema
-        library.
+    Returns:
+        jsonschema.protocols.Validator: the validator object
 
     Raises:
         BootPrepInternalError: if unable to open or read the schema file, load
@@ -93,17 +95,81 @@ def load_bootprep_schema():
     return validator_cls
 
 
+def validate_instance_schema_version(instance, schema_validator):
+    """Validate the schema version of the instance.
+
+   Args:
+        instance: The instance data loaded from the input file
+        schema_validator (jsonschema.protocols.Validator): the validator object
+
+    Returns:
+        None
+
+    Raises:
+        BootPrepValidationError: if the given instance specifies a schema
+            version that is incompatible with the schema version of the given
+            schema_validator.
+    """
+    schema_version_property = 'schema_version'
+
+    instance_version = instance.get(schema_version_property, DEFAULT_INPUT_SCHEMA_VERSION)
+
+    # No default is needed here because the version property was added to the
+    # bootprep_schema.yaml schema file simultaneously with this code.
+    current_version = schema_validator.schema['version']
+    strict_current_version = StrictVersion(current_version)
+
+    try:
+        strict_instance_version = StrictVersion(instance_version)
+    except ValueError as err:
+        raise BootPrepValidationError(
+            f'Invalid schema version {instance_version} specified '
+            f'as value of {schema_version_property} property.'
+        ) from err
+
+    err_template = (f'Schema version specified in input file ({instance_version}) '
+                    f'{{comparison_text}} current schema version ({current_version}){{suffix}}')
+
+    if strict_instance_version < strict_current_version:
+        # Major version difference indicates instance is not compatible with current schema
+        if strict_instance_version.version[0] < strict_current_version.version[0]:
+            raise BootPrepValidationError(
+                err_template.format(comparison_text='has an older major version than',
+                                    suffix=' and thus is not compatible.')
+            )
+        elif strict_instance_version.version[1] < strict_current_version.version[1]:
+            LOGGER.warning(
+                err_template.format(comparison_text='has an older minor version than',
+                                    suffix='. Unexpected behavior may occur.')
+            )
+        # An instance with an older schema patch version is assumed to be compatible
+    elif strict_instance_version > current_version:
+        # Any new properties would be ignored, so we should not proceed
+        raise BootPrepValidationError(
+            err_template.format(comparison_text='is newer than',
+                                suffix=' and thus is not compatible.')
+        )
+
+    # Versions are equal
+
+
 def validate_instance(instance, schema_validator):
     """Validate a given instance against the schema validator.
 
     Args:
         instance: The instance data loaded from the input file
-        schema_validator: The validator object from the jsonschema library
+        schema_validator (jsonschema.protocols.Validator): the validator object
 
     Raises:
-        BootPrepValidationError: if the given instance does not validate against
-            the given schema_validator.
+        BootPrepValidationError: if the given instance has an incompatible
+            schema version.
+        ValidationErrorCollection: if the given instance does not validate
+            against the given schema_validator.
     """
+    # First check if the current input file schema version is compatible with
+    # the version specified by the input instance
+    validate_instance_schema_version(instance, schema_validator)
+
     errors = list(schema_validator.iter_errors(instance))
     if errors:
         raise ValidationErrorCollection(errors)
@@ -114,7 +180,7 @@ def load_and_validate_instance(instance_file_path, schema_validator):
 
     Args:
         instance_file_path (str): the input file for bootprep
-        schema_validator: the validator object from the jsonschema library.
+        schema_validator (jsonschema.protocols.Validator): the validator object
 
     Returns:
         dict: the instance defined in the YAML input file, if valid.

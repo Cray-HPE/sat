@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 	- `name` of elements of the `configurations` array
 	- `name`, `branch`, and `version` of elements under `layers` in
 	  elements of the `configurations` array
+- Defined a `sat bootprep` input file schema version and began validating the
+  schema version specified by `sat bootprep` input files.
 
 ## [Unreleased]
 
