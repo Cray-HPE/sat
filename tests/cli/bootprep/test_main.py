@@ -242,8 +242,9 @@ class TestDoBootprep(unittest.TestCase):
     def setUp(self):
         """Mock functions called by do_bootprep."""
         self.args = Namespace()
-        self.mock_do_bootprep_run = patch('sat.cli.bootprep.main.do_bootprep_run').start()
         self.mock_do_bootprep_docs = patch('sat.cli.bootprep.main.do_bootprep_docs').start()
+        self.mock_do_bootprep_example = patch('sat.cli.bootprep.main.do_bootprep_example').start()
+        self.mock_do_bootprep_run = patch('sat.cli.bootprep.main.do_bootprep_run').start()
         self.mock_do_bootprep_schema = patch('sat.cli.bootprep.main.do_bootprep_schema').start()
         self.mock_validator_cls = MagicMock()
         self.mock_schema_file = MagicMock()
@@ -260,6 +261,12 @@ class TestDoBootprep(unittest.TestCase):
         self.args.action = 'run'
         do_bootprep(self.args)
         self.mock_do_bootprep_run.assert_called_once_with(self.mock_validator_cls, self.args)
+
+    def test_do_bootprep_example(self):
+        """Test the generate-example action calls do_bootprep_example."""
+        self.args.action = 'generate-example'
+        do_bootprep(self.args)
+        self.mock_do_bootprep_example.assert_called_once_with(self.mock_validator_cls, self.args)
 
     def test_do_bootprep_generate_docs(self):
         """Test the generate-docs action calls do_bootprep_docs."""

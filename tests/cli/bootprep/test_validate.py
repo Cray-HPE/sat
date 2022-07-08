@@ -25,6 +25,7 @@
 Unit tests for validation of bootprep input file based on the schema
 """
 from copy import deepcopy
+import logging
 import unittest
 from unittest.mock import mock_open, patch, Mock
 
@@ -36,7 +37,8 @@ from sat.cli.bootprep.errors import (
 from sat.cli.bootprep.validate import (
     load_and_validate_instance,
     load_bootprep_schema,
-    validate_instance
+    validate_instance,
+    validate_instance_schema_version
 )
 from tests.common import ExtendedTestCase
 
@@ -150,6 +152,77 @@ NOT_OF_TYPE_ARRAY_MESSAGE = "is not of type 'array'"
 NOT_OF_TYPE_STRING_MESSAGE = "is not of type 'string'"
 
 
+class TestValidateInstanceSchemaVersion(unittest.TestCase):
+    """Tests for the validate_instance_schema_version function."""
+
+    def setUp(self):
+        self.current_schema_version = '2.1.4'
+        self.mock_schema_validator = Mock()
+        self.mock_schema_validator.schema = {'version': self.current_schema_version}
+
+    def assert_valid_schema_version(self, version=None):
+        """Assert that the given schema version is valid.
+
+        Args:
+            version (str, optional): the schema version to use in the input instance
+        """
+        try:
+            validate_instance_schema_version({'schema_version': version} if version else {},
+                                             self.mock_schema_validator)
+        except BootPrepValidationError as err:
+            self.fail(f'Expected valid schema version failed to validate: {err}')
+
+    def assert_invalid_schema_version(self, version=None):
+        """Assert that the given schema version is invalid.
+
+        Args:
+            version (str, optional): the schema version to use in the input instance.
+        """
+        with self.assertRaises(BootPrepValidationError):
+            validate_instance_schema_version({'schema_version': version} if version else {},
+                                             self.mock_schema_validator)
+
+    def test_equal_schema_version(self):
+        """Test validate_instance_schema_version with equal version."""
+        self.assert_valid_schema_version(self.current_schema_version)
+
+    def test_older_major_schema_version(self):
+        """Test validate_instance_schema_version with older major version."""
+        self.assert_invalid_schema_version('1.0.5')
+
+    def test_older_minor_schema_version(self):
+        """Test validate_instance_schema_version with older minor version."""
+        with self.assertLogs(level=logging.WARNING):
+            self.assert_valid_schema_version('2.0.1')
+
+    def test_older_patch_schema_version(self):
+        """Test validate_instance_schema_version with older minor version."""
+        self.assert_valid_schema_version('2.1.0')
+
+    def test_newer_schema_version(self):
+        """Test validate_instance_schema_version with a newer version."""
+        self.assert_invalid_schema_version('4.2.0')
+
+    def test_default_schema_version(self):
+        """Test validate_instance_schema_version with no version specified."""
+        def default_patch(version):
+            """Patch the DEFAULT_INPUT_SCHEMA_VERSION."""
+            return patch('sat.cli.bootprep.validate.DEFAULT_INPUT_SCHEMA_VERSION', version)
+
+        with default_patch(self.current_schema_version):
+            self.assert_valid_schema_version()
+
+        with default_patch('9.9.9'):
+            self.assert_invalid_schema_version()
+
+    def test_malformed_schema_version(self):
+        """Test validate_instance_schema_version with a malformed schema version."""
+        invalid_schema_versions = ['1.2.3.4', '1.2.3-rc1', 'not-even-close']
+        for invalid_version in invalid_schema_versions:
+            with self.subTest(version=invalid_version):
+                self.assert_invalid_schema_version(invalid_version)
+
+
 class TestValidateInstance(ExtendedTestCase):
     """Tests for the validate_instance function."""
 
@@ -161,6 +234,13 @@ class TestValidateInstance(ExtendedTestCase):
         do not modify the schema_validator.
         """
         cls.schema_validator = load_bootprep_schema()
+
+    def setUp(self):
+        self.mock_validate_schema_version = patch('sat.cli.bootprep.validate'
+                                                  '.validate_instance_schema_version').start()
+
+    def tearDown(self):
+        patch.stopall()
 
     def assert_valid_instance(self, instance):
         """Helper assertion for asserting instance validates.
@@ -834,6 +914,14 @@ class TestValidateInstance(ExtendedTestCase):
                      f"'{bad_value}' is not of type 'array'", 1)
                 ]
                 self.assert_invalid_instance(instance, expected_errs)
+
+    def test_invalid_schema_version(self):
+        """Invalid schema version specified in bootprep input file."""
+        err_msg = 'Incompatible schema version.'
+        self.mock_validate_schema_version.side_effect = BootPrepValidationError(err_msg)
+
+        with self.assertRaisesRegex(BootPrepValidationError, err_msg):
+            validate_instance({}, self.schema_validator)
 
 
 class TestLoadBootprepSchema(unittest.TestCase):

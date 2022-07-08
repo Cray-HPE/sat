@@ -107,10 +107,11 @@ def do_bootprep_schema(schema_file_contents):
         raise SystemExit(1)
 
 
-def do_bootprep_example(args):
+def do_bootprep_example(schema_validator, args):
     """Generate an example bootprep input file.
 
     Args:
+        schema_validator (jsonschema.protocols.Validator): the validator object
         args: The argparse.Namespace object containing the parsed arguments
             passed to this subcommand.
 
@@ -128,6 +129,9 @@ def do_bootprep_example(args):
         LOGGER.error(str(err))
         raise SystemExit(1)
 
+    # Get current schema version
+    example_data['schema_version'] = schema_validator.schema['version']
+
     try:
         with open(full_example_file_path, 'w') as f:
             yaml.dump(example_data, f, sort_keys=False)
@@ -142,8 +146,7 @@ def do_bootprep_run(schema_validator, args):
     """Create images, configurations, and/or session templates.
 
     Args:
-        schema_validator: the schema validator object from the jsonschema
-            library used to validate the input instance.
+        schema_validator (jsonschema.protocols.Validator): the validator object
         args: The argparse.Namespace object containing the parsed arguments
             passed to this subcommand.
 
@@ -261,4 +264,4 @@ def do_bootprep(args):
     elif args.action == 'view-schema':
         do_bootprep_schema(schema_file_contents)
     elif args.action == 'generate-example':
-        do_bootprep_example(args)
+        do_bootprep_example(schema_validator, args)
