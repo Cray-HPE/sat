@@ -37,6 +37,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 	  elements of the `configurations` array
 - Defined a `sat bootprep` input file schema version and began validating the
   schema version specified by `sat bootprep` input files.
+- Added functionality to `sat bootprep` to look up images and recipes provided
+  by products.
+
+### Changed
+- Changed the `sat bootprep` input file schema by adding a new `base` property
+  for an image and moved the existing `ims` property beneath that new property.
+
+### Deprecated
+- Specifying the `ims` property at the top level of an image in the `sat
+  bootprep` input file is deprecated.
 
 ## [Unreleased]
 

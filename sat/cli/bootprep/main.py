@@ -28,6 +28,7 @@ import logging
 import os
 
 from cray_product_catalog.query import ProductCatalog, ProductCatalogError
+from jinja2.sandbox import SandboxedEnvironment
 import yaml
 
 from sat.apiclient import CFSClient, IMSClient
@@ -185,8 +186,10 @@ def do_bootprep_run(schema_validator, args):
     except VariableContextError as err:
         LOGGER.error(str(err))
         raise SystemExit(1)
+    jinja_env = SandboxedEnvironment()
+    jinja_env.globals = var_context.vars
 
-    instance = InputInstance(instance_data, cfs_client, ims_client, bos_client, var_context, product_catalog)
+    instance = InputInstance(instance_data, cfs_client, ims_client, bos_client, jinja_env, product_catalog)
 
     # TODO (CRAYSAT-1277): Refactor images to use BaseInputItemCollection
     # TODO (CRAYSAT-1278): Refactor configurations to use BaseInputItemCollection
