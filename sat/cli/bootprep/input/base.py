@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -26,9 +26,12 @@ Defines base classes for objects defined in the input file.
 """
 from abc import ABC, abstractmethod
 from collections import Counter
+import functools
 import logging
 
 from inflect import engine
+from jinja2 import TemplateError
+from jinja2.sandbox import SecurityError
 
 from sat.cached_property import cached_property
 from sat.cli.bootprep.errors import InputItemCreateError, InputItemValidateError, UserAbortException
@@ -371,3 +374,43 @@ class BaseInputItemCollection(ABC, Validatable):
             raise InputItemCreateError(
                 f'Failed to create {self.item_count_string(len(failed_items))}'
             )
+
+
+def jinja_rendered(func):
+    """Decorator for instance methods which return Jinja2 templates.
+
+    This should be used to decorate instance methods which return content from
+    the InputInstance that supports rendering as a Jinja2 template. If the
+    `func` returns `None`, this wrapper will as well.
+
+    This wrapper assumes the instance has the following attributes:
+
+        jinja_env (jinja2.Environment): the Jinja2 environment to use to get
+            Template objects to be rendered. Variables to use as context are
+            expected to already be set in the `globals` attribute.
+        create_error_cls: the specific subclass of InputItemCreateError that
+            should be raised if there is an issue rendering the template.
+            Defaults to InputItemCreateError if not set.
+    """
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        # First call the wrapped method and get its result
+        unrendered_result = func(self, *args, **kwargs)
+
+        # If value not specified in input file, the `func` may return `None`
+        if unrendered_result is None:
+            return unrendered_result
+
+        # Default to InputItemCreateError if no error class is specified
+        error_cls = getattr(self, 'create_error_cls', InputItemCreateError)
+
+        try:
+            return self.jinja_env.from_string(unrendered_result).render()
+        except SecurityError as err:
+            raise error_cls(f'Jinja2 template {unrendered_result} for value '
+                            f'{func.__name__} tried to access unsafe attributes.') from err
+        except TemplateError as err:
+            raise error_cls(f'Failed to render Jinja2 template {unrendered_result} '
+                            f'for value {func.__name__}: {err}') from err
+
+    return wrapper

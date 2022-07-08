@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -773,7 +773,8 @@ class TestValidateInstance(ExtendedTestCase):
                 del image[missing_property]
                 instance = {'images': [image]}
                 expected_errs = [
-                    (('images', 0), f"'{missing_property}' is a required property", 1)
+                    (('images', 0), NOT_VALID_ANY_OF_MESSAGE, 1),
+                    (('images', 0), f"'{missing_property}' is a required property", 2)
                 ]
                 self.assert_invalid_instance(instance, expected_errs)
 
@@ -783,7 +784,8 @@ class TestValidateInstance(ExtendedTestCase):
         del image['configuration_group_names']
         instance = {'images': [image]}
         expected_errs = [
-            (('images', 0), "'configuration_group_names' is a dependency of 'configuration'", 1)
+            (('images', 0), NOT_VALID_ANY_OF_MESSAGE, 1),
+            (('images', 0), "'configuration_group_names' is a dependency of 'configuration'", 2)
         ]
         self.assert_invalid_instance(instance, expected_errs)
 
@@ -806,8 +808,9 @@ class TestValidateInstance(ExtendedTestCase):
                               present_properties=list(bad_image['ims'].keys())):
                 instance = {'images': [bad_image]}
                 expected_errs = [
-                    (('images', 0, 'ims'), NOT_VALID_ANY_OF_MESSAGE, 1),
-                    (('images', 0, 'ims'), f"'{missing_property}' is a required property", 2)
+                    (('images', 0), NOT_VALID_ANY_OF_MESSAGE, 1),
+                    (('images', 0, 'ims'), NOT_VALID_ANY_OF_MESSAGE, 2),
+                    (('images', 0, 'ims'), f"'{missing_property}' is a required property", 3)
                 ]
                 self.assert_invalid_instance(instance, expected_errs)
 
@@ -827,12 +830,13 @@ class TestValidateInstance(ExtendedTestCase):
             ]
         }
         expected_errs = [
-            (('images', 0, 'name'), NOT_OF_TYPE_STRING_MESSAGE, 1),
-            (('images', 0, 'configuration'), NOT_OF_TYPE_STRING_MESSAGE, 1),
-            (('images', 0, 'configuration_group_names'), NOT_OF_TYPE_ARRAY_MESSAGE, 1),
-            (('images', 0, 'ims'), NOT_VALID_ANY_OF_MESSAGE, 1),
-            (('images', 0, 'ims', 'is_recipe'), "'bunch' is not of type 'boolean'", 2),
-            (('images', 0, 'ims', 'name'), NOT_OF_TYPE_STRING_MESSAGE, 2),
+            (('images', 0), NOT_VALID_ANY_OF_MESSAGE, 1),
+            (('images', 0, 'name'), NOT_OF_TYPE_STRING_MESSAGE, 2),
+            (('images', 0, 'configuration'), NOT_OF_TYPE_STRING_MESSAGE, 2),
+            (('images', 0, 'configuration_group_names'), NOT_OF_TYPE_ARRAY_MESSAGE, 2),
+            (('images', 0, 'ims'), NOT_VALID_ANY_OF_MESSAGE, 2),
+            (('images', 0, 'ims', 'is_recipe'), "'bunch' is not of type 'boolean'", 3),
+            (('images', 0, 'ims', 'name'), NOT_OF_TYPE_STRING_MESSAGE, 3),
         ]
         self.assert_invalid_instance(instance, expected_errs)
 

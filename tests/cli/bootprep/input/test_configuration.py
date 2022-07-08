@@ -31,6 +31,7 @@ import unittest
 from unittest.mock import patch, Mock
 
 from cray_product_catalog.query import ProductCatalogError
+from jinja2.sandbox import SandboxedEnvironment
 
 from sat.apiclient.vcs import VCSError
 from sat.cli.bootprep.errors import ConfigurationCreateError
@@ -56,7 +57,7 @@ class TestInputConfigurationLayer(unittest.TestCase):
         self.mock_git_layer = patch_configuration('GitInputConfigurationLayer').start()
         self.mock_product_layer = patch_configuration('ProductInputConfigurationLayer').start()
         self.mock_product_catalog = Mock()
-        self.mock_var_context = Mock()
+        self.mock_jinja_env = Mock()
 
     def tearDown(self):
         patch.stopall()
@@ -65,14 +66,14 @@ class TestInputConfigurationLayer(unittest.TestCase):
         """Test the get_configuration_layer static method with a git layer"""
         # Just needs a 'git' key; we're mocking the GitInputConfigurationLayer class
         layer_data = {'git': {}}
-        layer = InputConfigurationLayer.get_configuration_layer(layer_data, self.mock_var_context,
+        layer = InputConfigurationLayer.get_configuration_layer(layer_data, self.mock_jinja_env,
                                                                 self.mock_product_catalog)
         self.assertEqual(self.mock_git_layer.return_value, layer)
 
     def test_get_configuration_layer_product(self):
         """Test the get_configuration_layer static method with a product layer"""
         layer_data = {'product': {}}
-        layer = InputConfigurationLayer.get_configuration_layer(layer_data, self.mock_var_context,
+        layer = InputConfigurationLayer.get_configuration_layer(layer_data, self.mock_jinja_env,
                                                                 self.mock_product_catalog)
         self.assertEqual(self.mock_product_layer.return_value, layer)
 
@@ -84,7 +85,7 @@ class TestInputConfigurationLayer(unittest.TestCase):
         layer_data = {'unknown': {}}
         expected_err = 'Unrecognized type of configuration layer'
         with self.assertRaisesRegex(ValueError, expected_err):
-            InputConfigurationLayer.get_configuration_layer(layer_data, self.mock_var_context,
+            InputConfigurationLayer.get_configuration_layer(layer_data, self.mock_jinja_env,
                                                             self.mock_product_catalog)
 
 
@@ -133,8 +134,8 @@ class TestGitInputConfigurationLayer(TestInputConfigurationLayerBase):
         self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = self.branch_head_commit
 
         self.mock_sat_version = '2.3.6'
-        self.mock_var_context = Mock()
-        self.mock_var_context.vars = {
+        self.jinja_env = SandboxedEnvironment()
+        self.jinja_env.globals = {
             'sat': {'version': self.mock_sat_version}
         }
 
@@ -143,67 +144,67 @@ class TestGitInputConfigurationLayer(TestInputConfigurationLayerBase):
 
     def test_playbook_property_present(self):
         """Test the playbook property when a playbook is in the layer data"""
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.mock_var_context)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
         self.assertEqual(self.playbook, layer.playbook)
 
     def test_playbook_property_not_present(self):
         """Test the playbook property when a playbook is not in the layer data"""
         del self.branch_layer_data['playbook']
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.mock_var_context)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
         self.assertIsNone(layer.playbook)
 
     def test_name_property_present(self):
         """Test the name property when the name is in the layer data"""
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.mock_var_context)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
         self.assertEqual(self.branch_layer_data['name'], layer.name)
 
     def test_name_property_not_present(self):
         """Test the name property when the name is not in the layer data"""
         del self.branch_layer_data['name']
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.mock_var_context)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
         self.assertIsNone(layer.name)
 
     def test_name_property_jinja_template(self):
         """Test the name property when the name uses Jinja2 templating"""
         self.branch_layer_data['name'] = 'sat-ncn-{{sat.version}}'
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.mock_var_context)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
         self.assertEqual(f'sat-ncn-{self.mock_sat_version}', layer.name)
 
     def test_clone_url_property(self):
         """Test the clone_url property."""
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.mock_var_context)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
         self.assertEqual(self.branch_layer_data['git']['url'], layer.clone_url)
 
     def test_branch_property_present(self):
         """Test the branch property when the branch is in the layer data"""
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.mock_var_context)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
         self.assertEqual(self.branch_layer_data['git']['branch'], layer.branch)
 
     def test_branch_property_not_present(self):
         """Test the branch property when the branch is not in the layer data"""
-        layer = GitInputConfigurationLayer(self.commit_layer_data, self.mock_var_context)
+        layer = GitInputConfigurationLayer(self.commit_layer_data, self.jinja_env)
         self.assertIsNone(layer.branch)
 
     def test_branch_property_jinja_template(self):
         """Test the branch property when the branch uses Jinja2 templating"""
         self.branch_layer_data['git']['branch'] = 'integration-{{sat.version}}'
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.mock_var_context)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
         self.assertEqual(f'integration-{self.mock_sat_version}', layer.branch)
 
     def test_commit_property_present(self):
         """Test the commit property when the commit is in the layer data"""
-        layer = GitInputConfigurationLayer(self.commit_layer_data, self.mock_var_context)
+        layer = GitInputConfigurationLayer(self.commit_layer_data, self.jinja_env)
         self.assertEqual(self.commit_layer_data['git']['commit'], layer.commit)
 
     def test_commit_property_not_present(self):
         """Test the commit property when the commit is not in the layer data"""
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.mock_var_context)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
         self.assertIsNone(layer.commit)
 
     def test_get_cfs_api_data_optional_properties(self):
         """Test get_cfs_api_data method with all optional properties present."""
-        branch_layer = GitInputConfigurationLayer(self.branch_layer_data, self.mock_var_context)
-        commit_layer = GitInputConfigurationLayer(self.commit_layer_data, self.mock_var_context)
+        branch_layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
+        commit_layer = GitInputConfigurationLayer(self.commit_layer_data, self.jinja_env)
         subtests = (('branch', branch_layer), ('commit', commit_layer))
         for present_property, layer in subtests:
             with self.subTest(present_property=present_property):
@@ -219,13 +220,13 @@ class TestGitInputConfigurationLayer(TestInputConfigurationLayerBase):
     def test_commit_property_branch_commit_lookup(self):
         """Test looking up commit hash from branch in VCS when branch not supported in CSM"""
         with self.patch_resolve_branches(True):
-            layer = GitInputConfigurationLayer(self.branch_layer_data, self.mock_var_context)
+            layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
             self.assertEqual(layer.commit, self.branch_head_commit)
 
     def test_commit_property_branch_commit_vcs_query_fails(self):
         """Test looking up commit hash raises ConfigurationCreateError when VCS is inaccessible"""
         with self.patch_resolve_branches(True):
-            layer = GitInputConfigurationLayer(self.branch_layer_data, self.mock_var_context)
+            layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
             self.mock_vcs_repo.return_value.get_commit_hash_for_branch.side_effect = VCSError
             with self.assertRaises(ConfigurationCreateError):
                 _ = layer.commit
@@ -233,7 +234,7 @@ class TestGitInputConfigurationLayer(TestInputConfigurationLayerBase):
     def test_commit_property_branch_commit_lookup_fails(self):
         """Test looking up commit hash for nonexistent branch when branch not supported in CSM"""
         with self.patch_resolve_branches(True):
-            layer = GitInputConfigurationLayer(self.branch_layer_data, self.mock_var_context)
+            layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
             self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = None
             with self.assertRaises(ConfigurationCreateError):
                 _ = layer.commit
@@ -271,8 +272,8 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
         self.mock_product_catalog.get_product.side_effect = mock_get_product
 
         # Used to test variable substitution in Jinja2-templated fields
-        self.mock_var_context = Mock()
-        self.mock_var_context.vars = {
+        self.jinja_env = SandboxedEnvironment()
+        self.jinja_env.globals = {
             self.product_name: {'version': self.product_version}
         }
 
@@ -286,7 +287,7 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
             }
         }
         self.version_layer = ProductInputConfigurationLayer(self.version_layer_data,
-                                                            self.mock_var_context,
+                                                            self.jinja_env,
                                                             self.mock_product_catalog)
         self.branch = 'integration'
         self.branch_layer_data = {
@@ -298,7 +299,7 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
             }
         }
         self.branch_layer = ProductInputConfigurationLayer(self.branch_layer_data,
-                                                           self.mock_var_context,
+                                                           self.jinja_env,
                                                            self.mock_product_catalog)
 
         self.commit = 'c07f317c4127d8667a4bd6c08d48e716b1d47da1'
@@ -311,7 +312,7 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
             }
         }
         self.commit_layer = ProductInputConfigurationLayer(self.commit_layer_data,
-                                                           self.mock_var_context,
+                                                           self.jinja_env,
                                                            self.mock_product_catalog)
 
         self.branch_head_commit = 'e6bfdb28d44669c4317d6dc021c22a75cebb3bfb'
@@ -343,7 +344,7 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
         # Have to double the literal brackets that make up the Jinja2 variable reference
         self.version_layer_data['product']['version'] = '{{' + f'{self.product_name}.version' + '}}'
 
-        layer = ProductInputConfigurationLayer(self.version_layer_data, self.mock_var_context,
+        layer = ProductInputConfigurationLayer(self.version_layer_data, self.jinja_env,
                                                self.mock_product_catalog)
 
         self.assertEqual(self.product_version, layer.product_version)
@@ -360,13 +361,13 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
         """Test getting the matching InstalledProductVersion for an explict latest version."""
         latest_layer_data = deepcopy(self.branch_layer_data)
         latest_layer_data['product']['version'] = LATEST_VERSION_VALUE
-        latest_layer = ProductInputConfigurationLayer(latest_layer_data, self.mock_var_context,
+        latest_layer = ProductInputConfigurationLayer(latest_layer_data, self.jinja_env,
                                                       self.mock_product_catalog)
         self.assertEqual(self.new_cos, latest_layer.matching_product)
 
     def test_matching_product_no_product_catalog(self):
         """Test getting the matching InstalledProductVersion when the product catalog is missing."""
-        layer = ProductInputConfigurationLayer(self.version_layer_data, self.mock_var_context, None)
+        layer = ProductInputConfigurationLayer(self.version_layer_data, self.jinja_env, None)
         err_regex = 'Product catalog data is not available'
         with self.assertRaisesRegex(ConfigurationCreateError, err_regex):
             _ = layer.matching_product
@@ -411,7 +412,7 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
         # Have to double the literal brackets that make up the Jinja2 variable reference
         self.branch_layer_data['product']['branch'] = 'integration-{{' + f'{self.product_name}.version' + '}}'
 
-        layer = ProductInputConfigurationLayer(self.branch_layer_data, self.mock_var_context,
+        layer = ProductInputConfigurationLayer(self.branch_layer_data, self.jinja_env,
                                                self.mock_product_catalog)
 
         self.assertEqual(f'integration-{self.product_version}', layer.branch)
@@ -470,8 +471,8 @@ class TestInputConfiguration(unittest.TestCase):
         self.mock_product_catalog = Mock()
 
         self.shasta_version = '22.06'
-        self.mock_var_context = Mock()
-        self.mock_var_context.vars = {
+        self.jinja_env = SandboxedEnvironment()
+        self.jinja_env.globals = {
             'shasta': {'version': self.shasta_version}
         }
 
@@ -480,19 +481,19 @@ class TestInputConfiguration(unittest.TestCase):
 
     def test_init(self):
         """Test creation of a InputConfiguration"""
-        config = InputConfiguration(self.config_data, self.mock_var_context, self.mock_product_catalog)
+        config = InputConfiguration(self.config_data, self.jinja_env, self.mock_product_catalog)
         self.assertEqual(self.config_name, config.name)
         self.assertEqual(self.layers, config.layers)
 
     def test_name_property(self):
         """Test the name property of the InputConfiguration"""
-        config = InputConfiguration(self.config_data, self.mock_var_context, self.mock_product_catalog)
+        config = InputConfiguration(self.config_data, self.jinja_env, self.mock_product_catalog)
         self.assertEqual(self.config_name, config.name)
 
     def test_name_property_jinja_template(self):
         """Test the name property when it uses Jinja2 templating"""
         self.config_data['name'] = 'compute-config-shasta-{{shasta.version}}'
-        config = InputConfiguration(self.config_data, self.mock_var_context, self.mock_product_catalog)
+        config = InputConfiguration(self.config_data, self.jinja_env, self.mock_product_catalog)
         self.assertEqual(f'compute-config-shasta-{self.shasta_version}', config.name)
 
     def test_get_cfs_api_data(self):
@@ -501,7 +502,7 @@ class TestInputConfiguration(unittest.TestCase):
             'layers': [layer.get_cfs_api_data.return_value
                        for layer in self.layers]
         }
-        config = InputConfiguration(self.config_data, self.mock_var_context, self.mock_product_catalog)
+        config = InputConfiguration(self.config_data, self.jinja_env, self.mock_product_catalog)
         self.assertEqual(expected, config.get_cfs_api_data())
 
     def test_get_cfs_api_data_one_failure(self):
@@ -510,7 +511,7 @@ class TestInputConfiguration(unittest.TestCase):
         create_fail_msg = 'bad layer'
         failing_layer.get_cfs_api_data.side_effect = ConfigurationCreateError(create_fail_msg)
         err_regex = fr'Failed to create 1 layer\(s\) of configuration {self.config_name}'
-        config = InputConfiguration(self.config_data, self.mock_var_context, self.mock_product_catalog)
+        config = InputConfiguration(self.config_data, self.jinja_env, self.mock_product_catalog)
 
         with self.assertLogs(level=logging.ERROR) as logs_cm:
             with self.assertRaisesRegex(ConfigurationCreateError, err_regex):
@@ -527,7 +528,7 @@ class TestInputConfiguration(unittest.TestCase):
         for layer in self.layers:
             layer.get_cfs_api_data.side_effect = ConfigurationCreateError(create_fail_msg)
         err_regex = fr'Failed to create 3 layer\(s\) of configuration {self.config_name}'
-        config = InputConfiguration(self.config_data, self.mock_var_context, self.mock_product_catalog)
+        config = InputConfiguration(self.config_data, self.jinja_env, self.mock_product_catalog)
 
         with self.assertLogs(level=logging.ERROR) as logs_cm:
             with self.assertRaisesRegex(ConfigurationCreateError, err_regex):

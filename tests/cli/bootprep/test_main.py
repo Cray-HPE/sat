@@ -133,6 +133,8 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_variable_context_cls = patch('sat.cli.bootprep.main.VariableContext').start()
         self.mock_variable_context = self.mock_variable_context_cls.return_value
         self.mock_variable_context.vars = {}
+        self.mock_sandboxed_environment_cls = patch('sat.cli.bootprep.main.SandboxedEnvironment').start()
+        self.mock_sandboxed_environment = self.mock_sandboxed_environment_cls.return_value
         self.mock_request_dumper = patch('sat.cli.bootprep.main.RequestDumper').start()
 
     def tearDown(self):
@@ -147,7 +149,7 @@ class TestDoBootprepRun(unittest.TestCase):
             self.input_file, self.mock_validator_cls)
         self.mock_input_instance_cls.assert_called_once_with(
             self.validated_data, self.mock_cfs_client, self.mock_ims_client,
-            self.mock_bos_client, self.mock_variable_context, self.mock_product_catalog)
+            self.mock_bos_client, self.mock_sandboxed_environment, self.mock_product_catalog)
         self.mock_create_configurations.assert_called_once_with(self.mock_input_instance, self.args)
         self.mock_create_images.assert_called_once_with(self.mock_input_instance, self.args)
         self.mock_session_templates.handle_existing_items.assert_called_once_with(
@@ -206,7 +208,7 @@ class TestDoBootprepRun(unittest.TestCase):
             self.input_file, self.mock_validator_cls)
         self.mock_input_instance_cls.assert_called_once_with(
             self.validated_data, self.mock_cfs_client, self.mock_ims_client,
-            self.mock_bos_client, self.mock_variable_context, self.mock_product_catalog)
+            self.mock_bos_client, self.mock_sandboxed_environment, self.mock_product_catalog)
         self.mock_create_configurations.assert_called_once_with(self.mock_input_instance, self.args)
         self.mock_create_images.assert_not_called()
         self.mock_session_templates.handle_existing_items.assert_not_called()
@@ -228,7 +230,7 @@ class TestDoBootprepRun(unittest.TestCase):
             self.input_file, self.mock_validator_cls)
         self.mock_input_instance_cls.assert_called_once_with(
             self.validated_data, self.mock_cfs_client, self.mock_ims_client,
-            self.mock_bos_client, self.mock_variable_context, self.mock_product_catalog)
+            self.mock_bos_client, self.mock_sandboxed_environment, self.mock_product_catalog)
         self.mock_create_configurations.assert_called_once_with(self.mock_input_instance, self.args)
         self.mock_create_images.assert_called_once_with(self.mock_input_instance, self.args)
         self.mock_session_templates.handle_existing_items.assert_not_called()
