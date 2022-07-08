@@ -7,7 +7,7 @@ Shut down or boot the entire system gracefully
 ----------------------------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2020-2022 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -93,7 +93,7 @@ These options apply to both the ``shutdown`` and ``boot`` actions.
         Certain actions can be disruptive to the system, and so require
         interactive user confirmation to proceed. Using the ``--disruptive``
         option skips any interactive user prompts. If ``--disruptive`` is used
-        with a stage which is not disruptive, it is ignored. The following 
+        with a stage which is not disruptive, it is ignored. The following
         shutdown stages are considered disruptive:
 
         * bos-operations
@@ -114,6 +114,9 @@ These options apply to both the ``shutdown`` and ``boot`` actions.
         precedence over ``--cle-bos-template`` and ``--uan-bos-template``
         (below). This overrides the option ``bootsys.bos_templates`` in the
         config file.
+
+**--bos-version BOS_VERSION**
+        The version of the BOS API to use when launching BOS sessions.
 
 **--cle-bos-template** *CLE_BOS_TEMPLATE*
         The name of the BOS session template for shutdown or boot of
