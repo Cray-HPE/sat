@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added information regarding the `--bos-version` command line argument to man
+  pages for relevant subcommands.
+
 ### Fixed
 - Fixed unit tests that failed when run in PyCharm.
 
