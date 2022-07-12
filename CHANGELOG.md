@@ -25,6 +25,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased bootprep improvements]
+
+### Added
+- Added `--recipe-version`, `--vars-file`, and `--vars` options to `sat
+  bootprep run` to specify variables for use in `bootprep` input files.
+- Added variable substitution support to the following fields in `sat bootprep`
+  input files:
+	- `name` of elements of the `configurations` array
+	- `name`, `branch`, and `version` of elements under `layers` in
+	  elements of the `configurations` array
+
+## [Unreleased]
+
+### Added
+
+- Added information regarding the `--bos-version` command line argument to man
+  pages for relevant subcommands.
+
+### Fixed
+- Fixed unit tests that failed when run in PyCharm.
+
 ## [3.17.1] - 2022-07-05
 
 ### Changed

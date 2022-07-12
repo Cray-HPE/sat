@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -30,6 +30,8 @@ import logging
 from argparse import ArgumentParser
 
 from sat.constants import EMPTY_VALUE, MISSING_VALUE
+# If sat.util starts to import too much sat code, this will slow down tab completion
+from sat.util import set_val_by_path
 
 LOGGER = logging.getLogger(__name__)
 
@@ -206,3 +208,53 @@ def create_xname_options():
              'option multiple times.')
 
     return parser
+
+
+class StoreNestedVariable(argparse.Action):
+    """An argparse Action to parse and store nested variables.
+
+    For example, to define a '--vars' option using this action:
+
+        parser.add_argument('--vars', action=StoreNestedVariable)
+
+    If the user calls the program with these arguments:
+
+        --vars host.first=bob --vars host.last=barker
+
+    This will result in the following dict stored in the `vars` destination
+    of the argparse.Namespace object:
+
+        {
+            'host': {
+                'first': 'bob',
+                'last': 'barker'
+            }
+        }
+    """
+
+    def __init__(self, option_strings, dest, nargs=None, const=None,
+                 default=None, type=None, choices=None, required=False,
+                 help=None, metavar=None):
+        if nargs is not None:
+            raise ValueError('StoreNestedVariable action does not support '
+                             'nargs set to a non-default value.')
+        super().__init__(
+            option_strings=option_strings, dest=dest, nargs=nargs,
+            const=const, default=default, type=type, choices=choices,
+            required=required, help=help, metavar=metavar)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        # Split into variable name and value
+        try:
+            name, value = values.split('=', maxsplit=1)
+        except ValueError:
+            raise argparse.ArgumentError(self, f'Variable string "{values}" must contain "=".')
+
+        # Modify existing vars if any have already been set
+        current_vars = getattr(namespace, self.dest)
+        # Otherwise, start from an empty dict
+        if current_vars is None:
+            current_vars = {}
+            setattr(namespace, self.dest, current_vars)
+
+        set_val_by_path(current_vars, name, value)
