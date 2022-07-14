@@ -216,7 +216,7 @@ class BladeSwapProcedure(abc.ABC):
         Raises:
             SystemExit: if a BladeSwapError is raised during execution of the blade swap procedure
         """
-        if self.blade_class not in {'mountain', 'river'}:
+        if self.blade_class not in {'mountain', 'hill', 'river'}:
             LOGGER.error('Unsupported blade class "%s" for blade %s; aborting.',
                          self.blade_class.title(), self.xname)
             raise SystemExit(1)
@@ -416,7 +416,7 @@ class SwapOutProcedure(BladeSwapProcedure):
         # CRAYSAT-1373: Do this automatically with SCSD once CASMHMS-5447 is
         # completed.
 
-        if self.blade_class == 'mountain':
+        if self.blade_class in ('mountain', 'hill'):
             commands = []
             for node_bmc in self.blade_node_bmcs:
                 commands.append(
@@ -494,7 +494,7 @@ class SwapOutProcedure(BladeSwapProcedure):
 
         self.suspend_hms_discovery_cron_job()
 
-        if self.blade_class == 'mountain':
+        if self.blade_class in ('mountain', 'hill'):
             self.mountain_procedure()
         else:
             self.river_procedure()
@@ -625,7 +625,7 @@ class SwapInProcedure(BladeSwapProcedure):
         try:
             chassis_bmc = self.hsm_client.query_components(chassis_xname, type='ChassisBMC')[0]
         except (APIError, IndexError):
-            if self.blade_class == 'mountain':
+            if self.blade_class in ('mountain', 'hill'):
                 LOGGER.warning('Could not locate ChassisBMC for chassis %s; waiting '
                                'for hms-discovery to discover slot',
                                chassis_xname)
@@ -762,14 +762,14 @@ class SwapInProcedure(BladeSwapProcedure):
         if self.src_mapping and self.dst_mapping:
             self.map_ip_mac_addresses()
 
-        if self.blade_class == 'mountain':
+        if self.blade_class in ('mountain', 'hill'):
             self.enable_slot()
             self.power_on_slot()
 
         self.resume_hms_discovery_cron_job()
         self.begin_slot_discovery()
 
-        if self.blade_class == 'mountain':
+        if self.blade_class in ('mountain', 'hill'):
             self.wait_for_chassisbmc_endpoints()
 
         self.wait_for_nodebmc_endpoints()
