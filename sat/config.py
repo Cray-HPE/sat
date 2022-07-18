@@ -1,24 +1,28 @@
+#
+# MIT License
+#
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
 """
 Loads configuration from a config file in INI format.
-(C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
 """
 
 from collections import namedtuple
@@ -30,6 +34,7 @@ from textwrap import dedent, indent
 import toml
 
 from sat.cli.bootsys.parser import TIMEOUT_SPECS
+
 
 DEFAULT_CONFIG_PATH = f'{os.getenv("HOME", "/root")}/.config/sat/sat.toml'
 LOGGER = logging.getLogger(__name__)
@@ -430,7 +435,7 @@ def generate_default_config(path, username=None, force=False):
     config_file_dir = os.path.dirname(path)
     if not os.path.isdir(config_file_dir):
         try:
-            os.makedirs(config_file_dir, exist_ok=True)
+            os.makedirs(config_file_dir, mode=0o700, exist_ok=True)
         except OSError as e:
             LOGGER.error(f'Unable to create directory {config_file_dir}: {e}')
             raise SystemExit(1)
@@ -450,6 +455,8 @@ def generate_default_config(path, username=None, force=False):
 
     try:
         output_stream = open(path, 'w')
+        os.fchmod(output_stream.fileno(), 0o600)
+
         with output_stream:
             toml_str = toml.dumps(config_spec)
             output_stream.write(process_toml_output(toml_str))

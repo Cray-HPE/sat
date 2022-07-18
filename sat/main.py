@@ -1,25 +1,28 @@
+#
+# MIT License
+#
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
 """
 Entry point for the command-line interface.
-
-(C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import importlib
@@ -32,6 +35,7 @@ import argcomplete
 from sat.config import ConfigFileExistsError, DEFAULT_CONFIG_PATH, generate_default_config, load_config
 from sat.logging import bootstrap_logging, configure_logging
 from sat.parser import create_parent_parser
+from sat.util import ensure_permissions, get_resource_section_path
 
 LOGGER = logging.getLogger(__name__)
 
@@ -62,6 +66,20 @@ def main():
         parser = create_parent_parser()
         argcomplete.autocomplete(parser)
         args = parser.parse_args()
+
+        # Set the permissions on config directory and token directory in case
+        # they have been modified or incorrectly set up
+        permissions = {
+            DEFAULT_CONFIG_PATH: {
+                'file_mode': 0o600,
+                'dir_mode': 0o700,
+            },
+            get_resource_section_path('tokens'): {
+                'dir_mode': 0o700,
+            }
+        }
+        for filename, permission_kwargs in permissions.items():
+            ensure_permissions(filename, **permission_kwargs)
 
         # Automatically create config file if it does not exist, except
         # in `sat init` where the subcommand will create it.  With

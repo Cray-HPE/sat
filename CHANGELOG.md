@@ -1,6 +1,6 @@
 # Changelog
 
-(C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP.
+(C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -14,7 +14,7 @@ in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
 THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
 OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
@@ -25,8 +25,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-
 ## [Unreleased]
+
+### Added
+
+- Added information regarding the `--bos-version` command line argument to man
+  pages for relevant subcommands.
+- Added a ``sat swap blade`` subcommand which partially automates the procedure
+  for swapping compute and UAN blades.
+
+### Fixed
+- Fixed unit tests that failed when run in PyCharm.
+
+## [3.17.1] - 2022-07-05
+
+### Changed
+- Whenever `sat` is invoked, the permissions of the `~/.config/sat/sat.toml`
+  file will be set to `0600`, and the permissions of the `~/.config/sat/tokens`
+  and `~/.config/sat` directories will be set to `0700`.
+
+### Fixed
+- Fixed an issue where SAT crashed with a traceback if the file
+  `/etc/opt/cray/site.yaml` existed but was empty. A warning message will now be
+  logged instead.
+
+## [3.17.0] - 2022-06-27
 
 ### Added
 - Added client support for the BOS v2 API.
@@ -39,11 +62,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   listing the most recent BOS session, template, booted image, and boot status
   for nodes when BOS v2 is in use. Added a `--bos-fields` option to limit
   output to these fields.
-- Added a ``sat swap blade`` subcommand which automates the procedure for
-  swapping compute and UAN blades.
-- Added support for River blades to the ``sat swap blade`` subcommand.
-- Updated the ``sat-swap(8)`` man page to document the new ``sat swap blade``
-  subcommand.
 
 ### Fixed
 - Fixed an issue causing `sat init` to not print a message when a new config was created.
@@ -53,6 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Updated the project URL in `setup.py` to external GitHub location.
+- Changed the format of the license and copyright text in all of the
+  source files.
 
 ## [3.16.1] - 2022-06-07
 

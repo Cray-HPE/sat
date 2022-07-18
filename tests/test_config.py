@@ -1,25 +1,28 @@
+#
+# MIT License
+#
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
 """
 Unit tests for sat.config
-
-(C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
 """
 
 from collections import OrderedDict
@@ -155,6 +158,7 @@ class TestGenerateDefaultConfig(unittest.TestCase):
         }
         mock.patch('sat.config.SAT_CONFIG_SPEC', self.fake_config_spec).start()
         self.mock_open = mock.patch('builtins.open').start()
+        self.mock_fchmod = mock.patch('sat.config.os.fchmod').start()
         self.mock_output_stream = self.mock_open.return_value
         self.mock_isdir = mock.patch('sat.config.os.path.isdir', return_value=True).start()
         self.mock_isfile = mock.patch('sat.config.os.path.isfile', return_value=False).start()
@@ -196,6 +200,7 @@ class TestGenerateDefaultConfig(unittest.TestCase):
         generate_default_config(DEFAULT_CONFIG_PATH)
         self.mock_open.assert_called_with(DEFAULT_CONFIG_PATH, 'w')
         self.mock_output_stream.write.assert_called_once_with(self.expected_config)
+        self.mock_fchmod.assert_called_once_with(self.mock_output_stream.fileno.return_value, 0o600)
         self.mock_makedirs.assert_not_called()
 
     def test_generate_alternate_location(self):
@@ -203,6 +208,7 @@ class TestGenerateDefaultConfig(unittest.TestCase):
         generate_default_config('/mock/path.toml')
         self.mock_open.assert_called_once_with('/mock/path.toml', 'w')
         self.mock_output_stream.write.assert_called_once_with(self.expected_config)
+        self.mock_fchmod.assert_called_once_with(self.mock_output_stream.fileno.return_value, 0o600)
         self.mock_makedirs.assert_not_called()
 
     def test_generate_create_directory(self):
@@ -211,7 +217,8 @@ class TestGenerateDefaultConfig(unittest.TestCase):
         generate_default_config('/etc/opt/cray/sat.toml')
         self.mock_open.assert_called_once_with('/etc/opt/cray/sat.toml', 'w')
         self.mock_output_stream.write.assert_called_once_with(self.expected_config)
-        self.mock_makedirs.assert_called_once_with('/etc/opt/cray', exist_ok=True)
+        self.mock_fchmod.assert_called_once_with(self.mock_output_stream.fileno.return_value, 0o600)
+        self.mock_makedirs.assert_called_once_with('/etc/opt/cray', mode=0o700, exist_ok=True)
 
     def test_generate_with_username(self):
         """Test generating config with a username will write a config file with a username"""
@@ -219,6 +226,7 @@ class TestGenerateDefaultConfig(unittest.TestCase):
         generate_default_config(DEFAULT_CONFIG_PATH, username='sat_user')
         self.mock_open.assert_called_with(DEFAULT_CONFIG_PATH, 'w')
         self.mock_output_stream.write.assert_called_once_with(self.expected_config)
+        self.mock_fchmod.assert_called_once_with(self.mock_output_stream.fileno.return_value, 0o600)
         self.mock_makedirs.assert_not_called()
 
     def test_generate_file_exists(self):
@@ -231,6 +239,7 @@ class TestGenerateDefaultConfig(unittest.TestCase):
             generate_default_config(DEFAULT_CONFIG_PATH)
         self.mock_open.assert_not_called()
         self.mock_output_stream.write.assert_not_called()
+        self.mock_fchmod.assert_not_called()
         self.mock_makedirs.assert_not_called()
 
     def test_generate_file_exists_force(self):
@@ -239,6 +248,7 @@ class TestGenerateDefaultConfig(unittest.TestCase):
         generate_default_config(DEFAULT_CONFIG_PATH, force=True)
         self.mock_open.assert_called_with(DEFAULT_CONFIG_PATH, 'w')
         self.mock_output_stream.write.assert_called_once_with(self.expected_config)
+        self.mock_fchmod.assert_called_once_with(self.mock_output_stream.fileno.return_value, 0o600)
         self.mock_makedirs.assert_not_called()
 
 

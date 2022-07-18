@@ -1,33 +1,37 @@
+#
+# MIT License
+#
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
 """
 Unit tests for sat/util.py.
-
-(C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
 """
 from collections import OrderedDict
-from itertools import combinations, product
+from itertools import combinations, repeat
 import logging
 import os
 from textwrap import dedent
 from unittest import mock
 import unittest
+from unittest.mock import patch
 
 from sat import util
 from tests.common import ExtendedTestCase
@@ -595,6 +599,58 @@ class TestSubsequenceMatching(unittest.TestCase):
         for needle in ['zabraboof', 'nothing', 'ofoarbazb',
                        'foobarbax', 'bff', 'egads']:
             self.assertFalse(util.is_subsequence(needle, haystack))
+
+
+class TestEnsurePermissions(unittest.TestCase):
+    """Tests for the ensure_permissions() function"""
+    def setUp(self):
+        self.mock_chmod = patch('sat.util.os.chmod').start()
+
+        def mock_is_file(path):
+            return path == self.path
+        self.mock_is_file = patch('sat.util.os.path.isfile',
+                                  side_effect=mock_is_file).start()
+
+        def mock_is_dir(path):
+            return path == self.dirname
+        self.mock_is_dir = patch('sat.util.os.path.isdir',
+                                 side_effect=mock_is_dir).start()
+
+        self.dirname = '/foo/bar/baz'
+        self.filename = 'quux.toml'
+        self.path = os.path.join(self.dirname, self.filename)
+
+    def tearDown(self):
+        patch.stopall()
+
+    def test_file_and_dir_chmodded(self):
+        """Test that the target file and containing directory are chmodded"""
+        util.ensure_permissions(self.path)
+        self.mock_chmod.assert_any_call(self.dirname, 0o700)
+        self.mock_chmod.assert_any_call(self.path, 0o600)
+
+    def test_directory_chmodded_when_file_missing(self):
+        """Test that the containing directory is chmodded when the file is missing"""
+        # Using `side_effect = repeat(...)` is essentially the same as using
+        # `return_value`, but since `side_effect` is set in `setUp()`, it
+        # overrides `return_value`.
+        self.mock_is_file.side_effect = repeat(False)
+
+        util.ensure_permissions(self.path)
+        self.mock_chmod.assert_called_once_with(self.dirname, 0o700)
+
+    def test_nothing_chmodded_when_directory_missing(self):
+        """Test that chmod() is not called when file and directory are missing"""
+        self.mock_is_file.side_effect = repeat(False)
+        self.mock_is_dir.side_effect = repeat(False)
+        util.ensure_permissions(self.path)
+        self.mock_chmod.assert_not_called()
+
+    def test_directory_chmod_when_path_is_dir(self):
+        """Test changing the permissions on a directory path"""
+        self.mock_is_file.side_effect = repeat(False)
+        util.ensure_permissions(self.dirname)
+        self.mock_chmod.assert_called_once_with(self.dirname, 0o700)
 
 
 if __name__ == '__main__':
