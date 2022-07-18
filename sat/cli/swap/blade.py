@@ -1,26 +1,32 @@
+#
+# MIT License
+#
+# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
+# (C) Copyright 2022 Hewlett Packard Enterprise Development LP.
+
 """
 Procedure for swapping a blade.
-
-(C) Copyright 2022 Hewlett Packard Enterprise Development LP.
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
 """
+
 import abc
 from functools import wraps
 import json
@@ -216,7 +222,7 @@ class BladeSwapProcedure(abc.ABC):
         Raises:
             SystemExit: if a BladeSwapError is raised during execution of the blade swap procedure
         """
-        if self.blade_class not in {'mountain', 'river'}:
+        if self.blade_class not in {'mountain', 'hill', 'river'}:
             LOGGER.error('Unsupported blade class "%s" for blade %s; aborting.',
                          self.blade_class.title(), self.xname)
             raise SystemExit(1)
@@ -416,7 +422,7 @@ class SwapOutProcedure(BladeSwapProcedure):
         # CRAYSAT-1373: Do this automatically with SCSD once CASMHMS-5447 is
         # completed.
 
-        if self.blade_class == 'mountain':
+        if self.blade_class in ('mountain', 'hill'):
             commands = []
             for node_bmc in self.blade_node_bmcs:
                 commands.append(
@@ -494,7 +500,7 @@ class SwapOutProcedure(BladeSwapProcedure):
 
         self.suspend_hms_discovery_cron_job()
 
-        if self.blade_class == 'mountain':
+        if self.blade_class in ('mountain', 'hill'):
             self.mountain_procedure()
         else:
             self.river_procedure()
@@ -625,7 +631,7 @@ class SwapInProcedure(BladeSwapProcedure):
         try:
             chassis_bmc = self.hsm_client.query_components(chassis_xname, type='ChassisBMC')[0]
         except (APIError, IndexError):
-            if self.blade_class == 'mountain':
+            if self.blade_class in ('mountain', 'hill'):
                 LOGGER.warning('Could not locate ChassisBMC for chassis %s; waiting '
                                'for hms-discovery to discover slot',
                                chassis_xname)
@@ -762,14 +768,14 @@ class SwapInProcedure(BladeSwapProcedure):
         if self.src_mapping and self.dst_mapping:
             self.map_ip_mac_addresses()
 
-        if self.blade_class == 'mountain':
+        if self.blade_class in ('mountain', 'hill'):
             self.enable_slot()
             self.power_on_slot()
 
         self.resume_hms_discovery_cron_job()
         self.begin_slot_discovery()
 
-        if self.blade_class == 'mountain':
+        if self.blade_class in ('mountain', 'hill'):
             self.wait_for_chassisbmc_endpoints()
 
         self.wait_for_nodebmc_endpoints()
