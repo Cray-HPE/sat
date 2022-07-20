@@ -39,3 +39,8 @@ EXAMPLE_FILE_NAME = 'example-bootprep-input.yaml'
 
 # Special value used to indicate the latest version (e.g. of a product or the recipe)
 LATEST_VERSION_VALUE = 'latest'
+
+# Default value for the schema_version of an input file when it is not specified.
+# This is the version that would have been used in the initial version of the
+# input file schema if one had been specified.
+DEFAULT_INPUT_SCHEMA_VERSION = '1.0.0'
