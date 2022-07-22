@@ -36,7 +36,7 @@ from yaml import YAMLLoadWarning
 from sat.apiclient import APIError
 from sat.cached_property import cached_property
 from sat.cli.bootprep.errors import ImageCreateError
-from sat.cli.bootprep.input.base import jinja_rendered
+from sat.cli.bootprep.input.base import jinja_rendered, provides_context
 from sat.waiting import (
     DependencyGroupMember,
     WaitingFailure
@@ -117,6 +117,9 @@ class BaseInputImage(DependencyGroupMember, ABC):
         # Set by rename_configured_image
         self.final_image_id = None
 
+        # Additional context to be used when rendering Jinja2 templated properties
+        self.jinja_context = {}
+
     @staticmethod
     def get_image(image_data, *args, **kwargs):
         """Return an instance of a subclass of BaseInputImage for the given image data.
@@ -140,6 +143,7 @@ class BaseInputImage(DependencyGroupMember, ABC):
             raise ValueError('Unrecognized type of configuration layer')
 
     @property
+    @jinja_rendered
     def name(self):
         """str: the name of the final resulting image"""
         # 'name' is a required property in the bootprep schema
@@ -520,6 +524,7 @@ class IMSInputImage(BaseInputImage):
         return self.base_resource_type
 
     @cached_property
+    @provides_context('base')
     def ims_base(self):
         """dict: the data for the base IMS recipe or image to build and/or customize"""
         resource_type = self.base_resource_type
@@ -579,6 +584,7 @@ class ProductInputImage(BaseInputImage):
             raise ImageCreateError(f'Failed to find {self.base_description}: {err}')
 
     @cached_property
+    @provides_context('base')
     def ims_base(self):
         """dict: the data for the base IMS recipe or image to build and/or customize"""
         if self.base_is_recipe:

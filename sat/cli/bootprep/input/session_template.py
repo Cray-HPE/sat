@@ -28,7 +28,13 @@ import re
 
 from sat.apiclient import APIError
 from sat.cached_property import cached_property
-from sat.cli.bootprep.input.base import BaseInputItem, BaseInputItemCollection, Validatable
+from sat.cli.bootprep.input.base import (
+    BaseInputItem,
+    BaseInputItemCollection,
+    Validatable,
+    jinja_rendered,
+    provides_context
+)
 from sat.cli.bootprep.errors import InputItemCreateError, InputItemValidateError, SessionTemplateCreateError
 from sat.util import get_val_by_path
 
@@ -47,6 +53,9 @@ class InputSessionTemplate(BaseInputItem):
             requests to the CFS API
     """
     description = 'BOS session template'
+
+    # Use InputItemValidateError since fields are rendered in validation methods.
+    create_error_cls = InputItemValidateError
 
     def __init__(self, data, instance, bos_client, cfs_client, ims_client, **kwargs):
         """Create a new InputSessionTemplate.
@@ -67,6 +76,7 @@ class InputSessionTemplate(BaseInputItem):
         self.ims_client = ims_client
 
     @property
+    @jinja_rendered
     def configuration(self):
         """str: the configuration specified for the session template"""
         # the 'configuration' property is required by the schema
@@ -79,6 +89,7 @@ class InputSessionTemplate(BaseInputItem):
         return self.data['bos_parameters']['boot_sets']
 
     @property
+    @jinja_rendered
     def image(self):
         """str: the image specified for the session template
 
@@ -95,6 +106,7 @@ class InputSessionTemplate(BaseInputItem):
         return bool(uuid_regex.fullmatch(self.image))
 
     @cached_property
+    @provides_context('image')
     def image_record(self):
         """dict: the image record from IMS if one can be found"""
         try:
@@ -109,20 +121,20 @@ class InputSessionTemplate(BaseInputItem):
                 except APIError as err:
                     # TODO: should probably differentiate between 404 Not Found and other errors
                     raise InputItemValidateError(f'No image with name or ID {self.image} exists '
-                                                 f'for use by session template {self.name}: {err}')
+                                                 f'for use by {self}: {err}')
             else:
                 raise InputItemValidateError(f'No image with name {self.image} exists for '
-                                             f'use by session template {self.name}.')
+                                             f'use by session template {self}.')
 
         elif len(name_matches) > 1:
             raise InputItemValidateError(f'Found multiple matches for image named {self.image} '
-                                         f'for use by session template {self.name}. This image '
-                                         f'must be specified by ID instead.')
+                                         f'for use by {self}. This image must be specified by '
+                                         f'ID instead.')
 
         else:
             return name_matches[0]
 
-    @Validatable.validation_method
+    @Validatable.validation_method()
     def validate_configuration_exists(self, **_):
         """Validate that the configuration specified for this session template exists.
 
@@ -139,9 +151,9 @@ class InputSessionTemplate(BaseInputItem):
         except APIError as err:
             # TODO: should probably differentiate between 404 Not Found and other errors
             raise InputItemValidateError(f'Configuration {self.configuration} specified for '
-                                         f'session template {self.name} does not exist: {err}')
+                                         f'{self} does not exist: {err}')
 
-    @Validatable.validation_method
+    @Validatable.validation_method()
     def validate_image_exists(self, **_):
         """Validate that the image specified for this session template exists.
 
