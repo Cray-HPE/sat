@@ -57,7 +57,7 @@ class InputSessionTemplate(BaseInputItem):
     # Use InputItemValidateError since fields are rendered in validation methods.
     create_error_cls = InputItemValidateError
 
-    def __init__(self, data, instance, bos_client, cfs_client, ims_client, **kwargs):
+    def __init__(self, data, instance, index, jinja_env, bos_client, cfs_client, ims_client, **kwargs):
         """Create a new InputSessionTemplate.
 
         Args:
@@ -65,12 +65,15 @@ class InputSessionTemplate(BaseInputItem):
                 validated by the bootprep schema.
             instance (sat.bootprep.input.InputInstance): a reference to the
                 full instance loaded from the config file
+            index (int): the index of the item in the collection in the instance
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
             bos_client (sat.apiclient.BOSClientCommon): the BOS API client
             cfs_client (sat.apiclient.CFSClient): the CFS API client
             ims_client (sat.apiclient.IMSClient): the IMS API client
             **kwargs: additional keyword arguments
         """
-        super().__init__(data, instance, **kwargs)
+        super().__init__(data, instance, index, jinja_env, **kwargs)
         self.bos_client = bos_client
         self.cfs_client = cfs_client
         self.ims_client = ims_client
@@ -210,7 +213,7 @@ class InputSessionTemplateCollection(BaseInputItemCollection):
 
     item_class = InputSessionTemplate
 
-    def __init__(self, items_data, instance, bos_client, cfs_client, ims_client, **kwargs):
+    def __init__(self, items_data, instance, jinja_env, bos_client, cfs_client, ims_client, **kwargs):
         """Create a new InputSessionTemplateCollection.
 
         Args:
@@ -218,12 +221,14 @@ class InputSessionTemplateCollection(BaseInputItemCollection):
                 already validated by schema
             instance (sat.bootprep.input.InputInstance): a reference to the
                 full instance loaded from the config file
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
             bos_client (sat.apiclient.BOSClientCommon): the BOS API client
             cfs_client (sat.apiclient.CFSClient): the CFS API client
             ims_client (sat.apiclient.IMSClient): the IMS API client
             **kwargs: additional keyword arguments
         """
-        super().__init__(items_data, instance, bos_client=bos_client,
+        super().__init__(items_data, instance, jinja_env, bos_client=bos_client,
                          cfs_client=cfs_client, ims_client=ims_client, **kwargs)
         self.bos_client = bos_client
         self.cfs_client = cfs_client

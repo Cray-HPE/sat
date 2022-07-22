@@ -370,6 +370,11 @@ def create_images(instance, args):
     for image in input_images:
         image.public_key_id = ims_public_key_id
 
+    # TODO (CRAYSAT-1411): This makes it impossible to have one image depend on another in the instance
+    #   But it needs to be done first to render the names of images.
+    # Raises ImageCreateError if validation of IMS bases fails
+    validate_image_ims_bases(input_images)
+
     validate_unique_image_names(input_images)
     images_to_create = handle_existing_images(ims_client, input_images, args.overwrite_images,
                                               args.skip_existing_images, args.dry_run)
@@ -395,9 +400,6 @@ def create_images(instance, args):
     LOGGER.info(f'Of the {len(images_to_create)} that {verb} created, '
                 f'{len(images_without_dependencies)} have no dependencies '
                 f'and {verb} created first.')
-
-    # Raises ImageCreateError if validation of IMS bases fails
-    validate_image_ims_bases(images_without_dependencies)
 
     if args.dry_run:
         LOGGER.info("Dry run, not creating images.")

@@ -213,7 +213,7 @@ class BaseInputItem(Validatable, ABC):
 
     create_error_cls = InputItemValidateError
 
-    def __init__(self, data, instance, index, **_):
+    def __init__(self, data, instance, index, jinja_env, **_):
         """Create a new BaseInputItem.
 
         Args:
@@ -222,10 +222,13 @@ class BaseInputItem(Validatable, ABC):
             instance (sat.cli.bootprep.input.instance.InputInstance): a reference
                 to the full instance loaded from the input file
             index (int): the index of the item in the collection in the instance
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
         """
         self.data = data
         self.instance = instance
         self.index = index
+        self.jinja_env = jinja_env
         self.items_to_delete = []
 
     @property
@@ -299,7 +302,7 @@ class BaseInputItemCollection(ABC, Validatable):
     """
     item_class = BaseInputItem
 
-    def __init__(self, items_data, instance, **kwargs):
+    def __init__(self, items_data, instance, jinja_env, **kwargs):
         """Create a new BaseInputItemCollection.
 
         Args:
@@ -307,11 +310,13 @@ class BaseInputItemCollection(ABC, Validatable):
                 input file, already validated by the schema
             instance (sat.bootprep.input.InputInstance): a reference to the
                 full instance loaded from the config file
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
             **kwargs: additional keyword arguments which are passed through to
                 the constructor of the class defined in the class attribute
                 `item_class`
         """
-        self.items = [self.item_class(item_data, instance, index, **kwargs)
+        self.items = [self.item_class(item_data, instance, index, jinja_env, **kwargs)
                       for index, item_data in enumerate(items_data)]
         self.instance = instance
         self.items_to_create = []

@@ -77,6 +77,7 @@ class InputInstance:
         return InputSessionTemplateCollection(
             self.instance_dict.get('session_templates', []),
             self,
+            jinja_env=self.jinja_env,
             bos_client=self.bos_client,
             cfs_client=self.cfs_client,
             ims_client=self.ims_client
