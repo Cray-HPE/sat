@@ -78,6 +78,9 @@ class InputSessionTemplate(BaseInputItem):
         self.cfs_client = cfs_client
         self.ims_client = ims_client
 
+        # Additional context to be used when rendering Jinja2 templated properties
+        self.jinja_context = {}
+
     @property
     @jinja_rendered
     def configuration(self):

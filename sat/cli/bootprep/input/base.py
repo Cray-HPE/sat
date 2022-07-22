@@ -347,7 +347,7 @@ class BaseInputItemCollection(ABC, Validatable):
             InputItemValidateError: if any item is invalid
         """
         valid = True
-        for item in self.items_to_create:
+        for item in self.items:
             try:
                 item.validate(**kwargs)
             except InputItemValidateError as err:
@@ -375,7 +375,6 @@ class BaseInputItemCollection(ABC, Validatable):
                 f'{", ".join(non_unique_names)}'
             )
 
-    # TODO (CRAYSAT-1411): Also need to re-order this to occur after name rendering.
     def handle_existing_items(self, overwrite_all, skip_all, dry_run):
         """Handle any existing items that have the same name as this item.
 
