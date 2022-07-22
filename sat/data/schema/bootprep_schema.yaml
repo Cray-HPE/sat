@@ -80,7 +80,7 @@ properties:
         current version.
 
       - If the input version matches the current version, it is compatible.
-    default: '1.0.0'
+    default: '1.0.3'
     type: string
 
   configurations:
@@ -207,6 +207,13 @@ properties:
         properties:
           name:
             $ref: '#/$defs/ImageName'
+          ref_name:
+            type: string
+            description: >
+              A name for this image that can be used to refer to this image from other images
+              and session templates defined in this file. This name must be unique amongst all
+              other images in the input file.
+            examples: ['compute-image', 'uan-image']
           description:
             $ref: '#/$defs/ImageDescription'
           base:
@@ -262,6 +269,16 @@ properties:
                         Supports rendering as a Jinja template.
                     type:
                       $ref: '#/$defs/ImageBaseType'
+            - type: object
+              required: ['image_ref']
+              additionalProperties: false
+              properties:
+                image_ref:
+                  type: string
+                  description: >
+                    A reference to another image from this file to use as a base when creating this
+                    image. The value specified here should match the value of the "ref_name" property
+                    of another image.
           configuration:
             $ref: '#/$defs/ImageConfiguration'
           configuration_group_names:
@@ -336,6 +353,8 @@ properties:
           description: >
             The name of the session template to create. This is the name
             the session template will have in BOS.
+
+            Supports rendering as a Jinja template.
           type: string
         image:
           description: >
@@ -350,11 +369,15 @@ properties:
             The s3 path to the manifest.json file will be determined from the
             IMS image, and it will be populated in the "path" key in the boot
             set(s) within the session template.
+
+            Supports rendering as a Jinja template.
           type: string
         configuration:
           description: >
             The name of the CFS configuration that will be applied to the
             nodes in this session template after they have been booted.
+
+            Supports rendering as a Jinja template.
           type: string
         bos_parameters:
           description: >
@@ -476,6 +499,8 @@ $defs:
 
       If the image name is not unique in IMS, this command will fail and
       will not create another IMS image with this name.
+
+      Supports rendering as a Jinja template.
     type: string
   ImageDescription:
     description: >
@@ -493,6 +518,8 @@ $defs:
       prior to boot. This is optional. If omitted, the image will
       not be customized. If present, a value must be provided for
       configuration_group_names.
+
+      Supports rendering as a Jinja template.
     type: string
   ImageConfigurationGroupNames:
     description: >
