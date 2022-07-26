@@ -24,10 +24,9 @@
 """
 Defines a class for the input instance loaded from the input file.
 """
-
 from sat.cached_property import cached_property
 from sat.cli.bootprep.input.configuration import InputConfiguration
-from sat.cli.bootprep.input.image import InputImage
+from sat.cli.bootprep.input.image import BaseInputImage
 from sat.cli.bootprep.input.session_template import InputSessionTemplateCollection
 
 
@@ -35,7 +34,7 @@ class InputInstance:
     """A representation of the instance loaded from the provided input file.
     """
 
-    def __init__(self, instance_dict, cfs_client, ims_client, bos_client, var_context, product_catalog):
+    def __init__(self, instance_dict, cfs_client, ims_client, bos_client, jinja_env, product_catalog):
         """Create a new InputInstance from the validated contents of an input file.
 
         Args:
@@ -47,8 +46,8 @@ class InputInstance:
                 requests to the IMS API
             bos_client (sat.apiclient.BOSClientCommon): the BOS API client to make
                 requests to the BOS API
-            var_context (sat.cli.bootprep.vars.VariableContext): the variables
-                to use for variable substitution in input instance.
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
             product_catalog (cray_product_catalog.query.ProductCatalog):
                 the product catalog object
         """
@@ -56,19 +55,20 @@ class InputInstance:
         self.cfs_client = cfs_client
         self.ims_client = ims_client
         self.bos_client = bos_client
-        self.var_context = var_context
+        self.jinja_env = jinja_env
         self.product_catalog = product_catalog
 
     @cached_property
     def input_configurations(self):
         """list of InputConfiguration: the configurations in the input instance"""
-        return [InputConfiguration(configuration, self.var_context, self.product_catalog)
+        return [InputConfiguration(configuration, self.jinja_env, self.product_catalog)
                 for configuration in self.instance_dict.get('configurations', [])]
 
     @cached_property
     def input_images(self):
         """list of InputImages: the images in the input instance"""
-        return [InputImage(image, self.ims_client, self.cfs_client)
+        return [BaseInputImage.get_image(image, self.jinja_env, self.product_catalog,
+                                         self.ims_client, self.cfs_client)
                 for image in self.instance_dict.get('images', [])]
 
     @cached_property

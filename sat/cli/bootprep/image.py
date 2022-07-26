@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -30,6 +30,7 @@ import math
 
 from sat.apiclient import APIError, CFSClient, IMSClient
 from sat.cli.bootprep.errors import ImageCreateError
+from sat.cli.bootprep.input.image import ProductInputImage
 from sat.cli.bootprep.public_key import get_ims_public_key_id
 from sat.session import SATSession
 from sat.util import pester_choices
@@ -199,12 +200,13 @@ def find_image_dependencies(input_images):
                             for input_image in input_images}
     cycles_exist = False
     for image in input_images:
-        # If it is built from a recipe, or specifies an image by its id, then
-        # it does not depend on any names images in the input file.
-        if image.base_is_recipe or 'id' in image.ims_data:
+        # If it is built from a recipe, or specifies an image by its id, or it
+        # is based on an image or recipe provided by a product, then it should
+        # not depend on any named images in the input file.
+        if isinstance(image, ProductInputImage) or image.base_is_recipe or 'id' in image.ims_data:
             continue
 
-        # Since 'id' is not present, 'name' must be present according to the schema
+        # This is an IMSInputImage, and since 'id' is absent, 'name' must be present
         base_image_name = image.ims_data['name']
         if base_image_name in input_images_by_name:
             LOGGER.info(f'Image named {image.name} depends on image named {base_image_name} '
@@ -241,7 +243,7 @@ def validate_image_ims_bases(input_images):
         try:
             # Accessing this property for the first time queries the IMS API
             ims_base = image.ims_base
-            LOGGER.info(f'Found IMS base for {image}: {image.base_description}: ')
+            LOGGER.info(f'Found IMS base for {image}: {image.base_description}')
             LOGGER.debug(f'IMS base for {image}: {ims_base}')
         except ImageCreateError as err:
             failed_images.append(image)

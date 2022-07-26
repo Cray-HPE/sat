@@ -28,6 +28,7 @@ import logging
 import os
 
 from cray_product_catalog.query import ProductCatalog, ProductCatalogError
+from jinja2.sandbox import SandboxedEnvironment
 import yaml
 
 from sat.apiclient import CFSClient, IMSClient
@@ -107,10 +108,11 @@ def do_bootprep_schema(schema_file_contents):
         raise SystemExit(1)
 
 
-def do_bootprep_example(args):
+def do_bootprep_example(schema_validator, args):
     """Generate an example bootprep input file.
 
     Args:
+        schema_validator (jsonschema.protocols.Validator): the validator object
         args: The argparse.Namespace object containing the parsed arguments
             passed to this subcommand.
 
@@ -128,6 +130,9 @@ def do_bootprep_example(args):
         LOGGER.error(str(err))
         raise SystemExit(1)
 
+    # Get current schema version
+    example_data['schema_version'] = schema_validator.schema['version']
+
     try:
         with open(full_example_file_path, 'w') as f:
             yaml.dump(example_data, f, sort_keys=False)
@@ -142,8 +147,7 @@ def do_bootprep_run(schema_validator, args):
     """Create images, configurations, and/or session templates.
 
     Args:
-        schema_validator: the schema validator object from the jsonschema
-            library used to validate the input instance.
+        schema_validator (jsonschema.protocols.Validator): the validator object
         args: The argparse.Namespace object containing the parsed arguments
             passed to this subcommand.
 
@@ -182,8 +186,10 @@ def do_bootprep_run(schema_validator, args):
     except VariableContextError as err:
         LOGGER.error(str(err))
         raise SystemExit(1)
+    jinja_env = SandboxedEnvironment()
+    jinja_env.globals = var_context.vars
 
-    instance = InputInstance(instance_data, cfs_client, ims_client, bos_client, var_context, product_catalog)
+    instance = InputInstance(instance_data, cfs_client, ims_client, bos_client, jinja_env, product_catalog)
 
     # TODO (CRAYSAT-1277): Refactor images to use BaseInputItemCollection
     # TODO (CRAYSAT-1278): Refactor configurations to use BaseInputItemCollection
@@ -261,4 +267,4 @@ def do_bootprep(args):
     elif args.action == 'view-schema':
         do_bootprep_schema(schema_file_contents)
     elif args.action == 'generate-example':
-        do_bootprep_example(args)
+        do_bootprep_example(schema_validator, args)

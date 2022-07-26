@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 Unit tests for validation of bootprep input file based on the schema
 """
 from copy import deepcopy
+import logging
 import unittest
 from unittest.mock import mock_open, patch, Mock
 
@@ -36,7 +37,8 @@ from sat.cli.bootprep.errors import (
 from sat.cli.bootprep.validate import (
     load_and_validate_instance,
     load_bootprep_schema,
-    validate_instance
+    validate_instance,
+    validate_instance_schema_version
 )
 from tests.common import ExtendedTestCase
 
@@ -75,7 +77,7 @@ VALID_CONFIG_LAYER_GIT_COMMIT = {
     }
 }
 
-VALID_IMAGE_IMS_NAME_WITH_CONFIG = {
+VALID_IMAGE_IMS_NAME_WITH_CONFIG_V1 = {
     'name': 'compute-shasta-sles15sp1-1.4.2',
     'ims': {
         'is_recipe': True,
@@ -85,7 +87,7 @@ VALID_IMAGE_IMS_NAME_WITH_CONFIG = {
     'configuration_group_names': ['Compute', 'Compute_GPU']
 }
 
-VALID_IMAGE_IMS_ID_WITH_CONFIG = {
+VALID_IMAGE_IMS_ID_WITH_CONFIG_V1 = {
     'name': 'uan-shasta-sles15sp1-1.4.2',
     'ims': {
         'is_recipe': True,
@@ -93,6 +95,43 @@ VALID_IMAGE_IMS_ID_WITH_CONFIG = {
     },
     'configuration': UAN_CONFIG_IMAGE_NAME,
     'configuration_group_names': ['Application', 'Application_UAN']
+}
+
+VALID_IMAGE_IMS_NAME_WITH_CONFIG_V2 = {
+    'name': 'compute-shasta-sles15sp1-1.4.2',
+    'base': {
+        'ims': {
+            'type': 'recipe',
+            'name': 'cray-shasta-compute-sles15sp1.x86_64-1.4.80'
+        }
+    },
+    'configuration': COMPUTE_CONFIG_IMAGE_NAME,
+    'configuration_group_names': ['Compute', 'Compute_GPU']
+}
+
+VALID_IMAGE_IMS_ID_WITH_CONFIG_V2 = {
+    'name': 'uan-shasta-sles15sp1-1.4.2',
+    'base': {
+        'ims': {
+            'type': 'image',
+            'id': '4744ccb8-fce6-4e2b-84f5-393b86cbafde'
+        }
+    },
+    'configuration': UAN_CONFIG_IMAGE_NAME,
+    'configuration_group_names': ['Application', 'Application_UAN']
+}
+
+VALID_IMAGE_PRODUCT_WITH_CONFIG = {
+    'name': '{{ base.name }}',
+    'base': {
+        'product': {
+            'type': 'recipe',
+            'name': 'cos',
+            'version': '2.2.101'
+        }
+    },
+    'configuration': COMPUTE_CONFIG_IMAGE_NAME,
+    'configuration_group_names': ['Compute', 'Compute_GPU']
 }
 
 VALID_SESSION_TEMPLATE_COMPUTE = {
@@ -150,6 +189,77 @@ NOT_OF_TYPE_ARRAY_MESSAGE = "is not of type 'array'"
 NOT_OF_TYPE_STRING_MESSAGE = "is not of type 'string'"
 
 
+class TestValidateInstanceSchemaVersion(unittest.TestCase):
+    """Tests for the validate_instance_schema_version function."""
+
+    def setUp(self):
+        self.current_schema_version = '2.1.4'
+        self.mock_schema_validator = Mock()
+        self.mock_schema_validator.schema = {'version': self.current_schema_version}
+
+    def assert_valid_schema_version(self, version=None):
+        """Assert that the given schema version is valid.
+
+        Args:
+            version (str, optional): the schema version to use in the input instance
+        """
+        try:
+            validate_instance_schema_version({'schema_version': version} if version else {},
+                                             self.mock_schema_validator)
+        except BootPrepValidationError as err:
+            self.fail(f'Expected valid schema version failed to validate: {err}')
+
+    def assert_invalid_schema_version(self, version=None):
+        """Assert that the given schema version is invalid.
+
+        Args:
+            version (str, optional): the schema version to use in the input instance.
+        """
+        with self.assertRaises(BootPrepValidationError):
+            validate_instance_schema_version({'schema_version': version} if version else {},
+                                             self.mock_schema_validator)
+
+    def test_equal_schema_version(self):
+        """Test validate_instance_schema_version with equal version."""
+        self.assert_valid_schema_version(self.current_schema_version)
+
+    def test_older_major_schema_version(self):
+        """Test validate_instance_schema_version with older major version."""
+        self.assert_invalid_schema_version('1.0.5')
+
+    def test_older_minor_schema_version(self):
+        """Test validate_instance_schema_version with older minor version."""
+        with self.assertLogs(level=logging.WARNING):
+            self.assert_valid_schema_version('2.0.1')
+
+    def test_older_patch_schema_version(self):
+        """Test validate_instance_schema_version with older minor version."""
+        self.assert_valid_schema_version('2.1.0')
+
+    def test_newer_schema_version(self):
+        """Test validate_instance_schema_version with a newer version."""
+        self.assert_invalid_schema_version('4.2.0')
+
+    def test_default_schema_version(self):
+        """Test validate_instance_schema_version with no version specified."""
+        def default_patch(version):
+            """Patch the DEFAULT_INPUT_SCHEMA_VERSION."""
+            return patch('sat.cli.bootprep.validate.DEFAULT_INPUT_SCHEMA_VERSION', version)
+
+        with default_patch(self.current_schema_version):
+            self.assert_valid_schema_version()
+
+        with default_patch('9.9.9'):
+            self.assert_invalid_schema_version()
+
+    def test_malformed_schema_version(self):
+        """Test validate_instance_schema_version with a malformed schema version."""
+        invalid_schema_versions = ['1.2.3.4', '1.2.3-rc1', 'not-even-close']
+        for invalid_version in invalid_schema_versions:
+            with self.subTest(version=invalid_version):
+                self.assert_invalid_schema_version(invalid_version)
+
+
 class TestValidateInstance(ExtendedTestCase):
     """Tests for the validate_instance function."""
 
@@ -161,6 +271,13 @@ class TestValidateInstance(ExtendedTestCase):
         do not modify the schema_validator.
         """
         cls.schema_validator = load_bootprep_schema()
+
+    def setUp(self):
+        self.mock_validate_schema_version = patch('sat.cli.bootprep.validate'
+                                                  '.validate_instance_schema_version').start()
+
+    def tearDown(self):
+        patch.stopall()
 
     def assert_valid_instance(self, instance):
         """Helper assertion for asserting instance validates.
@@ -295,27 +412,58 @@ class TestValidateInstance(ExtendedTestCase):
         }
         self.assert_valid_instance(instance)
 
-    def test_valid_image_ims_name_with_config(self):
-        """Valid image by name with config specified"""
+    def test_valid_image_ims_name_with_config_v1(self):
+        """Valid image from IMS by name with config specified (deprecated schema)"""
         instance = {
-            'images': [VALID_IMAGE_IMS_NAME_WITH_CONFIG]
+            'images': [VALID_IMAGE_IMS_NAME_WITH_CONFIG_V1]
         }
         self.assert_valid_instance(instance)
 
-    def test_valid_image_ims_name_without_config(self):
-        """Valid image by name without config specified"""
-        image = deepcopy(VALID_IMAGE_IMS_NAME_WITH_CONFIG)
+    def test_valid_image_ims_name_without_config_v1(self):
+        """Valid image from IMS by name without config specified (deprecated schema)"""
+        image = deepcopy(VALID_IMAGE_IMS_NAME_WITH_CONFIG_V1)
         del image['configuration']
         del image['configuration_group_names']
         instance = {
-            'images': [VALID_IMAGE_IMS_NAME_WITH_CONFIG],
+            'images': [VALID_IMAGE_IMS_NAME_WITH_CONFIG_V1],
         }
         self.assert_valid_instance(instance)
 
-    def test_valid_image_ims_id_with_config(self):
-        """Valid image by id with config specified"""
+    def test_valid_image_ims_id_with_config_v1(self):
+        """Valid image from IMS by id with config specified (deprecated schema)"""
         instance = {
-            'images': [VALID_IMAGE_IMS_ID_WITH_CONFIG]
+            'images': [VALID_IMAGE_IMS_ID_WITH_CONFIG_V1]
+        }
+        self.assert_valid_instance(instance)
+
+    def test_valid_image_ims_name_with_config_v2(self):
+        """Valid image from IMS by name with config specified (new schema)"""
+        instance = {
+            'images': [VALID_IMAGE_IMS_NAME_WITH_CONFIG_V2]
+        }
+        self.assert_valid_instance(instance)
+
+    def test_valid_image_ims_name_without_config_v2(self):
+        """Valid image from IMS by name without config specified (new schema)"""
+        image = deepcopy(VALID_IMAGE_IMS_NAME_WITH_CONFIG_V2)
+        del image['configuration']
+        del image['configuration_group_names']
+        instance = {
+            'images': [VALID_IMAGE_IMS_NAME_WITH_CONFIG_V2],
+        }
+        self.assert_valid_instance(instance)
+
+    def test_valid_image_ims_id_with_config_v2(self):
+        """Valid image from IMS by id with config specified (new schema)"""
+        instance = {
+            'images': [VALID_IMAGE_IMS_ID_WITH_CONFIG_V2]
+        }
+        self.assert_valid_instance(instance)
+
+    def test_valid_image_product_with_config(self):
+        """Valid image from a version of a product with config specified"""
+        instance = {
+            'images': [VALID_IMAGE_PRODUCT_WITH_CONFIG]
         }
         self.assert_valid_instance(instance)
 
@@ -363,8 +511,8 @@ class TestValidateInstance(ExtendedTestCase):
                 VALID_UAN_CONFIGURATION
             ],
             'images': [
-                VALID_IMAGE_IMS_ID_WITH_CONFIG,
-                VALID_IMAGE_IMS_NAME_WITH_CONFIG
+                VALID_IMAGE_IMS_ID_WITH_CONFIG_V1,
+                VALID_IMAGE_IMS_NAME_WITH_CONFIG_V1
             ],
             'session_templates': [
                 VALID_SESSION_TEMPLATE_COMPUTE,
@@ -399,7 +547,7 @@ class TestValidateInstance(ExtendedTestCase):
     def test_invalid_images_not_array(self):
         """Invalid instance with non-array images value"""
         instance = {
-            'images': VALID_IMAGE_IMS_NAME_WITH_CONFIG
+            'images': VALID_IMAGE_IMS_NAME_WITH_CONFIG_V1
         }
         expected_errs = [
             (('images',), NOT_OF_TYPE_ARRAY_MESSAGE, 1)
@@ -684,26 +832,27 @@ class TestValidateInstance(ExtendedTestCase):
                 ]
                 self.assert_invalid_instance(instance, expected_errs)
 
-    def test_invalid_image_missing_properties(self):
+    def test_invalid_ims_image_missing_name(self):
         """Invalid image missing properties"""
-        missing_properties = ['ims', 'name']
-        for missing_property in missing_properties:
-            with self.subTest(missing_property=missing_property):
-                image = deepcopy(VALID_IMAGE_IMS_NAME_WITH_CONFIG)
-                del image[missing_property]
-                instance = {'images': [image]}
-                expected_errs = [
-                    (('images', 0), f"'{missing_property}' is a required property", 1)
-                ]
-                self.assert_invalid_instance(instance, expected_errs)
+        missing_property = 'name'
+        image = deepcopy(VALID_IMAGE_IMS_NAME_WITH_CONFIG_V1)
+        del image[missing_property]
+        instance = {'images': [image]}
+        expected_errs = [
+            (('images', 0), NOT_VALID_ANY_OF_MESSAGE, 1),
+            # 'base' property is first alternative and so is preferred
+            (('images', 0), f"'{missing_property}' is a required property", 2)
+        ]
+        self.assert_invalid_instance(instance, expected_errs)
 
     def test_invalid_image_missing_configuration_group_names(self):
         """Invalid image with 'configuration' specified but no 'configuration_group_names'"""
-        image = deepcopy(VALID_IMAGE_IMS_NAME_WITH_CONFIG)
+        image = deepcopy(VALID_IMAGE_IMS_NAME_WITH_CONFIG_V1)
         del image['configuration_group_names']
         instance = {'images': [image]}
         expected_errs = [
-            (('images', 0), "'configuration_group_names' is a dependency of 'configuration'", 1)
+            (('images', 0), NOT_VALID_ANY_OF_MESSAGE, 1),
+            (('images', 0), "'configuration_group_names' is a dependency of 'configuration'", 2)
         ]
         self.assert_invalid_instance(instance, expected_errs)
 
@@ -713,10 +862,10 @@ class TestValidateInstance(ExtendedTestCase):
         # separate subschemas of a 'oneOf' keyword, so use a list of tuples
         test_images = [
             # (property_to_remove, image)
-            ('is_recipe', VALID_IMAGE_IMS_NAME_WITH_CONFIG),
-            ('is_recipe', VALID_IMAGE_IMS_ID_WITH_CONFIG),
+            ('is_recipe', VALID_IMAGE_IMS_NAME_WITH_CONFIG_V1),
+            ('is_recipe', VALID_IMAGE_IMS_ID_WITH_CONFIG_V1),
             # Remove and assert that 'name' is missing because that subschema is first
-            ('name', VALID_IMAGE_IMS_NAME_WITH_CONFIG)
+            ('name', VALID_IMAGE_IMS_NAME_WITH_CONFIG_V1)
         ]
         for missing_property, image in test_images:
             bad_image = deepcopy(image)
@@ -726,8 +875,9 @@ class TestValidateInstance(ExtendedTestCase):
                               present_properties=list(bad_image['ims'].keys())):
                 instance = {'images': [bad_image]}
                 expected_errs = [
-                    (('images', 0, 'ims'), NOT_VALID_ANY_OF_MESSAGE, 1),
-                    (('images', 0, 'ims'), f"'{missing_property}' is a required property", 2)
+                    (('images', 0), NOT_VALID_ANY_OF_MESSAGE, 1),
+                    (('images', 0, 'ims'), NOT_VALID_ANY_OF_MESSAGE, 2),
+                    (('images', 0, 'ims'), f"'{missing_property}' is a required property", 3)
                 ]
                 self.assert_invalid_instance(instance, expected_errs)
 
@@ -747,12 +897,13 @@ class TestValidateInstance(ExtendedTestCase):
             ]
         }
         expected_errs = [
-            (('images', 0, 'name'), NOT_OF_TYPE_STRING_MESSAGE, 1),
-            (('images', 0, 'configuration'), NOT_OF_TYPE_STRING_MESSAGE, 1),
-            (('images', 0, 'configuration_group_names'), NOT_OF_TYPE_ARRAY_MESSAGE, 1),
-            (('images', 0, 'ims'), NOT_VALID_ANY_OF_MESSAGE, 1),
-            (('images', 0, 'ims', 'is_recipe'), "'bunch' is not of type 'boolean'", 2),
-            (('images', 0, 'ims', 'name'), NOT_OF_TYPE_STRING_MESSAGE, 2),
+            (('images', 0), NOT_VALID_ANY_OF_MESSAGE, 1),
+            (('images', 0, 'name'), NOT_OF_TYPE_STRING_MESSAGE, 2),
+            (('images', 0, 'configuration'), NOT_OF_TYPE_STRING_MESSAGE, 2),
+            (('images', 0, 'configuration_group_names'), NOT_OF_TYPE_ARRAY_MESSAGE, 2),
+            (('images', 0, 'ims'), NOT_VALID_ANY_OF_MESSAGE, 2),
+            (('images', 0, 'ims', 'is_recipe'), "'bunch' is not of type 'boolean'", 3),
+            (('images', 0, 'ims', 'name'), NOT_OF_TYPE_STRING_MESSAGE, 3),
         ]
         self.assert_invalid_instance(instance, expected_errs)
 
@@ -834,6 +985,14 @@ class TestValidateInstance(ExtendedTestCase):
                      f"'{bad_value}' is not of type 'array'", 1)
                 ]
                 self.assert_invalid_instance(instance, expected_errs)
+
+    def test_invalid_schema_version(self):
+        """Invalid schema version specified in bootprep input file."""
+        err_msg = 'Incompatible schema version.'
+        self.mock_validate_schema_version.side_effect = BootPrepValidationError(err_msg)
+
+        with self.assertRaisesRegex(BootPrepValidationError, err_msg):
+            validate_instance({}, self.schema_validator)
 
 
 class TestLoadBootprepSchema(unittest.TestCase):

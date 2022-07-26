@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -24,8 +24,11 @@
 """
 Defines class for images defined in the input file.
 """
+from abc import ABC, abstractmethod
+import logging
 import warnings
 
+from cray_product_catalog.query import ProductCatalogError
 from kubernetes.client import CoreV1Api
 from kubernetes.config import load_kube_config, ConfigException
 from yaml import YAMLLoadWarning
@@ -33,14 +36,16 @@ from yaml import YAMLLoadWarning
 from sat.apiclient import APIError
 from sat.cached_property import cached_property
 from sat.cli.bootprep.errors import ImageCreateError
-from sat.cli.bootprep.image import LOGGER
+from sat.cli.bootprep.input.base import jinja_rendered
 from sat.waiting import (
     DependencyGroupMember,
     WaitingFailure
 )
 
+LOGGER = logging.getLogger(__name__)
 
-class InputImage(DependencyGroupMember):
+
+class BaseInputImage(DependencyGroupMember, ABC):
     """An IMS image from a bootprep input file
 
     Attributes:
@@ -67,12 +72,18 @@ class InputImage(DependencyGroupMember):
             and renaming have been completed, as applicable
     """
 
-    def __init__(self, image_data, ims_client, cfs_client):
+    create_error_cls = ImageCreateError
+
+    def __init__(self, image_data, jinja_env, product_catalog, ims_client, cfs_client):
         """Create a new InputImage
 
         Args:
             image_data (dict): the data for an image, already validated against
                 the bootprep input file schema
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
+            product_catalog (cray_product_catalog.query.ProductCatalog):
+                the product catalog object
             ims_client (sat.apiclient.IMSClient): the IMS API client to make
                 requests to the IMS API
             cfs_client (sat.apiclient.CFSClient): the CFS API client to make
@@ -80,6 +91,8 @@ class InputImage(DependencyGroupMember):
         """
         super().__init__()
 
+        self.jinja_env = jinja_env
+        self.product_catalog = product_catalog
         self.image_data = image_data
         self.ims_client = ims_client
         self.cfs_client = cfs_client
@@ -103,6 +116,35 @@ class InputImage(DependencyGroupMember):
 
         # Set by rename_configured_image
         self.final_image_id = None
+
+    @staticmethod
+    def get_image(image_data, *args, **kwargs):
+        """Return an instance of a subclass of BaseInputImage for the given image data.
+
+        Args:
+            image_data (dict): the data for an image, already validated against
+                the bootprep input file schema
+            *args: arguments to pass to the constructor
+            **kwargs: keyword arguments to pass to the constructor
+
+        Raises:
+            ValueError: if neither 'ims' nor 'product' keys are present in the
+                input `image_data`. This will not happen if the input is
+                properly validated against the schema.
+        """
+        cls = None
+        if 'ims' in image_data:
+            cls = IMSInputImageV1
+        elif 'base' in image_data:
+            base_data = image_data['base']
+            if 'ims' in base_data:
+                cls = IMSInputImageV2
+            elif 'product' in base_data:
+                cls = ProductInputImage
+        if cls:
+            return cls(image_data, *args, **kwargs)
+        else:
+            raise ValueError('Unrecognized type of configuration layer')
 
     @property
     def name(self):
@@ -135,14 +177,9 @@ class InputImage(DependencyGroupMember):
         return self.image_data.get('configuration_group_names')
 
     @property
-    def ims_data(self):
-        """dict: the data that defines the base IMS image or recipe"""
-        return self.image_data['ims']
-
-    @property
+    @abstractmethod
     def base_is_recipe(self):
         """bool: whether the starting point is a recipe in IMS or an image"""
-        return self.ims_data['is_recipe']
 
     @property
     def base_resource_type(self):
@@ -150,14 +187,14 @@ class InputImage(DependencyGroupMember):
         return ('image', 'recipe')[self.base_is_recipe]
 
     @property
+    @abstractmethod
     def base_description(self):
         """str: a human-readable description of the base we are starting from"""
-        for param in ('id', 'name'):
-            if param in self.ims_data:
-                return f'{self.base_resource_type} with {param}={self.ims_data[param]}'
 
-        # This shouldn't happen since schema requires 'id' or 'name'
-        return self.base_resource_type
+    @cached_property
+    @abstractmethod
+    def ims_base(self):
+        """dict: the data for the base IMS recipe or image to build and/or customize"""
 
     # TODO: Reduce duplication of code between here and ProductInputConfigurationLayer
     @cached_property
@@ -173,25 +210,6 @@ class InputImage(DependencyGroupMember):
                                    f'to query image build status: {err}')
 
         return CoreV1Api()
-
-    @cached_property
-    def ims_base(self):
-        """dict: the data for the base IMS recipe or image to build and/or customize"""
-        resource_type = self.base_resource_type
-        try:
-            matching_base_resources = self.ims_client.get_matching_resources(
-                resource_type, resource_id=self.ims_data.get('id'),
-                name=self.ims_data.get('name'))
-        except APIError as err:
-            raise ImageCreateError(err)
-
-        if len(matching_base_resources) == 0:
-            raise ImageCreateError(f'Found no matches for {self.base_description}')
-        elif len(matching_base_resources) > 1:
-            raise ImageCreateError(f'Found {len(matching_base_resources)} matches for {self.base_description}. '
-                                   f'This {self.base_resource_type} must be specified by "id".')
-
-        return matching_base_resources[0]
 
     def add_images_to_delete(self, images_to_delete):
         """Add IMS images that should be deleted after this image is created and configured.
@@ -479,3 +497,146 @@ class InputImage(DependencyGroupMember):
         return self.image_create_success and self.image_configure_success
 
     begin = begin_image_create
+
+
+class IMSInputImage(BaseInputImage):
+    """An input image that specifies an explicit IMS image or recipe as a starting point."""
+
+    @property
+    @abstractmethod
+    def ims_data(self):
+        """dict: the data under the 'ims' key"""
+
+    @property
+    def base_description(self):
+        """str: a human-readable description of the base we are starting from"""
+        for param in ('id', 'name'):
+            if param in self.ims_data:
+                return f'{self.base_resource_type} with {param}={self.ims_data[param]}'
+
+        # This shouldn't happen since schema requires 'id' or 'name'
+        return self.base_resource_type
+
+    @cached_property
+    def ims_base(self):
+        """dict: the data for the base IMS recipe or image to build and/or customize"""
+        resource_type = self.base_resource_type
+        try:
+            matching_base_resources = self.ims_client.get_matching_resources(
+                resource_type, resource_id=self.ims_data.get('id'),
+                name=self.ims_data.get('name'))
+        except APIError as err:
+            raise ImageCreateError(err)
+
+        if len(matching_base_resources) == 0:
+            raise ImageCreateError(f'Found no matches for {self.base_description}')
+        elif len(matching_base_resources) > 1:
+            raise ImageCreateError(f'Found {len(matching_base_resources)} matches for {self.base_description}. '
+                                   f'This {self.base_resource_type} must be specified by "id".')
+
+        return matching_base_resources[0]
+
+
+class IMSInputImageV1(IMSInputImage):
+    """An input image that specifies a base IMS image/recipe under the 'ims' property."""
+    @property
+    def ims_data(self):
+        """dict: the data that defines the base IMS image or recipe"""
+        return self.image_data['ims']
+
+    @property
+    def base_is_recipe(self):
+        """bool: whether the starting point is a recipe in IMS or an image"""
+        # is_recipe is a required property
+        return self.ims_data['is_recipe']
+
+
+class IMSInputImageV2(IMSInputImage):
+    """An input image that specifies a base IMS image/recipe under the 'ims' property under the 'base' property."""
+    @property
+    def ims_data(self):
+        """dict: the data that defines the base IMS image or recipe"""
+        return self.image_data['base']['ims']
+
+    @property
+    def base_is_recipe(self):
+        """bool: whether the starting point is a recipe in IMS or an image"""
+        # type is a required property
+        return self.ims_data['type'] == 'recipe'
+
+
+class ProductInputImage(BaseInputImage):
+    """An input image that specifies a product-provided IMS image or recipe as a starting point."""
+
+    @property
+    def base_is_recipe(self):
+        """bool: whether the starting point is a recipe in IMS or an image"""
+        # base.product.type is a required property
+        return self.image_data['base']['product']['type'] == 'recipe'
+
+    @property
+    def product_name(self):
+        """str: the product name"""
+        # name is a required property
+        return self.image_data['base']['product']['name']
+
+    @property
+    @jinja_rendered
+    def product_version(self):
+        """str: the product version"""
+        # version is not required. base_description and installed_product treat None as latest
+        return self.image_data['base']['product'].get('version')
+
+    @property
+    def base_description(self):
+        """str: a human-readable description of the base we are starting from"""
+        return (
+            f'{self.base_resource_type} provided by '
+            f'{f"version {self.product_version}" if self.product_version else "latest version"} '
+            f'of product {self.product_name}'
+        )
+
+    @cached_property
+    def installed_product(self):
+        """cray_product_catalog.query.InstalledProductVersion: the matching product version"""
+        try:
+            return self.product_catalog.get_product(self.product_name, version=self.product_version)
+        except ProductCatalogError as err:
+            raise ImageCreateError(f'Failed to find {self.base_description}: {err}')
+
+    @cached_property
+    def ims_base(self):
+        """dict: the data for the base IMS recipe or image to build and/or customize"""
+        if self.base_is_recipe:
+            ims_resources = self.installed_product.recipes
+        else:
+            ims_resources = self.installed_product.images
+
+        if not ims_resources:
+            raise ImageCreateError(f'There is no {self.base_description}.')
+        elif len(ims_resources) > 1:
+            raise ImageCreateError(f'There exists more than one {self.base_description}.')
+        ims_resource = ims_resources[0]
+        ims_resource_desc = ', '.join(f'{key}={value}' for key, value in ims_resource.items())
+
+        try:
+            matching_base_resources = self.ims_client.get_matching_resources(
+                self.base_resource_type, resource_id=ims_resource['id']
+            )
+        except KeyError:
+            raise ImageCreateError(
+                f'{self.base_description} with {ims_resource_desc} does not '
+                f'have an id in product catalog data.'
+            )
+        except APIError as err:
+            raise ImageCreateError(err)
+
+        if not matching_base_resources:
+            raise ImageCreateError(f'Found no matches in IMS for {self.base_description} '
+                                   f'with {ims_resource_desc}')
+        elif len(matching_base_resources) > 1:
+            # This really shouldn't happen given that we are querying by unique IMS id
+            raise ImageCreateError(f'Found {len(matching_base_resources)} matches for '
+                                   f'{self.base_description} with {ims_resource_desc}')
+
+        return matching_base_resources[0]
