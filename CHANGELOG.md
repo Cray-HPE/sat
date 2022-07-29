@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schema version specified by `sat bootprep` input files.
 - Added functionality to `sat bootprep` to look up images and recipes provided
   by products.
+- Added functionality to `sat bootprep` to allow session templates to refer to
+  images by their `ref_name` under the new `image.image_ref` property.
 
 ### Changed
 - Changed the `sat bootprep` input file schema by adding a new `base` property
@@ -53,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 - Specifying the `ims` property at the top level of an image in the `sat
   bootprep` input file is deprecated.
+- Specifying a string value for the `image` property of session templates in the
+  `sat bootprep` input file is deprecated.
 
 ### Fixed
 - Deprecated version comparison utilites from `distutils` have been replaced

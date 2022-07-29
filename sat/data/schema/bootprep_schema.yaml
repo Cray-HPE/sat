@@ -357,21 +357,68 @@ properties:
             Supports rendering as a Jinja template.
           type: string
         image:
-          description: >
-            The image to use from IMS. This will first be treated as the name
-            of an IMS image. If multiple images with this name exist, then an
-            error will be reported. If it is not the name of an IMS image, and
-            it takes the form of a UUID, then it will be treated as an IMS
-            image ID. If it is neither a valid IMS image name nor a valid IMS
-            image ID, then an error will be reported.
+          oneOf:
+          - description: The IMS image to use in the BOS session template.
+            type: object
+            additionalProperties: false
+            required: ['ims']
+            properties:
+              ims:
+                oneOf:
+                - type: object
+                  required: ['name']
+                  additionalProperties: false
+                  properties:
+                    name:
+                      description: >
+                        The name of an image in IMS. Note that names are not
+                        required to be unique in IMS. If more than one image
+                        exists with this name, the image must be specified by
+                        ID.
+                      type: string
+                - type: object
+                  required: ['id']
+                  additionalProperties: false
+                  properties:
+                    id:
+                      description: >
+                        The id of an image in IMS.
+                      type: string
+          - description: The IMS image from this file to use in the BOS session template.
+            type: object
+            additionalProperties: false
+            required: ['image_ref']
+            properties:
+              image_ref:
+                type: string
+                description: >
+                  A reference to an image from this file to use in the BOS session
+                  template. The value specified here should match the value of the
+                  "ref_name" property of an image in this file.
 
-            This image will be used to boot the nodes in this session template.
-            The s3 path to the manifest.json file will be determined from the
-            IMS image, and it will be populated in the "path" key in the boot
-            set(s) within the session template.
+          - description: >
+              <h3>Deprecation Notice</h3>
+              Specifying a simple string here is deprecated. Instead, specify
+              an object with one of the supported properties, "ims" or "image_ref".
 
-            Supports rendering as a Jinja template.
-          type: string
+              <h3>Description</h3>
+              The image to use from IMS. This will first be treated as the name
+              of an IMS image. If multiple images with this name exist, then an
+              error will be reported. If it is not the name of an IMS image, and
+              it takes the form of a UUID, then it will be treated as an IMS
+              image ID. If it is neither a valid IMS image name nor a valid IMS
+              image ID, then an error will be reported.
+
+              This image will be used to boot the nodes in this session template.
+              The s3 path to the manifest.json file will be determined from the
+              IMS image, and it will be populated in the "path" key in the boot
+              set(s) within the session template.
+
+              Supports rendering as a Jinja template.
+            type: string
+            # Mark this entire alternative as deprecated, but note that this `deprecated`
+            # property is not supported by json-schema-for-humans yet.
+            deprecated: true
         configuration:
           description: >
             The name of the CFS configuration that will be applied to the

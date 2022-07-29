@@ -314,7 +314,10 @@ class BaseInputItemCollection(ABC, Validatable):
                 the constructor of the class defined in the class attribute
                 `item_class`
         """
-        self.items = [self.item_class(item_data, instance, index, jinja_env, **kwargs)
+        constructor = self.item_class
+        if hasattr(self.item_class, 'get_item'):
+            constructor = self.item_class.get_item
+        self.items = [constructor(item_data, instance, index, jinja_env, **kwargs)
                       for index, item_data in enumerate(items_data)]
         self.instance = instance
         self.items_to_create = []

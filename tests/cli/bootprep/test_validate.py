@@ -145,7 +145,7 @@ VALID_IMAGE_REF_WITH_CONFIG = {
     'configuration_group_names': ['Compute', 'Compute_GPU']
 }
 
-VALID_SESSION_TEMPLATE_COMPUTE = {
+VALID_SESSION_TEMPLATE_COMPUTE_V1 = {
     'name': COMPUTE_CONFIG_IMAGE_NAME,
     'image': 'compute-shasta-sles15sp1-1.4.2',
     'configuration': COMPUTE_CONFIG_IMAGE_NAME,
@@ -161,9 +161,34 @@ VALID_SESSION_TEMPLATE_COMPUTE = {
     }
 }
 
-VALID_SESSION_TEMPLATE_UAN = {
+
+VALID_SESSION_TEMPLATE_COMPUTE_V2 = {
+    'name': COMPUTE_CONFIG_IMAGE_NAME,
+    'image': {
+        'ims': {
+            'name': 'compute-shasta-sles15sp1-1.4.2'
+        }
+    },
+    'configuration': COMPUTE_CONFIG_IMAGE_NAME,
+    'bos_parameters': {
+        'boot_sets': {
+            'compute': {
+                'kernel_parameters': 'console=ttyS0,115200 bad_page=panic crashkernel=340M',
+                'node_roles_groups': ['Compute'],
+                'rootfs_provider': 'cpss3',
+                'rootfs_provider_passthrough': 'dvs:api-gw-service-nmn.local:300:nmn0'
+            }
+        }
+    }
+}
+
+VALID_SESSION_TEMPLATE_UAN_V2 = {
     'name': UAN_CONFIG_IMAGE_NAME,
-    'image': 'uan-shasta-sles15sp1-1.4.2',
+    'image': {
+        'ims': {
+            'id': 'some-uuid'
+        }
+    },
     'configuration': UAN_CONFIG_IMAGE_NAME,
     'bos_parameters': {
         'boot_sets': {
@@ -485,23 +510,30 @@ class TestValidateInstance(ExtendedTestCase):
         }
         self.assert_valid_instance(instance)
 
+    def test_valid_session_template_v1(self):
+        """Valid session template using the deprecated image schema"""
+        instance = {
+            'session_templates': [VALID_SESSION_TEMPLATE_COMPUTE_V1]
+        }
+        self.assert_valid_instance(instance)
+
     def test_valid_session_template_roles(self):
         """Valid session template with node_roles_groups"""
         instance = {
-            'session_templates': [VALID_SESSION_TEMPLATE_COMPUTE]
+            'session_templates': [VALID_SESSION_TEMPLATE_COMPUTE_V2]
         }
         self.assert_valid_instance(instance)
 
     def test_valid_session_template_nodes(self):
         """Valid session template with node_list"""
         instance = {
-            'session_templates': [VALID_SESSION_TEMPLATE_UAN]
+            'session_templates': [VALID_SESSION_TEMPLATE_UAN_V2]
         }
         self.assert_valid_instance(instance)
 
     def test_valid_session_template_node_groups(self):
         """Valid session template with node_list"""
-        session_template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE)
+        session_template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE_V2)
         boot_set = session_template['bos_parameters']['boot_sets']['compute']
         del boot_set['node_roles_groups']
         boot_set['node_groups'] = ['compute']
@@ -512,7 +544,7 @@ class TestValidateInstance(ExtendedTestCase):
 
     def test_valid_session_template_all_properties(self):
         """Valid session template with all possible properties"""
-        session_template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE)
+        session_template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE_V2)
         boot_set = session_template['bos_parameters']['boot_sets']['compute']
         boot_set['node_list'] = ['x1000c0s0b0n0', 'x1000c0s0b0n1']
         boot_set['node_groups'] = ['compute_x86', 'compute_aarch']
@@ -529,12 +561,12 @@ class TestValidateInstance(ExtendedTestCase):
                 VALID_UAN_CONFIGURATION
             ],
             'images': [
-                VALID_IMAGE_IMS_ID_WITH_CONFIG_V1,
-                VALID_IMAGE_IMS_NAME_WITH_CONFIG_V1
+                VALID_IMAGE_IMS_ID_WITH_CONFIG_V2,
+                VALID_IMAGE_IMS_NAME_WITH_CONFIG_V2
             ],
             'session_templates': [
-                VALID_SESSION_TEMPLATE_COMPUTE,
-                VALID_SESSION_TEMPLATE_UAN
+                VALID_SESSION_TEMPLATE_COMPUTE_V2,
+                VALID_SESSION_TEMPLATE_UAN_V2
             ]
         }
         self.assert_valid_instance(instance)
@@ -575,7 +607,7 @@ class TestValidateInstance(ExtendedTestCase):
     def test_invalid_session_templates_not_array(self):
         """Invalid instance with non-array session_templates value"""
         instance = {
-            'session_templates': VALID_SESSION_TEMPLATE_COMPUTE
+            'session_templates': VALID_SESSION_TEMPLATE_COMPUTE_V2
         }
         expected_errs = [
             (('session_templates',), NOT_OF_TYPE_ARRAY_MESSAGE, 1)
@@ -927,10 +959,10 @@ class TestValidateInstance(ExtendedTestCase):
 
     def test_invalid_session_template_types(self):
         """Invalid session templates with bad types"""
-        string_properties = ['name', 'image', 'configuration']
+        string_properties = ['name', 'configuration']
         for bad_property in string_properties:
             with self.subTest(bad_property=bad_property):
-                template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE)
+                template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE_V2)
                 template[bad_property] = 42
                 instance = {'session_templates': [template]}
                 expected_errs = [
@@ -943,7 +975,7 @@ class TestValidateInstance(ExtendedTestCase):
         missing_properties = ['name', 'image', 'configuration', 'bos_parameters']
         for missing_property in missing_properties:
             with self.subTest(missing_property=missing_property):
-                template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE)
+                template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE_V2)
                 del template[missing_property]
                 instance = {'session_templates': [template]}
                 expected_errs = [
@@ -954,7 +986,7 @@ class TestValidateInstance(ExtendedTestCase):
     # noinspection PyTypedDict
     def test_invalid_session_template_missing_boot_sets(self):
         """Invalid session template missing 'boot_sets' property"""
-        template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE)
+        template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE_V2)
         template['bos_parameters'] = {}
         instance = {'session_templates': [template]}
         expected_errs = [
@@ -965,7 +997,7 @@ class TestValidateInstance(ExtendedTestCase):
     # noinspection PyTypedDict
     def test_invalid_session_template_empty_boot_sets(self):
         """Invalid session template with empty boot_sets object"""
-        template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE)
+        template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE_V2)
         template['bos_parameters']['boot_sets'] = {}
         instance = {'session_templates': [template]}
         expected_errs = [
@@ -977,7 +1009,7 @@ class TestValidateInstance(ExtendedTestCase):
     # noinspection PyTypedDict
     def test_invalid_session_template_invalid_boot_sets_type(self):
         """Invalid session template with invalid type of 'boot_sets' property"""
-        template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE)
+        template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE_V2)
         template['bos_parameters']['boot_sets'] = []
         instance = {'session_templates': [template]}
         expected_errs = [
@@ -995,7 +1027,7 @@ class TestValidateInstance(ExtendedTestCase):
         }
         for bad_property, bad_value in property_values.items():
             with self.subTest(bad_property=bad_property):
-                template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE)
+                template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE_V2)
                 template['bos_parameters']['boot_sets']['compute'][bad_property] = bad_value
                 instance = {'session_templates': [template]}
                 expected_errs = [
