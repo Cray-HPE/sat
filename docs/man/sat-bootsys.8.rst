@@ -17,57 +17,89 @@ SYNOPSIS
 
 DESCRIPTION
 ===========
-The bootsys command boots or shuts down the entire system, including the compute
-nodes, user access nodes, and non-compute nodes running the management software.
+
+The bootsys command can be used to boot or shut down part or all of the system,
+including compute nodes, user access nodes, and non-compute nodes running the
+management software.
 
 SHUTDOWN ACTION
 ---------------
 
-The shutdown action consists of the following phases, some of which are not yet
-implemented.
+The shutdown action consists of the following stages. Each stage automates a
+specific portion of the system shutdown procedure.
 
-In the first phase, it saves the state of all kubernetes pods to a file in an
-S3 bucket. This file will be used when the system is booted to verify all pods
-are in the states they were in before the shutdown. The S3 bucket must be
-configured in the ``s3`` section of the SAT configuration file.
+In the ``capture-state`` stage, ``sat bootsys`` saves the state of all
+Kubernetes pods to a file in an S3 bucket. This file can be used when the system
+is booted to verify all pods are in the states they were in before the shutdown.
+The S3 bucket must be configured in the ``s3`` section of the SAT configuration
+file.
 
-In the second phase, it checks for any active sessions across multiple different
-services in the system, including the Boot Orchestration Service (BOS), the
-Configuration Framework Service (CFS), the Compute Rolling Upgrade Service
-(CRUS), the Firmware Action Service (FAS) or the Firmware Update Service (FUS),
-the Node Memory Dump (NMD) service, and the System Dump Utility (SDU). If any
-active sessions are found, it will print information about those sessions and
-exit with exit code 1. If it does not find any active sessions, it will print
-messages to that effect and proceed with the next phase of the shutdown.
+In the ``session-checks`` stage, it checks for any active sessions across
+multiple different services in the system, including the Boot Orchestration
+Service (BOS), the Configuration Framework Service (CFS), the Compute Rolling
+Upgrade Service (CRUS), the Firmware Action Service (FAS), the Node Memory Dump
+(NMD) service, and the System Dump Utility (SDU). If any active sessions are
+found, it will print information about those sessions and exit with exit code 1.
+If it does not find any active sessions, it will print messages to that effect
+and proceed with the next stage of the shutdown.
 
-In the third phase, it uses the Boot Orchestration Service (BOS) to shut down
-the compute nodes and User Access Nodes (UANs). It attempts to check whether the
-nodes are already in an "Off" state in the Hardware State Manager before
-attempting to shut them down with BOS. If it encounters an error while checking
-on node state, the shutdown operation will terminate by default, but this
-behavior can be changed with the ``--state-check-fail-action`` option. Once the
-BOS shutdowns have completed, it will proceed to the next phase of the shutdown.
+In the ``bos-operations`` stage, it uses the Boot Orchestration Service (BOS)
+to shut down the nodes specified by one or more BOS session templates, for
+instance the compute nodes and User Access Nodes (UANs). It attempts to check
+whether the nodes are already in an "Off" state in the Hardware State Manager
+before attempting to shut them down with BOS.
 
-The remaining phases are described below, but they are not yet implemented.
+In the ``cabinet-power`` stage, it suspends the ``hms-discovery`` Kubernetes
+cron job and uses the Cray Advanced Platform Monitoring and Control (CAPMC)
+service to power off all liquid-cooled and air-cooled compute node cabinet and
+non-management NCN cabinets. It then waits for all components in those cabinets
+to reach the power "Off" state.
 
-In the fourth phase, it stops all management services on the non-compute nodes
-(NCNs). This includes backing up and stopping the etcd cluster, stopping the
-kubelet service on each node, freezing ceph, and stopping all containers running
-in containerd. This ansible playbook is known to experience a problem that
-results in it hanging when stopping containers in containerd, so if this occurs,
-a workaround will automatically be executed that kills hanging processes on each
-node where it is necessary. Once the playbook has completed, it will move on to
-the next phase.
+In the ``platform-services`` stage, it stops all management services on the
+non-compute nodes (NCNs). This includes backing up and stopping the etcd
+cluster, stopping the kubelet service on each node, freezing ceph, and stopping
+all containers running in containerd.
 
-In the final phase, it will shut down linux on all NCNs, and it will power them
-off using IPMI. Once this has completed, the command will return, and it will be
-safe to shutdown and power off ncn-w001 where this command was run.
+In the ``ncn-power`` stage, it shuts down Linux on all management NCNs
+simultaneously, powers them off, and creates screen sessions to monitor console
+logs using ``ipmitool``. Once this has completed, and it is safe to shutdown
+and power off ncn-m001 where this command was run.
 
 BOOT ACTION
 -----------
 
-The boot action is not currently implemented and will exit with a non-zero exit
-code and an error message.
+The boot action consists of the following stages. Similar to the shutdown
+action, each stage automates a specific portion of the system boot procedure.
+
+In the ``ncn-power`` stage, ``sat bootsys`` powers on all mangagement NCNs in
+stages. It first boots the master nodes and waits for them to become accessible
+over the network, and then repeats for the worker nodes, then the storage
+nodes.
+
+In the ``platform-services`` stage, it ensures that containerd and etcd are are
+running and enabled on all Kubernetes NCNs, then starts Ceph services, unfreezes
+Ceph, and waits for Ceph to become healthy. After this, it starts and enables
+kubelet on all Kubernetes NCNs.
+
+In the ``k8s-check`` stage, it waits for the Kubernetes cluster to become
+available and for the Kubernetes pods to become healthy. Specifically, it waits
+for each pod that was running prior to shutdown to have a similarly-named pod
+after boot, and any new pods are expected to be in the "Running" or "Succeeded"
+states. Note that this stage may not work as expected since Kubernetes will
+re-create the pods with arbitrary names which may not match those saved prior
+to shutdown.
+
+In the ``cabinet-power`` stage, it enables the ``hms-discovery`` Kubernetes cron
+job and uses the Cray Advanced Platform Monitoring and Control (CAPMC) service
+to power on all liquid-cooled and air-cooled compute node cabinets and
+non-management NCN cabinets. It then waits for all components in those cabinets
+to reach the power "On" state.
+
+In the ``bos-operations`` stage, it uses the Boot Orchestration Service (BOS)
+to boot the nodes specified by one or more BOS session templates, for instance
+the compute nodes and User Access Nodes (UANs). It attempts to check whether
+the nodes are already in an "On" state in the Hardware State Manager before
+attempting to shut them down with BOS.
 
 ARGUMENTS
 =========
