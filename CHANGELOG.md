@@ -34,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a ``sat swap blade`` subcommand which partially automates the procedure
   for swapping compute and UAN blades.
 
+### Changed
+- Updated `sat bootsys` man page to reflect changes to stages and remove outdated information.
+
 ### Fixed
 - Fixed unit tests that failed when run in PyCharm.
 
