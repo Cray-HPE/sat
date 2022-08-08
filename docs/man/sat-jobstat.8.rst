@@ -41,7 +41,17 @@ An example usage of the command:
 ::
 
     # sat jobstat
-    TODO: Show example table here
++---------------------------------------+--------------+-------+-------------------------------------+-----------+-----------+---------------------+
+| apid                                  | jobid        | user  | command                             | state     | num_nodes | node_list           |
++---------------------------------------+--------------+-------+-------------------------------------+-----------+-----------+---------------------+
+| 7677b7d3-ec35-4e23-8678-92b823347939  | 49.pbs-host  | 5827  | mpiexec --ppn=1 -n2 ./signals       | completed | 2         | nid000001,nid000002 |
+| 76b783af-5c7e-4462-97c0-3dfd0f04b9b3  | 51.pbs-host  | 5827  | mpiexec --ppn=1 -n2 ./signals       | completed | 2         | nid000001,nid000002 |
+| 7a85c000-05a9-40cd-8551-00092cead801  | 48.pbs-host  | 5827  | mpiexec -n2 ./signals               | completed | 1         | nid000001           |
+| 8b5b14b3-8215-4cbe-bba4-7d7c82d48fef  | 50.pbs-host  | 5827  | mpiexec --ppn=1 -n2 ./signals       | completed | 2         | nid000001,nid000002 |
+| 957bbd4c-de3c-424d-99d6-fd2b728b2941  | 54.pbs-host  | 5827  | mpiexec --ppn=1 -n2 ./signals       | completed | 2         | nid000001,nid000002 |
+| ba977b71-40b6-40db-aa20-a583edc18be3  | 59.pbs-host  | 5827  | mpiexec --ppn=1 -n2 ./signals-sleep | completed | 2         | nid000001,nid000002 |
+| fea2726a-c531-4acd-b158-3fae197999dd  | 57.pbs-host  | 5827  | mpiexec --ppn=1 -n2 ./signals       | completed | 2         | nid000001,nid000002 |
++---------------------------------------+--------------+-------+-------------------------------------+-----------+-----------+---------------------+
 
 SEE ALSO
 ========
