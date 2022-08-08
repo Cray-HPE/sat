@@ -28,11 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-
 - Added new command "Jobstat." Provides system-wide view of application status data.
-
-### Added
-
 - Added information regarding the `--bos-version` command line argument to man
   pages for relevant subcommands.
 - Added a ``sat swap blade`` subcommand which partially automates the procedure
