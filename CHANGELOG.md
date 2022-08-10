@@ -25,17 +25,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.18.0] - 2022-08-10
 
 ### Added
 
-- Added information regarding the `--bos-version` command line argument to man
+- Added information regarding the `--bos-version` command-line argument to man
   pages for relevant subcommands.
-- Added a ``sat swap blade`` subcommand which partially automates the procedure
+- Added a `sat swap blade` subcommand which partially automates the procedure
   for swapping compute and UAN blades.
 
 ### Changed
-- Updated `sat bootsys` man page to reflect changes to stages and remove outdated information.
+- Updated `sat bootsys` man page to reflect changes to stages and remove
+  outdated information.
 
 ### Fixed
 - Fixed unit tests that failed when run in PyCharm.
