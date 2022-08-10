@@ -28,7 +28,6 @@ The manifest defines the versions of the products that are included in a given
 version of the HPC software recipe.
 """
 from contextlib import contextmanager
-from distutils.version import LooseVersion
 from functools import total_ordering
 import logging
 import os
@@ -36,6 +35,7 @@ import re
 from tempfile import TemporaryDirectory
 from urllib.parse import ParseResult, urlunparse
 
+from packaging.version import parse as parse_version
 import yaml
 
 from sat.apiclient.vcs import VCSError, VCSRepo
@@ -69,7 +69,7 @@ class HPCSoftwareRecipe:
         """
         # Allows for comparison of two software recipes. Original string can be
         # retrieved by calling `str` on it.
-        self.version = LooseVersion(version)
+        self.version = parse_version(version)
         self.vcs_repo = vcs_repo
         self.vcs_branch = vcs_branch
 
