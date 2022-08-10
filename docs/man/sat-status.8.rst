@@ -57,6 +57,13 @@ These options must be specified after the subcommand.
         Count fields will be shown. May be combined with **--hsm-fields** and
         **--sls-fields**.
 
+**--bos-fields**
+        Only query and display information from BOS about nodes' boot status,
+        recent BOS sessions, booted session templates, and booted images.
+        **--bos-fields** requires BOS v2, so the **bos.api_version**
+        configuration file setting or the **--bos-version** command line option
+        must be set to "v2".
+
 **--bos-template**
         Specify a BOS session template to filter against. Only nodes specified
         in the node list, node groups, and roles in this session template's
@@ -70,6 +77,10 @@ These options must be specified after the subcommand.
         Likewise, roles or groups may also be added to or removed from the
         session template itself, and these changes would not be reflected in
         any BOS running or completed session either.
+
+**--bos-version BOS_VERSION**
+        The version of the BOS API to use when looking up BOS template boot
+        sets or querying BOS boot status.
 
 .. include:: _sat-format-opts.rst
 .. include:: _sat-filter-opts.rst

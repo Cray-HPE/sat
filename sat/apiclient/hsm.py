@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,11 @@ Client for querying the Hardware State Manager (HSM) API
 """
 import logging
 
-from sat.apiclient.gateway import APIError, APIGatewayClient
+from sat.apiclient.gateway import (
+    APIError,
+    APIGatewayClient,
+    handle_api_errors,
+)
 from sat.constants import BMC_TYPES
 from sat.xname import XName
 
@@ -191,6 +195,35 @@ class HSMClient(APIGatewayClient):
         except KeyError as err:
             raise APIError(f'{err_prefix} due to missing {err} key in list of components.')
 
+    @handle_api_errors
+    def query_components(self, component=None, **kwargs):
+        """Query the HSM database to retrieve components matching given parameters.
+
+        Args:
+            component (str or None): if a str, then query HSM for that
+                component. If None, retrieve all components matching the parameters.
+            kwargs: keyword arguments should correspond to parameters accepted
+                by the /State/Components/Query HSM API.
+        Returns:
+            list of dictionaries of Node components.
+        Raises:
+            APIError: if there is a failure querying the HSM API or getting
+                the required information from the response, or if the component
+                xname is invalid.
+        """
+        # TODO: Consolidate query_components() and get_node_components().
+        if component:
+            component = XName(component)
+            if not component.is_valid:
+                raise APIError(f'Could not query component {component}: invalid xname')
+
+            components = self.get('State', 'Components', 'Query', str(component), params=kwargs).json()
+
+        else:
+            components = self.get('State', 'Components', params=kwargs).json()
+
+        return components['Components']
+
     def get_node_components(self, ancestor=None):
         """Get the components of Type=Node from HSM.
 
@@ -322,3 +355,138 @@ class HSMClient(APIGatewayClient):
                     LOGGER.debug(f'HSM API error for {cid}: {err}')
 
         return components
+
+    @handle_api_errors
+    def set_component_enabled(self, xname, *, enabled):
+        """Enable or disable a component in HSM inventory
+
+        Args:
+            xname (str): the xname of the component to modify
+            enabled (bool): if True, enable the component. If False, disable
+                the component.
+        """
+        self.patch(
+            'State', 'Components', xname, 'Enabled',
+            json={
+                'enabled': enabled
+            }
+        )
+
+    @handle_api_errors
+    def set_redfish_endpoint_enabled(self, xname, *, enabled):
+        """Enable or disable a Redfish endpoint in HSM inventory
+
+        Args:
+            xname (str): the xname of the component to modify
+            enabled (bool): if True, enable the Redfish endpoint. If False,
+                disable the Redfish endpoint.
+        """
+        self.patch(
+            'Inventory', 'RedfishEndpoints', xname,
+            json={
+                'enabled': enabled
+            }
+        )
+
+    @handle_api_errors
+    def get_ethernet_interfaces(self, xname=None):
+        """Get ethernet interfaces for some component
+
+        Args:
+            xname (str): the xname of the component for which to search for ethernet interfaces
+
+        Returns:
+            list of dict: interfaces retrieved from HSM for the given xname, or
+                all interfaces if xname is None
+
+        Raises:
+            APIError: if there is an issue retrieving ethernet interfaces from HSM
+        """
+        all_interfaces = self.get('Inventory', 'EthernetInterfaces').json()
+        if not xname:
+            return all_interfaces
+        xname = XName(xname)
+        return [
+            interface for interface in all_interfaces
+            if xname.contains_component(XName(interface['ComponentID']))
+        ]
+
+    @handle_api_errors
+    def delete_ethernet_interface(self, interface_id):
+        """Delete an ethernet interface from HSM
+
+        Args:
+            interface_id (str): the ID of the ethernet interface to delete
+
+        Raises:
+            APIError: if there is an issue deleting the ethernet interface from HSM
+        """
+        self.delete('Inventory', 'EthernetInterfaces', interface_id)
+
+    @handle_api_errors
+    def delete_redfish_endpoint(self, redfish_endpoint):
+        """Delete a Redfish endpoint from HSM
+
+        Args:
+            redfish_endpoint (str): the xname of the Redfish endpoint to delete
+
+        Raises:
+            APIError: if there is an issue deleting the Redfish endpoint from HSM
+        """
+        self.delete('Inventory', 'RedfishEndpoints', redfish_endpoint)
+
+    @handle_api_errors
+    def begin_discovery(self, xnames, force=False):
+        """Kick off discovery of the given xname.
+
+        Args:
+            xnames (Iterable[str]): the xnames to discover
+            force (bool): if True, force discovery.
+
+        Raises:
+            APIError: if there is a problem discovering the given xnames
+        """
+        self.post('Inventory', 'Discover', json={'xnames': list(xnames), 'force': force})
+
+    @handle_api_errors
+    def get_redfish_endpoint_inventory(self, xname):
+        """Get the Redfish endpoint inventory for some component.
+
+        Args:
+            xname (str): the xname to retrieve Redfish endpoints for
+
+        Raises:
+            APIError: if there is a problem retrieving the Redfish endpoint inventory
+        """
+        return self.get('Inventory', 'RedfishEndpoints', xname).json()
+
+    @handle_api_errors
+    def bulk_enable_components(self, components):
+        """Bulk enable a set of components.
+
+        Args:
+            components (Iterable[str]): xnames of components which should be bulk-enabled.
+
+        Raises:
+            APIError: if there is a problem bulk-enabling the components.
+        """
+        self.patch('State', 'Components', 'BulkEnabled', json={
+            'Enabled': True,
+            'ComponentIDs': list(components)
+        })
+
+    @handle_api_errors
+    def create_ethernet_interface(self, interface):
+        """Create an ethernet interface in HSM.
+
+        Args:
+            interface (dict): a dictionary with the following keys:
+                Description (str): the description of the interface
+                MACAddress (str): the MAC address of the interface
+                IPAddress (str): the IP address of the interface
+                ComponentID (str): the xname of the associated component
+
+        Raises:
+            APIError: if the interface cannot be created
+        """
+        self.post('Inventory', 'EthernetInterfaces', json=interface)
