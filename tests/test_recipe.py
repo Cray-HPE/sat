@@ -28,14 +28,27 @@ Unit tests for sat.recipe module.
 from unittest.mock import Mock, PropertyMock, patch
 import unittest
 
+from packaging import version
+
 from sat.apiclient.vcs import VCSError
 from sat.recipe import (
+    HPCSoftwareRecipe,
     HPCSoftwareRecipeCatalog,
     HPCSoftwareRecipeError,
     HPC_SOFTWARE_RECIPE_REPO_NAME,
     HPC_SOFTWARE_RECIPE_REPO_ORG,
     HPC_SOFTWARE_RECIPE_REPO_PATH
 )
+
+
+class TestRecipeVersioning(unittest.TestCase):
+    """Tests for handling of the recipe version"""
+
+    def test_rc_version_is_older(self):
+        """Test that release candidate recipe versions come first in ordering"""
+        rc = HPCSoftwareRecipe('22.09rc1', 'repo_path', 'repo_branch')
+        release = HPCSoftwareRecipe('22.09', 'repo_path', 'repo_branch')
+        self.assertLess(rc, release)
 
 
 class TestHPCSoftwareRecipeCatalog(unittest.TestCase):
@@ -79,7 +92,7 @@ class TestHPCSoftwareRecipeCatalog(unittest.TestCase):
         for recipe_version in self.recipe_versions:
             self.assertIn(recipe_version, recipe_catalog.recipes)
             recipe = recipe_catalog.recipes[recipe_version]
-            self.assertEqual(recipe_version, recipe.version)
+            self.assertEqual(version.parse(recipe_version), recipe.version)
             self.assertEqual(f'cray/hpc-software-recipe/{recipe_version}',
                              recipe.vcs_branch)
             self.assertEqual(self.mock_vcs_repo, recipe.vcs_repo)
@@ -97,7 +110,7 @@ class TestHPCSoftwareRecipeCatalog(unittest.TestCase):
         """Test the get_recipe_version method of HPCSoftwareRecipeCatalog."""
         recipe_catalog = HPCSoftwareRecipeCatalog()
         recipe = recipe_catalog.get_recipe_version(self.recipe_versions[0])
-        self.assertEqual(self.recipe_versions[0], recipe.version)
+        self.assertEqual(version.parse(self.recipe_versions[0]), recipe.version)
 
     def test_get_recipe_version_unknown_version(self):
         """Test the get_recipe_version method of HPCSoftwareRecipeCatalog with an unknown version."""
@@ -111,7 +124,7 @@ class TestHPCSoftwareRecipeCatalog(unittest.TestCase):
         """Test the get_latest_version method of HPCSoftwareRecipeCatalog."""
         recipe_catalog = HPCSoftwareRecipeCatalog()
         recipe = recipe_catalog.get_latest_version()
-        self.assertEqual(self.recipe_versions[-1], recipe.version)
+        self.assertEqual(version.parse(self.recipe_versions[-1]), recipe.version)
 
     def test_get_latest_version_no_recipes(self):
         """Test the get_latest_version method of HPCSoftwareRecipeCatalog when non are available."""

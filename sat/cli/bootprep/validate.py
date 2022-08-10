@@ -24,12 +24,12 @@
 """
 Validation functions for the bootprep input file based on the schema.
 """
-from distutils.version import StrictVersion
 import logging
 import pkgutil
 
 from jsonschema import SchemaError
 from jsonschema.validators import validator_for
+from packaging import version
 from yaml import safe_load, YAMLError
 
 from sat.cli.bootprep.constants import DEFAULT_INPUT_SCHEMA_VERSION
@@ -112,38 +112,43 @@ def validate_instance_schema_version(instance, schema_validator):
     """
     schema_version_property = 'schema_version'
 
-    instance_version = instance.get(schema_version_property, DEFAULT_INPUT_SCHEMA_VERSION)
+    instance_version_str = instance.get(schema_version_property, DEFAULT_INPUT_SCHEMA_VERSION)
 
     # No default is needed here because the version property was added to the
     # bootprep_schema.yaml schema file simultaneously with this code.
-    current_version = schema_validator.schema['version']
-    strict_current_version = StrictVersion(current_version)
+    current_version = version.parse(schema_validator.schema['version'])
 
     try:
-        strict_instance_version = StrictVersion(instance_version)
-    except ValueError as err:
+        instance_version = version.parse(instance_version_str)
+
+        # LegacyVersion is deprecated (see https://github.com/pypa/packaging/issues/321),
+        # and sometimes invalid versions can parse as "Legacy". To avoid this,
+        # treat LegacyVersions as invalid.
+        if isinstance(instance_version, version.LegacyVersion):
+            raise version.InvalidVersion()
+    except version.InvalidVersion as err:
         raise BootPrepValidationError(
-            f'Invalid schema version {instance_version} specified '
+            f'Invalid schema version {instance_version_str} specified '
             f'as value of {schema_version_property} property.'
         ) from err
 
-    err_template = (f'Schema version specified in input file ({instance_version}) '
+    err_template = (f'Schema version specified in input file ({instance_version_str}) '
                     f'{{comparison_text}} current schema version ({current_version}){{suffix}}')
 
-    if strict_instance_version < strict_current_version:
+    if instance_version < current_version:
         # Major version difference indicates instance is not compatible with current schema
-        if strict_instance_version.version[0] < strict_current_version.version[0]:
+        if instance_version.major < current_version.major:
             raise BootPrepValidationError(
                 err_template.format(comparison_text='has an older major version than',
                                     suffix=' and thus is not compatible.')
             )
-        elif strict_instance_version.version[1] < strict_current_version.version[1]:
+        elif instance_version.minor < current_version.minor:
             LOGGER.warning(
                 err_template.format(comparison_text='has an older minor version than',
                                     suffix='. Unexpected behavior may occur.')
             )
         # An instance with an older schema patch version is assumed to be compatible
-    elif strict_instance_version > current_version:
+    elif instance_version > current_version:
         # Any new properties would be ignored, so we should not proceed
         raise BootPrepValidationError(
             err_template.format(comparison_text='is newer than',

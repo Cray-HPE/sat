@@ -48,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specifying the `ims` property at the top level of an image in the `sat
   bootprep` input file is deprecated.
 
+### Fixed
+- Deprecated version comparison utilites from `distutils` have been replaced
+  equivalent functionality from the `packaging` library.
+
 ## [Unreleased]
 
 ### Added
