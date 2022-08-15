@@ -36,7 +36,7 @@ from yaml import YAMLLoadWarning
 from sat.apiclient import APIError
 from sat.cached_property import cached_property
 from sat.cli.bootprep.errors import ImageCreateError
-from sat.cli.bootprep.input.base import jinja_rendered
+from sat.cli.bootprep.input.base import jinja_rendered, provides_context
 from sat.waiting import (
     DependencyGroupMember,
     WaitingFailure
@@ -74,12 +74,15 @@ class BaseInputImage(DependencyGroupMember, ABC):
 
     create_error_cls = ImageCreateError
 
-    def __init__(self, image_data, jinja_env, product_catalog, ims_client, cfs_client):
+    def __init__(self, image_data, index, instance, jinja_env, product_catalog, ims_client, cfs_client):
         """Create a new InputImage
 
         Args:
             image_data (dict): the data for an image, already validated against
                 the bootprep input file schema
+            index (int): the index of the image in the instance
+            instance (sat.cli.bootprep.input.instance.InputInstance): a reference
+                to the full instance loaded from the input file
             jinja_env (jinja2.Environment): the Jinja2 environment in which
                 fields supporting Jinja2 templating should be rendered.
             product_catalog (cray_product_catalog.query.ProductCatalog):
@@ -91,9 +94,11 @@ class BaseInputImage(DependencyGroupMember, ABC):
         """
         super().__init__()
 
+        self.image_data = image_data
+        self.index = index
+        self.instance = instance
         self.jinja_env = jinja_env
         self.product_catalog = product_catalog
-        self.image_data = image_data
         self.ims_client = ims_client
         self.cfs_client = cfs_client
 
@@ -116,6 +121,9 @@ class BaseInputImage(DependencyGroupMember, ABC):
 
         # Set by rename_configured_image
         self.final_image_id = None
+
+        # Additional context to be used when rendering Jinja2 templated properties
+        self.jinja_context = {}
 
     @staticmethod
     def get_image(image_data, *args, **kwargs):
@@ -141,19 +149,30 @@ class BaseInputImage(DependencyGroupMember, ABC):
                 cls = IMSInputImageV2
             elif 'product' in base_data:
                 cls = ProductInputImage
+            elif 'image_ref' in base_data:
+                cls = DependentInputImage
         if cls:
             return cls(image_data, *args, **kwargs)
         else:
             raise ValueError('Unrecognized type of configuration layer')
 
     @property
+    @jinja_rendered
     def name(self):
         """str: the name of the final resulting image"""
         # 'name' is a required property in the bootprep schema
         return self.image_data['name']
 
+    @property
+    def ref_name(self):
+        """str or None: the ref_name given to this image for reference by other images"""
+        # 'ref_name' is an optional property in the bootprep schema
+        return self.image_data.get('ref_name')
+
     def __str__(self):
-        return f'image named {self.name}'
+        # Since the name can be rendered, and when unrendered, it does not need
+        # to be unique, just refer to this item by its index in the instance.
+        return f'image at index {self.index}'
 
     @property
     def created_image_name(self):
@@ -163,6 +182,7 @@ class BaseInputImage(DependencyGroupMember, ABC):
         return self.name
 
     @property
+    @jinja_rendered
     def configuration(self):
         """str or None: the configuration to apply to the image"""
         return self.image_data.get('configuration')
@@ -249,6 +269,10 @@ class BaseInputImage(DependencyGroupMember, ABC):
             return
 
         LOGGER.info(f'Launching IMS job to create image')
+
+        ims_base = self.ims_base
+        if 'id' not in ims_base:
+            raise WaitingFailure('Unable to create image from recipe with unknown ID.')
 
         try:
             self.image_create_job = self.ims_client.create_image_build_job(
@@ -518,6 +542,7 @@ class IMSInputImage(BaseInputImage):
         return self.base_resource_type
 
     @cached_property
+    @provides_context('base')
     def ims_base(self):
         """dict: the data for the base IMS recipe or image to build and/or customize"""
         resource_type = self.base_resource_type
@@ -528,7 +553,7 @@ class IMSInputImage(BaseInputImage):
         except APIError as err:
             raise ImageCreateError(err)
 
-        if len(matching_base_resources) == 0:
+        if not matching_base_resources:
             raise ImageCreateError(f'Found no matches for {self.base_description}')
         elif len(matching_base_resources) > 1:
             raise ImageCreateError(f'Found {len(matching_base_resources)} matches for {self.base_description}. '
@@ -605,6 +630,7 @@ class ProductInputImage(BaseInputImage):
             raise ImageCreateError(f'Failed to find {self.base_description}: {err}')
 
     @cached_property
+    @provides_context('base')
     def ims_base(self):
         """dict: the data for the base IMS recipe or image to build and/or customize"""
         if self.base_is_recipe:
@@ -638,5 +664,57 @@ class ProductInputImage(BaseInputImage):
             # This really shouldn't happen given that we are querying by unique IMS id
             raise ImageCreateError(f'Found {len(matching_base_resources)} matches for '
                                    f'{self.base_description} with {ims_resource_desc}')
+
+        return matching_base_resources[0]
+
+
+class DependentInputImage(BaseInputImage):
+    """An input image that specifies another input image as a starting point."""
+
+    @property
+    def base_image_ref(self):
+        """str: the ref_name of the image to use as a base"""
+        # base.image_ref is required by the schema
+        return self.image_data['base']['image_ref']
+
+    @cached_property
+    def ref_input_image(self):
+        """BaseInputImage: the input image this one uses as a base"""
+        for other_input_image in self.instance.input_images:
+            if other_input_image.ref_name == self.base_image_ref:
+                return other_input_image
+
+    @property
+    def base_is_recipe(self):
+        # If based on another input image, then it will never be a recipe
+        return False
+
+    @property
+    def base_description(self):
+        return f'image from input instance with ref_name="{self.base_image_ref}"'
+
+    # Note that we do not want to use cached property because we want to get the
+    # actual IMS record for the base image once it's been built.
+    @property
+    @provides_context('base')
+    def ims_base(self):
+        """dict: the data for the base IMS recipe or image to build and/or customize"""
+        # The base image must be created first before calling this function
+        base_image_id = self.ref_input_image.final_image_id
+        if base_image_id is None:
+            # There is no image yet to query from IMS.
+            return {'name': self.ref_input_image.name}
+
+        resource_type = self.base_resource_type
+        try:
+            matching_base_resources = self.ims_client.get_matching_resources(
+                resource_type, resource_id=base_image_id
+            )
+        except APIError as err:
+            raise ImageCreateError(err)
+
+        if not matching_base_resources or len(matching_base_resources) > 1:
+            raise ImageCreateError(f'Unable to find {self.base_description} by its'
+                                   f'id ({base_image_id}) in IMS')
 
         return matching_base_resources[0]

@@ -67,9 +67,9 @@ class InputInstance:
     @cached_property
     def input_images(self):
         """list of InputImages: the images in the input instance"""
-        return [BaseInputImage.get_image(image, self.jinja_env, self.product_catalog,
+        return [BaseInputImage.get_image(image, index, self, self.jinja_env, self.product_catalog,
                                          self.ims_client, self.cfs_client)
-                for image in self.instance_dict.get('images', [])]
+                for index, image in enumerate(self.instance_dict.get('images', []))]
 
     @cached_property
     def input_session_templates(self):
@@ -77,6 +77,7 @@ class InputInstance:
         return InputSessionTemplateCollection(
             self.instance_dict.get('session_templates', []),
             self,
+            jinja_env=self.jinja_env,
             bos_client=self.bos_client,
             cfs_client=self.cfs_client,
             ims_client=self.ims_client

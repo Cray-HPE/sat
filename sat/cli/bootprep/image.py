@@ -30,7 +30,7 @@ import math
 
 from sat.apiclient import APIError, CFSClient, IMSClient
 from sat.cli.bootprep.errors import ImageCreateError
-from sat.cli.bootprep.input.image import ProductInputImage
+from sat.cli.bootprep.input.image import DependentInputImage, IMSInputImage
 from sat.cli.bootprep.public_key import get_ims_public_key_id
 from sat.session import SATSession
 from sat.util import pester_choices
@@ -44,6 +44,24 @@ from sat.waiting import (
 LOGGER = logging.getLogger(__name__)
 
 
+def validate_unique_image_ref_names(input_images):
+    """Validate that all images have unique value for ref_name property.
+
+    Args:
+        input_images (list of sat.cli.bootprep.input.image.BaseInputImage): the
+            input images in the bootprep input instance
+
+    Raises:
+        ImageCreateError: if the images do not have unique ref_name values
+    """
+    counts_by_ref_name = Counter(image.ref_name for image in input_images if image.ref_name)
+    non_unique_ref_names = [name for name, count in counts_by_ref_name.items() if count > 1]
+    if non_unique_ref_names:
+        raise ImageCreateError(f'Images must have unique values for "ref_name" if specified.'
+                               f'Non-unique names: '
+                               f'{", ".join(non_unique_ref_names)}')
+
+
 def validate_unique_image_names(input_images):
     """Validate that the input images all have unique names
 
@@ -51,17 +69,56 @@ def validate_unique_image_names(input_images):
     session templates in a bootprep input file.
 
     Args:
-        input_images (list of sat.cli.bootprep.input.image.InputImage): the input
-            images in the bootprep input instance
+        input_images (list of sat.cli.bootprep.input.image.BaseInputImage): the
+            input images in the bootprep input instance
 
     Raises:
         ImageCreateError: if the images do not have unique names
     """
-    counts_by_name = Counter(image.name for image in input_images)
+    counts_by_name = Counter()
+
+    failed_name_renders = 0
+    for image in input_images:
+        try:
+            counts_by_name[image.name] += 1
+        except ImageCreateError as err:
+            failed_name_renders += 1
+            LOGGER.error(f'Failed to render name of {image}: {err}')
+
+    if failed_name_renders:
+        raise ImageCreateError(f'Failed to render {failed_name_renders} image names.')
+
     non_unique_names = [name for name, count in counts_by_name.items() if count > 1]
     if non_unique_names:
-        raise ImageCreateError('Names of images to create must be unique. Non-unique names: '
+        raise ImageCreateError(f'Names of images to create must be unique. Non-unique names: '
                                f'{", ".join(non_unique_names)}')
+
+
+def validate_no_overwritten_ims_bases(input_images):
+    """Validate that no images will overwrite another's IMS base.
+
+    The supported way for an image to depend on another is to refer to an image
+    by its ref_name in the base.image_ref property. Replacing an IMS image used
+    by another image as its base can result in undefined behavior because both
+    images could be built at the same time.
+    """
+    # Find all named IMS images used as bases
+    name_based_images = [image for image in input_images
+                         if isinstance(image, IMSInputImage) and not image.base_is_recipe
+                         and 'name' in image.ims_data]
+
+    conflicts_exist = False
+    for name_based_image in name_based_images:
+        for other_image in input_images:
+            if other_image.name == name_based_image.ims_data['name']:
+                conflicts_exist = True
+                LOGGER.error(f'{name_based_image} uses {name_based_image.base_description}'
+                             f'which conflicts with the image created by {other_image}.')
+
+    if conflicts_exist:
+        raise ImageCreateError(f'Conflicts between images bases and generated image names '
+                               f'exist. Use "ref_name" and "base.image_ref" to correctly '
+                               f'declare dependencies between images.')
 
 
 def get_ims_images_by_name(ims_client):
@@ -151,6 +208,8 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
         return input_images
     elif skip:
         LOGGER.info(msg_template, {'action': 'skipped'})
+        LOGGER.info('Any images which depend on these images will also be skipped.')
+
         # Create all images that do not already exist
         return [image for image in input_images if image.name not in existing_input_names]
 
@@ -161,28 +220,29 @@ def find_image_dependencies(input_images):
     For example, suppose the bootprep input file looks like this:
 
     images:
-    - name: compute-gpu
-      ims:
-        is_recipe: false
-        name: compute-base
+    - name: "{{ base.name }}"
+      ref_name: cos-base-image
+      base:
+        product:
+          name: cos
+          version: "{{ cos.version }}"
+    - name: compute-gpu-{{ base.name }}
+      base:
+        image_ref: cos-base-image
       configuration: compute-gpu
       configuration_group_names:
       - Compute
-    - name: compute-no-gpu
-      ims:
-        is_recipe: false
-        name: compute-base
+    - name: compute-no-gpu-{{ base.name }}
+      base:
+        image_ref: cos-base-image
       configuration: compute-no-gpu
       configuration_group_names:
       - Compute
-    - name: compute-base
-      ims:
-        is_recipe: true
-        name: compute-recipe
 
-    In this case, the compute-gpu and compute-no-gpu images both depend on the
-    compute-base image being built first from recipe, and then each customizes
-    it with a different configuration.
+    In this case, the second and third images whose names start with "compute-gpu"
+    and "compute-no-gpu", respectively, both depend on the first image with the
+    "ref_name" property value of "cos-base-image". That image must be built first,
+    before the second and third images customize it with different configurations.
 
     Args:
         input_images (list of sat.cli.bootprep.input.image.InputImage): the list
@@ -194,39 +254,41 @@ def find_image_dependencies(input_images):
 
     Raises:
         ImageCreateError: if the images defined in the input file have circular
-            dependencies.
+            dependencies or unresolved dependencies.
     """
-    input_images_by_name = {input_image.name: input_image
-                            for input_image in input_images}
-    cycles_exist = False
-    for image in input_images:
-        # If it is built from a recipe, or specifies an image by its id, or it
-        # is based on an image or recipe provided by a product, then it should
-        # not depend on any named images in the input file.
-        if isinstance(image, ProductInputImage) or image.base_is_recipe or 'id' in image.ims_data:
+    # Get a list of any input images which have dependencies
+    input_images_by_ref_name = {input_image.ref_name: input_image
+                                for input_image in input_images if input_image.ref_name is not None}
+    errors_exist = False
+    for index, image in enumerate(input_images):
+
+        # Only DependentInputImages will depend on other images
+        if not isinstance(image, DependentInputImage):
             continue
 
-        # This is an IMSInputImage, and since 'id' is absent, 'name' must be present
-        base_image_name = image.ims_data['name']
-        if base_image_name in input_images_by_name:
-            LOGGER.info(f'Image named {image.name} depends on image named {base_image_name} '
-                        f'which will also be created by this command.')
-            try:
-                image.add_dependency(input_images_by_name[base_image_name])
-            except DependencyCycleError as err:
-                LOGGER.error(str(err))
-                cycles_exist = True
+        if image.base_image_ref in input_images_by_ref_name:
+            dependency_image = input_images_by_ref_name[image.base_image_ref]
+            LOGGER.info(f'{image} depends on {dependency_image}.')
 
-    if cycles_exist:
-        raise ImageCreateError('Circular dependencies exist in images to be created. '
-                               'Resolve the circular dependencies and try again.')
+            try:
+                image.add_dependency(dependency_image)
+            except DependencyCycleError as err:
+                errors_exist = True
+                LOGGER.error(str(err))
+        else:
+            errors_exist = True
+            LOGGER.error(f'Unable to resolve {image.base_description}.')
+
+    if errors_exist:
+        raise ImageCreateError('Invalid dependencies exist in images to be created. '
+                               'Resolve the dependency issues and try again.')
 
 
 def validate_image_ims_bases(input_images):
     """Validate that the ims bases are valid for the given input images
 
     Args:
-        input_images (list of sat.cli.bootprep.input.image.InputImage): the
+        input_images (list of sat.cli.bootprep.input.image.BaseInputImage): the
             IMSImages which should have their IMS base validated. These images
             should be just the images without dependencies on other images from
             the input, since an image with dependencies depends on images that
@@ -247,7 +309,7 @@ def validate_image_ims_bases(input_images):
             LOGGER.debug(f'IMS base for {image}: {ims_base}')
         except ImageCreateError as err:
             failed_images.append(image)
-            LOGGER.error(f'Failed to find match in IMS for {image.base_description}: {err}')
+            LOGGER.error(f'Failed to find base for {image}: {err}')
 
     if failed_images:
         raise ImageCreateError(f'Failed to find match in IMS for {len(failed_images)} '
@@ -370,23 +432,25 @@ def create_images(instance, args):
     for image in input_images:
         image.public_key_id = ims_public_key_id
 
+    validate_unique_image_ref_names(input_images)
+    # Validate dependencies on the full set of input images
+    find_image_dependencies(input_images)
+
+    # Raises ImageCreateError if validation of IMS bases fails
+    # Do this early to provide information required to render names.
+    validate_image_ims_bases(input_images)
+
+    # Raises ImageCreateError if validation of CFS configurations fails
+    validate_image_configurations(input_images, cfs_client,
+                                  instance.input_configuration_names, args.dry_run)
+
+    # This is where name properties are first accessed and thus rendered
     validate_unique_image_names(input_images)
+
     images_to_create = handle_existing_images(ims_client, input_images, args.overwrite_images,
                                               args.skip_existing_images, args.dry_run)
 
-    # Raises ImageCreateError if validation of CFS configurations fails
-    validate_image_configurations(images_to_create, cfs_client,
-                                  instance.input_configuration_names, args.dry_run)
-
-    create_verb = ('Creating', 'Would create')[args.dry_run]
-    LOGGER.info(f'{create_verb} {len(images_to_create)} images.')
-
-    if not input_images:
-        LOGGER.info('Given input did not define any IMS images')
-        return
-
-    # This can raise ImageCreateError if there are any cycles
-    find_image_dependencies(images_to_create)
+    validate_no_overwritten_ims_bases(images_to_create)
 
     images_without_dependencies = [image for image in images_to_create
                                    if not image.has_dependencies()]
@@ -396,8 +460,8 @@ def create_images(instance, args):
                 f'{len(images_without_dependencies)} have no dependencies '
                 f'and {verb} created first.')
 
-    # Raises ImageCreateError if validation of IMS bases fails
-    validate_image_ims_bases(images_without_dependencies)
+    create_verb = ('Creating', 'Would create')[args.dry_run]
+    LOGGER.info(f'{create_verb} {len(images_to_create)} images.')
 
     if args.dry_run:
         LOGGER.info("Dry run, not creating images.")

@@ -74,7 +74,7 @@ class VariableContext:
         """Load variables from the HPC software recipe, vars file, and command-line.
 
         Raises:
-            VariableContextError: if there is a failure to load variables.
+            VariableContextError: if there is a failure to load variables from a file.
         """
         deep_update_dict(self.vars, self.get_hpc_software_recipe_vars())
         deep_update_dict(self.vars, self.get_file_vars())
@@ -117,14 +117,7 @@ class VariableContext:
 
         Returns:
             dict: the variables loaded from the HPC software recipe.
-
-        Raises:
-            VariableContextError: if there is a problem loading variables from
-                HPC software recipe
         """
-        if self.recipe_version is None:
-            return {}
-
         try:
             recipe_catalog = HPCSoftwareRecipeCatalog()
             if self.recipe_version == LATEST_VERSION_VALUE:
@@ -134,10 +127,10 @@ class VariableContext:
 
             return recipe.all_vars
         except HPCSoftwareRecipeError as err:
-            # Once we start defaulting to the latest version of the recipe, this
-            # should become a warning since the user may be overriding vars with
-            # --vars-file or --vars.
-            raise VariableContextError(
+            # Only issue a warning because the input file may not use the variables provided
+            # by the recipe, or the variables may be provided by --vars-file or --vars.
+            LOGGER.warning(
                 f'Failed to load variables defined by HPC software recipe version '
                 f'{self.recipe_version}: {err}'
-            ) from err
+            )
+            return {}

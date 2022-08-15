@@ -216,6 +216,14 @@ def do_bootprep_run(schema_validator, args):
     # newly created images when constructing session templates.
     ims_client.clear_resource_cache(resource_type='image')
 
+    # Must validate first because `handle_existing_items` must know the name of each
+    # item to be created, and validation will render names.
+    try:
+        instance.input_session_templates.validate(dry_run=args.dry_run)
+    except InputItemValidateError as err:
+        LOGGER.error(str(err))
+        raise SystemExit(1)
+
     try:
         instance.input_session_templates.handle_existing_items(args.overwrite_templates,
                                                                args.skip_existing_templates,
@@ -224,12 +232,6 @@ def do_bootprep_run(schema_validator, args):
         LOGGER.error('Aborted')
         raise SystemExit(1)
     except InputItemCreateError as err:
-        LOGGER.error(str(err))
-        raise SystemExit(1)
-
-    try:
-        instance.input_session_templates.validate(dry_run=args.dry_run)
-    except InputItemValidateError as err:
         LOGGER.error(str(err))
         raise SystemExit(1)
 

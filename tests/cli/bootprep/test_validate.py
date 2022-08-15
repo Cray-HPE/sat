@@ -122,13 +122,24 @@ VALID_IMAGE_IMS_ID_WITH_CONFIG_V2 = {
 }
 
 VALID_IMAGE_PRODUCT_WITH_CONFIG = {
-    'name': '{{ base.name }}',
+    'name': 'compute-{{ base.name }}',
+    'ref_name': 'cos-compute-image',
     'base': {
         'product': {
             'type': 'recipe',
             'name': 'cos',
             'version': '2.2.101'
         }
+    },
+    'configuration': COMPUTE_CONFIG_IMAGE_NAME,
+    'configuration_group_names': ['Compute', 'Compute_GPU']
+}
+
+VALID_IMAGE_REF_WITH_CONFIG = {
+    'name': 'compute-{{ base.name }}',
+    'ref_name': 'compute-cos-image',
+    'base': {
+        'image_ref': 'cos-image'
     },
     'configuration': COMPUTE_CONFIG_IMAGE_NAME,
     'configuration_group_names': ['Compute', 'Compute_GPU']
@@ -464,6 +475,13 @@ class TestValidateInstance(ExtendedTestCase):
         """Valid image from a version of a product with config specified"""
         instance = {
             'images': [VALID_IMAGE_PRODUCT_WITH_CONFIG]
+        }
+        self.assert_valid_instance(instance)
+
+    def test_valid_image_ref_with_config(self):
+        """Valid image using another image from bootprep input file as a base"""
+        instance = {
+            'images': [VALID_IMAGE_REF_WITH_CONFIG]
         }
         self.assert_valid_instance(instance)
 

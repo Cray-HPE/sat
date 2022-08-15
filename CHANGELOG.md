@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 	- `name` of elements of the `configurations` array
 	- `name`, `branch`, and `version` of elements under `layers` in
 	  elements of the `configurations` array
+	- `name`, `base.product.version`, and `configuration` properties of
+	  elements in the `images` array.
+	- `name`, `configuration`, and `image` properties of elements in the
+	  `session_templates` array.
 - Defined a `sat bootprep` input file schema version and began validating the
   schema version specified by `sat bootprep` input files.
 - Added functionality to `sat bootprep` to look up images and recipes provided
@@ -43,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Changed the `sat bootprep` input file schema by adding a new `base` property
   for an image and moved the existing `ims` property beneath that new property.
+- Changed how `sat bootprep` determines dependencies between images in the input
+  file using new `ref_name` and `base.image_ref` properties.
 
 ### Deprecated
 - Specifying the `ims` property at the top level of an image in the `sat

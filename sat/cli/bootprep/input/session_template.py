@@ -28,7 +28,13 @@ import re
 
 from sat.apiclient import APIError
 from sat.cached_property import cached_property
-from sat.cli.bootprep.input.base import BaseInputItem, BaseInputItemCollection, Validatable
+from sat.cli.bootprep.input.base import (
+    BaseInputItem,
+    BaseInputItemCollection,
+    Validatable,
+    jinja_rendered,
+    provides_context
+)
 from sat.cli.bootprep.errors import InputItemCreateError, InputItemValidateError, SessionTemplateCreateError
 from sat.util import get_val_by_path
 
@@ -48,25 +54,35 @@ class InputSessionTemplate(BaseInputItem):
     """
     description = 'BOS session template'
 
-    def __init__(self, data, instance, bos_client, cfs_client, ims_client, **kwargs):
+    # Use InputItemValidateError since fields are rendered in validation methods.
+    create_error_cls = InputItemValidateError
+
+    def __init__(self, data, instance, index, jinja_env, bos_client, cfs_client, ims_client, **kwargs):
         """Create a new InputSessionTemplate.
 
         Args:
             data (dict): the data defining the item from the input file, already
                 validated by the bootprep schema.
-            instance (sat.bootprep.input.InputInstance): a reference to the
-                full instance loaded from the config file
+            instance (sat.cli.bootprep.input.instance.InputInstance): a reference
+                to the full instance loaded from the input file
+            index (int): the index of the item in the collection in the instance
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
             bos_client (sat.apiclient.BOSClientCommon): the BOS API client
             cfs_client (sat.apiclient.CFSClient): the CFS API client
             ims_client (sat.apiclient.IMSClient): the IMS API client
             **kwargs: additional keyword arguments
         """
-        super().__init__(data, instance, **kwargs)
+        super().__init__(data, instance, index, jinja_env, **kwargs)
         self.bos_client = bos_client
         self.cfs_client = cfs_client
         self.ims_client = ims_client
 
+        # Additional context to be used when rendering Jinja2 templated properties
+        self.jinja_context = {}
+
     @property
+    @jinja_rendered
     def configuration(self):
         """str: the configuration specified for the session template"""
         # the 'configuration' property is required by the schema
@@ -79,6 +95,7 @@ class InputSessionTemplate(BaseInputItem):
         return self.data['bos_parameters']['boot_sets']
 
     @property
+    @jinja_rendered
     def image(self):
         """str: the image specified for the session template
 
@@ -109,20 +126,20 @@ class InputSessionTemplate(BaseInputItem):
                 except APIError as err:
                     # TODO: should probably differentiate between 404 Not Found and other errors
                     raise InputItemValidateError(f'No image with name or ID {self.image} exists '
-                                                 f'for use by session template {self.name}: {err}')
+                                                 f'for use by {self}: {err}')
             else:
                 raise InputItemValidateError(f'No image with name {self.image} exists for '
-                                             f'use by session template {self.name}.')
+                                             f'use by session template {self}.')
 
         elif len(name_matches) > 1:
             raise InputItemValidateError(f'Found multiple matches for image named {self.image} '
-                                         f'for use by session template {self.name}. This image '
-                                         f'must be specified by ID instead.')
+                                         f'for use by {self}. This image must be specified by '
+                                         f'ID instead.')
 
         else:
             return name_matches[0]
 
-    @Validatable.validation_method
+    @Validatable.validation_method()
     def validate_configuration_exists(self, **_):
         """Validate that the configuration specified for this session template exists.
 
@@ -139,9 +156,10 @@ class InputSessionTemplate(BaseInputItem):
         except APIError as err:
             # TODO: should probably differentiate between 404 Not Found and other errors
             raise InputItemValidateError(f'Configuration {self.configuration} specified for '
-                                         f'session template {self.name} does not exist: {err}')
+                                         f'{self} does not exist: {err}')
 
-    @Validatable.validation_method
+    @provides_context('image')
+    @Validatable.validation_method()
     def validate_image_exists(self, **_):
         """Validate that the image specified for this session template exists.
 
@@ -151,10 +169,12 @@ class InputSessionTemplate(BaseInputItem):
         # First check if the image is being created anew by the same input file
         input_image_names = [image.name for image in self.instance.input_images]
         if self.image in input_image_names:
-            return
+            image_name = self.image
+        else:
+            # Accessing the image_record queries IMS to find the image
+            image_name = self.image_record['name']
 
-        # Accessing the image_record queries IMS to find the image
-        _ = self.image_record
+        return {'name': image_name}
 
     def get_bos_api_data(self):
         """Get the data to pass to the BOS API to create this session template.
@@ -198,7 +218,7 @@ class InputSessionTemplateCollection(BaseInputItemCollection):
 
     item_class = InputSessionTemplate
 
-    def __init__(self, items_data, instance, bos_client, cfs_client, ims_client, **kwargs):
+    def __init__(self, items_data, instance, jinja_env, bos_client, cfs_client, ims_client, **kwargs):
         """Create a new InputSessionTemplateCollection.
 
         Args:
@@ -206,12 +226,14 @@ class InputSessionTemplateCollection(BaseInputItemCollection):
                 already validated by schema
             instance (sat.bootprep.input.InputInstance): a reference to the
                 full instance loaded from the config file
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
             bos_client (sat.apiclient.BOSClientCommon): the BOS API client
             cfs_client (sat.apiclient.CFSClient): the CFS API client
             ims_client (sat.apiclient.IMSClient): the IMS API client
             **kwargs: additional keyword arguments
         """
-        super().__init__(items_data, instance, bos_client=bos_client,
+        super().__init__(items_data, instance, jinja_env, bos_client=bos_client,
                          cfs_client=cfs_client, ims_client=ims_client, **kwargs)
         self.bos_client = bos_client
         self.cfs_client = cfs_client
