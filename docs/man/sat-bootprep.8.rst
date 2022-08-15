@@ -120,9 +120,8 @@ These options only apply to the ``run`` action.
 **--recipe-version RECIPE_VERSION**
         The HPC software recipe version, e.g. 22.03. This is used to obtain the
         product versions which can be substituted for variables specified in
-        fields in the input file. If not specified, variables are not loaded
-        from the HPC software recipe. If "latest" is specified, use the latest
-        available HPC software recipe.
+        fields in the input file. If not specified or if "latest" is specified,
+        use the latest available HPC software recipe.
 
 **--vars-file VARS_FILE**
         A file containing variables that can be used in fields in the input

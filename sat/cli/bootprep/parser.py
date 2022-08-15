@@ -220,14 +220,13 @@ def _add_bootprep_run_subparser(subparsers):
         choices=['v1', 'v2'],
         help='The version of the BOS API to use for BOS operations',
     )
-    # TODO (CASM-2920): With official recipe manifest, default to LATEST_VERSION_VALUE
     run_subparser.add_argument(
-        '--recipe-version',
-        help='The HPC software recipe version, e.g. 22.03. This is used to '
-             'obtain the product versions which can be substituted for variables '
-             'specified in fields in the input file. If not specified, variables '
-             f'are not loaded from the HPC software recipe. If "{LATEST_VERSION_VALUE}" '
-             f'is specified, use the latest available HPC software recipe.'
+        '--recipe-version', default=LATEST_VERSION_VALUE,
+        help=f'The HPC software recipe version, e.g. 22.03. This is used to '
+             f'obtain the product versions which can be substituted for variables '
+             f'specified in fields in the input file. If not specified or if '
+             f'"{LATEST_VERSION_VALUE}" is specified, use the latest available HPC '
+             f'software recipe version.'
     )
     run_subparser.add_argument(
         '--vars-file',
