@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.21.3] - 2023-03-24
 
+### Changed
+- Changed the default value of the config file option `bos.api_version` to "v2".
+
 ### Security
 - Update the version of oauthlib from 3.2.1 to 3.2.2 to resolve a moderate
   dependabot alert for CVE-2022-36087.
