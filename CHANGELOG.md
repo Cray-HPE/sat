@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   message printed at the end of the `sat bootsys` run. BOS sessions with
   greater than 0% failed components will be logged as warning messages, and all
   other session statuses will be logged as info messages.
+- Changed the default value of the config file option `bos.api_version` to "v2".
 
 ### Fixed
 - Fixed a bug in the `bos-operations` stage of `sat bootsys` where a Bad Request
