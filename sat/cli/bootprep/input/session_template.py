@@ -24,11 +24,18 @@
 """
 Defines class for session templates defined in the input file.
 """
+from abc import abstractmethod
 import re
 
 from sat.apiclient import APIError
 from sat.cached_property import cached_property
-from sat.cli.bootprep.input.base import BaseInputItem, BaseInputItemCollection, Validatable
+from sat.cli.bootprep.input.base import (
+    BaseInputItem,
+    BaseInputItemCollection,
+    Validatable,
+    jinja_rendered,
+    provides_context
+)
 from sat.cli.bootprep.errors import InputItemCreateError, InputItemValidateError, SessionTemplateCreateError
 from sat.util import get_val_by_path
 
@@ -48,25 +55,43 @@ class InputSessionTemplate(BaseInputItem):
     """
     description = 'BOS session template'
 
-    def __init__(self, data, instance, bos_client, cfs_client, ims_client, **kwargs):
+    # Use InputItemValidateError since fields are rendered in validation methods.
+    create_error_cls = InputItemValidateError
+
+    def __init__(self, data, instance, index, jinja_env, bos_client, cfs_client, ims_client, **kwargs):
         """Create a new InputSessionTemplate.
 
         Args:
             data (dict): the data defining the item from the input file, already
                 validated by the bootprep schema.
-            instance (sat.bootprep.input.InputInstance): a reference to the
-                full instance loaded from the config file
+            instance (sat.cli.bootprep.input.instance.InputInstance): a reference
+                to the full instance loaded from the input file
+            index (int): the index of the item in the collection in the instance
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
             bos_client (sat.apiclient.BOSClientCommon): the BOS API client
             cfs_client (sat.apiclient.CFSClient): the CFS API client
             ims_client (sat.apiclient.IMSClient): the IMS API client
             **kwargs: additional keyword arguments
         """
-        super().__init__(data, instance, **kwargs)
+        super().__init__(data, instance, index, jinja_env, **kwargs)
         self.bos_client = bos_client
         self.cfs_client = cfs_client
         self.ims_client = ims_client
 
+        # Additional context to be used when rendering Jinja2 templated properties
+        self.jinja_context = {}
+
+    @staticmethod
+    def get_item(data, *args, **kwargs):
+        """Get an instance of the appropriate subclass based on the data."""
+        if isinstance(data['image'], str):
+            return InputSessionTemplateV1(data, *args, **kwargs)
+        else:
+            return InputSessionTemplateV2(data, *args, **kwargs)
+
     @property
+    @jinja_rendered
     def configuration(self):
         """str: the configuration specified for the session template"""
         # the 'configuration' property is required by the schema
@@ -79,50 +104,11 @@ class InputSessionTemplate(BaseInputItem):
         return self.data['bos_parameters']['boot_sets']
 
     @property
-    def image(self):
-        """str: the image specified for the session template
-
-        Per the bootprep schema, this may be an image name or id.
-        """
-        # the 'image' property is required by the schema
-        return self.data['image']
-
-    @property
-    def image_is_uuid(self):
-        """bool: True if the image value appears to be a UUID, False otherwise"""
-        uuid_regex = re.compile('[a-f0-9]{8}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{12}',
-                                re.IGNORECASE)
-        return bool(uuid_regex.fullmatch(self.image))
-
-    @cached_property
+    @abstractmethod
     def image_record(self):
-        """dict: the image record from IMS if one can be found"""
-        try:
-            name_matches = self.ims_client.get_matching_resources('image', name=self.image)
-        except APIError as err:
-            raise InputItemValidateError(f'Unable to find image with name or ID {self.image}: {err}')
+        """dict: the image record from IMS for this session template"""
 
-        if len(name_matches) == 0:
-            if self.image_is_uuid:
-                try:
-                    return self.ims_client.get_image(self.image)
-                except APIError as err:
-                    # TODO: should probably differentiate between 404 Not Found and other errors
-                    raise InputItemValidateError(f'No image with name or ID {self.image} exists '
-                                                 f'for use by session template {self.name}: {err}')
-            else:
-                raise InputItemValidateError(f'No image with name {self.image} exists for '
-                                             f'use by session template {self.name}.')
-
-        elif len(name_matches) > 1:
-            raise InputItemValidateError(f'Found multiple matches for image named {self.image} '
-                                         f'for use by session template {self.name}. This image '
-                                         f'must be specified by ID instead.')
-
-        else:
-            return name_matches[0]
-
-    @Validatable.validation_method
+    @Validatable.validation_method()
     def validate_configuration_exists(self, **_):
         """Validate that the configuration specified for this session template exists.
 
@@ -139,22 +125,20 @@ class InputSessionTemplate(BaseInputItem):
         except APIError as err:
             # TODO: should probably differentiate between 404 Not Found and other errors
             raise InputItemValidateError(f'Configuration {self.configuration} specified for '
-                                         f'session template {self.name} does not exist: {err}')
+                                         f'{self} does not exist: {err}')
 
-    @Validatable.validation_method
+    @abstractmethod
     def validate_image_exists(self, **_):
         """Validate that the image specified for this session template exists.
+
+        Returns:
+            dict: information about the image to make available in an `image`
+                variable in Jinja2 context when rendering the name of the
+                session template.
 
         Raises:
             InputItemValidateError: if the image cannot be verified to exist
         """
-        # First check if the image is being created anew by the same input file
-        input_image_names = [image.name for image in self.instance.input_images]
-        if self.image in input_image_names:
-            return
-
-        # Accessing the image_record queries IMS to find the image
-        _ = self.image_record
 
     def get_bos_api_data(self):
         """Get the data to pass to the BOS API to create this session template.
@@ -193,12 +177,164 @@ class InputSessionTemplate(BaseInputItem):
             raise SessionTemplateCreateError(f'Failed to create session template: {err}')
 
 
+class InputSessionTemplateV1(InputSessionTemplate):
+    """A BOS session template that specifies its IMS image as a simple string."""
+
+    @provides_context('image')
+    @Validatable.validation_method()
+    def validate_image_exists(self, **_):
+        """Validate that the image specified for this session template exists.
+
+        See docstring of InputSessionTemplate.validate_image_exists.
+        """
+        # First check if the image is being created anew by the same input file
+        input_image_names = [image.name for image in self.instance.input_images]
+        if self.image in input_image_names:
+            image_name = self.image
+        else:
+            # Accessing the image_record queries IMS to find the image
+            image_name = self.image_record['name']
+
+        return {'name': image_name}
+
+    @property
+    @jinja_rendered
+    def image(self):
+        """str: the image specified for the session template
+        """
+        # the 'image' property is required by the schema
+        return self.data['image']
+
+    @property
+    def image_is_uuid(self):
+        """bool: True if the image value appears to be a UUID, False otherwise"""
+        uuid_regex = re.compile('[a-f0-9]{8}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{12}',
+                                re.IGNORECASE)
+        return bool(uuid_regex.fullmatch(self.image))
+
+    @cached_property
+    def image_record(self):
+        """dict: the image record from IMS if one can be found"""
+        try:
+            name_matches = self.ims_client.get_matching_resources('image', name=self.image)
+        except APIError as err:
+            raise InputItemValidateError(f'Unable to find image with name or ID {self.image}: {err}')
+
+        if len(name_matches) == 0:
+            if self.image_is_uuid:
+                try:
+                    return self.ims_client.get_image(self.image)
+                except APIError as err:
+                    # TODO: should probably differentiate between 404 Not Found and other errors
+                    raise InputItemValidateError(f'No image with name or ID {self.image} exists '
+                                                 f'for use by {self}: {err}')
+            else:
+                raise InputItemValidateError(f'No image with name {self.image} exists for '
+                                             f'use by session template {self}.')
+
+        elif len(name_matches) > 1:
+            raise InputItemValidateError(f'Found multiple matches for image named {self.image} '
+                                         f'for use by {self}. This image must be specified by '
+                                         f'ID instead.')
+
+        else:
+            return name_matches[0]
+
+
+class InputSessionTemplateV2(InputSessionTemplate):
+    """A BOS session template that specifies its IMS image as a dict."""
+
+    @provides_context('image')
+    @Validatable.validation_method()
+    def validate_image_exists(self, **_):
+        """Validate that the image specified for this session template exists.
+
+        See docstring of InputSessionTemplate.validate_image_exists.
+        """
+        # First check if the image is being created anew by the same input file
+        input_image_names = [image.name for image in self.instance.input_images]
+        if self.ims_image_name and self.ims_image_name in input_image_names:
+            image_name = self.ims_image_name
+        elif self.image_ref:
+            if self.image_ref_input_image:
+                # Found the image from the input instance by its ref
+                image_name = self.image_ref_input_image.name
+            else:
+                # If the image_ref does not exist in the input instance, this is an error
+                raise InputItemValidateError(f'No image exists with ref_name={self.image_ref} '
+                                             f'for use by {self}.')
+        else:
+            # Image is not from input instance. Access image_record to look up in IMS
+            image_name = self.image_record['name']
+
+        return {'name': image_name}
+
+    @cached_property
+    @jinja_rendered
+    def ims_image_name(self):
+        """str or None: the name specified for the ims image, or None if not specified"""
+        return get_val_by_path(self.data, 'image.ims.name')
+
+    @property
+    def ims_image_id(self):
+        """str or None: the id specified for the IMS image, or None if not specified"""
+        return get_val_by_path(self.data, 'image.ims.id')
+
+    @cached_property
+    @jinja_rendered
+    def image_ref(self):
+        """str or None: the name specified for the image ref, or None if not specified"""
+        return get_val_by_path(self.data, 'image.image_ref')
+
+    @cached_property
+    def image_ref_input_image(self):
+        """BaseInputImage or None: the image referenced by image.image_ref, if it exists"""
+        for input_image in self.instance.input_images:
+            if self.image_ref == input_image.ref_name:
+                return input_image
+
+    @cached_property
+    def image_record(self):
+        """dict: the image record from IMS if one can be found"""
+        if self.ims_image_id:
+            try:
+                return self.ims_client.get_image(self.ims_image_id)
+            except APIError as err:
+                # TODO: should probably differentiate between 404 Not Found and other errors
+                raise InputItemValidateError(f'No image with ID {self.ims_image_id} exists '
+                                             f'for use by {self}: {err}')
+        else:
+            # First, get the name of the image
+            image_name = self.ims_image_name
+            if not image_name:
+                # Image must have been specified by image_ref. `validate_image_exists` already
+                # checked that the ref_name exists, but be defensive anyway.
+                if self.image_ref_input_image:
+                    image_name = self.image_ref_input_image.name
+                else:
+                    raise InputItemValidateError(f'No image exists with ref_name={self.image_ref} '
+                                                 f'for use by {self}.')
+
+            try:
+                name_matches = self.ims_client.get_matching_resources('image', name=image_name)
+            except APIError as err:
+                raise InputItemValidateError(f'Unable to find image with name {image_name} '
+                                             f'for use by {self}: {err}')
+
+            if not name_matches:
+                raise InputItemValidateError(f'No image with name {image_name} exists for use by {self}.')
+            elif len(name_matches) > 1:
+                raise InputItemValidateError(f'Found multiple images named {image_name} for use '
+                                             f'by {self}. This image must be specified by ID.')
+            return name_matches[0]
+
+
 class InputSessionTemplateCollection(BaseInputItemCollection):
     """The collection BOS session templates defined in the input file"""
 
     item_class = InputSessionTemplate
 
-    def __init__(self, items_data, instance, bos_client, cfs_client, ims_client, **kwargs):
+    def __init__(self, items_data, instance, jinja_env, bos_client, cfs_client, ims_client, **kwargs):
         """Create a new InputSessionTemplateCollection.
 
         Args:
@@ -206,12 +342,14 @@ class InputSessionTemplateCollection(BaseInputItemCollection):
                 already validated by schema
             instance (sat.bootprep.input.InputInstance): a reference to the
                 full instance loaded from the config file
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
             bos_client (sat.apiclient.BOSClientCommon): the BOS API client
             cfs_client (sat.apiclient.CFSClient): the CFS API client
             ims_client (sat.apiclient.IMSClient): the IMS API client
             **kwargs: additional keyword arguments
         """
-        super().__init__(items_data, instance, bos_client=bos_client,
+        super().__init__(items_data, instance, jinja_env, bos_client=bos_client,
                          cfs_client=cfs_client, ims_client=ims_client, **kwargs)
         self.bos_client = bos_client
         self.cfs_client = cfs_client

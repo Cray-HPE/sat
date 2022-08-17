@@ -464,6 +464,90 @@ def get_val_by_path(dict_val, dotted_path, default_value=None):
     return current_val
 
 
+def set_val_by_path(dict_val, dotted_path, value):
+    """Set a value in a dictionary using a dotted path.
+
+    If any values along the path are not a dictionary, this will overwrite those
+    values with a dictionary.
+
+    For example, if `dict_val` is as follows:
+
+        dict_val = {
+            'price_is_right': {
+                'host': 'Bob Barker'
+            }
+        }
+
+    Then the following calls:
+
+        set_val_by_path(dict_val, 'price_is_right.host', 'Drew Carey')
+        set_val_by_path(dict_val, 'price_is_right.genre', 'Game Show')
+
+    Would result in this dictionary:
+
+        dict_val = {
+            'price_is_right': {
+                'host': 'Drew Carey'
+                'genre': 'Game Show'
+            }
+        }
+
+    The subsequent calls:
+
+        set_val_by_path(dict_val, 'price_is_right.host.first_name', 'Drew')
+        set_val_by_path(dict_val, 'price_is_right.host.last_name', 'Carey')
+
+    Would result in:
+
+        dict_val = {
+            'price_is_right': {
+                'host': {
+                    'first_name': 'Drew',
+                    'last_name': 'Carey'
+                }
+                'genre': 'Game Show'
+            }
+        }
+
+    Returns:
+        None. The dictionary `dict_val` is modified in place.
+    """
+    if not dotted_path:
+        raise ValueError('set_val_by_path requires a non-empty path')
+
+    split_path = dotted_path.split('.')
+
+    for key in split_path[:-1]:
+        if not isinstance(dict_val.get(key), dict):
+            dict_val[key] = {}
+        dict_val = dict_val[key]
+
+    dict_val[split_path[-1]] = value
+
+
+def deep_update_dict(original_dict, new_dict):
+    """Perform a deep update of a dictionary with values from a new dictionary.
+
+    This is like the built-in `update` method of dicts, but it recursively updates
+    nested dicts. If any keys have a dict value in `original_dict` but have a non-dict
+    value in `new_dict`, the value from `new_dict` is used.
+
+    Returns:
+        None. Modifies `original_dict` in place like `original_dict.update` would.
+
+    Raises:
+        ValueError: if either argument is not a dict
+    """
+    if not isinstance(original_dict, dict) or not isinstance(new_dict, dict):
+        raise TypeError(f'Expected two dict instances. Got {type(original_dict)} and {type(new_dict)}')
+
+    for key, value in new_dict.items():
+        if key in original_dict and isinstance(original_dict[key], dict) and isinstance(value, dict):
+            deep_update_dict(original_dict[key], value)
+        else:
+            original_dict[key] = value
+
+
 def get_new_ordered_dict(orig_dict, dotted_paths, default_value=None, strip_path=True):
     """Get a new ordered dict from a dict using the given dotted_paths.
 

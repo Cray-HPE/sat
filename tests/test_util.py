@@ -24,6 +24,7 @@
 """
 Unit tests for sat/util.py.
 """
+import copy
 from collections import OrderedDict
 from itertools import combinations, repeat
 import logging
@@ -265,6 +266,156 @@ class TestGetValByPath(unittest.TestCase):
             'foo': None
         }
         self.assertIsNone(util.get_val_by_path(d, 'foo.bar'))
+
+
+class TestSetValByPath(unittest.TestCase):
+    """Tests for set_val_by_path"""
+
+    def test_set_new_nested_value(self):
+        """Test that set_val_by_path adds a new key in a nested dict."""
+        current_value = {
+            'price_is_right': {
+                'host': {
+                    'first_name': 'Bob'
+                }
+            }
+        }
+        expected_value = copy.deepcopy(current_value)
+        expected_value['price_is_right']['host']['last_name'] = 'Barker'
+        util.set_val_by_path(current_value, 'price_is_right.host.last_name', 'Barker')
+        self.assertEqual(expected_value, current_value)
+
+    def test_set_value_overwrite(self):
+        """Test that set_val_by_path overwrites a non-dict value with a dict value."""
+        current_value = {
+            'price_is_right': {
+                'host': 'Bob Barker',
+                'genre': 'Game Show'
+            }
+        }
+        expected_value = {
+            'price_is_right': {
+                'host': {
+                    'first_name': 'Drew',
+                    'last_name': 'Carey'
+                },
+                'genre': 'Game Show'
+            }
+        }
+        util.set_val_by_path(current_value, 'price_is_right.host.first_name', 'Drew')
+        util.set_val_by_path(current_value, 'price_is_right.host.last_name', 'Carey')
+        self.assertEqual(expected_value, current_value)
+
+    def test_existing_value(self):
+        """Test that set_val_by_path overwrites an existing value and adds a new value."""
+        current_value = {
+            'price_is_right': {
+                'host': 'Bob Barker'
+            }
+        }
+        expected_value = {
+            'price_is_right': {
+                'host': 'Drew Carey',
+                'genre': 'Game Show'
+            }
+        }
+        util.set_val_by_path(current_value, 'price_is_right.host', 'Drew Carey')
+        util.set_val_by_path(current_value, 'price_is_right.genre', 'Game Show')
+        self.assertEqual(expected_value, current_value)
+
+
+class TestDeepUpdateDict(unittest.TestCase):
+    """Tests for deep_update_dict function."""
+
+    def test_add_key_nested(self):
+        """Test deep_update_dict adds a key in a nested dict."""
+        original = {
+            'cast': {
+                'Joel': 'Jim Carrey'
+            }
+        }
+        new = {
+            'cast': {
+                'Clementine': 'Kate Winslet'
+            }
+        }
+        expected = {
+            'cast': {
+                'Joel': 'Jim Carrey',
+                'Clementine': 'Kate Winslet'
+            }
+        }
+
+        util.deep_update_dict(original, new)
+
+        self.assertEqual(expected, original)
+
+    def test_replace_non_dict_value(self):
+        """Test deep_update_dict when a non-dict value in original is replaced by a dict."""
+        original = {
+            'garden': ['corn', 'tomatoes', 'zucchini'],
+            'yard': ['red fescue', 'kentucky bluegrass']
+        }
+        new = {
+            'garden': {
+                'row1': ['corn'],
+                'row2': ['tomatoes'],
+                'row3': ['zucchini']
+            }
+        }
+        expected = {
+            'garden': {
+                'row1': ['corn'],
+                'row2': ['tomatoes'],
+                'row3': ['zucchini']
+            },
+            'yard': ['red fescue', 'kentucky bluegrass']
+        }
+
+        util.deep_update_dict(original, new)
+
+        self.assertEqual(expected, original)
+
+    def test_replace_with_non_dict_value(self):
+        """Test deep_update_dict when a dict value in original is replaced by a non-dict."""
+        original = {
+            'kitchen': {
+                'cupboard': {
+                    'top_shelf': 'cups',
+                    'bottom_shelf': 'plates'
+                }
+            },
+            'bathroom': {
+                'closet': ['medicine', 'towels']
+            }
+        }
+        new = {
+            'kitchen': {
+                'cupboard': ['cups', 'plates']
+            }
+        }
+        expected = {
+            'kitchen': {
+                'cupboard': ['cups', 'plates']
+            },
+            'bathroom': {
+                'closet': ['medicine', 'towels']
+            }
+        }
+
+        util.deep_update_dict(original, new)
+
+        self.assertEqual(expected, original)
+
+    def test_update_dict_with_non_dict(self):
+        """Test that a ValueError is raised if attempting to update a dict with a non-dict."""
+        with self.assertRaises(TypeError):
+            util.deep_update_dict({'name': 'updateme'}, 'newname')
+
+    def test_update_non_dict_with_dict(self):
+        """Test that a ValueError is raised if attempting to update a non-dict value."""
+        with self.assertRaises(TypeError):
+            util.deep_update_dict('mrducks', {'response': 'mrnotducks'})
 
 
 class TestGetNewOrderedDict(unittest.TestCase):

@@ -28,6 +28,7 @@ import logging
 import os
 
 from cray_product_catalog.query import ProductCatalog, ProductCatalogError
+from jinja2.sandbox import SandboxedEnvironment
 import yaml
 
 from sat.apiclient import CFSClient, IMSClient
@@ -58,6 +59,7 @@ from sat.cli.bootprep.validate import (
     load_and_validate_schema,
     SCHEMA_FILE_RELATIVE_PATH,
 )
+from sat.cli.bootprep.vars import VariableContext, VariableContextError
 from sat.session import SATSession
 
 
@@ -106,10 +108,11 @@ def do_bootprep_schema(schema_file_contents):
         raise SystemExit(1)
 
 
-def do_bootprep_example(args):
+def do_bootprep_example(schema_validator, args):
     """Generate an example bootprep input file.
 
     Args:
+        schema_validator (jsonschema.protocols.Validator): the validator object
         args: The argparse.Namespace object containing the parsed arguments
             passed to this subcommand.
 
@@ -127,6 +130,9 @@ def do_bootprep_example(args):
         LOGGER.error(str(err))
         raise SystemExit(1)
 
+    # Get current schema version
+    example_data['schema_version'] = schema_validator.schema['version']
+
     try:
         with open(full_example_file_path, 'w') as f:
             yaml.dump(example_data, f, sort_keys=False)
@@ -141,8 +147,7 @@ def do_bootprep_run(schema_validator, args):
     """Create images, configurations, and/or session templates.
 
     Args:
-        schema_validator: the schema validator object from the jsonschema
-            library used to validate the input instance.
+        schema_validator (jsonschema.protocols.Validator): the validator object
         args: The argparse.Namespace object containing the parsed arguments
             passed to this subcommand.
 
@@ -175,7 +180,16 @@ def do_bootprep_run(schema_validator, args):
         # data will fail. Otherwise, this is not a problem.
         product_catalog = None
 
-    instance = InputInstance(instance_data, cfs_client, ims_client, bos_client, product_catalog)
+    var_context = VariableContext(args.recipe_version, args.vars_file, args.vars)
+    try:
+        var_context.load_vars()
+    except VariableContextError as err:
+        LOGGER.error(str(err))
+        raise SystemExit(1)
+    jinja_env = SandboxedEnvironment()
+    jinja_env.globals = var_context.vars
+
+    instance = InputInstance(instance_data, cfs_client, ims_client, bos_client, jinja_env, product_catalog)
 
     # TODO (CRAYSAT-1277): Refactor images to use BaseInputItemCollection
     # TODO (CRAYSAT-1278): Refactor configurations to use BaseInputItemCollection
@@ -202,6 +216,14 @@ def do_bootprep_run(schema_validator, args):
     # newly created images when constructing session templates.
     ims_client.clear_resource_cache(resource_type='image')
 
+    # Must validate first because `handle_existing_items` must know the name of each
+    # item to be created, and validation will render names.
+    try:
+        instance.input_session_templates.validate(dry_run=args.dry_run)
+    except InputItemValidateError as err:
+        LOGGER.error(str(err))
+        raise SystemExit(1)
+
     try:
         instance.input_session_templates.handle_existing_items(args.overwrite_templates,
                                                                args.skip_existing_templates,
@@ -210,12 +232,6 @@ def do_bootprep_run(schema_validator, args):
         LOGGER.error('Aborted')
         raise SystemExit(1)
     except InputItemCreateError as err:
-        LOGGER.error(str(err))
-        raise SystemExit(1)
-
-    try:
-        instance.input_session_templates.validate(dry_run=args.dry_run)
-    except InputItemValidateError as err:
         LOGGER.error(str(err))
         raise SystemExit(1)
 
@@ -253,4 +269,4 @@ def do_bootprep(args):
     elif args.action == 'view-schema':
         do_bootprep_schema(schema_file_contents)
     elif args.action == 'generate-example':
-        do_bootprep_example(args)
+        do_bootprep_example(schema_validator, args)
