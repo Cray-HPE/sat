@@ -32,11 +32,10 @@ from cray_product_catalog.query import ProductCatalogError
 
 from sat.apiclient.vcs import VCSError, VCSRepo
 from sat.cached_property import cached_property
+from sat.cli.bootprep.constants import LATEST_VERSION_VALUE
 from sat.cli.bootprep.errors import ConfigurationCreateError
+from sat.cli.bootprep.input.base import jinja_rendered
 from sat.config import get_config_value
-
-# This value is used to specify that the latest version of a product is desired
-LATEST_VERSION_VALUE = 'latest'
 
 LOGGER = logging.getLogger(__name__)
 
@@ -62,13 +61,18 @@ class InputConfigurationLayer(ABC):
     # for both GitCFSConfigurationLayers and ProductCFSConfigurationLayers.
     resolve_branches = True
 
-    def __init__(self, layer_data):
+    create_error_cls = ConfigurationCreateError
+
+    def __init__(self, layer_data, jinja_env):
         """Create a new configuration layer.
 
         Args:
             layer_data (dict): the layer data from the input instance
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
         """
         self.layer_data = layer_data
+        self.jinja_env = jinja_env
 
     @property
     def playbook(self):
@@ -76,6 +80,7 @@ class InputConfigurationLayer(ABC):
         return self.layer_data.get('playbook')
 
     @property
+    @jinja_rendered
     def name(self):
         """str or None: the name specified for the layer"""
         return self.layer_data.get('name')
@@ -123,12 +128,14 @@ class InputConfigurationLayer(ABC):
         return cfs_layer_data
 
     @staticmethod
-    def get_configuration_layer(layer_data, product_catalog):
+    def get_configuration_layer(layer_data, jinja_env, product_catalog):
         """Get and return a new InputConfigurationLayer for the given layer data.
 
         Args:
             layer_data (dict): The data for a layer, already validated against
                 the bootprep input file schema.
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
             product_catalog (cray_product_catalog.query.ProductCatalog):
                 the product catalog object
 
@@ -138,9 +145,9 @@ class InputConfigurationLayer(ABC):
                 properly validated against the schema.
         """
         if 'git' in layer_data:
-            return GitInputConfigurationLayer(layer_data)
+            return GitInputConfigurationLayer(layer_data, jinja_env)
         elif 'product' in layer_data:
-            return ProductInputConfigurationLayer(layer_data, product_catalog)
+            return ProductInputConfigurationLayer(layer_data, jinja_env, product_catalog)
         else:
             raise ValueError('Unrecognized type of configuration layer')
 
@@ -180,6 +187,7 @@ class GitInputConfigurationLayer(InputConfigurationLayer):
         return self.layer_data['git']['url']
 
     @property
+    @jinja_rendered
     def branch(self):
         # The 'branch' property is optional
         return self.layer_data['git'].get('branch')
@@ -198,15 +206,17 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
     A configuration layer that is defined with the name of a product
     and the version or branch.
     """
-    def __init__(self, layer_data, product_catalog):
+    def __init__(self, layer_data, jinja_env, product_catalog):
         """Create a new ProductInputConfigurationLayer.
 
         Args:
             layer_data (dict): the layer data from the input instance
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
             product_catalog (cray_product_catalog.query.ProductCatalog or None):
                 the product catalog object
         """
-        super().__init__(layer_data)
+        super().__init__(layer_data, jinja_env)
         self.product_catalog = product_catalog
 
     @property
@@ -216,8 +226,9 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
         return self.layer_data['product']['name']
 
     @property
+    @jinja_rendered
     def product_version(self):
-        """str or None: the version specified for the product"""
+        """str: the version specified for the product"""
         # The 'version' property is optional. If not specified, assume latest
         return self.layer_data['product'].get('version', LATEST_VERSION_VALUE)
 
@@ -256,6 +267,7 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
         return self.substitute_url_hostname(self.matching_product.clone_url)
 
     @cached_property
+    @jinja_rendered
     def branch(self):
         # The 'branch' property is optional
         return self.layer_data['product'].get('branch')
@@ -294,12 +306,16 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
 class InputConfiguration:
     """A CFS Configuration from a bootprep input file."""
 
-    def __init__(self, configuration_data, product_catalog):
+    create_error_cls = ConfigurationCreateError
+
+    def __init__(self, configuration_data, jinja_env, product_catalog):
         """Create a new InputConfiguration.
 
         Args:
             configuration_data (dict): The data for a configuration, already
                 validated against the bootprep input file schema.
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
             product_catalog (cray_product_catalog.query.ProductCatalog):
                 the product catalog object
 
@@ -309,11 +325,13 @@ class InputConfiguration:
                 happen if the input is properly validated against the schema.
         """
         self.configuration_data = configuration_data
+        self.jinja_env = jinja_env
         # The 'layers' property is required and must be a list, but it can be empty
-        self.layers = [InputConfigurationLayer.get_configuration_layer(layer_data, product_catalog)
+        self.layers = [InputConfigurationLayer.get_configuration_layer(layer_data, jinja_env, product_catalog)
                        for layer_data in self.configuration_data['layers']]
 
     @property
+    @jinja_rendered
     def name(self):
         """The name of the CFS configuration."""
         # The 'name' property is required

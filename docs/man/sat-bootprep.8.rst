@@ -7,7 +7,7 @@ Prepare to boot nodes with images and configurations
 ----------------------------------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2021 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2021-2022 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -114,6 +114,30 @@ These options only apply to the ``run`` action.
         Delete IMS jobs after creating images. Note that deleting IMS jobs makes
         determining image history impossible.
 
+**--bos-version BOS_VERSION**
+        The version of the BOS API to use when creating BOS session templates.
+
+**--recipe-version RECIPE_VERSION**
+        The HPC software recipe version, e.g. 22.03. This is used to obtain the
+        product versions which can be substituted for variables specified in
+        fields in the input file. If not specified or if "latest" is specified,
+        use the latest available HPC software recipe.
+
+**--vars-file VARS_FILE**
+        A file containing variables that can be used in fields in the input
+        file. Values from this file take precedence over values in the HPC
+        software recipe defaults.
+
+**--vars VARS**
+        Variables that can be used in fields in the input file. Values specified
+        here take precedence over values specified in any --vars-file or in the
+        HPC software recipe defaults.
+
+        Specify this option multiple times to specify values for multiple
+        variables. Use dots to refer to keys in dictionaries. For example, to
+        override the value of the "version" key within the value of the "cos"
+        key, specify ``--vars cos.version=VALUE``.
+
 **--skip-existing-configs**
         Skip creating any configurations for which a configuration with the same
         name already exists.
@@ -153,11 +177,27 @@ EXAMPLES
 ========
 
 Create the CFS configurations, build and customize IMS images, and create BOS
-session templates as described in the configuration file, ``bootprep_input.yaml``:
+session templates as described in the input file, ``bootprep_input.yaml``:
 
 ::
 
         # sat bootprep run bootprep_input.yaml
+
+Create CFS configurations, IMS images, and BOS session templates as described in
+the input file, using variables from HPC software recipe version 22.06 and
+overrides from a file:
+
+::
+
+        # sat bootprep run --recipe-version 22.06 --vars-file overrides.yaml bootprep_input.yaml
+
+Create CFS configurations, IMS images, and BOS session templates as described in
+the input file, using variables from a HPC software recipe version 22.06 and
+overriding the variables ``cos.version`` and ``cpe.version``:
+
+::
+
+        # sat bootprep run --recipe-version 22.06 --vars cos.version=2.1.65 --vars cpe.version=22.3.1 bootprep_input.yaml
 
 View the exact input file schema specification:
 

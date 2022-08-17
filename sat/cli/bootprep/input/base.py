@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -26,32 +26,121 @@ Defines base classes for objects defined in the input file.
 """
 from abc import ABC, abstractmethod
 from collections import Counter
+import functools
 import logging
 
 from inflect import engine
+from jinja2 import TemplateError
+from jinja2.sandbox import SecurityError
 
 from sat.cached_property import cached_property
 from sat.cli.bootprep.errors import InputItemCreateError, InputItemValidateError, UserAbortException
 from sat.util import pester_choices
 
 LOGGER = logging.getLogger(__name__)
+inflector = engine()
+
+
+def provides_context(context_var=None):
+    """Get decorator for instance methods which provide Jinja2 context.
+
+    This should be used to decorate instance methods which provide additional
+    context which should be used when rendering Jinja2 templates with the
+    jinja_rendered decorator defined below.
+
+    Note that the context provided by the instance method decorated with this
+    decorator will not be available until that method is called.
+
+    This decorator requires that the instance has the following attribute:
+
+        jinja_context (dict): additional context to use when rendering the
+            result of the method as a Jinja2 template. Defaults to the empty
+            dict if not set.
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            result = func(self, *args, **kwargs)
+            self.jinja_context[context_var or func.__name__] = result
+            return result
+
+        return wrapper
+
+    return decorator
+
+
+def jinja_rendered(func):
+    """Decorator for instance methods which return Jinja2 templates.
+
+    This should be used to decorate instance methods which return content from
+    the InputInstance that supports rendering as a Jinja2 template. If the
+    `func` returns `None`, this wrapper will as well.
+
+    This decorator requires the instance has the following attribute:
+
+        jinja_env (jinja2.Environment): the Jinja2 environment to use to get
+            Template objects to be rendered. Variables to use as context are
+            expected to already be set in the `globals` attribute.
+
+    This decorator uses the following additional optional attributes of the instance:
+
+        create_error_cls: the exception class that should be raised if there is
+            an issue rendering the template. Defaults to InputItemValidateError
+            if not set.
+
+        jinja_context (dict): additional context to use when rendering the
+            result of the method as a Jinja2 template. Defaults to the empty
+            dict if not set.
+    """
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        # First call the wrapped method and get its result
+        unrendered_result = func(self, *args, **kwargs)
+
+        # If value not specified in input file, the `func` may return `None`
+        if unrendered_result is None:
+            return unrendered_result
+
+        # Default to InputItemCreateError if no error class is specified
+        error_cls = getattr(self, 'create_error_cls', InputItemValidateError)
+
+        # Default to no additional context if not set
+        context = getattr(self, 'jinja_context', {})
+
+        try:
+            return self.jinja_env.from_string(unrendered_result).render(context)
+        except SecurityError as err:
+            raise error_cls(f'Jinja2 template {unrendered_result} for value '
+                            f'{func.__name__} tried to access unsafe attributes.') from err
+        except TemplateError as err:
+            raise error_cls(f'Failed to render Jinja2 template {unrendered_result} '
+                            f'for value {func.__name__}: {err}') from err
+
+    return wrapper
 
 
 class Validatable:
     """A base class for something that can be validated"""
 
     VAL_METHOD_ATTR = 'is_validation_method'
+    VAL_METHOD_ORDINAL_ATTR = 'validation_method_ordinal'
+    # The default value for a validation method's ordinal value
+    DEFAULT_ORDINAL = 1
 
     @staticmethod
-    def validation_method(method):
-        """Mark a method as a validation method.
+    def validation_method(ordinal=DEFAULT_ORDINAL):
+        """Return a decorator to mark a method as a validation method.
 
         Args:
-            method: the method on which to set the attribute
-                Validatable.VAL_METHOD_ATTR to True
+            ordinal (int): the priority of the validation method. Validation
+                methods will be called in priority order
         """
-        setattr(method, Validatable.VAL_METHOD_ATTR, True)
-        return method
+        def decorator(method):
+            setattr(method, Validatable.VAL_METHOD_ATTR, True)
+            setattr(method, Validatable.VAL_METHOD_ORDINAL_ATTR, ordinal)
+            return method
+
+        return decorator
 
     def attr_is_validation_method(self, attr_name):
         """Returns whether the method is a validation method of this class
@@ -77,9 +166,12 @@ class Validatable:
 
     @property
     def validation_methods(self):
-        """list of callable: all the methods tagged as validation methods"""
-        return [getattr(self, attr_name) for attr_name in dir(self)
-                if self.attr_is_validation_method(attr_name)]
+        """list of callable: all the methods tagged as validation methods in ordinal order"""
+        return sorted(
+            [getattr(self, attr_name) for attr_name in dir(self)
+             if self.attr_is_validation_method(attr_name)],
+            key=lambda m: getattr(m, self.VAL_METHOD_ORDINAL_ATTR, self.DEFAULT_ORDINAL)
+        )
 
     def validate(self, **kwargs):
         """Validate this object by calling all of its validation methods.
@@ -117,28 +209,38 @@ class BaseInputItem(Validatable, ABC):
     # The description for the input item, to be overridden by each subclass
     description = 'base input item'
 
-    def __init__(self, data, instance, **_):
+    create_error_cls = InputItemValidateError
+
+    def __init__(self, data, instance, index, jinja_env, **_):
         """Create a new BaseInputItem.
 
         Args:
             data (dict): the data defining the item from the input file, already
                 validated by the bootprep schema
-            instance (sat.cli.bootprep.input.InputInstance): a reference to the
-                full instance loaded from the config file
+            instance (sat.cli.bootprep.input.instance.InputInstance): a reference
+                to the full instance loaded from the input file
+            index (int): the index of the item in the collection in the instance
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
         """
         self.data = data
         self.instance = instance
+        self.index = index
+        self.jinja_env = jinja_env
         self.items_to_delete = []
 
     @property
+    @jinja_rendered
     def name(self):
-        """str: the name of this input item that is to be created"""
+        """str: the rendered name of this input item that is to be created"""
         # The 'name' property is required by the schema for all types of input
         # items that inherit from BaseInputItem.
         return self.data['name']
 
     def __str__(self):
-        return f'{self.description} named {self.name}'
+        # Since the name can be rendered, and when unrendered, it does not need
+        # to be unique, just refer to this item by its index in the instance.
+        return f'{self.description} at index {self.index}'
 
     def add_items_to_delete(self, delete_list):
         """Add a list of items that should be deleted after this item is created.
@@ -196,10 +298,9 @@ class BaseInputItemCollection(ABC, Validatable):
         skipped_items (list of BaseInputItem): the input items that
             should be skipped
     """
-    inflector = engine()
     item_class = BaseInputItem
 
-    def __init__(self, items_data, instance, **kwargs):
+    def __init__(self, items_data, instance, jinja_env, **kwargs):
         """Create a new BaseInputItemCollection.
 
         Args:
@@ -207,17 +308,23 @@ class BaseInputItemCollection(ABC, Validatable):
                 input file, already validated by the schema
             instance (sat.bootprep.input.InputInstance): a reference to the
                 full instance loaded from the config file
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
             **kwargs: additional keyword arguments which are passed through to
                 the constructor of the class defined in the class attribute
                 `item_class`
         """
-        self.items = [self.item_class(item_data, instance, **kwargs) for item_data in items_data]
+        constructor = self.item_class
+        if hasattr(self.item_class, 'get_item'):
+            constructor = self.item_class.get_item
+        self.items = [constructor(item_data, instance, index, jinja_env, **kwargs)
+                      for index, item_data in enumerate(items_data)]
         self.instance = instance
         self.items_to_create = []
         self.skipped_items = []
 
     def __str__(self):
-        return f'collection of {self.inflector.plural(self.item_class.description)}'
+        return f'collection of {inflector.plural(self.item_class.description)}'
 
     def item_count_string(self, count):
         """Get a string describing the given `count` of items.
@@ -225,9 +332,11 @@ class BaseInputItemCollection(ABC, Validatable):
         Args:
             count (int): the number of items to get a descriptor for
         """
-        return f'{count} {self.inflector.plural(self.item_class.description, count)}'
+        return f'{count} {inflector.plural(self.item_class.description, count)}'
 
-    @Validatable.validation_method
+    # Item validation should occur before name validation because validating an
+    # item ensures its name can be rendered.
+    @Validatable.validation_method(ordinal=0)
     def validate_items(self, **kwargs):
         """Validate all items within this collection.
 
@@ -239,7 +348,7 @@ class BaseInputItemCollection(ABC, Validatable):
             InputItemValidateError: if any item is invalid
         """
         valid = True
-        for item in self.items_to_create:
+        for item in self.items:
             try:
                 item.validate(**kwargs)
             except InputItemValidateError as err:
@@ -249,19 +358,36 @@ class BaseInputItemCollection(ABC, Validatable):
         if not valid:
             raise InputItemValidateError(f'One or more items is not valid in {self}')
 
-    @Validatable.validation_method
+    # Validation of unique names must occur after item validation because item
+    # validation will render names using Jinja2 templates.
+    @Validatable.validation_method(ordinal=1)
     def validate_unique_names(self, **_):
         """Validate that all items in collection have unique names.
 
         Raises:
             InputItemValidateError: if there are any items with the same name
         """
-        counts_by_name = Counter(item.name for item in self.items)
+        counts_by_name = Counter()
+
+        failed_name_renders = 0
+        for item in self.items:
+            try:
+                counts_by_name[item.name] += 1
+            except self.item_class.create_error_cls as err:
+                failed_name_renders += 1
+                LOGGER.error(f'Failed to render name of {item}: {err}')
+
+        if failed_name_renders:
+            raise InputItemValidateError(
+                f'Failed to render name of {failed_name_renders} '
+                f'{inflector.plural(self.item_class.description, failed_name_renders)}'
+            )
+
         non_unique_names = [name for name, count in counts_by_name.items() if count > 1]
         if non_unique_names:
             raise InputItemValidateError(
-                f'Names of {self.inflector.plural(self.item_class.description)} '
-                f'must be unique. Non-unique {self.inflector.plural("name", len(non_unique_names))}: '
+                f'Names of {inflector.plural(self.item_class.description)} '
+                f'must be unique. Non-unique {inflector.plural("name", len(non_unique_names))}: '
                 f'{", ".join(non_unique_names)}'
             )
 
@@ -284,6 +410,9 @@ class BaseInputItemCollection(ABC, Validatable):
             InputItemCreateError: if there is a failure to get existing items
             UserAbortException: if the user chooses to abort at any point
         """
+        if not self.items:
+            return
+
         existing_items_by_name = self.get_existing_items_by_name()
 
         existing_input_items = [input_item for input_item in self.items
@@ -301,8 +430,8 @@ class BaseInputItemCollection(ABC, Validatable):
         for item in existing_input_items:
             conflicting_items = existing_items_by_name.get(item.name, [])
             count = len(conflicting_items)
-            conflict_msg = (f'{count} {self.inflector.plural(self.item_class.description, count)} '
-                            f'already {self.inflector.plural_verb("exists", count)} with the name {item.name}')
+            conflict_msg = (f'{count} {inflector.plural(self.item_class.description, count)} '
+                            f'already {inflector.plural_verb("exists", count)} with the name {item.name}')
 
             overwrite = overwrite_all
             skip = skip_all
@@ -310,7 +439,7 @@ class BaseInputItemCollection(ABC, Validatable):
             if not overwrite and not skip:
                 choices = ('skip', 'overwrite', 'abort')
                 answer = pester_choices(f'{conflict_msg}. Would you like to '
-                                        f'{self.inflector.join(choices, conj="or")}?', choices)
+                                        f'{inflector.join(choices, conj="or")}?', choices)
                 if answer == 'abort':
                     raise UserAbortException()
 

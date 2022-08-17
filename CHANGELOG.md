@@ -25,6 +25,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.19.0] - 2022-08-16
+
+### Added
+- Added `--recipe-version`, `--vars-file`, and `--vars` options to `sat
+  bootprep run` to specify variables for use in `bootprep` input files.
+- Added variable substitution support to the following fields in `sat bootprep`
+  input files:
+	- `name` of elements of the `configurations` array
+	- `name`, `branch`, and `version` of elements under `layers` in
+	  elements of the `configurations` array
+	- `name`, `base.product.version`, and `configuration` properties of
+	  elements in the `images` array.
+	- `name`, `configuration`, and `image` properties of elements in the
+	  `session_templates` array.
+- Defined a `sat bootprep` input file schema version and began validating the
+  schema version specified by `sat bootprep` input files.
+- Added functionality to `sat bootprep` to look up images and recipes provided
+  by products.
+- Added functionality to `sat bootprep` to allow session templates to refer to
+  images by their `ref_name` under the new `image.image_ref` property.
+
+### Changed
+- Changed the `sat bootprep` input file schema by adding a new `base` property
+  for an image and moved the existing `ims` property beneath that new property.
+- Changed how `sat bootprep` determines dependencies between images in the input
+  file using new `ref_name` and `base.image_ref` properties.
+- Changed the default value of the config file option `bos.api_version` to "v2".
+
+### Deprecated
+- Specifying the `ims` property at the top level of an image in the `sat
+  bootprep` input file is deprecated.
+- Specifying a string value for the `image` property of session templates in the
+  `sat bootprep` input file is deprecated.
+
 ## [3.18.0] - 2022-08-10
 
 ### Added

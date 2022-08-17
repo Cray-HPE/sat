@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -25,44 +25,119 @@
 Client for interacting with the Version Control Service (VCS).
 """
 
-# TODO (CRAYSAT-1214): This code was essentially copied verbatim from
-# cfs_config_util/vcs.py, and so we should look at factoring this out when
-# splitting out other API access code. This version of the code has a slight
-# improvement over the version used in cfs-config-util as it can accept a full
-# URL in addition to just the path to the config repo.
-
+# TODO (CRAYSAT-1214): This code was originally copied from cfs_config_util/vcs.py
+# and should be refactored into a common library.
+import base64
+from contextlib import contextmanager
+import logging
 import os
 import subprocess
 from tempfile import NamedTemporaryFile
-from urllib.parse import ParseResult, urlparse, urlunparse
+from urllib.parse import urlparse, urlunparse
+
+from kubernetes.config import load_kube_config
+from kubernetes.client import CoreV1Api
 
 from sat.cached_property import cached_property
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class VCSError(Exception):
     """An error occurring during VCS access."""
 
 
-class VCSRepo:
-    """Main client object for accessing VCS."""
-    _default_username = os.environ.get('VCS_USERNAME', 'crayvcs')
+@contextmanager
+def vcs_creds_helper():
+    """Context manager to set up a helper script to get VCS credentials.
 
-    def __init__(self, repo_url, username=None):
+    Yields:
+        dict: A dictionary containing current process environment with GIT_ASKPASS
+            set to the path to the script for obtaining VCS credentials.
+    """
+    # Get the password directly from k8s to avoid leaking it via the /proc filesystem
+    try:
+        with NamedTemporaryFile(delete=False) as cred_helper_script:
+            cred_helper_script.write('#!/bin/bash\n'
+                                     'kubectl get secret -n services vcs-user-credentials '
+                                     '--template={{.data.vcs_password}} | base64 -d'.encode())
+
+        os.chmod(cred_helper_script.name, 0o700)  # Make executable by user
+        env = dict(os.environ)
+        env.update(GIT_ASKPASS=cred_helper_script.name)
+        yield env
+    finally:
+        os.remove(cred_helper_script.name)
+
+
+class VCSRepo:
+    """Main client object for accessing a VCS repository."""
+
+    def __init__(self, clone_url):
         """Constructor for VCSRepo.
 
         Args:
-            repo_url (str): The URL to the repo on the git server.
-            username (str or None): if a str, then use this username to
-                authenticate to the git server. If None, use the default
-                username.
+            clone_url (str): The clone URL of the git repo.
         """
-        parsed_url = urlparse(repo_url)
-        self.repo_path = parsed_url.path
+        parsed_url = urlparse(clone_url)
+        if '@' in parsed_url.netloc:
+            username, netloc = parsed_url.netloc.split('@', maxsplit=1)
+            LOGGER.warning(f'Ignoring username {username} specified in clone URL {clone_url}')
+            clone_url = urlunparse(parsed_url._replace(netloc=netloc))
 
+        self.clone_url = clone_url
+
+    @cached_property
+    def repo_path(self):
+        """str: the path component of the clone_url"""
+        parsed_url = urlparse(self.clone_url)
+        return parsed_url.path
+
+    @cached_property
+    def repo_name(self):
+        """str: the name of the repo"""
+        return os.path.basename(os.path.splitext(self.repo_path)[0])
+
+    @cached_property
+    def vcs_username(self):
+        """str: the VCS username from a Kubernetes secret
+
+        Raises:
+            VCSError: if unable to read the vcs_username from the K8s secret.
+        """
+        load_kube_config()
+        k8s_api = CoreV1Api()
+
+        username = k8s_api.read_namespaced_secret('vcs-user-credentials', 'services').data.get('vcs_username')
         if username is None:
-            self.username = self._default_username
-        else:
-            self.username = username
+            raise VCSError('Unable to get VCS username from Kubernetes secret.')
+
+        return base64.b64decode(username).decode('utf-8').strip()
+
+    @property
+    def user_clone_url(self):
+        """str: the clone url including the username"""
+        parsed_url = urlparse(self.clone_url)
+        user_netloc = f'{self.vcs_username}@{parsed_url.netloc}'
+        return urlunparse(parsed_url._replace(netloc=user_netloc))
+
+    @staticmethod
+    def run_authenticated_git_cmd(git_cmd):
+        """Run the given git command, authenticated using credentials from the K8s secret.
+
+        Args:
+            git_cmd (list of str): the git command to run
+
+        Returns:
+            subprocess.CompletedProcess: the completed process
+
+        Raises:
+            subprocess.CalledProcessError: if the command fails
+        """
+        with vcs_creds_helper() as env:
+            return subprocess.run(git_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                  env=env, check=True)
 
     @property
     def remote_refs(self):
@@ -75,38 +150,10 @@ class VCSRepo:
             VCSError: if there is an error when git accesses VCS to enumerate
                 remote refs
         """
-
-        user_netloc = f'{self.username}@{self.vcs_host}'
-        url_components = ParseResult(scheme='https', netloc=user_netloc, path=self.repo_path,
-                                     params='', query='', fragment='')
-        vcs_full_url = urlunparse(url_components)
-
-        # Get the password directly from k8s to avoid leaking it via the /proc
-        # filesystem.
-        # TODO (CRAYSAT-1214): cfs-config-util uses the Python kubernetes
-        # library (via a small `vcs-creds-helper` script) since kubectl isn't
-        # available in the cfs-config-util image. As part of CRAYSAT-1214, we
-        # probably want to figure out a consistent way to retrieve credentials
-        # regardless of whether kubectl is installed. An argument could be made
-        # that both approaches used are clunky in their own way, and perhaps
-        # there's a cleaner common solution for both.
-        with NamedTemporaryFile(delete=False) as cred_helper_script:
-            cred_helper_script.write('#!/bin/bash\n'
-                                     'kubectl get secret -n services vcs-user-credentials '
-                                     '--template={{.data.vcs_password}} | base64 -d'.encode())
-
-        os.chmod(cred_helper_script.name, 0o700)  # Make executable by user
-
-        env = dict(os.environ)
-        env.update(GIT_ASKPASS=cred_helper_script.name)
         try:
-            proc = subprocess.run(['git', 'ls-remote', vcs_full_url],
-                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                  env=env, check=True)
+            proc = self.run_authenticated_git_cmd(['git', 'ls-remote', self.user_clone_url])
         except subprocess.CalledProcessError as err:
             raise VCSError(f"Error accessing VCS: {err}") from err
-        finally:
-            os.remove(cred_helper_script.name)
 
         # Each line in the output from `git ls-remote` has the form
         # "<commit_hash>\t<ref_name>", and we want the returned dictionary to map
@@ -133,12 +180,30 @@ class VCSRepo:
         target_ref = f'refs/heads/{branch}'
         return self.remote_refs.get(target_ref)
 
-    @cached_property
-    def vcs_host(self):
-        """str: Hostname of the VCS server."""
-        return 'api-gw-service-nmn.local'  # TODO: Update per CRAYSAT-898.
+    def clone(self, branch=None, directory=None, single_branch=False, depth=None):
+        """Clone the VCS repo to the given path.
 
-    @cached_property
-    def clone_url(self):
-        """str: a full, git-clone-able URL to the repository"""
-        return urlunparse(('https', self.vcs_host, self.repo_path, '', '', ''))
+        Args:
+            branch (str, optional): the branch to set as HEAD in the cloned repo.
+                If omitted, defaults to the HEAD of the remote repo.
+            directory (str, optional): the directory to clone the repo to.
+                If omitted, clone to a directory matching the name of the repo.
+            single_branch (bool, optional): whether to clone just a single branch.
+            depth (int, optional): create a shallow clone with history truncated
+                 to this number of commits.
+        """
+        git_cmd = ['git', 'clone']
+        if branch:
+            git_cmd += ['--branch', branch]
+        if single_branch:
+            git_cmd += ['--single-branch']
+        if depth:
+            git_cmd += ['--depth', str(depth)]
+        git_cmd.append(self.user_clone_url)
+        if directory:
+            git_cmd.append(directory)
+
+        try:
+            self.run_authenticated_git_cmd(git_cmd)
+        except subprocess.CalledProcessError as err:
+            raise VCSError(f"Error cloning VCS repo: {err}") from err
