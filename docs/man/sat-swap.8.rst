@@ -17,6 +17,8 @@ SYNOPSIS
 
 **sat** [global-opts] **swap** cable [options] *xname* [*xname* ...]
 
+**sat** [global-opts] **swap** blade [options] *xname*
+
 DESCRIPTION
 ===========
 
@@ -32,12 +34,16 @@ The 'swap cable' subcommand disables or enables the ports to which a cable
 is connected.  Given one or more jacks that a cable connects, the command
 will disable all ports connected by that cable.
 
+The 'swap blade' subcommand disables or enables a compute or UAN blade. This can
+be used to replace a given blade with a different blade from the same system or
+another system.
+
 ARGUMENTS
 =========
 
 *xname*
-        The xname of the switch, or one or more xnames describing
-        the physical jacks that a cable connects.
+        The xname of the blade, switch, or one or more xnames describing the
+        physical jacks that a cable connects.
 
 OPTIONS
 =======
@@ -48,17 +54,18 @@ These options must be specified after the subcommand.
         Print the help message for 'sat swap'.
 
 **-a, --action** {enable, disable}
-        Perform action to enable or disable the ports on a switch
-        or connected by a cable.  Required if a dry run is not
-        being performed.
+        Perform action to enable or disable a blade, ports on a switch, or ports
+        connected by a cable. Required if a dry run is not being performed.
 
 **--disruptive**
         Perform disable/enable action without a prompt to continue.
 
 **--dry-run**
-        Perform a dry run without action to disable/enable the switch
-        or cable.  The dry run obtains port links and port policies.
-        This can be used to check in advance there are no error conditions.
+        Perform a dry run without action to disable/enable the switch, cable,
+        or blade. If swapping a switch or cable, the dry run obtains port links
+        and port policies. If swapping a blade, ethernet interface mapping
+        files will be saved. This can be used to check in advance there are no
+        error conditions.
 
 **-f, --force**
         If specified, the command will continue if there are errors when
@@ -71,6 +78,28 @@ These options must be specified after the subcommand.
         For each port that is affected, the xname, port_link, and
         policy_link is included in the JSON output. This option
         can be useful even without enable/disable of the switch ports.
+
+BLADE SWAP OPTIONS
+==================
+
+These options may only be specified when using the **sat swap blade**
+subcommand, and must be specified after the **blade** subcommand.
+
+**--src-mapping PATH**
+        The path to the JSON-formatted ethernet interface mappings file from
+        the source system. Such a file is created on the source system when
+        **sat swap blade -a disable** is run against the source blade. The path
+        to this file should be supplied when the source system blade is swapped
+        into the destination system with the *enable* action. This option only
+        applies to the *enable* action.
+
+**--dst-mapping PATH**
+        The path to the JSON-formatted ethernet interface mappings file from
+        the destination system. Such a file is created on the destination system
+        when **sat swap blade -a disable** is run against the destination
+        blade. The path to this file should be supplied when the source system
+        blade is swapped into the destination system with the *enable* action.
+        This option only applies to the *enable* action.
 
 EXIT STATUS
 ===========

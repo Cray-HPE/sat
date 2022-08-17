@@ -25,7 +25,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased bootprep improvements]
+## [3.19.0]
 
 ### Added
 - Added `--recipe-version`, `--vars-file`, and `--vars` options to `sat
@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for an image and moved the existing `ims` property beneath that new property.
 - Changed how `sat bootprep` determines dependencies between images in the input
   file using new `ref_name` and `base.image_ref` properties.
+- Changed the default value of the config file option `bos.api_version` to "v2".
 
 ### Deprecated
 - Specifying the `ims` property at the top level of an image in the `sat
@@ -58,16 +59,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Specifying a string value for the `image` property of session templates in the
   `sat bootprep` input file is deprecated.
 
-### Fixed
-- Deprecated version comparison utilites from `distutils` have been replaced
-  equivalent functionality from the `packaging` library.
-
-## [Unreleased]
+## [3.18.0] - 2022-08-10
 
 ### Added
 
-- Added information regarding the `--bos-version` command line argument to man
+- Added information regarding the `--bos-version` command-line argument to man
   pages for relevant subcommands.
+- Added a `sat swap blade` subcommand which partially automates the procedure
+  for swapping compute and UAN blades.
+
+### Changed
+- Updated `sat bootsys` man page to reflect changes to stages and remove
+  outdated information.
 
 ### Fixed
 - Fixed unit tests that failed when run in PyCharm.

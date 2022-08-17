@@ -123,18 +123,22 @@ def pester_choices(prompt, choices):
         return None
 
 
-def prompt_continue(action_msg):
+def prompt_continue(action_msg, description=None):
     """Prompt whether to continue with an action and exit if answer is no.
 
     Args:
         action_msg (str): Prompt whether to continue with an action. If the
             answer is yes, print a message that we are continuing. If the answer
             is no, then exit.
+        description (str): if not None, print the description before prompting to
+            continue.
 
     Raises:
         SystemExit: if the user answers no to the prompt.
     """
     # TODO: we should add an option to be non-interactive like --disruptive
+    if description:
+        print(description)
     answer = pester_choices('Proceed with {}?'.format(action_msg),
                             ('yes', 'no'))
     if answer == 'yes':
