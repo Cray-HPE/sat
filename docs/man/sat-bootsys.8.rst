@@ -73,7 +73,7 @@ action, each stage automates a specific portion of the system boot procedure.
 
 In the ``ncn-power`` stage, ``sat bootsys`` powers on all mangagement NCNs in
 stages. It first boots the master nodes and waits for them to become accessible
-over the network, and then repeats for the worker nodes, then the storage
+over the network, and then repeats for the storage nodes, then the worker
 nodes.
 
 In the ``platform-services`` stage, it ensures that containerd and etcd are are
