@@ -25,12 +25,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
 
 ### Fixed
 - The ordering of the bootup sequence of management NCNs in the
   `sat-bootsys(8)` man page was fixed to reflect their correct ordering in the
   `ncn-power` stage of `sat bootsys boot`.
+
+### Security
+- Update the version of paramiko from 2.9.2 to 2.10.1 to mitigate
+  CVE-2022-24302.
 
 ## [3.19.0] - 2022-08-16
 
