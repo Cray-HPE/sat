@@ -325,7 +325,6 @@ class TestBOSSessionThread(unittest.TestCase):
         self.mock_bos_client = Mock()
         patch('sat.cli.bootsys.bos.BOSClientCommon.get_bos_client', return_value=self.mock_bos_client).start()
         patch('sat.cli.bootsys.bos.SATSession').start()
-        self.mock_get_config_value = patch('sat.cli.bootsys.bos.get_config_value').start()
 
         self.mock_session_id = '0123456789abcdef'
         self.mock_create_response = {
@@ -399,9 +398,8 @@ class TestBOSSessionThread(unittest.TestCase):
                 'row.'.format(bos_thread.max_consec_fails + 1)
             )
 
-    def test_create_session_bos_v1(self):
+    def test_create_session(self):
         """Test create_session method of BOSSessionThread."""
-        self.mock_get_config_value.return_value = 'v1'
         bos_thread = BOSSessionThread('cle-1.3.0', 'boot')
         bos_thread.create_session()
         self.assertEqual(self.mock_session_id, bos_thread.session_id)
