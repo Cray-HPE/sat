@@ -103,7 +103,7 @@ SAT_CONFIG_SPEC = {
         'api_timeout': OptionSpec(int, 60, None, 'api_timeout'),
     },
     'bos': {
-        'api_version': OptionSpec(str, 'v2', validate_bos_api_version, 'bos_version')
+        'api_version': OptionSpec(str, 'v1', validate_bos_api_version, 'bos_version')
     },
     'bootsys': {
         'max_hsn_states': OptionSpec(int, 10, None, None),
