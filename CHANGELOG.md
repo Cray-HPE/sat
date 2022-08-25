@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The ordering of the bootup sequence of management NCNs in the
   `sat-bootsys(8)` man page was fixed to reflect their correct ordering in the
   `ncn-power` stage of `sat bootsys boot`.
+- Fixed a bug in which giving an invalid subcommand resulted in a traceback
+  on Python 3.9.
 
 ### Security
 - Update the version of paramiko from 2.9.2 to 2.10.1 to mitigate
