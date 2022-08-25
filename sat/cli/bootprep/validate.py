@@ -29,7 +29,7 @@ import pkgutil
 
 from jsonschema import SchemaError
 from jsonschema.validators import validator_for
-from packaging import version
+from semver import VersionInfo
 from yaml import safe_load, YAMLError
 
 from sat.cli.bootprep.constants import DEFAULT_INPUT_SCHEMA_VERSION
@@ -116,17 +116,12 @@ def validate_instance_schema_version(instance, schema_validator):
 
     # No default is needed here because the version property was added to the
     # bootprep_schema.yaml schema file simultaneously with this code.
-    current_version = version.parse(schema_validator.schema['version'])
+    current_version = VersionInfo.parse(schema_validator.schema['version'])
 
     try:
-        instance_version = version.parse(instance_version_str)
+        instance_version = VersionInfo.parse(instance_version_str)
 
-        # LegacyVersion is deprecated (see https://github.com/pypa/packaging/issues/321),
-        # and sometimes invalid versions can parse as "Legacy". To avoid this,
-        # treat LegacyVersions as invalid.
-        if isinstance(instance_version, version.LegacyVersion):
-            raise version.InvalidVersion()
-    except version.InvalidVersion as err:
+    except ValueError as err:
         raise BootPrepValidationError(
             f'Invalid schema version {instance_version_str} specified '
             f'as value of {schema_version_property} property.'

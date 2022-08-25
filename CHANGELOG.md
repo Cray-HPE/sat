@@ -25,10 +25,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.19.1] - 2022-08-26
 
 ### Changed
 - Reverted the default value of the config file option `bos.api_version` to "v1".
+- Shasta Software Recipe version numbers now conform to Semantic Versioning
+  syntax, and version comparisons to determine the latest version are now
+  handled according to Semantic Versioning precedence rules.
 
 ### Fixed
 - The ordering of the bootup sequence of management NCNs in the

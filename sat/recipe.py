@@ -35,7 +35,7 @@ import re
 from tempfile import TemporaryDirectory
 from urllib.parse import ParseResult, urlunparse
 
-from packaging.version import parse as parse_version
+from semver import VersionInfo
 import yaml
 
 from sat.apiclient.vcs import VCSError, VCSRepo
@@ -66,10 +66,13 @@ class HPCSoftwareRecipe:
             version (str): the recipe version string
             vcs_repo (VCSRepo): the VCS repository containing software recipe information
             vcs_branch: the full branch name of the `vcs_repo` that defines this recipe version
+
+        Raises:
+            ValueError: if `version` is not a valid Semantic Version
         """
         # Allows for comparison of two software recipes. Original string can be
         # retrieved by calling `str` on it.
-        self.version = parse_version(version)
+        self.version = VersionInfo.parse(version)
         self.vcs_repo = vcs_repo
         self.vcs_branch = vcs_branch
 
@@ -142,7 +145,11 @@ class HPCSoftwareRecipeCatalog:
 
             branch_name = match.group(1)
             recipe_version = match.group(2)
-            recipes[recipe_version] = HPCSoftwareRecipe(recipe_version, self.vcs_repo, branch_name)
+            try:
+                recipes[recipe_version] = HPCSoftwareRecipe(recipe_version, self.vcs_repo, branch_name)
+            except ValueError:
+                LOGGER.warning('Recipe version "%s" does not conform to semantic versioning syntax; ignoring.',
+                               recipe_version)
 
         return recipes
 
