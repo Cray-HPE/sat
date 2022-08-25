@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -79,10 +79,6 @@ class SATArgParser(ArgumentParser):
 
         else:
             return parsed
-
-    def parse_known_args(self, args=None, namespace=None):
-        self.exit_on_error = False
-        return super().parse_known_args(args=args, namespace=namespace)
 
     def error(self, message):
         """Prints errors based on invalid arguments.
