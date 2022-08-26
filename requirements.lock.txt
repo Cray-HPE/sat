@@ -28,8 +28,7 @@ marshmallow-enum==1.5.1
 mypy-extensions==0.4.3
 natsort==8.1.0
 oauthlib==3.2.0
-packaging==21.3
-paramiko==2.9.2
+paramiko==2.10.1
 parsec==3.5
 prettytable==0.7.2
 pyasn1==0.4.8
@@ -45,6 +44,7 @@ requests==2.27.1
 requests-oauthlib==1.3.1
 rsa==4.8
 s3transfer==0.5.2
+semver==2.13.0
 six==1.16.0
 sseclient-py==1.7.2
 toml==0.10.0

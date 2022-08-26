@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -430,6 +430,27 @@ class DependencyGroupMember(abc.ABC):
         self.dependencies.add(dependency)
         # dependency has self as a dependent
         dependency.dependents.add(self)
+
+    def remove_dependency(self, dependency):
+        """Remove an item as a direct dependency.
+
+        Ignore items which are not a direct dependency of this item.
+
+        Args:
+            dependency (DependencyGroupMember): an item upon which this item
+                should no longer depend.
+        """
+        try:
+            self.dependencies.remove(dependency)
+        except KeyError:
+            LOGGER.debug(f'No dependency to remove: {self} does not depend on '
+                         f'{dependency}.')
+
+        try:
+            dependency.dependents.remove(self)
+        except KeyError:
+            LOGGER.debug(f'No dependent to remove: {dependency} does not have '
+                         f'{self} as a dependent.')
 
     def depends_on(self, other, dependency_chain=None):
         """Return a chain of dependencies if this item depends on the other item.

@@ -108,6 +108,9 @@ class BaseInputImage(DependencyGroupMember, ABC):
         # Populated by add_images_to_delete method
         self.image_ids_to_delete = []
 
+        # Set to true if the image already exists and should be skipped
+        self.skip = False
+
         # Set in begin_image_create and begin_image_configure
         self.image_create_job = None
         self.finished_job_details = None
@@ -325,7 +328,11 @@ class BaseInputImage(DependencyGroupMember, ABC):
         if self.base_is_recipe:
             return self.ims_resultant_image_id
         # Otherwise, we just configure the base image
-        return self.ims_base['id']
+        try:
+            return self.ims_base['id']
+        except KeyError:
+            # This should not happen, but guard against it just in case.
+            raise ImageCreateError(f'Unable to get id of base image for {self}.')
 
     def log_created_image_info(self):
         """Log information about the created image
@@ -699,16 +706,23 @@ class DependentInputImage(BaseInputImage):
     @provides_context('base')
     def ims_base(self):
         """dict: the data for the base IMS recipe or image to build and/or customize"""
-        # The base image must be created first before calling this function
-        base_image_id = self.ref_input_image.final_image_id
-        if base_image_id is None:
-            # There is no image yet to query from IMS.
+        base_image_name = None
+        base_image_id = None
+        if self.ref_input_image.skip:
+            # There is an existing image with the same name that should be used
+            base_image_name = self.ref_input_image.name
+        elif self.ref_input_image.final_image_id is not None:
+            # The image has been created already
+            base_image_id = self.ref_input_image.final_image_id
+        else:
+            # The image has not yet been created, but at least get its name
             return {'name': self.ref_input_image.name}
 
         resource_type = self.base_resource_type
         try:
+            # Either base_image_name or base_image_id will not be None
             matching_base_resources = self.ims_client.get_matching_resources(
-                resource_type, resource_id=base_image_id
+                resource_type, resource_id=base_image_id, name=base_image_name
             )
         except APIError as err:
             raise ImageCreateError(err)
