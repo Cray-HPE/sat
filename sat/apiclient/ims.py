@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -175,8 +175,10 @@ class IMSClient(APIGatewayClient):
 
         if resource_type is None:
             self._cached_resources = {}
-        elif resource_type in self._cached_resources:
-            del self._cached_resources[resource_type]
+        else:
+            plural_resource = self.inflector.plural(resource_type)
+            if plural_resource in self._cached_resources:
+                del self._cached_resources[plural_resource]
 
     def get_matching_resources(self, resource_type, resource_id=None, **kwargs):
         """Get the resource(s) matching the given type and id or name.

@@ -208,7 +208,15 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
         return input_images
     elif skip:
         LOGGER.info(msg_template, {'action': 'skipped'})
-        LOGGER.info('Any images which depend on these images will also be skipped.')
+
+        # Remove already existing images as dependencies of other images. They can be built right away
+        for existing_image in existing_input_images:
+            existing_image.skip = True
+            for image in input_images:
+                if existing_image in image.dependencies:
+                    LOGGER.debug(f'Removing skipped, already existing {existing_image} '
+                                 f'from dependencies of {image}.')
+                    image.remove_dependency(existing_image)
 
         # Create all images that do not already exist
         return [image for image in input_images if image.name not in existing_input_names]

@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ncn-power` stage of `sat bootsys boot`.
 - Fixed a bug in which giving an invalid subcommand resulted in a traceback
   on Python 3.9.
+- Fixed a bug in `sat bootprep` that caused dependent images to be skipped when
+  an existing image that is used as the base of another image is skipped.
 
 ### Security
 - Update the version of paramiko from 2.9.2 to 2.10.1 to mitigate
