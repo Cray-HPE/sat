@@ -28,7 +28,7 @@ Unit tests for sat.recipe module.
 from unittest.mock import Mock, PropertyMock, patch
 import unittest
 
-from packaging import version
+from semver import VersionInfo
 
 from sat.apiclient.vcs import VCSError
 from sat.recipe import (
@@ -46,8 +46,8 @@ class TestRecipeVersioning(unittest.TestCase):
 
     def test_rc_version_is_older(self):
         """Test that release candidate recipe versions come first in ordering"""
-        rc = HPCSoftwareRecipe('22.09rc1', 'repo_path', 'repo_branch')
-        release = HPCSoftwareRecipe('22.09', 'repo_path', 'repo_branch')
+        rc = HPCSoftwareRecipe('22.9.0-rc.1', 'repo_path', 'repo_branch')
+        release = HPCSoftwareRecipe('22.9.0', 'repo_path', 'repo_branch')
         self.assertLess(rc, release)
 
 
@@ -62,7 +62,9 @@ class TestHPCSoftwareRecipeCatalog(unittest.TestCase):
 
         self.mock_vcs_repo_cls = patch('sat.recipe.VCSRepo').start()
         self.mock_vcs_repo = self.mock_vcs_repo_cls.return_value
-        self.recipe_versions = ['22.03', '22.06', '22.06.1', '22.07.0', '22.07.1']
+        self.good_versions = ['22.3.0', '22.6.0', '22.6.1', '22.7.0', '22.7.1']
+        self.bad_versions = ['22.09', '22.11.dev12']
+        self.recipe_versions = self.good_versions + self.bad_versions
         self.short_branch_names = [
             # These branches follow the expected release branch format
             f'{HPC_SOFTWARE_RECIPE_REPO_ORG}/{HPC_SOFTWARE_RECIPE_REPO_NAME}/{recipe_version}'
@@ -88,14 +90,18 @@ class TestHPCSoftwareRecipeCatalog(unittest.TestCase):
         """Test the recipes property of HPCSoftwareRecipeCatalog"""
         recipe_catalog = HPCSoftwareRecipeCatalog()
 
-        self.assertEqual(len(self.recipe_versions), len(recipe_catalog.recipes))
-        for recipe_version in self.recipe_versions:
+        self.assertEqual(len(self.good_versions), len(recipe_catalog.recipes))
+        for recipe_version in self.good_versions:
             self.assertIn(recipe_version, recipe_catalog.recipes)
             recipe = recipe_catalog.recipes[recipe_version]
-            self.assertEqual(version.parse(recipe_version), recipe.version)
+            self.assertEqual(VersionInfo.parse(recipe_version), recipe.version)
             self.assertEqual(f'cray/hpc-shasta-software-recipe/{recipe_version}',
                              recipe.vcs_branch)
             self.assertEqual(self.mock_vcs_repo, recipe.vcs_repo)
+
+    def test_recipes_with_bad_versions_missing(self):
+        """Test that versions with invalid versions are not included in the catalog"""
+        self.assertFalse(set(self.bad_versions).intersection(set(HPCSoftwareRecipeCatalog().recipes)))
 
     def test_recipes_property_vcs_error(self):
         """Test the recipes property when there is an error accessing VCS."""
@@ -109,8 +115,8 @@ class TestHPCSoftwareRecipeCatalog(unittest.TestCase):
     def test_get_recipe_version(self):
         """Test the get_recipe_version method of HPCSoftwareRecipeCatalog."""
         recipe_catalog = HPCSoftwareRecipeCatalog()
-        recipe = recipe_catalog.get_recipe_version(self.recipe_versions[0])
-        self.assertEqual(version.parse(self.recipe_versions[0]), recipe.version)
+        recipe = recipe_catalog.get_recipe_version(self.good_versions[0])
+        self.assertEqual(VersionInfo.parse(self.good_versions[0]), recipe.version)
 
     def test_get_recipe_version_unknown_version(self):
         """Test the get_recipe_version method of HPCSoftwareRecipeCatalog with an unknown version."""
@@ -124,7 +130,7 @@ class TestHPCSoftwareRecipeCatalog(unittest.TestCase):
         """Test the get_latest_version method of HPCSoftwareRecipeCatalog."""
         recipe_catalog = HPCSoftwareRecipeCatalog()
         recipe = recipe_catalog.get_latest_version()
-        self.assertEqual(version.parse(self.recipe_versions[-1]), recipe.version)
+        self.assertEqual(VersionInfo.parse(self.good_versions[-1]), recipe.version)
 
     def test_get_latest_version_no_recipes(self):
         """Test the get_latest_version method of HPCSoftwareRecipeCatalog when non are available."""
