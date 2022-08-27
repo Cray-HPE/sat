@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -49,6 +49,14 @@ LOGGER = logging.getLogger(__name__)
 
 ERR_SLS_API_FAILED = 1
 ERR_HSM_API_FAILED = 2
+
+
+def _convert_chassis_bmc_xname(sls_hardware):
+    sls_type = sls_hardware.get('TypeString')
+    xname = sls_hardware.get('Xname')
+    if sls_type == 'ChassisBMC' and not re.match(r'^.*b\d+$', xname):
+        return xname + 'b0'
+    return xname
 
 
 def create_hw_component_dict(xname, hw_type, hw_class, hw_role, hw_subrole):
@@ -105,8 +113,7 @@ def create_sls_hw_component_dicts(hardware, include_types):
     sls_class = hardware.get('Class', MISSING_VALUE)
     if sls_type in include_types:
         # Add b0 to xname if the ChassisBMC xname does not end in b followed by a digit
-        if sls_type == 'ChassisBMC' and not re.match(r'^.*b\d+$', xname):
-            xname = xname + 'b0'
+        xname = _convert_chassis_bmc_xname(hardware)
         extra = hardware.get('ExtraProperties', {})
         sls_role = extra.get('Role', MISSING_VALUE)
         sls_subrole = extra.get('SubRole', MISSING_VALUE)
@@ -115,7 +122,8 @@ def create_sls_hw_component_dicts(hardware, include_types):
             sls_type,
             sls_class,
             sls_role,
-            sls_subrole)
+            sls_subrole
+        )
 
     # In SLS, there is no NodeBMC value for TypeString
     # The NodeBMC data is created from the SLS data returned for TypeString="Node"
@@ -162,7 +170,7 @@ def create_sls_hw_to_check(sls_hardware, include_types):
     for hardware in sls_hardware.values():
         hw_info, parent_hw_info = create_sls_hw_component_dicts(hardware, include_types)
         if hw_info:
-            xname = hardware.get('Xname')
+            xname = _convert_chassis_bmc_xname(hardware)
             if xname:
                 sls_hw_to_check[xname] = hw_info
         if parent_hw_info:
