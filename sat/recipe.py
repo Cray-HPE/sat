@@ -43,7 +43,7 @@ from sat.cached_property import cached_property
 from sat.config import get_config_value
 
 HPC_SOFTWARE_RECIPE_REPO_ORG = 'cray'
-HPC_SOFTWARE_RECIPE_REPO_NAME = 'hpc-shasta-software-recipe'
+HPC_SOFTWARE_RECIPE_REPO_NAME = 'hpc-csm-software-recipe'
 HPC_SOFTWARE_RECIPE_REPO_PATH = f'/vcs/{HPC_SOFTWARE_RECIPE_REPO_ORG}/{HPC_SOFTWARE_RECIPE_REPO_NAME}.git'
 # Be generous with what is allowed after cray/hpc-software-recipe/
 HPC_SOFTWARE_RECIPE_RELEASE_REGEX = rf'refs/heads/(cray/{HPC_SOFTWARE_RECIPE_REPO_NAME}/(.+))'
