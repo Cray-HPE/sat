@@ -25,6 +25,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.19.2] - 2022-08-30
+
+### Changed
+- Changed the name of the VCS repository containing the `product_vars.yaml`
+  file from `hpc-shasta-software-recipe` to `hpc-csm-software-recipe`.
+
 ## [3.19.1] - 2022-08-26
 
 ### Changed
