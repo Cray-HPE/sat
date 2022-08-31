@@ -95,7 +95,7 @@ class TestHPCSoftwareRecipeCatalog(unittest.TestCase):
             self.assertIn(recipe_version, recipe_catalog.recipes)
             recipe = recipe_catalog.recipes[recipe_version]
             self.assertEqual(VersionInfo.parse(recipe_version), recipe.version)
-            self.assertEqual(f'cray/hpc-shasta-software-recipe/{recipe_version}',
+            self.assertEqual(f'cray/hpc-csm-software-recipe/{recipe_version}',
                              recipe.vcs_branch)
             self.assertEqual(self.mock_vcs_repo, recipe.vcs_repo)
 
