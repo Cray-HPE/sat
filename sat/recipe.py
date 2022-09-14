@@ -35,10 +35,10 @@ import re
 from tempfile import TemporaryDirectory
 from urllib.parse import ParseResult, urlunparse
 
+from csm_api_client.service.vcs import VCSError, VCSRepo
 from semver import VersionInfo
 import yaml
 
-from sat.apiclient.vcs import VCSError, VCSRepo
 from sat.cached_property import cached_property
 from sat.config import get_config_value
 

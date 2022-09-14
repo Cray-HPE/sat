@@ -25,14 +25,16 @@
 Client for querying the API gateway.
 """
 # Import these names so that they can still be imported from the apiclient package directly
+
+from csm_api_client.service.cfs import CFSClient
+from csm_api_client.service.gateway import APIError, APIGatewayClient, ReadTimeout
+from csm_api_client.service.hsm import HSMClient
+
 from sat.apiclient.bos import BOSV1Client
 from sat.apiclient.capmc import CAPMCClient, CAPMCError
-from sat.apiclient.cfs import CFSClient
 from sat.apiclient.fabric import FabricControllerClient
 from sat.apiclient.fas import FASClient
 from sat.apiclient.fox import FoxClient
-from sat.apiclient.gateway import APIError, APIGatewayClient, ReadTimeout
-from sat.apiclient.hsm import HSMClient
 from sat.apiclient.ims import IMSClient
 from sat.apiclient.sls import SLSClient
 from sat.apiclient.telemetry import TelemetryAPIClient

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -30,13 +30,12 @@ from datetime import datetime
 import json
 import logging
 import unittest
-from unittest.mock import call, Mock, patch
+from unittest.mock import Mock, call, patch
 
 from sat.apiclient import APIError, APIGatewayClient
-from sat.apiclient.fas import _DateTimeEncoder, FASClient, _now_and_later
+from sat.apiclient.fas import FASClient, _DateTimeEncoder, _now_and_later
 from sat.xname import XName
 from tests.test_util import ExtendedTestCase
-
 
 FAS_FIRMWARE_DEVICES = {
     'full_snap': {
@@ -112,7 +111,8 @@ class TestFASClient(ExtendedTestCase):
 
     def setUp(self):
         """Set up some mocks."""
-        self.fas_client = FASClient(session=Mock(), host=Mock(), cert_verify=True)
+        self.mock_session = Mock()
+        self.fas_client = FASClient(self.mock_session)
         self.fas_firmware_devices = copy.deepcopy(FAS_FIRMWARE_DEVICES)
         self.fas_snapshots = {'snapshots': [{'name': name} for name in self.fas_firmware_devices]}
         self.fas_actions = copy.deepcopy(FAS_ACTIONS)

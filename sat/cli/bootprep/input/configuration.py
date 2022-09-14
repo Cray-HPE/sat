@@ -29,8 +29,8 @@ import logging
 from urllib.parse import urlparse, urlunparse
 
 from cray_product_catalog.query import ProductCatalogError
+from csm_api_client.service.vcs import VCSError, VCSRepo
 
-from sat.apiclient.vcs import VCSError, VCSRepo
 from sat.cached_property import cached_property
 from sat.cli.bootprep.constants import LATEST_VERSION_VALUE
 from sat.cli.bootprep.errors import ConfigurationCreateError

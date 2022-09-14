@@ -30,10 +30,11 @@ from collections import defaultdict
 import logging
 from urllib.parse import urlparse
 
+from csm_api_client.service.cfs import CFSClient
+from csm_api_client.service.gateway import APIError
+from csm_api_client.service.hsm import HSMClient
+
 from sat.apiclient.bos import BOSClientCommon
-from sat.apiclient.cfs import CFSClient
-from sat.apiclient.gateway import APIError
-from sat.apiclient.hsm import HSMClient
 from sat.apiclient.ims import IMSClient
 from sat.apiclient.sls import SLSClient
 from sat.config import get_config_value

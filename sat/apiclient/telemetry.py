@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@ Client for querying the Cray Shasta Telemetry API
 """
 import logging
 
-from sat.apiclient.gateway import APIError, APIGatewayClient, ReadTimeout
+from csm_api_client.service.gateway import APIError, APIGatewayClient, ReadTimeout
 
 LOGGER = logging.getLogger(__name__)
 

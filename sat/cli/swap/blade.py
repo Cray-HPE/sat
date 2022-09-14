@@ -33,19 +33,16 @@ import json
 import logging
 import warnings
 
-from kubernetes.client.exceptions import ApiException
-from kubernetes.client import CoreV1Api
-from kubernetes.config import (
-    ConfigException,
-    load_kube_config
-)
+from csm_api_client.service.gateway import APIError
+from csm_api_client.service.hsm import HSMClient
 import inflect
+from kubernetes.client import CoreV1Api
+from kubernetes.client.exceptions import ApiException
+from kubernetes.config import ConfigException, load_kube_config
 from yaml import YAMLLoadWarning
 
-from sat.cached_property import cached_property
 from sat.apiclient.capmc import CAPMCClient
-from sat.apiclient.gateway import APIError
-from sat.apiclient.hsm import HSMClient
+from sat.cached_property import cached_property
 from sat.hms_discovery import (
     HMSDiscoveryCronJob,
     HMSDiscoveryError,
@@ -56,7 +53,6 @@ from sat.session import SATSession
 from sat.util import prompt_continue
 from sat.waiting import GroupWaiter, WaitingFailure
 from sat.xname import XName
-
 
 LOGGER = logging.getLogger(__name__)
 inf = inflect.engine()
