@@ -346,12 +346,15 @@ def validate_image_configurations(input_images, cfs_client, input_config_names, 
         if dry_run and image.configuration in input_config_names:
             continue
 
-        try:
-            cfs_client.get_configuration(image.configuration)
-        except APIError as err:
-            # TODO: should probably differentiate between 404 Not Found and other errors
+        resp = cfs_client.get('configurations', image.configuration, raise_not_ok=False)
+        if not resp.ok:
+            if resp.status_code == 404:
+                LOGGER.error('Configuration %s not found for image %s',
+                             image.configuration, image.name)
+            else:
+                LOGGER.error('Could not query configuration %s for image %s: %s',
+                             image.configuration, image.name, resp.reason)
             failed_images.append(image)
-            LOGGER.error(f'Invalid configuration specified for image {image.name}: {err}')
 
     if failed_images:
         raise ImageCreateError(f'Failed to validate CFS configuration for {len(failed_images)} '

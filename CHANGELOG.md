@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored to use common `APIGatewayClient`, `CFSClient`, `HSMClient`, and
   `VCSRepo` classes and associated exception classes and utility functions from
   the new `csm-api-client` Python library.
+- New common functionality in `csm-api-client` is now used to differentiate 404
+  errors to provided better error messages and clearer semantics in `sat swap
+  blade` and `sat bootprep`.
 
 ## [3.19.3] - 2022-09-29
 

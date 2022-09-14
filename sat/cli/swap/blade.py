@@ -248,18 +248,19 @@ class RedfishEndpointDiscoveryWaiter(GroupWaiter):
         return f'slots {", ".join(self.members)} populated'
 
     def member_has_completed(self, member):
-        try:
-            endpoint = self.hsm_client.get_redfish_endpoint_inventory(member)
-            if not endpoint:
-                raise WaitingFailure(f'No Redfish endpoint found for {member}')
-            return endpoint['DiscoveryInfo']['LastDiscoveryStatus'] == 'DiscoverOK'
-        except APIError as err:
-            # TODO: Should probably be a better way to determine cause of
-            # failure -- it is assumed that members are guaranteed to be valid
-            # RedfishEndpoints so if an invalid xname is given it will time out
-            # instead of giving a proper error
-            if not any('404' in arg for arg in err.args):
-                raise WaitingFailure(f'Could not query Redfish endpoint for {member}: {err}')
+        resp = self.hsm_client.get('Inventory', 'RedfishEndpoints', member, raise_not_ok=False)
+        # Missing endpoints may have not been discovered yet, in which case
+        # querying their xnames will simply return a 404.
+        if not resp.ok:
+            if resp.status_code != 404:
+                raise WaitingFailure(f'Could not query Redfish endpoint for {member}: {resp.reason}')
+            else:
+                return False
+
+        endpoint = resp.json()
+        if not endpoint:
+            raise WaitingFailure(f'No Redfish endpoint found for {member}')
+        return endpoint['DiscoveryInfo']['LastDiscoveryStatus'] == 'DiscoverOK'
 
 
 class SwapOutProcedure(BladeSwapProcedure):
