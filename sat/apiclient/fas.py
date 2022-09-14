@@ -25,7 +25,6 @@
 Client for querying the Firmware Action Service (FAS) API.
 """
 from datetime import datetime, timedelta
-import json
 import logging
 import time
 
@@ -49,18 +48,6 @@ def _now_and_later(minutes):
     now = datetime.utcnow().replace(microsecond=0)
     later = now + timedelta(minutes=minutes)
     return now, later
-
-
-class _DateTimeEncoder(json.JSONEncoder):
-    """For encoding datetimes in JSON compatible with the FAS.
-
-    Only works with times in UTC.
-    """
-    def default(self, o):
-        if isinstance(o, datetime):
-            return o.isoformat() + 'Z'
-
-        return json.JSONEncoder.default(self, o)
 
 
 class FASClient(APIGatewayClient):
@@ -338,13 +325,11 @@ class FASClient(APIGatewayClient):
         )
 
         # create a system snapshot set to expire in 10 minutes
-        payload = {'name': name, 'expirationTime': later}
+        payload = {'name': name, 'expirationTime': later.isoformat() + 'Z'}
 
         # filter on xnames if provided.
         if xnames:
             payload['stateComponentFilter'] = {'xnames': xnames}
-
-        payload = json.dumps(payload, cls=_DateTimeEncoder)
 
         try:
             self.post('snapshots', payload=payload)

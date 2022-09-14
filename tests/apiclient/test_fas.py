@@ -27,13 +27,12 @@ Unit tests for sat.apiclient.fas
 
 import copy
 from datetime import datetime
-import json
 import logging
 import unittest
 from unittest.mock import Mock, call, patch
 
 from sat.apiclient import APIError, APIGatewayClient
-from sat.apiclient.fas import FASClient, _DateTimeEncoder, _now_and_later
+from sat.apiclient.fas import FASClient, _now_and_later
 from sat.xname import XName
 from tests.test_util import ExtendedTestCase
 
@@ -442,8 +441,7 @@ class TestFASClient(ExtendedTestCase):
 
         exp_name = 'SAT-{}-{}-{}-{}-{}-{}'.format(
             now.year, now.month, now.day, now.hour, now.minute, now.second)
-        exp_payload = {'name': exp_name, 'expirationTime': later}
-        exp_payload = json.dumps(exp_payload, cls=_DateTimeEncoder)
+        exp_payload = {'name': exp_name, 'expirationTime': later.isoformat() + 'Z'}
 
         self.assertEqual(expected, actual)
         self.mock_post.assert_called_once_with('snapshots', payload=exp_payload)
@@ -486,9 +484,10 @@ class TestFASClient(ExtendedTestCase):
         exp_name = 'SAT-{}-{}-{}-{}-{}-{}'.format(
             now.year, now.month, now.day, now.hour, now.minute, now.second)
         exp_payload = {
-            'name': exp_name, 'expirationTime': later, 'stateComponentFilter': {'xnames': [xname_to_query]}
+            'name': exp_name,
+            'expirationTime': later.isoformat() + 'Z',
+            'stateComponentFilter': {'xnames': [xname_to_query]}
         }
-        exp_payload = json.dumps(exp_payload, cls=_DateTimeEncoder)
 
         self.assertEqual(expected, actual)
         self.mock_post.assert_called_once_with('snapshots', payload=exp_payload)

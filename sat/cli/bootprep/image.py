@@ -330,7 +330,7 @@ def validate_image_configurations(input_images, cfs_client, input_config_names, 
     Args:
         input_images (list of sat.cli.bootprep.input.image.InputImage): the
             IMSImages which should have their configurations validated.
-        cfs_client (sat.apiclient.CFSClient): the CFS client to query to
+        cfs_client (csm_api_client.service.cfs.CFSClient): the CFS client to query to
             determine whether the configuration for the image exists.
         input_config_names (list of str): the list of configuration names that
             are defined in the input file

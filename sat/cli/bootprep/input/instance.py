@@ -40,7 +40,7 @@ class InputInstance:
         Args:
             instance_dict (dict): the instance from the input file. This assumes
                 the instance has already been validated against the schema.
-            cfs_client (sat.apiclient.CFSClient): the CFS API client to make
+            cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client to make
                 requests to the CFS API
             ims_client (sat.apiclient.IMSClient): the IMS API client to make
                 requests to the IMS API
