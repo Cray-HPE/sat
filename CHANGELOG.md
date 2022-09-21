@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added new command `jobstat`, which provides system-wide view of application
+  status data.
 ### Changed
 - Updated the README file to remove outdated information.
 
