@@ -41,7 +41,7 @@ $schema: "https://json-schema.org/draft/2020-12/schema"
 # ... patch component when all input files that were valid under the old schema
 #     are still valid under the new schema
 #
-version: '1.0.2'
+version: '1.0.3'
 title: Bootprep Input File
 description: >
   A description of the set of CFS configurations to create, the set of IMS
@@ -80,7 +80,7 @@ properties:
         current version.
 
       - If the input version matches the current version, it is compatible.
-    default: '1.0.3'
+    default: '1.0.0'
     type: string
 
   configurations:

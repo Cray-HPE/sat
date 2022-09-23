@@ -40,7 +40,7 @@ LOGGER = logging.getLogger(__name__)
 # The path to the bootprep schema file, relative to the top level of the sat
 # package. Note that the file is in a YAML format, but it defines a schema using
 # the JSON Schema standard.
-SCHEMA_FILE_RELATIVE_PATH = 'data/schema/bootprep_schema.yaml'
+SCHEMA_FILE_RELATIVE_PATH = 'cli/bootprep/data/schema/bootprep_schema.yaml'
 
 
 def load_and_validate_schema():

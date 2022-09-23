@@ -1,0 +1,92 @@
+#
+# MIT License
+#
+# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included
+# in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#
+---
+schema_version: {{ schema_version }}
+
+# Throughout this file, PRODUCT is used as a placeholder for the name of a product.
+# Wherever it is used, it should be replaced with the real name of a product as it
+# is stored in the product catalog, for example cos for the Cray Operating System (COS)
+# product.
+
+{% if include_configurations %}
+configurations:
+- name: compute-{% raw %}{{recipe.version}}{% endraw %}
+  description: CFS configuration for compute nodes
+  layers:
+  - name: {% raw %}PRODUCT-{{PRODUCT.version}}{% endraw %}
+    product:
+      name: PRODUCT
+      version: {% raw %}"{{PRODUCT.version}}"{% endraw %}
+      branch: integration-{% raw %}{{PRODUCT.version}}{% endraw %}
+  - name: custom-git-layer
+    git:
+      url: https://api-gw-service-nmn.local/vcs/cray/custom-config-management.git
+      branch: integration
+{% endif %}
+
+{% if include_images %}
+images:
+
+# An image created from a recipe provided by the product with name PRODUCT
+- name: {% raw %}"{{base.name}}"{% endraw %}
+  ref_name: base_PRODUCT_image
+  base:
+    product:
+      name: PRODUCT
+      version: {% raw %}"{{PRODUCT.version}}"{% endraw %}
+      type: recipe
+
+# An image created by customizing the previously defined image with the
+# configuration defined under the "configurations" key above.
+- name: compute-{% raw %}{{base.name}}{% endraw %}
+  ref_name: compute_PRODUCT_image
+  base:
+    image_ref: base_PRODUCT_image
+  configuration: compute-{% raw %}{{recipe.version}}{% endraw %}
+  configuration_group_names:
+  - Compute
+
+# An image created by building an IMS image from a named IMS recipe and then
+# customized using a configuration named "uan"
+- name: other-customized-image
+  base:
+    ims:
+      name: name-of-image-recipe-from-ims
+      type: recipe
+  configuration: uan
+  configuration_group_names:
+  - Application
+  - Application_UAN
+{% endif %}
+
+{% if include_session_templates %}
+session_templates:
+- name: compute-{% raw %}{{recipe.version}}{% endraw %}
+  image:
+    image_ref: compute_PRODUCT_image
+  bos_parameters:
+    boot_sets:
+      compute:
+        ...
+{% endif %}
