@@ -49,10 +49,6 @@ class JobstatClient(APIGatewayClient):
         err_prefix = 'Failed to get State Checker data'
         try:
             response = self.get('all').json()
-            # TODO: determine if this extra error handling can be removed,
-            #   if the state checker service will conform to RFC7807 standards.
-            if 'errorcode' in response and response['errorcode']:
-                raise APIError(response.get('errormessage', 'unknown error'))
             return response['jobstat']
         except APIError as err:
             raise APIError(f'{err_prefix}: {err}')

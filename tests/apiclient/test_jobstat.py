@@ -101,16 +101,6 @@ class TestJobstatClient(unittest.TestCase):
         actual = self.jobstat_client.get_all()
         self.assertEqual(expected, actual)
 
-    def test_error_case(self):
-        """Test a case when the jobstat service returns an error."""
-        # This was the error behavior from the jobstat service when the jobstat
-        # command was added, but in the future it may change to use RFC7807 format.
-        self.mock_response['errorcode'] = 4
-        self.mock_response['errormessage'] = 'task failed'
-        self.mock_response['jobstat'] = []
-        with self.assertRaisesRegex(APIError, r'Failed to get State Checker data: task failed'):
-            self.jobstat_client.get_all()
-
     def test_no_data(self):
         """Test the case when the API unexpectedly returns no data."""
         self.mock_get.return_value.json.return_value = {}
