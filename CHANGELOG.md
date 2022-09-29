@@ -29,9 +29,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Updated the README file to remove outdated information.
+- Removed the HTTP timeout from the IMSClient instance used in
+  `sat bootprep` to address slow IMS delete requests.
 
 ### Removed
 - Removed the `cray-sat` spec file from the repository.
+
+### Fixed
+- Fixed an issue where `sat bootprep` would sometimes fail to rename
+  large images.
 
 ### Security
 - Update the version of oauthlib from 3.2.0 to 3.2.1 to address
