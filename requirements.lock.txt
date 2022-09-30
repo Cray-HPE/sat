@@ -27,7 +27,7 @@ marshmallow==3.14.1
 marshmallow-enum==1.5.1
 mypy-extensions==0.4.3
 natsort==8.1.0
-oauthlib==3.2.0
+oauthlib==3.2.1
 paramiko==2.10.1
 parsec==3.5
 prettytable==0.7.2

@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed the `cray-sat` spec file from the repository.
 
+### Security
+- Update the version of oauthlib from 3.2.0 to 3.2.1 to address
+  CVE-2022-36087.
+
 ## [3.19.2] - 2022-08-30
 
 ### Changed
