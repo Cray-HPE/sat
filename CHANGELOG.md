@@ -25,6 +25,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.19.3] - 2022-09-29
+
+### Changed
+- Updated the README file to remove outdated information.
+- Removed the HTTP timeout from the IMSClient instance used in
+  `sat bootprep` to address slow IMS delete requests.
+
+### Removed
+- Removed the `cray-sat` spec file from the repository.
+
+### Fixed
+- Fixed an issue where `sat bootprep` would sometimes fail to rename
+  large images.
+
+### Security
+- Update the version of oauthlib from 3.2.0 to 3.2.1 to address
+  CVE-2022-36087.
+
 ## [3.19.2] - 2022-08-30
 
 ### Changed
