@@ -11,6 +11,7 @@ click==8.0.4
 cray-product-catalog==1.6.0
 croniter==0.3.37
 cryptography==36.0.1
+csm-api-client==1.0.0
 dataclasses-json==0.5.6
 google-auth==2.6.0
 htmlmin==0.1.12

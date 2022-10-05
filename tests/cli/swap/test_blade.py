@@ -32,11 +32,11 @@ import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
+from csm_api_client.service.gateway import APIError
+from csm_api_client.service.hsm import HSMClient
 from kubernetes.client.exceptions import ApiException
 
 from sat.apiclient.capmc import CAPMCClient
-from sat.apiclient.gateway import APIError
-from sat.apiclient.hsm import HSMClient
 from sat.cli.swap.blade import (
     blade_swap_stage,
     BladeSwapError,

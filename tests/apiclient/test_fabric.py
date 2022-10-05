@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -37,8 +37,6 @@ class TestFabricControllerClient(ExtendedTestCase):
     """Tests for the APIGatewayClient class: Fabric Controller client."""
 
     def setUp(self):
-        mock.patch('sat.apiclient.gateway.get_config_value').start()
-
         self.mock_port_sets = {
             'fabric-ports': {'ports': ['x3000c0r24j4p0', 'x3000c0r24j4p1']},
             'edge-ports': {'ports': ['x3000c0r24j8p0', 'x3000c0r24j8p1']}
@@ -79,7 +77,8 @@ class TestFabricControllerClient(ExtendedTestCase):
 
         self.mock_fc_get = mock.patch.object(APIGatewayClient, 'get', mock_fc_get).start()
 
-        self.fabric_client = FabricControllerClient()
+        self.mock_session = mock.MagicMock()
+        self.fabric_client = FabricControllerClient(self.mock_session)
 
         self.fabric_status_fail_msg = 'Failed to get port status for port set fabric-ports'
         self.edge_status_fail_msg = 'Failed to get port status for port set edge-ports'

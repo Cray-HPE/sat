@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -104,10 +104,11 @@ class TestCAPMCClientSetState(ExtendedTestCase):
         self.post_params = {'xnames': self.xnames, 'force': False,
                             'recursive': False, 'prereq': False}
 
+        self.mock_session = mock.MagicMock(host='api-gw-client.local')
         self.mock_post = mock.patch.object(APIGatewayClient, 'post').start()
         self.mock_post.return_value.json.return_value = {'e': 0, 'err_msg': '', 'xnames': []}
 
-        self.capmc_client = CAPMCClient()
+        self.capmc_client = CAPMCClient(self.mock_session)
 
     def tearDown(self):
         mock.patch.stopall()
@@ -180,6 +181,7 @@ class TestCAPMCClientGetState(ExtendedTestCase):
         self.xnames = ['x1000c0s0b0n0', 'x1000c0s1b0n0']
         self.post_params = {'xnames': self.xnames}
 
+        self.mock_session = mock.MagicMock(host='api-gw-host.local')
         self.mock_post = mock.patch.object(APIGatewayClient, 'post').start()
         self.mock_post.return_value.json.return_value = {
             'e': 0,
@@ -188,7 +190,7 @@ class TestCAPMCClientGetState(ExtendedTestCase):
             'off': self.xnames[1:]
         }
 
-        self.capmc_client = CAPMCClient()
+        self.capmc_client = CAPMCClient(self.mock_session)
 
     def tearDown(self):
         mock.patch.stopall()
@@ -243,12 +245,12 @@ class TestCAPMCClientGetState(ExtendedTestCase):
         expected_msg = (f'Failed to get power state of one or more xnames, e=-1, '
                         f'err_msg="{err_msg}". xnames with undefined power state: '
                         f'{", ".join(self.xnames)}')
-        capmc_client = CAPMCClient(suppress_warnings=True)
+        capmc_client = CAPMCClient(self.mock_session, suppress_warnings=True)
         with self.assertLogs(level=logging.DEBUG) as cm:
             capmc_client.get_xnames_power_state(self.xnames)
 
         self.assertEqual(logging.getLevelName(logging.DEBUG), cm.records[0].levelname)
-        self.assertEqual(cm.records[0].message, expected_msg)
+        self.assertEqual(cm.records[-1].message, expected_msg)
 
     def test_get_xname_power_state_success(self):
         """Test get_xname_power_state when there is a single matching state."""

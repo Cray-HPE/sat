@@ -37,13 +37,13 @@ import warnings
 import boto3
 from botocore.exceptions import ClientError
 from boto3.exceptions import Boto3Error
+from csm_api_client.service.gateway import APIError, APIGatewayClient
 from inflect import engine
 from kubernetes.client import ApiException, CoreV1Api
-from kubernetes.config import load_kube_config, ConfigException
+from kubernetes.config import ConfigException, load_kube_config
 from urllib3.exceptions import InsecureRequestWarning
 from yaml import YAMLLoadWarning
 
-from sat.apiclient.gateway import APIGatewayClient, APIError
 from sat.cached_property import cached_property
 from sat.config import get_config_value
 from sat.util import get_val_by_path
@@ -57,8 +57,8 @@ class IMSClient(APIGatewayClient):
     # The bucket for boot images created by IMS
     boot_images_bucket = 'boot-images'
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, session, timeout=None):
+        super().__init__(session, timeout)
         # Dictionary to cache the list of different types of resources from IMS
         self._cached_resources = {}
         self.inflector = engine()

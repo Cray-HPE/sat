@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -24,14 +24,13 @@
 """
 Client for querying the Firmware Action Service (FAS) API.
 """
-import json
+from datetime import datetime, timedelta
 import logging
 import time
-from datetime import datetime, timedelta
 
+from csm_api_client.service.gateway import APIError, APIGatewayClient
 import inflect
 
-from sat.apiclient.gateway import APIGatewayClient, APIError
 from sat.constants import MISSING_VALUE
 from sat.xname import XName
 
@@ -49,18 +48,6 @@ def _now_and_later(minutes):
     now = datetime.utcnow().replace(microsecond=0)
     later = now + timedelta(minutes=minutes)
     return now, later
-
-
-class _DateTimeEncoder(json.JSONEncoder):
-    """For encoding datetimes in JSON compatible with the FAS.
-
-    Only works with times in UTC.
-    """
-    def default(self, o):
-        if isinstance(o, datetime):
-            return o.isoformat() + 'Z'
-
-        return json.JSONEncoder.default(self, o)
 
 
 class FASClient(APIGatewayClient):
@@ -338,13 +325,11 @@ class FASClient(APIGatewayClient):
         )
 
         # create a system snapshot set to expire in 10 minutes
-        payload = {'name': name, 'expirationTime': later}
+        payload = {'name': name, 'expirationTime': later.isoformat() + 'Z'}
 
         # filter on xnames if provided.
         if xnames:
             payload['stateComponentFilter'] = {'xnames': xnames}
-
-        payload = json.dumps(payload, cls=_DateTimeEncoder)
 
         try:
             self.post('snapshots', payload=payload)

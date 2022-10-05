@@ -50,7 +50,7 @@ class InputSessionTemplate(BaseInputItem):
             requests to the BOS API
         ims_client (sat.apiclient.IMSClient): the IMS API client to make
             requests to the IMS API
-        cfs_client (sat.apiclient.CFSClient): the CFS API client to make
+        cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client to make
             requests to the CFS API
     """
     description = 'BOS session template'
@@ -70,7 +70,7 @@ class InputSessionTemplate(BaseInputItem):
             jinja_env (jinja2.Environment): the Jinja2 environment in which
                 fields supporting Jinja2 templating should be rendered.
             bos_client (sat.apiclient.BOSClientCommon): the BOS API client
-            cfs_client (sat.apiclient.CFSClient): the CFS API client
+            cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client
             ims_client (sat.apiclient.IMSClient): the IMS API client
             **kwargs: additional keyword arguments
         """
@@ -345,7 +345,7 @@ class InputSessionTemplateCollection(BaseInputItemCollection):
             jinja_env (jinja2.Environment): the Jinja2 environment in which
                 fields supporting Jinja2 templating should be rendered.
             bos_client (sat.apiclient.BOSClientCommon): the BOS API client
-            cfs_client (sat.apiclient.CFSClient): the CFS API client
+            cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client
             ims_client (sat.apiclient.IMSClient): the IMS API client
             **kwargs: additional keyword arguments
         """

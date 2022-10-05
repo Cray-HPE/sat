@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -27,16 +27,14 @@ Unit tests for sat.apiclient.fas
 
 import copy
 from datetime import datetime
-import json
 import logging
 import unittest
-from unittest.mock import call, Mock, patch
+from unittest.mock import Mock, call, patch
 
 from sat.apiclient import APIError, APIGatewayClient
-from sat.apiclient.fas import _DateTimeEncoder, FASClient, _now_and_later
+from sat.apiclient.fas import FASClient, _now_and_later
 from sat.xname import XName
 from tests.test_util import ExtendedTestCase
-
 
 FAS_FIRMWARE_DEVICES = {
     'full_snap': {
@@ -112,7 +110,8 @@ class TestFASClient(ExtendedTestCase):
 
     def setUp(self):
         """Set up some mocks."""
-        self.fas_client = FASClient(session=Mock(), host=Mock(), cert_verify=True)
+        self.mock_session = Mock()
+        self.fas_client = FASClient(self.mock_session)
         self.fas_firmware_devices = copy.deepcopy(FAS_FIRMWARE_DEVICES)
         self.fas_snapshots = {'snapshots': [{'name': name} for name in self.fas_firmware_devices]}
         self.fas_actions = copy.deepcopy(FAS_ACTIONS)
@@ -442,8 +441,7 @@ class TestFASClient(ExtendedTestCase):
 
         exp_name = 'SAT-{}-{}-{}-{}-{}-{}'.format(
             now.year, now.month, now.day, now.hour, now.minute, now.second)
-        exp_payload = {'name': exp_name, 'expirationTime': later}
-        exp_payload = json.dumps(exp_payload, cls=_DateTimeEncoder)
+        exp_payload = {'name': exp_name, 'expirationTime': later.isoformat() + 'Z'}
 
         self.assertEqual(expected, actual)
         self.mock_post.assert_called_once_with('snapshots', payload=exp_payload)
@@ -486,9 +484,10 @@ class TestFASClient(ExtendedTestCase):
         exp_name = 'SAT-{}-{}-{}-{}-{}-{}'.format(
             now.year, now.month, now.day, now.hour, now.minute, now.second)
         exp_payload = {
-            'name': exp_name, 'expirationTime': later, 'stateComponentFilter': {'xnames': [xname_to_query]}
+            'name': exp_name,
+            'expirationTime': later.isoformat() + 'Z',
+            'stateComponentFilter': {'xnames': [xname_to_query]}
         }
-        exp_payload = json.dumps(exp_payload, cls=_DateTimeEncoder)
 
         self.assertEqual(expected, actual)
         self.mock_post.assert_called_once_with('snapshots', payload=exp_payload)
