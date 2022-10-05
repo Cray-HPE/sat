@@ -32,7 +32,12 @@ from sat.cli.bootprep.constants import (
     EXAMPLE_FILE_NAME,
     LATEST_VERSION_VALUE
 )
-from sat.parsergroups import StoreNestedVariable
+from sat.parsergroups import (
+    StoreNestedVariable,
+    create_filter_options,
+    create_format_options,
+)
+
 
 OUTPUT_DIR_OPTION = '--output-dir'
 
@@ -91,6 +96,29 @@ def add_output_dir_option(parser):
     )
 
 
+def add_vars_options(parser):
+    parser.add_argument(
+        '--recipe-version', default=LATEST_VERSION_VALUE,
+        help=f'The HPC software recipe version, e.g. 22.03. This is used to '
+             f'obtain the product versions which can be substituted for variables '
+             f'specified in fields in the input file. If not specified or if '
+             f'"{LATEST_VERSION_VALUE}" is specified, use the latest available HPC '
+             f'software recipe version.'
+    )
+    parser.add_argument(
+        '--vars-file',
+        help='A file containing variables that can be used in fields in the '
+             'input file. Values from this file take precedence over values '
+             'in the HPC Software Recipe defaults.'
+    )
+    parser.add_argument(
+        '--vars', action=StoreNestedVariable,
+        help='Variables that can be used in fields in the input file. Values '
+             'specified here take precedence over values specified in any '
+             '--vars-file or in the HPC software recipe defaults.'
+    )
+
+
 def add_bootprep_subparser(subparsers):
     """Add the bootprep subparser to the parent parser.
 
@@ -117,6 +145,7 @@ def add_bootprep_subparser(subparsers):
     _add_bootprep_generate_docs_subparser(actions_subparsers)
     _add_bootprep_view_schema_subparser(actions_subparsers)
     _add_bootprep_example_subparser(actions_subparsers)
+    _add_bootprep_list_vars_subparser(actions_subparsers)
 
 
 def _add_bootprep_generate_docs_subparser(subparsers):
@@ -220,27 +249,8 @@ def _add_bootprep_run_subparser(subparsers):
         choices=['v1', 'v2'],
         help='The version of the BOS API to use for BOS operations',
     )
-    run_subparser.add_argument(
-        '--recipe-version', default=LATEST_VERSION_VALUE,
-        help=f'The HPC software recipe version, e.g. 22.03. This is used to '
-             f'obtain the product versions which can be substituted for variables '
-             f'specified in fields in the input file. If not specified or if '
-             f'"{LATEST_VERSION_VALUE}" is specified, use the latest available HPC '
-             f'software recipe version.'
-    )
-    run_subparser.add_argument(
-        '--vars-file',
-        help='A file containing variables that can be used in fields in the '
-             'input file. Values from this file take precedence over values '
-             'in the HPC Software Recipe defaults.'
-    )
-    run_subparser.add_argument(
-        '--vars', action=StoreNestedVariable,
-        help='Variables that can be used in fields in the input file. Values '
-             'specified here take precedence over values specified in any '
-             '--vars-file or in the HPC software recipe defaults.'
-    )
 
+    add_vars_options(run_subparser)
     add_skip_and_overwrite_options(run_subparser, 'config', 'configuration')
     add_skip_and_overwrite_options(run_subparser, 'image', 'image')
     add_skip_and_overwrite_options(run_subparser, 'template', 'session template')
@@ -261,3 +271,18 @@ def _add_bootprep_run_subparser(subparsers):
         help=f'The id of the SSH public key stored in IMS to use when building images '
              f'with IMS. {default_behavior}'
     )
+
+
+def _add_bootprep_list_vars_subparser(subparsers):
+    format_options = create_format_options()
+    filter_options = create_filter_options()
+    vars_subparser = subparsers.add_parser(
+        'list-vars',
+        parents=[format_options, filter_options],
+        help='List the variables that may be used in bootprep input file',
+        description='List the variables that are available during variable substitution '
+                    'when processing a bootprep input file. Variables are sourced from '
+                    'vars files and the software recipe.',
+    )
+
+    add_vars_options(vars_subparser)

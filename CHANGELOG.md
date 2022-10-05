@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added a `sat bootprep list-vars` subcommand which lists the variables
+  available in bootprep input files at runtime.
+
 ### Changed
 - Refactored to use common `APIGatewayClient`, `CFSClient`, `HSMClient`, and
   `VCSRepo` classes and associated exception classes and utility functions from

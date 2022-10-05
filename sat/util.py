@@ -548,6 +548,57 @@ def deep_update_dict(original_dict, new_dict):
             original_dict[key] = value
 
 
+def collapse_keys(vars, separator="."):
+    """Convert a nested dict to a flat dict with dot-separated keys.
+
+    For example, given the following input dictionary:
+
+    {
+        "foo": {"bar": "baz"},
+        "quux": {
+            "giblet": {"znurt": "fizzle"},
+            "xyzzy": "fnord"
+        }
+    }
+
+    The following "collapsed" dictionary will be returned:
+
+    {
+        "foo.bar": "baz",
+        "quux.giblet.znurt": "fizzle",
+        "quux.xyzzy": "fnord"
+    }
+
+    Args:
+        vars (dict): A (nested) dictionary of strings mapping to strings
+        separator (str): the separator to use to concated nested keys
+
+    Returns:
+        dict: a "flattened" dictionary in which nested dictionaries' keys are
+            concatenated using the given separator, and the values are the
+            corresponding leaves in the nested dictionary tree
+    """
+    vars_stack = dict(vars)
+    collapsed = {}
+
+    while vars_stack:
+        key, val = vars_stack.popitem()
+        if isinstance(val, dict):
+            for subkey, subval in val.items():
+                push_key = f'{key}{separator}{subkey}'
+                if push_key in vars_stack:
+                    raise ValueError(f'Collapsed dict key conflicts with '
+                                     f'existing input key {push_key}')
+                vars_stack[push_key] = subval
+        else:
+            if key in collapsed:
+                raise ValueError(f'Existing input key {key} conflicts '
+                                 f'with collapsed dict key')
+            collapsed[key] = val
+
+    return collapsed
+
+
 def get_new_ordered_dict(orig_dict, dotted_paths, default_value=None, strip_path=True):
     """Get a new ordered dict from a dict using the given dotted_paths.
 

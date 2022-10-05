@@ -24,12 +24,13 @@
 """
 Classes for managing variables that can be used in bootprep input files.
 """
+from functools import cached_property
 import logging
 import yaml
 
 from sat.cli.bootprep.constants import LATEST_VERSION_VALUE
 from sat.recipe import HPCSoftwareRecipeCatalog, HPCSoftwareRecipeError
-from sat.util import deep_update_dict
+from sat.util import collapse_keys, deep_update_dict
 
 LOGGER = logging.getLogger(__name__)
 
@@ -73,14 +74,18 @@ class VariableContext:
     def load_vars(self):
         """Load variables from the HPC software recipe, vars file, and command-line.
 
+        Variables from the software recipe, vars file, and command line are loaded into
+        the `vars` attribute.
+
         Raises:
             VariableContextError: if there is a failure to load variables from a file.
         """
-        deep_update_dict(self.vars, self.get_hpc_software_recipe_vars())
-        deep_update_dict(self.vars, self.get_file_vars())
+        deep_update_dict(self.vars, self.software_recipe_vars)
+        deep_update_dict(self.vars, self.file_vars)
         deep_update_dict(self.vars, self.cli_vars)
 
-    def get_file_vars(self):
+    @cached_property
+    def file_vars(self):
         """Get variables from the vars file.
 
         Returns:
@@ -112,7 +117,8 @@ class VariableContext:
 
         return file_vars
 
-    def get_hpc_software_recipe_vars(self):
+    @cached_property
+    def software_recipe_vars(self):
         """Get variables from the HPC software recipe.
 
         Returns:
@@ -134,3 +140,27 @@ class VariableContext:
                 f'{self.recipe_version}: {err}'
             )
             return {}
+
+    def enumerate_vars_and_sources(self):
+        """Generate 3-tuples of variable names, values, and sources
+
+        Yields:
+            (name: str, value: str, source: str):
+                name: dot-separated variable name
+                value: value of variable
+                source: "--vars", vars file path, or "recipe ..."
+        """
+        var_attr_by_source = {
+            f'--vars': 'cli_vars',
+            self.vars_file_path: 'file_vars',
+            f'{self.recipe_version} recipe': 'software_recipe_vars',
+        }
+        yielded_keys = set()
+        for source, attr in var_attr_by_source.items():
+            vars_from_source = getattr(self, attr)
+            if vars_from_source:
+                variables = collapse_keys(vars_from_source)
+                for fq_var_name, var_value in variables.items():
+                    if fq_var_name not in yielded_keys:
+                        yield fq_var_name, var_value, source
+                        yielded_keys.add(fq_var_name)
