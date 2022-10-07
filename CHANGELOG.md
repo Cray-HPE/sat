@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   errors to provided better error messages and clearer semantics in `sat swap
   blade` and `sat bootprep`.
 
+### Fixed
+- Fixed a bug which prevented `sat init` from creating a configuration file in
+  the current directory when not prefixed with `./`.
+
 ## [3.19.3] - 2022-09-29
 
 ### Changed

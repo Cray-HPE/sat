@@ -220,6 +220,15 @@ class TestGenerateDefaultConfig(unittest.TestCase):
         self.mock_fchmod.assert_called_once_with(self.mock_output_stream.fileno.return_value, 0o600)
         self.mock_makedirs.assert_called_once_with('/etc/opt/cray', mode=0o700, exist_ok=True)
 
+    def test_generate_in_current_directory(self):
+        """Test generate_default_config() will not create a directory when not needed"""
+        self.mock_isdir.return_value = False
+        generate_default_config('local.toml')
+        self.mock_open.assert_called_once_with('local.toml', 'w')
+        self.mock_output_stream.write.assert_called_once_with(self.expected_config)
+        self.mock_makedirs.assert_not_called()
+        self.mock_fchmod.assert_called_once_with(self.mock_output_stream.fileno.return_value, 0o600)
+
     def test_generate_with_username(self):
         """Test generating config with a username will write a config file with a username"""
         self.expected_config = self.expected_config.replace('# username = ""', 'username = "sat_user"')
