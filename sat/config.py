@@ -433,7 +433,7 @@ def generate_default_config(path, username=None, force=False):
             f'Configuration file "{path}" already exists. Not generating configuration file.'
         )
     config_file_dir = os.path.dirname(path)
-    if not os.path.isdir(config_file_dir):
+    if config_file_dir and not os.path.isdir(config_file_dir):
         try:
             os.makedirs(config_file_dir, mode=0o700, exist_ok=True)
         except OSError as e:
