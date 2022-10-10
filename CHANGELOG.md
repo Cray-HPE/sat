@@ -42,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed a bug which prevented `sat init` from creating a configuration file in
   the current directory when not prefixed with `./`.
+- Updated `csm-api-client` dependency to version 1.1.0 to fix minor type
+  checking bug with `APIGatewayClient.set_timeout()`.
 
 ## [3.19.3] - 2022-09-29
 
