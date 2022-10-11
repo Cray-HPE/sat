@@ -60,6 +60,7 @@ from sat.cli.bootprep.validate import (
     SCHEMA_FILE_RELATIVE_PATH,
 )
 from sat.cli.bootprep.vars import VariableContext, VariableContextError
+from sat.config import get_config_value
 from sat.report import Report
 from sat.session import SATSession
 
@@ -283,7 +284,15 @@ def do_bootprep_list_available_vars(args):
         args.vars_file,
         args.vars
     )
-    report = Report(['Variable name', 'Value', 'Source'])
+    report = Report(
+        ['Variable name', 'Value', 'Source'], 'Bootprep Variables',
+        args.sort_by, args.reverse,
+        get_config_value('format.no_headings'),
+        get_config_value('format.no_borders'),
+        filter_strs=args.filter_strs,
+        display_headings=args.fields,
+        print_format=args.format
+    )
     report.add_rows(var_context.enumerate_vars_and_sources())
     print(report)
 
