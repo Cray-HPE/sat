@@ -150,6 +150,8 @@ class VariableContext:
                 value: value of variable
                 source: "--vars", vars file path, or "recipe ..."
         """
+        # Order of dict keys is important here: it determines the
+        # precedence of where the variables are sourced from.
         var_attr_by_source = {
             f'--vars': 'cli_vars',
             self.vars_file_path: 'file_vars',

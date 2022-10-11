@@ -103,19 +103,19 @@ def add_vars_options(parser):
              f'obtain the product versions which can be substituted for variables '
              f'specified in fields in the input file. If not specified or if '
              f'"{LATEST_VERSION_VALUE}" is specified, use the latest available HPC '
-             f'software recipe version.'
+             f'CSM Software Recipe version.'
     )
     parser.add_argument(
         '--vars-file',
         help='A file containing variables that can be used in fields in the '
              'input file. Values from this file take precedence over values '
-             'in the HPC Software Recipe defaults.'
+             'in the HPC CSM Software Recipe defaults.'
     )
     parser.add_argument(
         '--vars', action=StoreNestedVariable,
         help='Variables that can be used in fields in the input file. Values '
              'specified here take precedence over values specified in any '
-             '--vars-file or in the HPC software recipe defaults.'
+             '--vars-file or in the HPC CSM Software Recipe defaults.'
     )
 
 
@@ -279,10 +279,10 @@ def _add_bootprep_list_vars_subparser(subparsers):
     vars_subparser = subparsers.add_parser(
         'list-vars',
         parents=[format_options, filter_options],
-        help='List the variables that may be used in bootprep input file',
+        help='List the variables that may be used in bootprep input files.',
         description='List the variables that are available during variable substitution '
                     'when processing a bootprep input file. Variables are sourced from '
-                    'vars files and the software recipe.',
+                    'the command line, vars files, and the HPC CSM Software Recipe.',
     )
 
     add_vars_options(vars_subparser)

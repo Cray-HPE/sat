@@ -67,7 +67,7 @@ from sat.session import SATSession
 LOGGER = logging.getLogger(__name__)
 
 
-def load_vars_or_exit(recipe_version, vars_file, additional_vars):
+def load_vars_or_exit(recipe_version, vars_file_path, additional_vars):
     """Load variables and construct the variable context.
 
     This is a simple wrapper around VariableContext.load_vars()
@@ -77,8 +77,9 @@ def load_vars_or_exit(recipe_version, vars_file, additional_vars):
     Args:
         recipe_version (str): the version of the software recipe to
             load from VCS
-        vars_file (str): the path to the vars file to load
-        additional_vars (str):
+        vars_file_path (str): the path to the vars file to load
+        additional_vars (dict): additional variables, e.g. from
+            the command line
 
     Returns:
         VariableContext: the context containing the loaded variables
@@ -87,7 +88,7 @@ def load_vars_or_exit(recipe_version, vars_file, additional_vars):
         SystemExit: if the variables cannot be loaded.
     """
     try:
-        var_context = VariableContext(recipe_version, vars_file, additional_vars)
+        var_context = VariableContext(recipe_version, vars_file_path, additional_vars)
         var_context.load_vars()
         return var_context
     except VariableContextError as err:

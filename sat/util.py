@@ -548,7 +548,7 @@ def deep_update_dict(original_dict, new_dict):
             original_dict[key] = value
 
 
-def collapse_keys(vars, separator="."):
+def collapse_keys(nested_dict, separator="."):
     """Convert a nested dict to a flat dict with dot-separated keys.
 
     For example, given the following input dictionary:
@@ -570,15 +570,15 @@ def collapse_keys(vars, separator="."):
     }
 
     Args:
-        vars (dict): A (nested) dictionary of strings mapping to strings
-        separator (str): the separator to use to concated nested keys
+        nested_dict (dict): A (nested) dictionary of strings mapping to strings
+        separator (str): the separator to use to concatenated nested keys
 
     Returns:
         dict: a "flattened" dictionary in which nested dictionaries' keys are
             concatenated using the given separator, and the values are the
             corresponding leaves in the nested dictionary tree
     """
-    vars_stack = dict(vars)
+    vars_stack = dict(nested_dict)
     collapsed = {}
 
     while vars_stack:
