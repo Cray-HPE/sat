@@ -24,14 +24,39 @@
 The main entry point for the jobstat subcommand.
 """
 import logging
-from sat.report import Report
-from sat.config import get_config_value
+import textwrap
+
 from sat.apiclient import APIError
 from sat.apiclient.jobstat import JobstatClient
+from sat.report import Report
 from sat.session import SATSession
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def wrap_long_row_lines(row):
+    """Wrap long lines in the output.
+    Args:
+        row (dict): A row in the application data returned
+            from the State Checker.
+    Returns:
+        None. Modifies row in place.
+    """
+    if row.get('apid'):
+        row['apid'] = textwrap.fill(text=row['apid'], width=20)
+    if row.get('jobid'):
+        row['jobid'] = textwrap.fill(text=row['jobid'], width=20)
+    if row.get('command'):
+        row['command'] = textwrap.fill(text=row['command'], width=40)
+    if row.get('node_list'):
+        # number of nodes to print on each line
+        length = 2
+        nodelist = row['node_list'].split(',')
+        row['node_list'] = '\n'.join(
+            ','.join(e)
+            for e in [nodelist[i: i + length] for i in range(0, len(nodelist), length)]
+        )
 
 
 def do_jobstat(args):
@@ -54,7 +79,11 @@ def do_jobstat(args):
             display_headings=args.fields,
             print_format=args.format,
         )
+
         for row in application_data:
+            if args.format == 'pretty':
+                LOGGER.debug('Applying formatting to node_list and command fields.')
+                wrap_long_row_lines(row)
             report.add_row(row)
         print(report)
     except APIError as err:
