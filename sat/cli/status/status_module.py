@@ -493,7 +493,7 @@ class BOSStatusModule(StatusModule):
 
             except APIError as err:
                 LOGGER.warning('Could not retrieve image name for component %s: %s',
-                               raw_component['xname'], err)
+                               raw_component['id'], err)
             except KeyError as err:
                 LOGGER.warning('Image %s missing "%s" field in IMS response',
                                img_id, err)
