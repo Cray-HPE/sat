@@ -44,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the current directory when not prefixed with `./`.
 - Updated `csm-api-client` dependency to version 1.1.0 to fix minor type
   checking bug with `APIGatewayClient.set_timeout()`.
+- Fixed a bug in which `sat status` would fail with a traceback when using
+  BOS v2 and reporting components whose most recent image did not exist.
+- Improved the performance of `sat status` when using BOS v2.
 
 ## [3.19.3] - 2022-09-29
 
