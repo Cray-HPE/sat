@@ -30,11 +30,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added new command `jobstat`, which provides system-wide view of application
   status data.
+- Added a `sat bootprep list-vars` subcommand which lists the variables
+  available in bootprep input files at runtime.
+
+### Changed
+- Refactored to use common `APIGatewayClient`, `CFSClient`, `HSMClient`, and
+  `VCSRepo` classes and associated exception classes and utility functions from
+  the new `csm-api-client` Python library.
+- New common functionality in `csm-api-client` is now used to differentiate 404
+  errors to provided better error messages and clearer semantics in `sat swap
+  blade` and `sat bootprep`.
+
+### Fixed
+- Fixed a bug which prevented `sat init` from creating a configuration file in
+  the current directory when not prefixed with `./`.
+- Updated `csm-api-client` dependency to version 1.1.0 to fix minor type
+  checking bug with `APIGatewayClient.set_timeout()`.
+- Fixed a bug in which `sat status` would fail with a traceback when using
+  BOS v2 and reporting components whose most recent image did not exist.
+- Improved the performance of `sat status` when using BOS v2.
+
+## [3.19.3] - 2022-09-29
+
 ### Changed
 - Updated the README file to remove outdated information.
+- Removed the HTTP timeout from the IMSClient instance used in
+  `sat bootprep` to address slow IMS delete requests.
 
 ### Removed
 - Removed the `cray-sat` spec file from the repository.
+
+### Fixed
+- Fixed an issue where `sat bootprep` would sometimes fail to rename
+  large images.
+
+### Security
+- Update the version of oauthlib from 3.2.0 to 3.2.1 to address
+  CVE-2022-36087.
 
 ## [3.19.2] - 2022-08-30
 

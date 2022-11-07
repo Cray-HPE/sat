@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -27,7 +27,7 @@ Client for querying the Cray Advanced Platform Monitoring and Control (CAPMC) AP
 from collections import defaultdict
 import logging
 
-from sat.apiclient.gateway import APIError, APIGatewayClient
+from csm_api_client.service.gateway import APIError, APIGatewayClient
 
 LOGGER = logging.getLogger(__name__)
 
@@ -71,20 +71,20 @@ class CAPMCError(APIError):
 class CAPMCClient(APIGatewayClient):
     base_resource_path = 'capmc/capmc/v1/'
 
-    def __init__(self, *args, suppress_warnings=False, **kwargs):
+    def __init__(self, session, suppress_warnings=False, timeout=None):
         """Initialize the CAPMCClient.
 
         Args:
-            *args: args passed through to APIGatewayClient.__init__
+            session (Session): authenticated session
             suppress_warnings (bool): if True, suppress warnings when a query to
                 get_xname_status results in an error and node(s) in undefined
                 state. As an example, this is useful when waiting for a BMC or
                 node controller to be powered on since CAPMC will fail to query
                 the power status until it is powered on.
-            **kwargs: keyword args passed through to APIGatewayClient.__init__
+            timeout (Optional[int]): timeout for requests
         """
         self.suppress_warnings = suppress_warnings
-        super().__init__(*args, **kwargs)
+        super().__init__(session, timeout)
 
     def set_xnames_power_state(self, xnames, power_state, force=False, recursive=False, prereq=False):
         """Set the power state of the given xnames.

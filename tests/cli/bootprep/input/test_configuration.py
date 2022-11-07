@@ -24,16 +24,16 @@
 """
 Tests for sat.cli.bootprep.input.configuration
 """
-import logging
 from copy import deepcopy
-from urllib.parse import urlparse
+import logging
 import unittest
-from unittest.mock import patch, Mock
+from unittest.mock import Mock, patch
+from urllib.parse import urlparse
 
 from cray_product_catalog.query import ProductCatalogError
+from csm_api_client.service.vcs import VCSError
 from jinja2.sandbox import SandboxedEnvironment
 
-from sat.apiclient.vcs import VCSError
 from sat.cli.bootprep.errors import ConfigurationCreateError
 from sat.cli.bootprep.input.configuration import (
     InputConfigurationLayer,

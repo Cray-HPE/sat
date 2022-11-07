@@ -29,7 +29,7 @@ import inspect
 import unittest
 from unittest.mock import MagicMock, patch
 
-from sat.apiclient.gateway import APIError
+from csm_api_client.service.gateway import APIError
 import sat.cli.status.status_module as status_module_module
 from sat.cli.status.status_module import (
     BOSStatusModule,

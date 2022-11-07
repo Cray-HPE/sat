@@ -26,9 +26,10 @@ Entry point for the status subcommand.
 """
 import logging
 
+from csm_api_client.service.gateway import APIError
+from csm_api_client.service.hsm import HSMClient
+
 from sat.apiclient.bos import BOSClientCommon
-from sat.apiclient.gateway import APIError
-from sat.apiclient.hsm import HSMClient
 from sat.cli.status.constants import COMPONENT_TYPES
 import sat.cli.status.status_module
 from sat.cli.status.status_module import StatusModule

@@ -60,10 +60,41 @@ from sat.cli.bootprep.validate import (
     SCHEMA_FILE_RELATIVE_PATH,
 )
 from sat.cli.bootprep.vars import VariableContext, VariableContextError
+from sat.config import get_config_value
+from sat.report import Report
 from sat.session import SATSession
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def load_vars_or_exit(recipe_version, vars_file_path, additional_vars):
+    """Load variables and construct the variable context.
+
+    This is a simple wrapper around VariableContext.load_vars()
+    which handles constructing the context and loading variables.
+    If there is a problem loading the variables, exit the program.
+
+    Args:
+        recipe_version (str): the version of the software recipe to
+            load from VCS
+        vars_file_path (str): the path to the vars file to load
+        additional_vars (dict): additional variables, e.g. from
+            the command line
+
+    Returns:
+        VariableContext: the context containing the loaded variables
+
+    Raises:
+        SystemExit: if the variables cannot be loaded.
+    """
+    try:
+        var_context = VariableContext(recipe_version, vars_file_path, additional_vars)
+        var_context.load_vars()
+        return var_context
+    except VariableContextError as err:
+        LOGGER.error(str(err))
+        raise SystemExit(1)
 
 
 def do_bootprep_docs(args):
@@ -169,6 +200,9 @@ def do_bootprep_run(schema_validator, args):
     session = SATSession()
     cfs_client = CFSClient(session)
     ims_client = IMSClient(session)
+    # CASMTRIAGE-4288: IMS can be extremely slow to return DELETE requests for
+    # large images, so this IMSClient will not use a timeout on HTTP requests
+    ims_client.set_timeout(None)
     bos_client = BOSClientCommon.get_bos_client(session)
 
     try:
@@ -180,12 +214,12 @@ def do_bootprep_run(schema_validator, args):
         # data will fail. Otherwise, this is not a problem.
         product_catalog = None
 
-    var_context = VariableContext(args.recipe_version, args.vars_file, args.vars)
-    try:
-        var_context.load_vars()
-    except VariableContextError as err:
-        LOGGER.error(str(err))
-        raise SystemExit(1)
+    var_context = load_vars_or_exit(
+        args.recipe_version,
+        args.vars_file,
+        args.vars
+    )
+
     jinja_env = SandboxedEnvironment()
     jinja_env.globals = var_context.vars
 
@@ -244,6 +278,25 @@ def do_bootprep_run(schema_validator, args):
             raise SystemExit(1)
 
 
+def do_bootprep_list_available_vars(args):
+    var_context = load_vars_or_exit(
+        args.recipe_version,
+        args.vars_file,
+        args.vars
+    )
+    report = Report(
+        ['Variable name', 'Value', 'Source'], 'Bootprep Variables',
+        args.sort_by, args.reverse,
+        get_config_value('format.no_headings'),
+        get_config_value('format.no_borders'),
+        filter_strs=args.filter_strs,
+        display_headings=args.fields,
+        print_format=args.format
+    )
+    report.add_rows(var_context.enumerate_vars_and_sources())
+    print(report)
+
+
 def do_bootprep(args):
     """Main entry point for bootprep command.
 
@@ -270,3 +323,5 @@ def do_bootprep(args):
         do_bootprep_schema(schema_file_contents)
     elif args.action == 'generate-example':
         do_bootprep_example(schema_validator, args)
+    elif args.action == 'list-vars':
+        do_bootprep_list_available_vars(args)

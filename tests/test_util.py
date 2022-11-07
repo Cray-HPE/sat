@@ -418,6 +418,57 @@ class TestDeepUpdateDict(unittest.TestCase):
             util.deep_update_dict('mrducks', {'response': 'mrnotducks'})
 
 
+class TestCollapseVariables(unittest.TestCase):
+    """Tests for collapsing variable names"""
+
+    def test_non_nested_variable(self):
+        """Test that flat dicts are unaffected"""
+        flat_dict = {'foo': 'bar'}
+        self.assertEqual(util.collapse_keys(flat_dict), flat_dict)
+
+    def test_single_nested(self):
+        """Test collapsing a single level of nesting"""
+        self.assertEqual(util.collapse_keys({'foo': {'bar': 'baz'}}),
+                         {'foo.bar': 'baz'})
+
+    def test_multiple_nested(self):
+        """Test collapsing multiple levels of nesting"""
+        self.assertEqual(util.collapse_keys({'foo': {'bar': {'baz': {'quux': 'znurt'}}}}),
+                         {'foo.bar.baz.quux': 'znurt'})
+
+    def test_nested_with_multiple_keys(self):
+        """Test collapsing multiple levels of nesting with multiple keys at each level"""
+        input_dict = {
+            'foo': {
+                'bar': {
+                    'baz': 'quux',
+                    'giblet': 'znurt'
+                }
+            },
+            'spam': {
+                'eggs': 'france'
+            }
+        }
+
+        collapsed = {
+            'foo.bar.baz': 'quux',
+            'foo.bar.giblet': 'znurt',
+            'spam.eggs': 'france'
+        }
+
+        self.assertEqual(util.collapse_keys(input_dict), collapsed)
+
+    def test_conflicting_existing_key(self):
+        """Test that conflicts with an existing key with a collapsed name are detected"""
+        with self.assertRaises(ValueError):
+            _ = util.collapse_keys({'foo': {'bar': 'baz'}, 'foo.bar': 'baz'})
+
+    def test_conflicting_collapsed_key(self):
+        """Test that conflicts with a collapsed name with an existing key are detected"""
+        with self.assertRaises(ValueError):
+            _ = util.collapse_keys({'foo.bar': 'baz', 'foo': {'bar': 'baz'}})
+
+
 class TestGetNewOrderedDict(unittest.TestCase):
     """Test the get_new_ordered_dict function."""
 

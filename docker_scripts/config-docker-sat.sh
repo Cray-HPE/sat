@@ -27,10 +27,11 @@ LOGDIR=/var/log/cray/sat
 
 SATMANDIR=/usr/share/man/man8
 
-NODE_IMAGE_KUBERNETES_REPO="https://github.com/Cray-HPE/node-image-build.git"
-NODE_IMAGE_KUBERNETES_DIR="node-image-kubernetes"
-NODE_IMAGE_KUBERNETES_PATH="boxes/ncn-node-images/kubernetes"
-NODE_IMAGE_KUBERNETES_BRANCH="main"
+CSM_RPMS_REPO="https://github.com/Cray-HPE/csm-rpms.git"
+CSM_RPMS_DIR="csm-rpms"
+CSM_RPMS_BASE_PACKAGES_PATH="packages/node-image-common/base.packages"
+CSM_RPMS_BRANCH="main"
+KUBERNETES_VERSION_REGEX="[0-9]+\.[0-9]+\.[0-9]+"
 
 # create logging directory
 if [ ! -d "$LOGDIR" ]; then
@@ -62,11 +63,11 @@ echo "export PATH=$VIRTUAL_ENV/bin:\$PATH" > /etc/profile.d/sat_path.sh
 
 # install kubectl using same version used in ncn image
 cd /sat
-git clone $NODE_IMAGE_KUBERNETES_REPO $NODE_IMAGE_KUBERNETES_DIR
-cd  $NODE_IMAGE_KUBERNETES_DIR
-git checkout $NODE_IMAGE_KUBERNETES_BRANCH
+git clone $CSM_RPMS_REPO $CSM_RPMS_DIR
+cd $CSM_RPMS_DIR
+git checkout $CSM_RPMS_BRANCH
 
-source "${NODE_IMAGE_KUBERNETES_PATH}/files/resources/common/vars.sh"
+KUBERNETES_PULL_VERSION="$(grep ^kubectl= "$CSM_RPMS_BASE_PACKAGES_PATH" | sed -E "s/.*=(${KUBERNETES_VERSION_REGEX})-.*/\1/")"
 if [ -z "$KUBERNETES_PULL_VERSION" ]; then
     KUBERNETES_PULL_VERSION=$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)
 fi

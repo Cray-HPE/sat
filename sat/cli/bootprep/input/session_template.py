@@ -50,7 +50,7 @@ class InputSessionTemplate(BaseInputItem):
             requests to the BOS API
         ims_client (sat.apiclient.IMSClient): the IMS API client to make
             requests to the IMS API
-        cfs_client (sat.apiclient.CFSClient): the CFS API client to make
+        cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client to make
             requests to the CFS API
     """
     description = 'BOS session template'
@@ -70,7 +70,7 @@ class InputSessionTemplate(BaseInputItem):
             jinja_env (jinja2.Environment): the Jinja2 environment in which
                 fields supporting Jinja2 templating should be rendered.
             bos_client (sat.apiclient.BOSClientCommon): the BOS API client
-            cfs_client (sat.apiclient.CFSClient): the CFS API client
+            cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client
             ims_client (sat.apiclient.IMSClient): the IMS API client
             **kwargs: additional keyword arguments
         """
@@ -121,11 +121,16 @@ class InputSessionTemplate(BaseInputItem):
             return
 
         try:
-            self.cfs_client.get_configuration(self.configuration)
-        except APIError as err:
-            # TODO: should probably differentiate between 404 Not Found and other errors
-            raise InputItemValidateError(f'Configuration {self.configuration} specified for '
-                                         f'{self} does not exist: {err}')
+            resp = self.cfs_client.get('configurations', self.configuration, raise_not_ok=False)
+            if not resp.ok:
+                if resp.status_code == 404:
+                    raise InputItemValidateError(f'Configuration {self.configuration} specified for '
+                                                 f'{self} does not exist.')
+                else:
+                    self.cfs_client.raise_from_response(resp)
+        except (APIError, ValueError) as err:
+            raise InputItemValidateError(f'An error occurred while querying configuration '
+                                         f'{self.configuration}: {err}')
 
     @abstractmethod
     def validate_image_exists(self, **_):
@@ -164,6 +169,33 @@ class InputSessionTemplate(BaseInputItem):
             api_data['boot_sets'][boot_set_name] = boot_set_api_data
 
         return api_data
+
+    def get_image_record_by_id(self, ims_image_id):
+        """Look up an IMS image record by its ID.
+
+        Args:
+            ims_image_id (str): the UUID of the image
+
+        Returns:
+            dict: the IMS image ID corresponding to the given UUID
+
+        Raises:
+            InputItemValidateError: if there is an issue looking up the image
+                or if the image does not exist.
+        """
+        try:
+            resp = self.ims_client.get('images', ims_image_id, raise_not_ok=False)
+            if not resp.ok:
+                if resp.status_code == 404:
+                    raise InputItemValidateError(f'No image with name or ID {ims_image_id} exists '
+                                                 f'for use by {self}')
+                else:
+                    self.ims_client.raise_from_response(resp)
+            else:
+                return resp.json()
+        except (APIError, ValueError) as err:
+            raise InputItemValidateError(f'An error occurred while querying the image record '
+                                         f'with ID {ims_image_id}: {err}') from err
 
     def create(self, dumper=None):
         """Create the session template with a request to the BOS API."""
@@ -222,12 +254,7 @@ class InputSessionTemplateV1(InputSessionTemplate):
 
         if len(name_matches) == 0:
             if self.image_is_uuid:
-                try:
-                    return self.ims_client.get_image(self.image)
-                except APIError as err:
-                    # TODO: should probably differentiate between 404 Not Found and other errors
-                    raise InputItemValidateError(f'No image with name or ID {self.image} exists '
-                                                 f'for use by {self}: {err}')
+                return self.get_image_record_by_id(self.image)
             else:
                 raise InputItemValidateError(f'No image with name {self.image} exists for '
                                              f'use by session template {self}.')
@@ -297,12 +324,7 @@ class InputSessionTemplateV2(InputSessionTemplate):
     def image_record(self):
         """dict: the image record from IMS if one can be found"""
         if self.ims_image_id:
-            try:
-                return self.ims_client.get_image(self.ims_image_id)
-            except APIError as err:
-                # TODO: should probably differentiate between 404 Not Found and other errors
-                raise InputItemValidateError(f'No image with ID {self.ims_image_id} exists '
-                                             f'for use by {self}: {err}')
+            return self.get_image_record_by_id(self.ims_image_id)
         else:
             # First, get the name of the image
             image_name = self.ims_image_name
@@ -345,7 +367,7 @@ class InputSessionTemplateCollection(BaseInputItemCollection):
             jinja_env (jinja2.Environment): the Jinja2 environment in which
                 fields supporting Jinja2 templating should be rendered.
             bos_client (sat.apiclient.BOSClientCommon): the BOS API client
-            cfs_client (sat.apiclient.CFSClient): the CFS API client
+            cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client
             ims_client (sat.apiclient.IMSClient): the IMS API client
             **kwargs: additional keyword arguments
         """

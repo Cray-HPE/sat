@@ -35,14 +35,15 @@ from tempfile import TemporaryDirectory
 import warnings
 
 import boto3
+from botocore.exceptions import ClientError
 from boto3.exceptions import Boto3Error
+from csm_api_client.service.gateway import APIError, APIGatewayClient
 from inflect import engine
 from kubernetes.client import ApiException, CoreV1Api
-from kubernetes.config import load_kube_config, ConfigException
+from kubernetes.config import ConfigException, load_kube_config
 from urllib3.exceptions import InsecureRequestWarning
 from yaml import YAMLLoadWarning
 
-from sat.apiclient.gateway import APIGatewayClient, APIError
 from sat.cached_property import cached_property
 from sat.config import get_config_value
 from sat.util import get_val_by_path
@@ -56,8 +57,8 @@ class IMSClient(APIGatewayClient):
     # The bucket for boot images created by IMS
     boot_images_bucket = 'boot-images'
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, session, timeout=None):
+        super().__init__(session, timeout)
         # Dictionary to cache the list of different types of resources from IMS
         self._cached_resources = {}
         self.inflector = engine()
@@ -372,7 +373,7 @@ class IMSClient(APIGatewayClient):
                     warnings.filterwarnings('ignore', category=InsecureRequestWarning)
                     self.s3_resource.Object(s3_manifest_bucket,
                                             s3_manifest_key).download_file(local_manifest_path)
-            except Boto3Error as err:
+            except (Boto3Error, ClientError) as err:
                 raise APIError(f'Failed to download manifest with key {s3_manifest_key} '
                                f'from bucket {s3_manifest_bucket}: {err}')
             try:
@@ -441,14 +442,19 @@ class IMSClient(APIGatewayClient):
 
                     new_object = self.s3_resource.Object(self.boot_images_bucket, new_artifact_key)
                     LOGGER.debug(f'Created new S3 object: {new_object}')
-                    copy_result = new_object.copy_from(CopySource=f'{old_artifact_bucket}/{old_artifact_key}',
-                                                       Metadata=new_metadata, MetadataDirective='REPLACE')
-                    LOGGER.debug(f'Got response from copying S3 object: {copy_result}')
-            except Boto3Error as err:
+                    new_object.copy({
+                        'Bucket': old_artifact_bucket,
+                        'Key': old_artifact_key,
+                    })
+                    for key, value in new_metadata.items():
+                        new_object.metadata[key] = value
+                    LOGGER.debug(f'Successfully copied artifact {old_artifact_key} to {new_artifact_key}')
+            except (Boto3Error, ClientError) as err:
                 raise APIError(f'Failed to copy artifact {old_artifact_key} to {new_artifact_key}: {err}')
 
             new_artifact = copy.deepcopy(old_artifact)
-            new_artifact['link']['etag'] = get_val_by_path(copy_result, 'CopyObjectResult.ETag')
+            # For some reason the etag contains explicit quotes
+            new_artifact['link']['etag'] = new_object.e_tag.strip('"')
             new_artifact['link']['path'] = f's3://{self.boot_images_bucket}/{new_artifact_key}'
             new_artifacts.append(new_artifact)
 
@@ -493,7 +499,7 @@ class IMSClient(APIGatewayClient):
                     manifest_object = self.s3_resource.Object(self.boot_images_bucket, manifest_key)
                     manifest_object.upload_file(local_manifest_path,
                                                 ExtraArgs={'Metadata': {'md5sum': md5sum_digest}})
-            except Boto3Error as err:
+            except (Boto3Error, ClientError) as err:
                 raise APIError(f'Failed to upload manifest file to {manifest_key} '
                                f'in S3 bucket {self.boot_images_bucket}: {err}')
             LOGGER.debug(f'Created new S3 manifest object: {manifest_object}')
@@ -541,7 +547,7 @@ class IMSClient(APIGatewayClient):
                 try:
                     # For some reason the etag contains explicit quotes
                     new_etag = new_manifest_object.e_tag.strip('"')
-                except Boto3Error as err:
+                except (Boto3Error, ClientError) as err:
                     raise APIError(f'Failed to get etag of new manifest object: {err}')
 
             new_image_link_info = {

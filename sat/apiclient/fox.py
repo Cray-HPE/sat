@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -28,7 +28,7 @@ API Client for the Fox service, which provides indirect access to HMJTD.
 import json
 import logging
 
-from sat.apiclient.gateway import APIError, APIGatewayClient
+from csm_api_client.service.gateway import APIError, APIGatewayClient
 
 
 LOGGER = logging.getLogger(__name__)
