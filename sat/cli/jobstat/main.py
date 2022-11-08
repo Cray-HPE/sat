@@ -24,9 +24,11 @@
 The main entry point for the jobstat subcommand.
 """
 import logging
+import re
 import textwrap
 
-from sat.apiclient import APIError
+from csm_api_client.service.gateway import APIError
+
 from sat.apiclient.jobstat import JobstatClient
 from sat.report import Report
 from sat.session import SATSession
@@ -44,15 +46,20 @@ def wrap_long_row_lines(row):
         None. Modifies row in place.
     """
     if row.get('apid'):
-        row['apid'] = textwrap.fill(text=row['apid'], width=20)
+        row['apid'] = row['apid'][:8]
     if row.get('jobid'):
         row['jobid'] = textwrap.fill(text=row['jobid'], width=20)
     if row.get('command'):
-        row['command'] = textwrap.fill(text=row['command'], width=40)
+        tempstr = textwrap.fill(text=row['command'], width=40)
+        tempstr = re.sub(r'\A/.*/mpiexec', 'mpiexec', tempstr, 1)
+        tempstr = re.sub(r'\A/.*/aprun', 'aprun', tempstr, 1)
+        row['command'] = tempstr
     if row.get('node_list'):
         # number of nodes to print on each line
-        length = 2
-        nodelist = row['node_list'].split(',')
+        length = 4
+        nodelist = re.sub(r'nid', '', row['node_list'])
+        nodelist = nodelist.split(',')
+        nodelist = [nid.lstrip('0') for nid in nodelist]
         row['node_list'] = '\n'.join(
             ','.join(e)
             for e in [nodelist[i: i + length] for i in range(0, len(nodelist), length)]
