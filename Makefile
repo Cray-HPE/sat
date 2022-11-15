@@ -28,6 +28,9 @@ DOCKER_BUILD = docker build . --pull $(DOCKER_ARGS)
 DEFAULT_TAG = '$(NAME):$(VERSION)'
 TEST_TAG = '$(NAME)-testing:$(VERSION)'
 CODESTYLE_TAG = '$(NAME)-codestyle:$(VERSION)'
+ifneq ($(wildcard ${HOME}/.netrc),)
+	DOCKER_ARGS ?= --secret id=netrc,src=${HOME}/.netrc
+endif
 
 all : unittest codestyle image
 
