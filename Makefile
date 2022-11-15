@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,9 @@ DOCKER_BUILD = docker build . --pull $(DOCKER_ARGS)
 DEFAULT_TAG = '$(NAME):$(VERSION)'
 TEST_TAG = '$(NAME)-testing:$(VERSION)'
 CODESTYLE_TAG = '$(NAME)-codestyle:$(VERSION)'
+ifneq ($(wildcard ${HOME}/.netrc),)
+	DOCKER_ARGS ?= --secret id=netrc,src=${HOME}/.netrc
+endif
 
 all : unittest codestyle image
 

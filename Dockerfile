@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -56,7 +56,8 @@ RUN apk update && \
 
 COPY requirements.lock.txt requirements.txt
 ARG PIP_EXTRA_INDEX_URL="https://artifactory.algol60.net/artifactory/csm-python-modules/simple"
-RUN pip3 install --no-cache-dir -U pip && \
+RUN --mount=type=secret,id=netrc,target=/root/.netrc \
+    pip3 install --no-cache-dir -U pip && \
     pip3 install -r requirements.txt
 
 COPY CHANGELOG.md README.md setup.cfg setup.py ./
@@ -74,7 +75,8 @@ RUN pip3 install --no-cache-dir pip && \
 FROM base as ci_base
 COPY --from=build $VIRTUAL_ENV $VIRTUAL_ENV
 COPY requirements-dev.lock.txt requirements-dev.lock.txt
-RUN pip3 install -r requirements-dev.lock.txt
+RUN --mount=type=secret,id=netrc,target=/root/.netrc \
+    pip3 install -r requirements-dev.lock.txt
 
 # The testing stage runs tests in the container in the CI pipeline. This allows
 # us to use the same Python version in CI as we use in our production Docker
