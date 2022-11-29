@@ -41,6 +41,7 @@ pipeline {
         IS_STABLE = getBuildIsStable(releaseBranchIsStable: true)
         VERSION = getDockerBuildVersion(versionScript: 'build_scripts/version.sh', isStable: env.IS_STABLE)
         DOCKER_ARGS = getDockerBuildArgs(name: 'sat', description: env.DESCRIPTION, version: env.VERSION)
+        DOCKER_BUILDKIT = '1'
     }
 
     stages {
