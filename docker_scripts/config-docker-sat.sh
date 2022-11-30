@@ -29,7 +29,7 @@ SATMANDIR=/usr/share/man/man8
 
 CSM_RPMS_REPO="https://github.com/Cray-HPE/csm-rpms.git"
 CSM_RPMS_DIR="csm-rpms"
-CSM_RPMS_BASE_PACKAGES_PATH="packages/node-image-common/base.packages"
+CSM_RPMS_BASE_PACKAGES_PATH="packages/node-image-ncn-common/base.packages"
 CSM_RPMS_BRANCH="main"
 KUBERNETES_VERSION_REGEX="[0-9]+\.[0-9]+\.[0-9]+"
 
