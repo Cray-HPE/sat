@@ -40,7 +40,7 @@ def add_jobstat_subparser(subparsers):
 
     jobstat_parser = subparsers.add_parser(
         'jobstat',
-        help='Application information',
+        help='Report job and application status.',
         description='This command shows all jobs and relevant information pertaining to those applications.',
         parents=[format_options, filter_options],
     )
