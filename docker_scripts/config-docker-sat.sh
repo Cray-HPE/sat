@@ -29,7 +29,7 @@ SATMANDIR=/usr/share/man/man8
 
 CSM_RPMS_REPO="https://github.com/Cray-HPE/csm-rpms.git"
 CSM_RPMS_DIR="csm-rpms"
-CSM_RPMS_BASE_PACKAGES_PATH="packages/node-image-common/base.packages"
+CSM_RPMS_BASE_PACKAGES_PATH="packages/node-image-ncn-common/base.packages"
 CSM_RPMS_BRANCH="main"
 KUBERNETES_VERSION_REGEX="[0-9]+\.[0-9]+\.[0-9]+"
 
@@ -69,7 +69,8 @@ git checkout $CSM_RPMS_BRANCH
 
 KUBERNETES_PULL_VERSION="$(grep ^kubectl= "$CSM_RPMS_BASE_PACKAGES_PATH" | sed -E "s/.*=(${KUBERNETES_VERSION_REGEX})-.*/\1/")"
 if [ -z "$KUBERNETES_PULL_VERSION" ]; then
-    KUBERNETES_PULL_VERSION=$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)
+    echo >&2 "Unable to determine version of kubectl to use from ${CSM_RPMS_REPO}"
+    exit 1
 fi
 
 curl -LO "https://storage.googleapis.com/kubernetes-release/release/v${KUBERNETES_PULL_VERSION#v}/bin/linux/amd64/kubectl"
