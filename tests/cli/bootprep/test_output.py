@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -106,10 +106,10 @@ class TestRequestDumper(unittest.TestCase):
 
     def test_writing_request_body(self):
         """Test that request bodies are written to output files"""
-        dumper = RequestDumper(self.request_type, self.args)
-        dumper.write_request_body(self.item_name, self.request_body)
+        dumper = RequestDumper(self.args.save_files, self.args.output_dir)
+        dumper.write_request_body(self.request_type, self.item_name, self.request_body)
         self.mock_open.assert_called_once_with(
-            dumper.get_filename_for_request(self.item_name), 'w'
+            dumper.get_filename_for_request(self.request_type, self.item_name), 'w'
         )
         self.mock_json_dump.assert_called_once_with(
             self.request_body,
@@ -120,23 +120,23 @@ class TestRequestDumper(unittest.TestCase):
     def test_writing_request_body_when_not_saving_files(self):
         """Test that requests are not written when --save-files not used"""
         self.args.save_files = False
-        dumper = RequestDumper(self.request_type, self.args)
-        dumper.write_request_body(self.item_name, self.request_body)
+        dumper = RequestDumper(self.args.save_files, self.args.output_dir)
+        dumper.write_request_body(self.request_type, self.item_name, self.request_body)
         self.mock_open.assert_not_called()
         self.mock_json_dump.assert_not_called()
 
     def test_warning_logged_on_req_write_failure(self):
         """Test that a warning is logged if the request cannot be written"""
         self.mock_open.side_effect = OSError
-        dumper = RequestDumper(self.request_type, self.args)
+        dumper = RequestDumper(self.args.save_files, self.args.output_dir)
         with self.assertLogs(level='WARNING'):
-            dumper.write_request_body(self.item_name, self.request_body)
+            dumper.write_request_body(self.request_type, self.item_name, self.request_body)
 
     def test_arbitrary_json_format_params(self):
         """Test that arbitrary json formatting parameters can be used"""
         json_params = {'indent': 2, 'allow_nan': False}
-        dumper = RequestDumper(self.request_type, self.args, json_params=json_params)
-        dumper.write_request_body(self.item_name, self.request_body)
+        dumper = RequestDumper(self.args.save_files, self.args.output_dir, json_params=json_params)
+        dumper.write_request_body(self.request_type, self.item_name, self.request_body)
         self.mock_json_dump.assert_called_once_with(
             self.request_body,
             self.mocked_file,

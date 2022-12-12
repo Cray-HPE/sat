@@ -1,6 +1,6 @@
 # Changelog
 
-(C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+(C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -41,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New common functionality in `csm-api-client` is now used to differentiate 404
   errors to provided better error messages and clearer semantics in `sat swap
   blade` and `sat bootprep`.
+- `sat bootprep` now prompts individually for each CFS configuration that already
+  exists.
+- Improved output when creating CFS configurations and BOS session templates with
+  `sat bootprep`.
 
 ### Fixed
 - Fixed a bug which prevented `sat init` from creating a configuration file in

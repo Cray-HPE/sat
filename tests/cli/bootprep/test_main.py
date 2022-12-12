@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -33,7 +33,7 @@ from sat.cli.bootprep.errors import (
     BootPrepInternalError,
     BootPrepDocsError,
     BootPrepValidationError,
-    ConfigurationCreateError,
+    InputItemCreateError,
     ImageCreateError,
     ValidationErrorCollection
 )
@@ -109,12 +109,17 @@ class TestDoBootprepRun(unittest.TestCase):
         self.input_file = 'input.yaml'
         self.overwrite_templates = False
         self.skip_existing_templates = False
+        self.overwrite_configs = False
+        self.skip_existing_configs = False
         self.dry_run = False
         self.args = Namespace(action='run', input_file=self.input_file,
                               overwrite_templates=self.overwrite_templates,
-                              skip_existing_templates=self.skip_existing_templates, dry_run=self.dry_run,
-                              view_input_schema=False, generate_schema_docs=False,
-                              bos_version='v1', recipe_version=None, vars_file=None, vars=None)
+                              skip_existing_templates=self.skip_existing_templates,
+                              overwrite_configs=self.overwrite_configs,
+                              skip_existing_configs=self.skip_existing_configs,
+                              dry_run=self.dry_run, view_input_schema=False, generate_schema_docs=False,
+                              bos_version='v1', recipe_version=None, vars_file=None, vars=None,
+                              output_dir='.', save_files=True, resolve_branches=True)
         self.schema_file = 'schema.yaml'
         self.mock_validator_cls = MagicMock()
         self.mock_load_and_validate_instance = patch('sat.cli.bootprep.main.load_and_validate_instance').start()
@@ -125,7 +130,7 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_cfs_client = patch('sat.cli.bootprep.main.CFSClient').start().return_value
         self.mock_ims_client = patch('sat.cli.bootprep.main.IMSClient').start().return_value
         self.mock_bos_client = patch('sat.cli.bootprep.main.BOSClientCommon.get_bos_client').start().return_value
-        self.mock_create_configurations = patch('sat.cli.bootprep.main.create_configurations').start()
+        self.mock_configurations = self.mock_input_instance.input_configurations
         self.mock_create_images = patch('sat.cli.bootprep.main.create_images').start()
         self.mock_session_templates = self.mock_input_instance.input_session_templates
         self.mock_product_catalog_cls = patch('sat.cli.bootprep.main.ProductCatalog').start()
@@ -135,7 +140,8 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_variable_context.vars = {}
         self.mock_sandboxed_environment_cls = patch('sat.cli.bootprep.main.SandboxedEnvironment').start()
         self.mock_sandboxed_environment = self.mock_sandboxed_environment_cls.return_value
-        self.mock_request_dumper = patch('sat.cli.bootprep.main.RequestDumper').start()
+        self.mock_request_dumper_cls = patch('sat.cli.bootprep.main.RequestDumper').start()
+        self.mock_request_dumper = self.mock_request_dumper_cls.return_value
 
     def tearDown(self):
         patch.stopall()
@@ -148,16 +154,21 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_load_and_validate_instance.assert_called_once_with(
             self.input_file, self.mock_validator_cls)
         self.mock_input_instance_cls.assert_called_once_with(
-            self.validated_data, self.mock_cfs_client, self.mock_ims_client,
-            self.mock_bos_client, self.mock_sandboxed_environment, self.mock_product_catalog)
-        self.mock_create_configurations.assert_called_once_with(self.mock_input_instance, self.args)
+            self.validated_data, self.mock_request_dumper, self.mock_cfs_client, self.mock_ims_client,
+            self.mock_bos_client, self.mock_sandboxed_environment, self.mock_product_catalog,
+            self.dry_run
+        )
+        self.mock_configurations.handle_existing_items.assert_called_once_with(
+            self.overwrite_configs, self.skip_existing_configs
+        )
+        self.mock_configurations.validate.assert_called_once_with()
+        self.mock_configurations.create_items.assert_called_once_with()
         self.mock_create_images.assert_called_once_with(self.mock_input_instance, self.args)
         self.mock_session_templates.handle_existing_items.assert_called_once_with(
-            self.overwrite_templates, self.skip_existing_templates, self.dry_run
+            self.overwrite_templates, self.skip_existing_templates
         )
-        self.mock_session_templates.validate.assert_called_once_with(dry_run=self.dry_run)
-        self.mock_session_templates.create_items.assert_called_once_with(
-            dumper=self.mock_request_dumper.return_value)
+        self.mock_session_templates.validate.assert_called_once_with()
+        self.mock_session_templates.create_items.assert_called_once_with()
         info_msgs = [r.msg for r in cm.records]
         expected_msgs = [
             f'Validating given input file {self.input_file}',
@@ -196,7 +207,7 @@ class TestDoBootprepRun(unittest.TestCase):
     def test_do_bootprep_run_configuration_create_error(self):
         """Test do_bootprep_run when an error occurs creating a configuration"""
         create_err_msg = 'Failed to create a configuration'
-        self.mock_create_configurations.side_effect = ConfigurationCreateError(create_err_msg)
+        self.mock_configurations.create_items.side_effect = InputItemCreateError(create_err_msg)
         with self.assertRaises(SystemExit) as raises_cm:
             with self.assertLogs(level=logging.ERROR) as logs_cm:
                 do_bootprep_run(self.mock_validator_cls, self.args)
@@ -207,9 +218,15 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_load_and_validate_instance.assert_called_once_with(
             self.input_file, self.mock_validator_cls)
         self.mock_input_instance_cls.assert_called_once_with(
-            self.validated_data, self.mock_cfs_client, self.mock_ims_client,
-            self.mock_bos_client, self.mock_sandboxed_environment, self.mock_product_catalog)
-        self.mock_create_configurations.assert_called_once_with(self.mock_input_instance, self.args)
+            self.validated_data, self.mock_request_dumper, self.mock_cfs_client, self.mock_ims_client,
+            self.mock_bos_client, self.mock_sandboxed_environment, self.mock_product_catalog,
+            self.dry_run
+        )
+        self.mock_configurations.handle_existing_items.assert_called_once_with(
+            self.overwrite_configs, self.skip_existing_configs
+        )
+        self.mock_configurations.validate.assert_called_once_with()
+        self.mock_configurations.create_items.assert_called_once_with()
         self.mock_create_images.assert_not_called()
         self.mock_session_templates.handle_existing_items.assert_not_called()
         self.mock_session_templates.validate.assert_not_called()
@@ -229,9 +246,15 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_load_and_validate_instance.assert_called_once_with(
             self.input_file, self.mock_validator_cls)
         self.mock_input_instance_cls.assert_called_once_with(
-            self.validated_data, self.mock_cfs_client, self.mock_ims_client,
-            self.mock_bos_client, self.mock_sandboxed_environment, self.mock_product_catalog)
-        self.mock_create_configurations.assert_called_once_with(self.mock_input_instance, self.args)
+            self.validated_data, self.mock_request_dumper, self.mock_cfs_client, self.mock_ims_client,
+            self.mock_bos_client, self.mock_sandboxed_environment, self.mock_product_catalog,
+            self.dry_run
+        )
+        self.mock_configurations.handle_existing_items.assert_called_once_with(
+            self.overwrite_configs, self.skip_existing_configs
+        )
+        self.mock_configurations.validate.assert_called_once_with()
+        self.mock_configurations.create_items.assert_called_once_with()
         self.mock_create_images.assert_called_once_with(self.mock_input_instance, self.args)
         self.mock_session_templates.handle_existing_items.assert_not_called()
         self.mock_session_templates.validate.assert_not_called()

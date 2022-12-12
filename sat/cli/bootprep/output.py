@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -29,8 +29,6 @@ import json
 import logging
 import os
 import re
-
-from sat.cached_property import cached_property
 
 
 DEFAULT_JSON_FORMAT_PARAMS = {'indent': 4}
@@ -66,31 +64,28 @@ def ensure_output_directory(args):
 
 class RequestDumper:
     """A helper class which dumps API payloads"""
-    def __init__(self, request_type_name, args, json_params=None):
+    def __init__(self, save_files, output_dir, json_params=None):
         """Construct a new RequestDumper.
 
         If output_dir is specified in the args namespace, it is assumed that
         the directory exists and is writable.
 
         Args:
-            request_type_name (str): The human-readable name of the
-                request type being dumped.
-            args (Namespace): The arguments Namespace object from the command
-                line.
+            save_files (bool): whether this dumper should save files at all
+            output_dir (str): the directory in which files should be saved
             json_params (dict): kwargs to be passed to json.dump() to configure
                 JSON dump formatting.
         """
         if json_params is None:
             json_params = DEFAULT_JSON_FORMAT_PARAMS
 
-        self.request_type_name = request_type_name
         self.json_params = json_params
 
-        self.save_files = args.save_files
-        self.output_dir = args.output_dir
+        self.save_files = save_files
+        self.output_dir = output_dir
 
     @staticmethod
-    def canonicalize_name(name):
+    def canonicalize(name):
         """Canonicalize the given name by converting to lowercase and replacing chars.
 
         Removes parentheses. Removes leading and trailing whitespace, and
@@ -104,30 +99,29 @@ class RequestDumper:
         """
         return re.sub(r'[\s/]+', '-', re.sub(r'[()]', '', name.strip().lower()))
 
-    @cached_property
-    def filename_prefix(self):
-        """str: the prefix to every filename dumped by this dumper."""
-        return self.canonicalize_name(self.request_type_name)
-
-    def get_filename_for_request(self, item_name):
+    def get_filename_for_request(self, item_type, item_name):
         """Helper function to get the full filename to dump the request body to.
 
         Args:
+            item_type (str): the type of item being dumped
             item_name (str): the name of the item related to this request
 
         Returns:
             str: the full filename to write the request to
         """
-        canonical_name = self.canonicalize_name(item_name)
-        return os.path.join(self.output_dir, f'{self.filename_prefix}-{canonical_name}.json')
+        canonical_type = self.canonicalize(item_type)
+        canonical_name = self.canonicalize(item_name)
+        return os.path.join(self.output_dir, f'{canonical_type}-{canonical_name}.json')
 
-    def write_request_body(self, item_name, request_body):
+    def write_request_body(self, item_type, item_name, request_body):
         """Write a JSON-formatted request body to a file.
 
         If save_files is set to False in the constructor, this method does
         nothing.
 
         Args:
+            item_type (str): the type of the item associated with the request
+                being dumps. (For instance, "CFS configuration")
             item_name (str): the name of the item associated with the request
                 being dumped. (For instance, a CFS configuration name.)
             request_body (dict): payload to be used as the request body.
@@ -135,11 +129,11 @@ class RequestDumper:
         if not self.save_files:
             return
 
-        output_path = self.get_filename_for_request(item_name)
-        LOGGER.info(f'Saving {self.request_type_name} request body to {output_path}')
+        output_path = self.get_filename_for_request(item_type, item_name)
+        LOGGER.info(f'Saving {item_type} request body to {output_path}')
         try:
             with open(output_path, 'w') as f:
                 json.dump(request_body, f, **self.json_params)
         except OSError as err:
             LOGGER.warning('Failed to write %s request body to %s: %s',
-                           self.request_type_name, output_path, err)
+                           item_type, output_path, err)

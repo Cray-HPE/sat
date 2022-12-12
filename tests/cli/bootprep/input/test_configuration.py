@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -34,6 +34,7 @@ from cray_product_catalog.query import ProductCatalogError
 from csm_api_client.service.vcs import VCSError
 from jinja2.sandbox import SandboxedEnvironment
 
+from csm_api_client.service.cfs import CFSClient
 from sat.cli.bootprep.errors import ConfigurationCreateError
 from sat.cli.bootprep.input.configuration import (
     InputConfigurationLayer,
@@ -42,6 +43,7 @@ from sat.cli.bootprep.input.configuration import (
     InputConfiguration,
     LATEST_VERSION_VALUE
 )
+from sat.cli.bootprep.input.instance import InputInstance
 
 
 def patch_configuration(path, *args, **kwargs):
@@ -202,7 +204,7 @@ class TestGitInputConfigurationLayer(TestInputConfigurationLayerBase):
         self.assertIsNone(layer.commit)
 
     def test_get_cfs_api_data_optional_properties(self):
-        """Test get_cfs_api_data method with all optional properties present."""
+        """Test get_create_item_data method with all optional properties present."""
         branch_layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
         commit_layer = GitInputConfigurationLayer(self.commit_layer_data, self.jinja_env)
         subtests = (('branch', branch_layer), ('commit', commit_layer))
@@ -475,35 +477,43 @@ class TestInputConfiguration(unittest.TestCase):
         self.jinja_env.globals = {
             'shasta': {'version': self.shasta_version}
         }
+        self.mock_instance = Mock(spec=InputInstance)
+        # Fake index of configuration data in an input file
+        self.index = 0
+        self.mock_cfs_client = Mock(spep=CFSClient)
 
     def tearDown(self):
         patch.stopall()
 
     def test_init(self):
         """Test creation of a InputConfiguration"""
-        config = InputConfiguration(self.config_data, self.jinja_env, self.mock_product_catalog)
+        config = InputConfiguration(self.config_data, self.mock_instance, self.index,
+                                    self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
         self.assertEqual(self.config_name, config.name)
         self.assertEqual(self.layers, config.layers)
 
     def test_name_property(self):
         """Test the name property of the InputConfiguration"""
-        config = InputConfiguration(self.config_data, self.jinja_env, self.mock_product_catalog)
+        config = InputConfiguration(self.config_data, self.mock_instance, self.index,
+                                    self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
         self.assertEqual(self.config_name, config.name)
 
     def test_name_property_jinja_template(self):
         """Test the name property when it uses Jinja2 templating"""
         self.config_data['name'] = 'compute-config-shasta-{{shasta.version}}'
-        config = InputConfiguration(self.config_data, self.jinja_env, self.mock_product_catalog)
+        config = InputConfiguration(self.config_data, self.mock_instance, self.index,
+                                    self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
         self.assertEqual(f'compute-config-shasta-{self.shasta_version}', config.name)
 
     def test_get_cfs_api_data(self):
-        """Test successful case of get_cfs_api_data"""
+        """Test successful case of get_create_item_data"""
         expected = {
             'layers': [layer.get_cfs_api_data.return_value
                        for layer in self.layers]
         }
-        config = InputConfiguration(self.config_data, self.jinja_env, self.mock_product_catalog)
-        self.assertEqual(expected, config.get_cfs_api_data())
+        config = InputConfiguration(self.config_data, self.mock_instance, self.index,
+                                    self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
+        self.assertEqual(expected, config.get_create_item_data())
 
     def test_get_cfs_api_data_one_failure(self):
         """Test when there is a failure to get data for one layer"""
@@ -511,11 +521,12 @@ class TestInputConfiguration(unittest.TestCase):
         create_fail_msg = 'bad layer'
         failing_layer.get_cfs_api_data.side_effect = ConfigurationCreateError(create_fail_msg)
         err_regex = fr'Failed to create 1 layer\(s\) of configuration {self.config_name}'
-        config = InputConfiguration(self.config_data, self.jinja_env, self.mock_product_catalog)
+        config = InputConfiguration(self.config_data, self.mock_instance, self.index,
+                                    self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
 
         with self.assertLogs(level=logging.ERROR) as logs_cm:
             with self.assertRaisesRegex(ConfigurationCreateError, err_regex):
-                config.get_cfs_api_data()
+                config.get_create_item_data()
 
         self.assertEqual(1, len(logs_cm.records))
         self.assertEqual(f'Failed to create layers[1] of configuration '
@@ -528,11 +539,12 @@ class TestInputConfiguration(unittest.TestCase):
         for layer in self.layers:
             layer.get_cfs_api_data.side_effect = ConfigurationCreateError(create_fail_msg)
         err_regex = fr'Failed to create 3 layer\(s\) of configuration {self.config_name}'
-        config = InputConfiguration(self.config_data, self.jinja_env, self.mock_product_catalog)
+        config = InputConfiguration(self.config_data, self.mock_instance, self.index,
+                                    self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
 
         with self.assertLogs(level=logging.ERROR) as logs_cm:
             with self.assertRaisesRegex(ConfigurationCreateError, err_regex):
-                config.get_cfs_api_data()
+                config.get_create_item_data()
 
         self.assertEqual(self.num_layers, len(logs_cm.records))
         for idx in range(self.num_layers):

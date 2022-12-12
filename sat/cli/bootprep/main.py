@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -37,14 +37,13 @@ from sat.cli.bootprep.errors import (
     BootPrepDocsError,
     BootPrepInternalError,
     BootPrepValidationError,
-    ConfigurationCreateError,
     ImageCreateError,
     InputItemCreateError,
     InputItemValidateError,
     UserAbortException
 )
 from sat.cli.bootprep.input.instance import InputInstance
-from sat.cli.bootprep.configuration import create_configurations
+from sat.cli.bootprep.input.configuration import InputConfigurationLayer
 from sat.cli.bootprep.constants import EXAMPLE_FILE_NAME
 from sat.cli.bootprep.documentation import (
     display_schema,
@@ -204,6 +203,7 @@ def do_bootprep_run(schema_validator, args):
     # large images, so this IMSClient will not use a timeout on HTTP requests
     ims_client.set_timeout(None)
     bos_client = BOSClientCommon.get_bos_client(session)
+    request_dumper = RequestDumper(args.save_files, args.output_dir)
 
     try:
         product_catalog = ProductCatalog()
@@ -223,10 +223,34 @@ def do_bootprep_run(schema_validator, args):
     jinja_env = SandboxedEnvironment()
     jinja_env.globals = var_context.vars
 
-    instance = InputInstance(instance_data, cfs_client, ims_client, bos_client, jinja_env, product_catalog)
+    instance = InputInstance(instance_data, request_dumper, cfs_client, ims_client, bos_client,
+                             jinja_env, product_catalog, args.dry_run)
+
+    # This is kind of an odd way to pass this through, but it works
+    InputConfigurationLayer.resolve_branches = args.resolve_branches
+    try:
+        instance.input_configurations.validate()
+    except InputItemValidateError as err:
+        LOGGER.error(str(err))
+        raise SystemExit(1)
+
+    try:
+        instance.input_configurations.handle_existing_items(args.overwrite_configs,
+                                                            args.skip_existing_configs)
+    except UserAbortException:
+        LOGGER.error('Aborted')
+        raise SystemExit(1)
+    except InputItemCreateError as err:
+        LOGGER.error(str(err))
+        raise SystemExit(1)
+
+    try:
+        instance.input_configurations.create_items()
+    except InputItemCreateError as err:
+        LOGGER.error(str(err))
+        raise SystemExit(1)
 
     # TODO (CRAYSAT-1277): Refactor images to use BaseInputItemCollection
-    # TODO (CRAYSAT-1278): Refactor configurations to use BaseInputItemCollection
     # As part of the above, do more in methods of those classes. Generally, we
     # should do the following, perhaps in methods on `InputInstance`:
     # - Validate the input file, which includes:
@@ -234,11 +258,6 @@ def do_bootprep_run(schema_validator, args):
     #   - Validate that referenced configurations and images exist
     # - Handle any existing objects of the same name
     # - Create the objects, if this is not a dry-run (or validation-only run)
-    try:
-        create_configurations(instance, args)
-    except ConfigurationCreateError as err:
-        LOGGER.error(str(err))
-        raise SystemExit(1)
 
     try:
         create_images(instance, args)
@@ -253,15 +272,14 @@ def do_bootprep_run(schema_validator, args):
     # Must validate first because `handle_existing_items` must know the name of each
     # item to be created, and validation will render names.
     try:
-        instance.input_session_templates.validate(dry_run=args.dry_run)
+        instance.input_session_templates.validate()
     except InputItemValidateError as err:
         LOGGER.error(str(err))
         raise SystemExit(1)
 
     try:
         instance.input_session_templates.handle_existing_items(args.overwrite_templates,
-                                                               args.skip_existing_templates,
-                                                               args.dry_run)
+                                                               args.skip_existing_templates)
     except UserAbortException:
         LOGGER.error('Aborted')
         raise SystemExit(1)
@@ -269,13 +287,11 @@ def do_bootprep_run(schema_validator, args):
         LOGGER.error(str(err))
         raise SystemExit(1)
 
-    if not args.dry_run:
-        try:
-            request_dumper = RequestDumper('BOS session template', args)
-            instance.input_session_templates.create_items(dumper=request_dumper)
-        except InputItemCreateError as err:
-            LOGGER.error(str(err))
-            raise SystemExit(1)
+    try:
+        instance.input_session_templates.create_items()
+    except InputItemCreateError as err:
+        LOGGER.error(str(err))
+        raise SystemExit(1)
 
 
 def do_bootprep_list_available_vars(args):

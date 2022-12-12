@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,7 @@
 Defines a class for the input instance loaded from the input file.
 """
 from sat.cached_property import cached_property
-from sat.cli.bootprep.input.configuration import InputConfiguration
+from sat.cli.bootprep.input.configuration import InputConfigurationCollection
 from sat.cli.bootprep.input.image import BaseInputImage
 from sat.cli.bootprep.input.session_template import InputSessionTemplateCollection
 
@@ -34,12 +34,16 @@ class InputInstance:
     """A representation of the instance loaded from the provided input file.
     """
 
-    def __init__(self, instance_dict, cfs_client, ims_client, bos_client, jinja_env, product_catalog):
+    def __init__(self, instance_dict, request_dumper,
+                 cfs_client, ims_client, bos_client,
+                 jinja_env, product_catalog, dry_run):
         """Create a new InputInstance from the validated contents of an input file.
 
         Args:
             instance_dict (dict): the instance from the input file. This assumes
                 the instance has already been validated against the schema.
+            request_dumper (sat.cli.bootprep.output.RequestDumper): the dumper
+                for dumping request data to files.
             cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client to make
                 requests to the CFS API
             ims_client (sat.apiclient.IMSClient): the IMS API client to make
@@ -50,19 +54,28 @@ class InputInstance:
                 fields supporting Jinja2 templating should be rendered.
             product_catalog (cray_product_catalog.query.ProductCatalog):
                 the product catalog object
+            dry_run (bool): True if this is a dry run, False otherwise.
         """
         self.instance_dict = instance_dict
+        self.request_dumper = request_dumper
         self.cfs_client = cfs_client
         self.ims_client = ims_client
         self.bos_client = bos_client
         self.jinja_env = jinja_env
         self.product_catalog = product_catalog
+        self.dry_run = dry_run
 
     @cached_property
     def input_configurations(self):
-        """list of InputConfiguration: the configurations in the input instance"""
-        return [InputConfiguration(configuration, self.jinja_env, self.product_catalog)
-                for configuration in self.instance_dict.get('configurations', [])]
+        """InputConfigurationCollection: the configurations in the input instance"""
+        return InputConfigurationCollection(
+            self.instance_dict.get('configurations', []),
+            self,
+            jinja_env=self.jinja_env,
+            request_dumper=self.request_dumper,
+            cfs_client=self.cfs_client,
+            product_catalog=self.product_catalog
+        )
 
     @cached_property
     def input_images(self):
@@ -78,6 +91,7 @@ class InputInstance:
             self.instance_dict.get('session_templates', []),
             self,
             jinja_env=self.jinja_env,
+            request_dumper=self.request_dumper,
             bos_client=self.bos_client,
             cfs_client=self.cfs_client,
             ims_client=self.ims_client
@@ -86,7 +100,7 @@ class InputInstance:
     @cached_property
     def input_configuration_names(self):
         """list of str: the names of configurations in the input instance"""
-        return [configuration.name for configuration in self.input_configurations]
+        return [configuration.name for configuration in self.input_configurations.items]
 
     @cached_property
     def input_image_names(self):

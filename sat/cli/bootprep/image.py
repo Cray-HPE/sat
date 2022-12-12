@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -112,7 +112,7 @@ def validate_no_overwritten_ims_bases(input_images):
         for other_image in input_images:
             if other_image.name == name_based_image.ims_data['name']:
                 conflicts_exist = True
-                LOGGER.error(f'{name_based_image} uses {name_based_image.base_description}'
+                LOGGER.error(f'{name_based_image} uses {name_based_image.base_description} '
                              f'which conflicts with the image created by {other_image}.')
 
     if conflicts_exist:

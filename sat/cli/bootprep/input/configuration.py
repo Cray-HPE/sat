@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -29,12 +29,18 @@ import logging
 from urllib.parse import urlparse, urlunparse
 
 from cray_product_catalog.query import ProductCatalogError
+from csm_api_client.service.gateway import APIError
 from csm_api_client.service.vcs import VCSError, VCSRepo
 
 from sat.cached_property import cached_property
 from sat.cli.bootprep.constants import LATEST_VERSION_VALUE
 from sat.cli.bootprep.errors import ConfigurationCreateError
-from sat.cli.bootprep.input.base import jinja_rendered
+from sat.cli.bootprep.input.base import (
+    BaseInputItem,
+    BaseInputItemCollection,
+    InputItemValidateError,
+    jinja_rendered,
+)
 from sat.config import get_config_value
 
 LOGGER = logging.getLogger(__name__)
@@ -303,41 +309,44 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
         return self.matching_product.commit
 
 
-class InputConfiguration:
+class InputConfiguration(BaseInputItem):
     """A CFS Configuration from a bootprep input file."""
+    description = 'CFS configuration'
 
-    create_error_cls = ConfigurationCreateError
+    # Use InputItemValidateError since fields are rendered in validation methods.
+    # TODO: Consider renaming to something like `template_render_err` because this is
+    #       only used by the jinja_rendered decorator.
+    create_error_cls = InputItemValidateError
 
-    def __init__(self, configuration_data, jinja_env, product_catalog):
+    def __init__(self, data, instance, index, jinja_env, cfs_client,
+                 product_catalog, **kwargs):
         """Create a new InputConfiguration.
 
         Args:
-            configuration_data (dict): The data for a configuration, already
-                validated against the bootprep input file schema.
+            data (dict): the data defining the item from the input file, already
+                validated by the bootprep schema.
+            instance (sat.cli.bootprep.input.instance.InputInstance): a reference
+                to the full instance loaded from the input file
+            index (int): the index of the item in the collection in the instance
             jinja_env (jinja2.Environment): the Jinja2 environment in which
                 fields supporting Jinja2 templating should be rendered.
+            cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client
             product_catalog (cray_product_catalog.query.ProductCatalog):
                 the product catalog object
-
-        Raises:
-            ValueError: if any of the layers in the given `configuration_data`
-                have neither 'git' nor 'product' keys in their data. This won't
-                happen if the input is properly validated against the schema.
+            **kwargs: additional keyword arguments
         """
-        self.configuration_data = configuration_data
-        self.jinja_env = jinja_env
+        super().__init__(data, instance, index, jinja_env, **kwargs)
+        self.cfs_client = cfs_client
+        self.product_catalog = product_catalog
+
+        # Additional context to be used when rendering Jinja2 templated properties
+        self.jinja_context = {}
+
         # The 'layers' property is required and must be a list, but it can be empty
         self.layers = [InputConfigurationLayer.get_configuration_layer(layer_data, jinja_env, product_catalog)
-                       for layer_data in self.configuration_data['layers']]
+                       for layer_data in self.data['layers']]
 
-    @property
-    @jinja_rendered
-    def name(self):
-        """The name of the CFS configuration."""
-        # The 'name' property is required
-        return self.configuration_data['name']
-
-    def get_cfs_api_data(self):
+    def get_create_item_data(self):
         """Get the data to pass to the CFS API to create this configuration.
 
         Returns:
@@ -365,3 +374,62 @@ class InputConfiguration:
                                            f'of configuration {self.name}')
 
         return cfs_api_data
+
+    def create(self, payload):
+        """Create the CFS configuration with a request to the CFS API.
+
+        Args:
+            payload (dict): the payload to pass to the CFS API to create the
+                CFS configuration
+        """
+        try:
+            # request_body guaranteed to have 'name' key, so no need to catch ValueError
+            self.cfs_client.put_configuration(self.name, payload)
+        except APIError as err:
+            raise ConfigurationCreateError(f'Failed to create configuration: {err}')
+
+
+class InputConfigurationCollection(BaseInputItemCollection):
+    """The collection of CFS configurations defined in the input file."""
+
+    item_class = InputConfiguration
+
+    def __init__(self, items_data, instance, jinja_env, request_dumper, cfs_client, **kwargs):
+        """Create a new InputConfigurationCollection.
+
+        Args:
+            items_data (list of dict): CFS configuration data from input file,
+                already validated by schema
+            instance (sat.bootprep.input.InputInstance): a reference to the
+                full instance loaded from the config file
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
+            request_dumper (sat.cli.bootprep.output.RequestDumper): the dumper
+                for dumping request data to files.
+            cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client
+            **kwargs: additional keyword arguments
+        """
+        super().__init__(items_data, instance, jinja_env, request_dumper,
+                         cfs_client=cfs_client, **kwargs)
+        self.cfs_client = cfs_client
+
+    def get_existing_items_by_name(self):
+        """Get existing CFS configurations by name.
+
+        See parent class for full docstring.
+        """
+        try:
+            # TODO: Add a get_configurations method to cfs_client?
+            configurations = self.cfs_client.get('configurations').json()
+        except APIError as err:
+            # TODO: Consider whether we need subclasses of InputItemCreateError
+            raise ConfigurationCreateError(f'Unable to get existing CFS configurations: {err}')
+        except ValueError as err:
+            raise ConfigurationCreateError(f'Unable to parse response when getting existing CFS '
+                                           f'configurations: {err}')
+
+        # CFS configurations have unique names, so this is safe
+        return {
+            configuration.get('name'): [configuration]
+            for configuration in configurations
+        }
