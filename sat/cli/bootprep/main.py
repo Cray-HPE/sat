@@ -24,6 +24,8 @@
 """
 Entry point for the bootprep subcommand.
 """
+import json
+from collections import defaultdict
 import logging
 import os
 
@@ -42,6 +44,7 @@ from sat.cli.bootprep.errors import (
     InputItemValidateError,
     UserAbortException
 )
+from sat.cli.bootprep.input.image import IMSInputImage
 from sat.cli.bootprep.input.instance import InputInstance
 from sat.cli.bootprep.input.configuration import InputConfigurationLayer
 from sat.cli.bootprep.constants import EXAMPLE_FILE_NAME
@@ -260,7 +263,7 @@ def do_bootprep_run(schema_validator, args):
     # - Create the objects, if this is not a dry-run (or validation-only run)
 
     try:
-        create_images(instance, args)
+        created_images = create_images(instance, args)
     except ImageCreateError as err:
         LOGGER.error(str(err))
         raise SystemExit(1)
@@ -292,6 +295,53 @@ def do_bootprep_run(schema_validator, args):
     except InputItemCreateError as err:
         LOGGER.error(str(err))
         raise SystemExit(1)
+
+    print_report(args, instance, created_images)
+
+
+def print_report(args, instance, created_images):
+    """Print a report about created items to stdout.
+
+    Args:
+        args (Namespace): parsed commandline arguments
+        instance (InputInstance): the parsed bootprep input file
+        created_images (Iterable[IMSInputImage]): the IMS
+            images which were created as part of the bootprep run
+    """
+    if args.dry_run:
+        return
+
+    created_types_items = [
+        ('configurations', instance.input_configurations),
+        ('images', created_images),
+        ('session_templates', instance.input_session_templates),
+    ]
+    # TODO: Prefer not to special case JSON and YAML here.
+    if args.format == 'pretty':
+        for json_key, items in created_types_items:
+            if json_key == 'images':
+                # Special case for images since they are not BaseInputItems
+                created = items
+                item_class = IMSInputImage
+            else:
+                created = items.created
+                item_class = items.item_class
+
+            if created:
+                report = Report(item_class.report_attrs, title=json_key)
+                report.add_rows(item.report_row() for item in created)
+                print(report)
+    else:
+        report = defaultdict(list)
+        for json_key, items in created_types_items:
+            created = items.created if json_key != 'images' else items
+            for item in created:
+                report[json_key].append(item.report_row())
+        dump_fn = {
+            'json': json.dumps,
+            'yaml': yaml.safe_dump
+        }[args.format]
+        print(dump_fn(report))
 
 
 def do_bootprep_list_available_vars(args):

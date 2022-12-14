@@ -54,6 +54,7 @@ class InputSessionTemplate(BaseInputItem):
             requests to the CFS API
     """
     description = 'BOS session template'
+    report_attrs = ['name', 'configuration']
 
     def __init__(self, data, instance, index, jinja_env, bos_client, cfs_client, ims_client, **kwargs):
         """Create a new InputSessionTemplate.

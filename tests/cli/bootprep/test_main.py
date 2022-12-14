@@ -112,6 +112,7 @@ class TestDoBootprepRun(unittest.TestCase):
         self.overwrite_configs = False
         self.skip_existing_configs = False
         self.dry_run = False
+        self.mock_report = patch('sat.cli.bootprep.main.Report').start()
         self.args = Namespace(action='run', input_file=self.input_file,
                               overwrite_templates=self.overwrite_templates,
                               skip_existing_templates=self.skip_existing_templates,
@@ -119,7 +120,8 @@ class TestDoBootprepRun(unittest.TestCase):
                               skip_existing_configs=self.skip_existing_configs,
                               dry_run=self.dry_run, view_input_schema=False, generate_schema_docs=False,
                               bos_version='v1', recipe_version=None, vars_file=None, vars=None,
-                              output_dir='.', save_files=True, resolve_branches=True)
+                              output_dir='.', save_files=True, resolve_branches=True,
+                              format='pretty')
         self.schema_file = 'schema.yaml'
         self.mock_validator_cls = MagicMock()
         self.mock_load_and_validate_instance = patch('sat.cli.bootprep.main.load_and_validate_instance').start()

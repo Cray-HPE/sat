@@ -313,6 +313,8 @@ class InputConfiguration(BaseInputItem):
     """A CFS Configuration from a bootprep input file."""
     description = 'CFS configuration'
 
+    report_attrs = ['name']
+
     def __init__(self, data, instance, index, jinja_env, cfs_client,
                  product_catalog, **kwargs):
         """Create a new InputConfiguration.

@@ -420,7 +420,8 @@ def create_images(instance, args):
         args: The argparse.Namespace object containing the parsed arguments
             passed to the bootprep subcommand.
 
-    Returns: None
+    Returns:
+        Iterable[IMSInputImage]: images which were created or overwritten
 
     Raises:
         ImageCreateError: if there is a failure to create images
@@ -428,7 +429,7 @@ def create_images(instance, args):
     input_images = instance.input_images
     if not input_images:
         LOGGER.info('Given input did not define any IMS images')
-        return
+        return []
 
     sat_session = SATSession()
     ims_client = IMSClient(sat_session)
@@ -476,7 +477,7 @@ def create_images(instance, args):
 
     if args.dry_run:
         LOGGER.info("Dry run, not creating images.")
-        return
+        return []
 
     # Default to no timeout since it's unknown how long image creation could take
     waiter = ImageCreationGroupWaiter(images_to_create, math.inf)
@@ -490,3 +491,7 @@ def create_images(instance, args):
     if args.delete_ims_jobs:
         for image in images_to_create:
             image.clean_up_image_create_job()
+
+    # TODO: This is pretty ugly, and would probably be better for it to go in
+    #  the GroupWaiter class or the future InputImageCollection class.
+    return set(waiter.members) - set(waiter.pending | waiter.failed)

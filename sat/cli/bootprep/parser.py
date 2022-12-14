@@ -216,7 +216,7 @@ def _add_bootprep_run_subparser(subparsers):
         None
     """
     run_subparser = subparsers.add_parser(
-        'run', help='Run sat bootprep.',
+        'run', help='Run sat bootprep.', parents=[create_format_options()],
         description='Create images, configurations and session templates.'
     )
     run_subparser.add_argument(

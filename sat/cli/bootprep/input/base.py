@@ -35,6 +35,7 @@ from jinja2.sandbox import SecurityError
 
 from sat.cached_property import cached_property
 from sat.cli.bootprep.errors import InputItemCreateError, InputItemValidateError, UserAbortException
+from sat.constants import MISSING_VALUE
 from sat.util import pester_choices
 
 LOGGER = logging.getLogger(__name__)
@@ -209,6 +210,9 @@ class BaseInputItem(Validatable, ABC):
     # The description for the input item, to be overridden by each subclass
     description = 'base input item'
 
+    # Attributes to corresponding to columns in report rows
+    report_attrs = []
+
     # Template rendering generally occurs in validation methods
     template_render_err = InputItemValidateError
 
@@ -297,6 +301,15 @@ class BaseInputItem(Validatable, ABC):
         """
         pass
 
+    def report_row(self):
+        """Create a report row about the item.
+
+        Each row contains the attributes listed in `report_attrs` in order.
+
+        Returns:
+            a list containing the attributes from report_attrs"""
+        return [getattr(self, attr, MISSING_VALUE) for attr in self.report_attrs]
+
 
 class BaseInputItemCollection(ABC, Validatable):
     """An abstract base class for a collection of items defined in the input file.
@@ -337,6 +350,7 @@ class BaseInputItemCollection(ABC, Validatable):
         self.instance = instance
         self.request_dumper = request_dumper
         self.items_to_create = []
+        self.created = []
         self.skipped_items = []
 
     def __str__(self):
@@ -518,6 +532,7 @@ class BaseInputItemCollection(ABC, Validatable):
                     failed_items.append(item)
                     LOGGER.error(f'Failed to create {item_description}: {err}')
                 else:
+                    self.created.append(item)
                     LOGGER.info(f'Successfully created {item_description}')
 
         if failed_items:
