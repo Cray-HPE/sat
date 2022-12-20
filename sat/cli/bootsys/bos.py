@@ -24,17 +24,18 @@
 """
 Bootsys operations that use the Boot Orchestration Service (BOS).
 """
-from collections import defaultdict
 import logging
 import math
 import posixpath
-from random import choices, randint
 import shlex
 import subprocess
 import sys
+from argparse import Namespace
+from collections import defaultdict
+from random import choices, randint
 from textwrap import dedent, indent
 from threading import Event, Thread
-from time import sleep, monotonic
+from time import monotonic, sleep
 
 from inflect import engine
 
@@ -44,14 +45,16 @@ from sat.cli.bootsys.defaults import PARALLEL_CHECK_INTERVAL
 from sat.config import get_config_value
 from sat.session import SATSession
 from sat.util import pester, prompt_continue
-from sat.xname import XName
 from sat.waiting import Waiter
+from sat.xname import XName
 
 LOGGER = logging.getLogger(__name__)
 
 SHUTDOWN_OPERATION = 'shutdown'
 BOOT_OPERATION = 'boot'
-SUPPORTED_BOS_OPERATIONS = (SHUTDOWN_OPERATION, BOOT_OPERATION)
+REBOOT_OPERATION = 'reboot'
+SUPPORTED_BOS_OPERATIONS = (
+    SHUTDOWN_OPERATION, BOOT_OPERATION, REBOOT_OPERATION)
 INFLECTOR = engine()
 
 
@@ -697,6 +700,7 @@ def get_template_nodes_by_state(session_template_data):
 def get_templates_needing_operation(session_templates, operation):
     """
     Get the session templates that still need the given `operation` performed.
+    If the operation is deemed always needed, just return the given `session_templates`
 
     Args:
         session_templates (list): A list of BOS session template names to check.
@@ -715,7 +719,10 @@ def get_templates_needing_operation(session_templates, operation):
             states of nodes in the BOS session template boot sets.
     """
     # Get the state nodes should be in after the operation is performed
-    if operation == BOOT_OPERATION:
+    # If the operation is a reboot, it should always be performed.
+    if operation == REBOOT_OPERATION:
+        return session_templates
+    elif operation == BOOT_OPERATION:
         end_state = 'Ready'
     elif operation == SHUTDOWN_OPERATION:
         end_state = 'Off'
@@ -723,7 +730,6 @@ def get_templates_needing_operation(session_templates, operation):
         raise ValueError("Unknown operation '{}'".format(operation))
 
     bos_client = BOSClientCommon.get_bos_client(SATSession())
-
     needed_st = []
     failed_st = []
     for session_template in session_templates:
@@ -940,6 +946,31 @@ def do_bos_boots(args):
     try:
         do_bos_operations('boot', get_config_value('bootsys.bos_boot_timeout'),
                           limit=args.bos_limit, recursive=args.recursive)
+    except BOSFailure as err:
+        LOGGER.error(err)
+        sys.exit(1)
+
+
+def do_bos_reboots(args: Namespace):
+    """Reboots compute nodes and UANs using BOS.
+
+    Args:
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to this stage.
+
+    Returns: None
+    """
+    if not args.disruptive:
+        prompt_continue('reboot of compute nodes and UANs using BOS')
+
+    try:
+        do_bos_operations(
+            "reboot",
+            get_config_value("bootsys.bos_boot_timeout") +
+            get_config_value("bootsys.bos_shutdown_timeout"),
+            limit=args.bos_limit,
+            recursive=args.recursive,
+        )
     except BOSFailure as err:
         LOGGER.error(err)
         sys.exit(1)

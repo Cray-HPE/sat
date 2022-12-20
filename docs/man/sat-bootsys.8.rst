@@ -2,9 +2,9 @@
  SAT-BOOTSYS
 =============
 
-----------------------------------------------
-Shut down or boot the entire system gracefully
-----------------------------------------------
+-------------------------------------------------------
+Perform boot, shutdown, or reboot actions on the system
+-------------------------------------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
 :Copyright: Copyright 2020-2022 Hewlett Packard Enterprise Development LP.
@@ -101,13 +101,20 @@ the compute nodes and User Access Nodes (UANs). It attempts to check whether
 the nodes are already in an "On" state in the Hardware State Manager before
 attempting to shut them down with BOS.
 
+REBOOT ACTION
+-------------
+The reboot action only supports the ``bos-operations`` stage.
+In the ``bos-operations`` stage, ``sat bootsys`` uses the Boot Orchestration Service (BOS)
+to reboot the nodes specified by one or more BOS session templates, for instance
+the compute nodes and User Access Nodes (UANs). Regardless of node state (on, off),
+(BOS) will perform a ``shutdown`` followed by a ``boot``. 
+
+
 ARGUMENTS
 =========
 
 **ACTION**
-        Specify the action. This should be either ``shutdown`` or ``boot``. The
-        ``shutdown`` action is only partially implemented, and the ``boot``
-        operation is not implemented yet.
+        Specify the action. This should be either ``shutdown``, ``boot``, or ``reboot``.
 
 OPTIONS
 =======
