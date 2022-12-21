@@ -29,6 +29,7 @@ import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
+from sat.cli.bootprep.constants import ALL_KEYS
 from sat.cli.bootprep.errors import (
     BootPrepInternalError,
     BootPrepDocsError,
@@ -121,7 +122,7 @@ class TestDoBootprepRun(unittest.TestCase):
                               dry_run=self.dry_run, view_input_schema=False, generate_schema_docs=False,
                               bos_version='v1', recipe_version=None, vars_file=None, vars=None,
                               output_dir='.', save_files=True, resolve_branches=True,
-                              format='json')
+                              format='json', limit=None)
         self.schema_file = 'schema.yaml'
         self.mock_multireport_cls = patch('sat.cli.bootprep.main.MultiReport').start()
         self.mock_validator_cls = MagicMock()
@@ -135,6 +136,7 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_bos_client = patch('sat.cli.bootprep.main.BOSClientCommon.get_bos_client').start().return_value
         self.mock_configurations = self.mock_input_instance.input_configurations
         self.mock_create_images = patch('sat.cli.bootprep.main.create_images').start()
+        self.mock_validate_images = patch('sat.cli.bootprep.main.validate_images').start()
         self.mock_session_templates = self.mock_input_instance.input_session_templates
         self.mock_product_catalog_cls = patch('sat.cli.bootprep.main.ProductCatalog').start()
         self.mock_product_catalog = self.mock_product_catalog_cls.return_value
@@ -159,14 +161,15 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_input_instance_cls.assert_called_once_with(
             self.validated_data, self.mock_request_dumper, self.mock_cfs_client, self.mock_ims_client,
             self.mock_bos_client, self.mock_sandboxed_environment, self.mock_product_catalog,
-            self.dry_run
+            self.dry_run, ALL_KEYS
         )
         self.mock_configurations.handle_existing_items.assert_called_once_with(
             self.overwrite_configs, self.skip_existing_configs
         )
         self.mock_configurations.validate.assert_called_once_with()
         self.mock_configurations.create_items.assert_called_once_with()
-        self.mock_create_images.assert_called_once_with(self.mock_input_instance, self.args)
+        self.mock_validate_images.assert_called_once_with(self.mock_input_instance, self.args, self.mock_cfs_client)
+        self.mock_create_images.assert_called_once_with(self.mock_input_instance, self.args, self.mock_ims_client)
         self.mock_session_templates.handle_existing_items.assert_called_once_with(
             self.overwrite_templates, self.skip_existing_templates
         )
@@ -226,13 +229,14 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_input_instance_cls.assert_called_once_with(
             self.validated_data, self.mock_request_dumper, self.mock_cfs_client, self.mock_ims_client,
             self.mock_bos_client, self.mock_sandboxed_environment, self.mock_product_catalog,
-            self.dry_run
+            self.dry_run, ALL_KEYS
         )
         self.mock_configurations.handle_existing_items.assert_called_once_with(
             self.overwrite_configs, self.skip_existing_configs
         )
         self.mock_configurations.validate.assert_called_once_with()
         self.mock_configurations.create_items.assert_called_once_with()
+        self.mock_validate_images.assert_not_called()
         self.mock_create_images.assert_not_called()
         self.mock_session_templates.handle_existing_items.assert_not_called()
         self.mock_session_templates.validate.assert_not_called()
@@ -255,14 +259,15 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_input_instance_cls.assert_called_once_with(
             self.validated_data, self.mock_request_dumper, self.mock_cfs_client, self.mock_ims_client,
             self.mock_bos_client, self.mock_sandboxed_environment, self.mock_product_catalog,
-            self.dry_run
+            self.dry_run, ALL_KEYS
         )
         self.mock_configurations.handle_existing_items.assert_called_once_with(
             self.overwrite_configs, self.skip_existing_configs
         )
         self.mock_configurations.validate.assert_called_once_with()
         self.mock_configurations.create_items.assert_called_once_with()
-        self.mock_create_images.assert_called_once_with(self.mock_input_instance, self.args)
+        self.mock_validate_images.assert_called_once_with(self.mock_input_instance, self.args, self.mock_cfs_client)
+        self.mock_create_images.assert_called_once_with(self.mock_input_instance, self.args, self.mock_ims_client)
         self.mock_session_templates.handle_existing_items.assert_not_called()
         self.mock_session_templates.validate.assert_not_called()
         self.mock_session_templates.create_items.assert_not_called()

@@ -46,14 +46,20 @@ from sat.cli.bootprep.errors import (
 from sat.cli.bootprep.input.image import IMSInputImage
 from sat.cli.bootprep.input.instance import InputInstance
 from sat.cli.bootprep.input.configuration import InputConfigurationLayer
-from sat.cli.bootprep.constants import EXAMPLE_FILE_NAME
+from sat.cli.bootprep.constants import (
+    ALL_KEYS,
+    CONFIGURATIONS_KEY,
+    EXAMPLE_FILE_NAME,
+    IMAGES_KEY,
+    SESSION_TEMPLATES_KEY
+)
 from sat.cli.bootprep.documentation import (
     display_schema,
     generate_docs_tarball,
     resource_absolute_path,
 )
 from sat.cli.bootprep.example import BootprepExampleError, get_example_cos_and_uan_data
-from sat.cli.bootprep.image import create_images
+from sat.cli.bootprep.image import create_images, validate_images
 from sat.cli.bootprep.output import ensure_output_directory, RequestDumper
 from sat.cli.bootprep.validate import (
     load_and_validate_instance,
@@ -190,6 +196,10 @@ def do_bootprep_run(schema_validator, args):
     Raises:
         SystemExit: If a fatal error is encountered.
     """
+    if args.limit is None:
+        # Default to creating all items from input file.
+        args.limit = ALL_KEYS
+
     LOGGER.info(f'Validating given input file {args.input_file}')
     try:
         instance_data = load_and_validate_instance(args.input_file, schema_validator)
@@ -227,74 +237,91 @@ def do_bootprep_run(schema_validator, args):
     jinja_env.globals = var_context.vars
 
     instance = InputInstance(instance_data, request_dumper, cfs_client, ims_client, bos_client,
-                             jinja_env, product_catalog, args.dry_run)
+                             jinja_env, product_catalog, args.dry_run, args.limit)
 
     # This is kind of an odd way to pass this through, but it works
     InputConfigurationLayer.resolve_branches = args.resolve_branches
+    # Always validate CFS configurations. The names of CFS configurations from
+    # the input instance are used when validating images and session templates,
+    # and validation ensures the names render.
     try:
         instance.input_configurations.validate()
     except InputItemValidateError as err:
         LOGGER.error(str(err))
         raise SystemExit(1)
 
-    try:
-        instance.input_configurations.handle_existing_items(args.overwrite_configs,
-                                                            args.skip_existing_configs)
-    except UserAbortException:
-        LOGGER.error('Aborted')
-        raise SystemExit(1)
-    except InputItemCreateError as err:
-        LOGGER.error(str(err))
-        raise SystemExit(1)
+    if CONFIGURATIONS_KEY in args.limit:
+        try:
+            instance.input_configurations.handle_existing_items(args.overwrite_configs,
+                                                                args.skip_existing_configs)
+        except UserAbortException:
+            LOGGER.error('Aborted')
+            raise SystemExit(1)
+        except InputItemCreateError as err:
+            LOGGER.error(str(err))
+            raise SystemExit(1)
 
-    try:
-        instance.input_configurations.create_items()
-    except InputItemCreateError as err:
-        LOGGER.error(str(err))
-        raise SystemExit(1)
+        try:
+            instance.input_configurations.create_items()
+        except InputItemCreateError as err:
+            LOGGER.error(str(err))
+            raise SystemExit(1)
+    else:
+        LOGGER.info('Skipping creation of CFS configurations based on value of --limit option.')
 
     # TODO (CRAYSAT-1277): Refactor images to use BaseInputItemCollection
-    # As part of the above, do more in methods of those classes. Generally, we
-    # should do the following, perhaps in methods on `InputInstance`:
-    # - Validate the input file, which includes:
-    #   - Validate names of new objects are unique
-    #   - Validate that referenced configurations and images exist
-    # - Handle any existing objects of the same name
-    # - Create the objects, if this is not a dry-run (or validation-only run)
 
-    try:
-        created_images = create_images(instance, args)
-    except ImageCreateError as err:
-        LOGGER.error(str(err))
-        raise SystemExit(1)
+    # If images or session templates are being created we must validate images,
+    # so session templates that use IMS images from the input instance can find
+    # the corresponding IMS record.
+    if IMAGES_KEY in args.limit or SESSION_TEMPLATES_KEY in args.limit:
+        try:
+            validate_images(instance, args, cfs_client)
+        except ImageCreateError as err:
+            LOGGER.error(str(err))
+            raise SystemExit(1)
+
+    created_images = []
+    if IMAGES_KEY in args.limit:
+        try:
+            created_images = create_images(instance, args, ims_client)
+        except ImageCreateError as err:
+            LOGGER.error(str(err))
+            raise SystemExit(1)
+    else:
+        LOGGER.info('Skipping creation of IMS images based on value of --limit option.')
 
     # The IMSClient caches the list of images. Clear the cache so that we can find
     # newly created images when constructing session templates.
     ims_client.clear_resource_cache(resource_type='image')
 
-    # Must validate first because `handle_existing_items` must know the name of each
-    # item to be created, and validation will render names.
-    try:
-        instance.input_session_templates.validate()
-    except InputItemValidateError as err:
-        LOGGER.error(str(err))
-        raise SystemExit(1)
+    if SESSION_TEMPLATES_KEY in args.limit:
+        # Skip validation if session templates are not being created. Otherwise, a
+        # validation error will occur when creating only CFS configurations because
+        # images required by session templates may not exist yet.
+        try:
+            instance.input_session_templates.validate()
+        except InputItemValidateError as err:
+            LOGGER.error(str(err))
+            raise SystemExit(1)
+        try:
+            # Validation renders the names, so must occur first.
+            instance.input_session_templates.handle_existing_items(args.overwrite_templates,
+                                                                   args.skip_existing_templates)
+        except UserAbortException:
+            LOGGER.error('Aborted')
+            raise SystemExit(1)
+        except InputItemCreateError as err:
+            LOGGER.error(str(err))
+            raise SystemExit(1)
 
-    try:
-        instance.input_session_templates.handle_existing_items(args.overwrite_templates,
-                                                               args.skip_existing_templates)
-    except UserAbortException:
-        LOGGER.error('Aborted')
-        raise SystemExit(1)
-    except InputItemCreateError as err:
-        LOGGER.error(str(err))
-        raise SystemExit(1)
-
-    try:
-        instance.input_session_templates.create_items()
-    except InputItemCreateError as err:
-        LOGGER.error(str(err))
-        raise SystemExit(1)
+        try:
+            instance.input_session_templates.create_items()
+        except InputItemCreateError as err:
+            LOGGER.error(str(err))
+            raise SystemExit(1)
+    else:
+        LOGGER.info('Skipping creation of BOS session templates based on value of --limit option.')
 
     print_report(args, instance, created_images)
 

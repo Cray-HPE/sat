@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bootprep run.
 - The value of the `playbook` property of CFS configuration layers in `sat
   bootprep` input files can now be rendered with Jinja2 templates.
+- Added a new `--limit` option to `sat bootprep run` that allows limiting which
+  types of items from the input file are created.
 
 ### Changed
 - Refactored to use common `APIGatewayClient`, `CFSClient`, `HSMClient`, and

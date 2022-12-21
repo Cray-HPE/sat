@@ -29,6 +29,7 @@ import re
 
 from sat.apiclient import APIError
 from sat.cached_property import cached_property
+from sat.cli.bootprep.constants import CONFIGURATIONS_KEY, IMAGES_KEY
 from sat.cli.bootprep.input.base import (
     BaseInputItem,
     BaseInputItemCollection,
@@ -113,8 +114,11 @@ class InputSessionTemplate(BaseInputItem):
         Raises:
             InputItemValidateError: if the configuration does not exist
         """
-        # First check if the configuration is being created anew by the same input file
-        if self.configuration in self.instance.input_configuration_names:
+        # Assume configs from input file exist when not being excluded and in dry-run mode
+        input_configs_exist = CONFIGURATIONS_KEY in self.instance.limit and self.instance.dry_run
+
+        # Check if the configuration would be created by the input file
+        if input_configs_exist and self.configuration in self.instance.input_configuration_names:
             return
 
         try:
@@ -233,7 +237,10 @@ class InputSessionTemplateV1(InputSessionTemplate):
         """
         # First check if the image is being created anew by the same input file
         input_image_names = [image.name for image in self.instance.input_images]
-        if self.image in input_image_names:
+
+        # Assume images from the input file exist when not being excluded and in dry-run mode
+        input_images_exist = self.instance.dry_run and IMAGES_KEY in self.instance.limit
+        if input_images_exist and self.image in input_image_names:
             image_name = self.image
         else:
             # Accessing the image_record queries IMS to find the image
@@ -292,13 +299,18 @@ class InputSessionTemplateV2(InputSessionTemplate):
         """
         # First check if the image is being created anew by the same input file
         input_image_names = [image.name for image in self.instance.input_images]
-        if self.ims_image_name and self.ims_image_name in input_image_names:
+        # Assume images from the input file exist when not being excluded and in dry-run mode
+        input_images_exist = self.instance.dry_run and IMAGES_KEY in self.instance.limit
+        if self.ims_image_name and input_images_exist and self.ims_image_name in input_image_names:
             image_name = self.ims_image_name
         elif self.image_ref:
             if self.image_ref_input_image:
-                # Found the image from the input instance by its ref
-                # Do not look up the image record in IMS in case this is a dry run.
-                image_name = self.image_ref_input_image.name
+                if input_images_exist:
+                    image_name = self.image_ref_input_image.name
+                else:
+                    # Either not a dry-run or images are being skipped via --limit,
+                    # so look it up in IMS.
+                    image_name = self.image_record['name']
             else:
                 # If the image_ref does not exist in the input instance, this is an error
                 raise InputItemValidateError(f'No image exists with ref_name={self.image_ref} '
