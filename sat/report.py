@@ -24,10 +24,10 @@
 """
 Class to aid with unified formatting and printing of data.
 """
-
-import logging
 from collections import OrderedDict
+import logging
 import sys
+from typing import Any, List
 
 import inflect
 from parsec import ParseError
@@ -46,14 +46,39 @@ from sat.util import (
     json_dump
 )
 
-
 LOGGER = logging.getLogger(__name__)
 inf = inflect.engine()
+
+
+def dump_structure(report_format: str, struct: Any) -> str:
+    """Dump a Python structure (e.g. a dict) as a serialized string
+
+    Args:
+        report_format: "json" or "yaml", which determines
+        struct: the structure to dump
+
+    Returns:
+        a string containing the structure's contents, serialized
+        in the format given by `report_format`
+
+    Raises:
+        ValueError: if report_format is not a valid report format
+    """
+    if report_format == 'yaml':
+        dump_fn = yaml_dump
+    elif report_format == 'json':
+        dump_fn = json_dump
+    else:
+        # This case theoretically shouldn't happen.
+        raise ValueError('Invalid report format.')
+
+    return dump_fn(struct)
 
 
 class Report:
     """Designed to serve as a consistent output and formatter.
     """
+
     def __init__(self, headings, title=None,
                  sort_by=None, reverse=False,
                  no_headings=None, no_borders=None,
@@ -91,7 +116,7 @@ class Report:
                 If None, then default to the normal behavior of show_empty and show_missing.
             display_headings: a list of headings which should be included in the
                 output. This list should be a subset of headings.
-            print_format: (str) The format to to return the report. Expected to be 'pretty',
+            print_format: (str) The format to return the report. Expected to be 'pretty',
                 'json', or 'yaml'.
 
         """
@@ -306,7 +331,8 @@ class Report:
         missing columns are removed.
 
         Returns:
-            a list of OrderedDicts containing sorted rows which match the
+            a 2-tuple containing a list of headings for the output, and a
+            list of OrderedDicts containing sorted rows which match the
             filters given in the filter strings of the Report. The columns
             returned are limited to those in the display_headings minus those
             whose rows contain only EMPTY or MISSING.
@@ -359,15 +385,36 @@ class Report:
 
         return pt
 
+    def get_dumpable_structure(self):
+        """Get a structure which can be natively dumped as YAML or JSON.
+
+        Returns:
+            Union[List, Dict]: if the report has a title, then return
+                a dict which has the title as its only key, and a list
+                of the rows as its value. Otherwise, return a list of
+                dicts representing the rows.
+        """
+        _, rows_to_print = self.get_rows_to_print()
+
+        if not self.no_headings and self.title:
+            return {self.title: rows_to_print}
+        else:
+            if not rows_to_print:
+                return []
+            return rows_to_print
+
     def get_formatted_report(self, report_format):
         """Retrieve the report's data according to the given format.
 
-            Args:
-                report_format (str): The format to print the report in. Expected
-                to be 'pretty', 'yaml', or 'json'.
+        Args:
+            report_format (str): The format to print the report in. Expected
+            to be 'pretty', 'yaml', or 'json'.
 
-            Returns:
-                The report formatted as a string.
+        Returns:
+            The report formatted as a string.
+
+        Raises:
+            ValueError: if report_format is not a valid format
         """
         if report_format == 'pretty':
             heading = ''
@@ -382,19 +429,90 @@ class Report:
                 return heading + str(pt)
             else:
                 return ''
-        elif report_format == 'yaml':
-            dump_fn = yaml_dump
-        elif report_format == 'json':
-            dump_fn = json_dump
         else:
-            # This case theoretically shouldn't happen.
-            raise ValueError('Invalid report format.')
+            return dump_structure(report_format, self.get_dumpable_structure())
 
-        _, rows_to_print = self.get_rows_to_print()
 
-        if not self.no_headings and self.title:
-            return dump_fn({self.title: rows_to_print})
+class MultiReport:
+    """A container for multiple reports"""
+
+    def __init__(self, **kwargs):
+        """Constructor for MultiReports.
+
+        Args:
+            kwargs: kewyord arguments to be passed to each created Report class.
+                See the Report() constructor.
+        """
+        self._print_format = kwargs.get('print_format')
+        self.report_kwargs = kwargs
+        self.reports: List[Report] = []
+
+    def add_report(self, title: str, headings: List[str], **kwargs) -> Report:
+        """Add a new Report to this MultiReport.
+
+        Args:
+            title: the title of the report
+            headings: headings to use for the new report
+            kwargs: keyword arguments accepted by Report() to be passed
+                through to each Report. If no kwargs are passed, then
+                the kwargs passed into the MultiReport constructor will
+                be passed into the Report constructor. Otherwise, default
+                values will be used for the Report kwargs.
+
+        Returns:
+            the constructed Report
+        """
+        new_report = Report(headings, title=title, **(kwargs or self.report_kwargs))
+        self.reports.append(new_report)
+        return new_report
+
+    @property
+    def print_format(self) -> str:
+        """The print format to use for the MultiReport.
+
+        If the print_format argument was passed to the MultiReport constructor
+        or the print_format attribute is set on the MultiReport object, then
+        that format is used. Otherwise, if all constituent Reports have the
+        same format, that is used; otherwise, the default value is "pretty".
+        """
+        if self._print_format:
+            return self._print_format
+        report_formats_in_use = set(r.print_format for r in self.reports)
+        if len(report_formats_in_use) != 1:
+            LOGGER.warning('Multiple report formats are in use (%s); defaulting to "pretty"',
+                           ', '.join(report_formats_in_use))
+            return 'pretty'
         else:
-            if not rows_to_print:
-                return ''
-            return dump_fn(rows_to_print)
+            return report_formats_in_use.pop()
+
+    @print_format.setter
+    def print_format(self, value: str):
+        self._print_format = value
+
+    def __str__(self):
+        return self.get_formatted_report(self.print_format)
+
+    def get_formatted_report(self, report_format: str) -> str:
+        """Get a string of the report in the given format.
+
+        Args:
+            report_format: the format to use. May be "pretty",
+                "yaml", or "json".
+
+        Returns:
+            The formatted report
+        """
+        if report_format == 'pretty':
+            return '\n'.join(report.get_formatted_report(report_format)
+                             for report in self.reports)
+        else:
+            all_reports = {}
+            for report in self.reports:
+                dump = report.get_dumpable_structure()
+
+                # defaultdict is not natively supported by PyYAML,
+                # so we do this by hand.
+                if report.title not in all_reports:
+                    all_reports[report.title] = []
+                all_reports[report.title].extend(dump[report.title])
+            return dump_structure(report_format, all_reports)

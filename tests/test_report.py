@@ -26,7 +26,7 @@ Unit tests for sat/report.py.
 """
 from collections import defaultdict
 from copy import deepcopy
-from itertools import repeat, permutations
+from itertools import combinations_with_replacement, permutations, repeat
 import unittest
 from unittest.mock import call, Mock, patch
 
@@ -34,7 +34,7 @@ from parsec import ParseError
 import yaml
 import json
 
-from sat.report import Report
+from sat.report import Report, MultiReport
 from sat.constants import EMPTY_VALUE, MISSING_VALUE
 from sat.xname import XName
 
@@ -677,3 +677,66 @@ class TestReportEmptyMissingRemoval(unittest.TestCase):
         # headings and data should be unaltered
         self.assertEqual(self.headings, headings)
         self.assertEqual(self.sample_data, out_data)
+
+
+class TestMultiReport(unittest.TestCase):
+    """Tests for the MultiReport class"""
+    def setUp(self):
+        self.multireport = MultiReport()
+        self.reports = {
+            'bread_recipe': [
+                ['flour', '500 g'],
+                ['water', '300 mL'],
+                ['yeast', '2 g']
+            ],
+            'variables': [
+                ['foo'],
+                ['bar']
+            ],
+        }
+        self.recipe_headings = ['ingredient', 'amount']
+        self.variables_headings = ['name']
+        self.recipe_report = self.multireport.add_report('Bread Recipe', self.recipe_headings)
+        self.variables_report = self.multireport.add_report('Variables', self.variables_headings)
+
+        self.recipe_report.add_rows(self.reports['bread_recipe'])
+        self.variables_report.add_rows(self.reports['variables'])
+
+    def test_adding_multiple_reports(self):
+        """Test that reports are added with the correct headings"""
+        for idx, headings in enumerate([self.recipe_headings, self.variables_headings]):
+            self.assertEqual(self.multireport.reports[idx].headings, headings)
+
+    def test_pretty_printing_multireport(self):
+        """Test pretty-printing a MultiReport"""
+        pretty_report = self.multireport.get_formatted_report('pretty')
+        self.assertIn(self.recipe_report.get_formatted_report('pretty'), pretty_report)
+        self.assertIn(self.variables_report.get_formatted_report('pretty'), pretty_report)
+
+    def test_multireport_with_multiple_formats(self):
+        """Test that a MultiReport with multiple formats in use defaults to pretty format"""
+        for recipe_format, variables_format in combinations_with_replacement(['pretty', 'json', 'yaml'], 2):
+            self.recipe_report.print_format = recipe_format
+            self.variables_report.print_format = variables_format
+
+            if recipe_format != variables_format:
+                with self.assertLogs(level='WARN'):
+                    self.assertEqual(self.multireport.print_format, 'pretty')
+            else:
+                self.assertEqual(self.multireport.print_format, recipe_format)
+                self.assertEqual(self.multireport.print_format, variables_format)
+
+    def test_dumping_structured_multireports(self):
+        """Test dumping a MultiReport as json and yaml"""
+        for format_name, loader in [('json', json.loads), ('yaml', yaml.safe_load)]:
+            report = loader(self.multireport.get_formatted_report(format_name))
+            self.assertEqual(report, {
+                'Bread Recipe': [
+                    dict(zip(self.recipe_headings, row))
+                    for row in self.reports['bread_recipe']
+                ],
+                'Variables': [
+                    dict(zip(self.variables_headings, row))
+                    for row in self.reports['variables']
+                ],
+            })

@@ -24,12 +24,11 @@
 """
 Entry point for the bootprep subcommand.
 """
-import json
-from collections import defaultdict
 import logging
 import os
 
 from cray_product_catalog.query import ProductCatalog, ProductCatalogError
+import inflect
 from jinja2.sandbox import SandboxedEnvironment
 import yaml
 
@@ -63,11 +62,12 @@ from sat.cli.bootprep.validate import (
 )
 from sat.cli.bootprep.vars import VariableContext, VariableContextError
 from sat.config import get_config_value
-from sat.report import Report
+from sat.report import MultiReport, Report
 from sat.session import SATSession
 
 
 LOGGER = logging.getLogger(__name__)
+inf = inflect.engine()
 
 
 def load_vars_or_exit(recipe_version, vars_file_path, additional_vars):
@@ -316,32 +316,26 @@ def print_report(args, instance, created_images):
         ('images', created_images),
         ('session_templates', instance.input_session_templates),
     ]
-    # TODO: Prefer not to special case JSON and YAML here.
-    if args.format == 'pretty':
-        for json_key, items in created_types_items:
-            if json_key == 'images':
-                # Special case for images since they are not BaseInputItems
-                created = items
-                item_class = IMSInputImage
-            else:
-                created = items.created
-                item_class = items.item_class
+    bootprep_report = MultiReport(print_format=args.format)
+    for item_type_name, items in created_types_items:
+        if item_type_name == 'images':
+            # Special case for images since they are not BaseInputItems
+            created = items
+            item_class = IMSInputImage
+        else:
+            created = items.created
+            skipped = items.skipped_items
+            item_class = items.item_class
 
-            if created:
-                report = Report(item_class.report_attrs, title=json_key)
-                report.add_rows(item.report_row() for item in created)
-                print(report)
-    else:
-        report = defaultdict(list)
-        for json_key, items in created_types_items:
-            created = items.created if json_key != 'images' else items
-            for item in created:
-                report[json_key].append(item.report_row())
-        dump_fn = {
-            'json': json.dumps,
-            'yaml': yaml.safe_dump
-        }[args.format]
-        print(dump_fn(report))
+        if not created:
+            continue
+
+        report_title = inf.plural_noun(item_class.description) if args.format == 'pretty' else item_type_name
+        current_report = bootprep_report.add_report(report_title, item_class.report_attrs)
+        for item in created:
+            current_report.add_row(item.report_row())
+
+    print(bootprep_report)
 
 
 def do_bootprep_list_available_vars(args):

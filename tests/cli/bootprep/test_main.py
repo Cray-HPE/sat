@@ -121,8 +121,9 @@ class TestDoBootprepRun(unittest.TestCase):
                               dry_run=self.dry_run, view_input_schema=False, generate_schema_docs=False,
                               bos_version='v1', recipe_version=None, vars_file=None, vars=None,
                               output_dir='.', save_files=True, resolve_branches=True,
-                              format='pretty')
+                              format='json')
         self.schema_file = 'schema.yaml'
+        self.mock_multireport_cls = patch('sat.cli.bootprep.main.MultiReport').start()
         self.mock_validator_cls = MagicMock()
         self.mock_load_and_validate_instance = patch('sat.cli.bootprep.main.load_and_validate_instance').start()
         self.validated_data = self.mock_load_and_validate_instance.return_value
@@ -177,6 +178,7 @@ class TestDoBootprepRun(unittest.TestCase):
             'Input file successfully validated against schema'
         ]
         self.assertEqual(expected_msgs, info_msgs)
+        self.mock_multireport_cls.assert_called_once()
 
     def test_do_bootprep_run_validation_error(self):
         """Test do_bootprep_run when an error occurs loading the input file"""
@@ -191,6 +193,7 @@ class TestDoBootprepRun(unittest.TestCase):
         self.assertEqual(validation_err_msg, logs_cm.records[0].msg)
         self.mock_load_and_validate_instance.assert_called_once_with(
             self.input_file, self.mock_validator_cls)
+        self.mock_multireport_cls.assert_not_called()
 
     def test_do_bootprep_run_validation_error_collection(self):
         """Test do_bootprep_run when an error occurs validating the input against the schema"""
@@ -205,6 +208,7 @@ class TestDoBootprepRun(unittest.TestCase):
                          logs_cm.records[0].msg)
         self.mock_load_and_validate_instance.assert_called_once_with(
             self.input_file, self.mock_validator_cls)
+        self.mock_multireport_cls.assert_not_called()
 
     def test_do_bootprep_run_configuration_create_error(self):
         """Test do_bootprep_run when an error occurs creating a configuration"""
@@ -233,6 +237,7 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_session_templates.handle_existing_items.assert_not_called()
         self.mock_session_templates.validate.assert_not_called()
         self.mock_session_templates.create_items.assert_not_called()
+        self.mock_multireport_cls.assert_not_called()
 
     def test_do_bootprep_run_image_create_error(self):
         """Test do_bootprep_run when an error occurs creating an image"""
@@ -261,6 +266,8 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_session_templates.handle_existing_items.assert_not_called()
         self.mock_session_templates.validate.assert_not_called()
         self.mock_session_templates.create_items.assert_not_called()
+
+        self.mock_multireport_cls.assert_not_called()
 
 
 class TestDoBootprep(unittest.TestCase):
