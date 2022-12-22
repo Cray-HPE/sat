@@ -7,7 +7,7 @@ Prepare to boot nodes with images and configurations
 ----------------------------------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2021-2022 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2021-2023 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -97,11 +97,17 @@ RUN OPTIONS
 
 These options only apply to the ``run`` action.
 
+**-d, --dry-run**
+        Do a dry-run. Do not actually create CFS configurations, build
+        images, customize images, or create BOS session templates. This still
+        performs validation of the input file.
+
 **-s, --save-files**
-        Save files that could be passed to the CFS and BOS to create CFS
-        configurations and BOS session templates, respectively. If
-        ``--dry-run`` is specified, then only files for CFS configurations will
-        be saved.
+        Save files containing the payloads to be passed to the CFS and BOS
+        APIs to create CFS configurations and BOS session templates,
+        respectively. Note that if ``--dry-run`` is specified, the BOS session
+        template payloads may be incomplete if the images referenced by the BOS
+        session templates do not exist yet.
 
 **--no-resolve-branches**
         Do not look up the HEAD commits of branches name before creating CFS
