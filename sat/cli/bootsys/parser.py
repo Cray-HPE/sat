@@ -28,7 +28,6 @@ from collections import namedtuple
 
 from sat.cli.bootsys.stages import STAGES_BY_ACTION
 
-
 TimeoutSpec = namedtuple('TimeoutSpec', ['option_prefix', 'applicable_actions',
                                          'default', 'condition'])
 
@@ -238,6 +237,19 @@ def _add_bootsys_boot_subparser(subparsers):
     _add_bootsys_action_subparser(subparsers, 'boot')
 
 
+def _add_bootsys_reboot_subparser(subparsers):
+    """Add the reboot subparser to the parent bootsys parser.
+
+    Args:
+        subparsers: The argparse.ArgumentParser object returned by the
+            add_subparsers method.
+
+    Returns:
+        None
+    """
+    _add_bootsys_action_subparser(subparsers, "reboot")
+
+
 def add_bootsys_subparser(subparsers):
     """Add the bootsys subparser to the parent parser.
 
@@ -249,8 +261,8 @@ def add_bootsys_subparser(subparsers):
         None
     """
     bootsys_parser = subparsers.add_parser(
-        'bootsys', help='Boot or shut down the system.',
-        description='Boot or shut down the entire system, including the '
+        'bootsys', help='Boot, shutdown, or reboot the system.',
+        description='Perform boot, shutdown, or reboot actions on the system, including the '
                     'compute nodes, user access nodes, and non-compute '
                     'nodes running the management software.',
     )
@@ -267,3 +279,4 @@ def add_bootsys_subparser(subparsers):
 
     _add_bootsys_shutdown_subparser(actions_subparsers)
     _add_bootsys_boot_subparser(actions_subparsers)
+    _add_bootsys_reboot_subparser(actions_subparsers)

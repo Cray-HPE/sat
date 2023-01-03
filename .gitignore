@@ -16,3 +16,4 @@ venv
 *.swp
 
 nosetests.xml
+.vscode/

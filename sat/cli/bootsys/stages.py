@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -72,5 +72,8 @@ STAGES_BY_ACTION = {
         ('k8s-check', ('k8s', 'do_k8s_check')),
         ('cabinet-power', ('cabinet_power', 'do_cabinets_power_on')),
         ('bos-operations', ('bos', 'do_bos_boots'))
-    ])
+    ]),
+    'reboot': OrderedDict([
+        ('bos-operations', ('bos', 'do_bos_reboots')),
+    ]),
 }
