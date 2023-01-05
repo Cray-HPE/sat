@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -72,7 +72,7 @@ class BaseInputImage(DependencyGroupMember, ABC):
             and renaming have been completed, as applicable
     """
 
-    create_error_cls = ImageCreateError
+    template_render_err = ImageCreateError
 
     def __init__(self, image_data, index, instance, jinja_env, product_catalog, ims_client, cfs_client):
         """Create a new InputImage

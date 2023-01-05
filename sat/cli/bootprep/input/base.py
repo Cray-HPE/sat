@@ -84,7 +84,7 @@ def jinja_rendered(func):
 
     This decorator uses the following additional optional attributes of the instance:
 
-        create_error_cls: the exception class that should be raised if there is
+        template_render_err: the exception class that should be raised if there is
             an issue rendering the template. Defaults to InputItemValidateError
             if not set.
 
@@ -102,7 +102,7 @@ def jinja_rendered(func):
             return unrendered_result
 
         # Default to InputItemCreateError if no error class is specified
-        error_cls = getattr(self, 'create_error_cls', InputItemValidateError)
+        error_cls = getattr(self, 'template_render_err', InputItemValidateError)
 
         # Default to no additional context if not set
         context = getattr(self, 'jinja_context', {})
@@ -209,7 +209,8 @@ class BaseInputItem(Validatable, ABC):
     # The description for the input item, to be overridden by each subclass
     description = 'base input item'
 
-    create_error_cls = InputItemValidateError
+    # Template rendering generally occurs in validation methods
+    template_render_err = InputItemValidateError
 
     def __init__(self, data, instance, index, jinja_env, **_):
         """Create a new BaseInputItem.
@@ -388,7 +389,7 @@ class BaseInputItemCollection(ABC, Validatable):
         for item in self.items:
             try:
                 counts_by_name[item.name] += 1
-            except self.item_class.create_error_cls as err:
+            except self.item_class.template_render_err as err:
                 failed_name_renders += 1
                 LOGGER.error(f'Failed to render name of {item}: {err}')
 

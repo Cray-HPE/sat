@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -133,11 +133,6 @@ class InputItemCreateError(Exception):
 
 class InputItemValidateError(Exception):
     """An error occurred while validating an item specified in the input file."""
-    pass
-
-
-class ConfigurationCreateError(InputItemCreateError):
-    """A fatal error occurred during the creation of CFS configurations."""
     pass
 
 

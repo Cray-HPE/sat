@@ -55,9 +55,6 @@ class InputSessionTemplate(BaseInputItem):
     """
     description = 'BOS session template'
 
-    # Use InputItemValidateError since fields are rendered in validation methods.
-    create_error_cls = InputItemValidateError
-
     def __init__(self, data, instance, index, jinja_env, bos_client, cfs_client, ims_client, **kwargs):
         """Create a new InputSessionTemplate.
 
