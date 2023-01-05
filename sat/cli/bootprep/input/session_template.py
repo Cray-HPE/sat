@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -54,9 +54,6 @@ class InputSessionTemplate(BaseInputItem):
             requests to the CFS API
     """
     description = 'BOS session template'
-
-    # Use InputItemValidateError since fields are rendered in validation methods.
-    create_error_cls = InputItemValidateError
 
     def __init__(self, data, instance, index, jinja_env, bos_client, cfs_client, ims_client, **kwargs):
         """Create a new InputSessionTemplate.
@@ -116,8 +113,7 @@ class InputSessionTemplate(BaseInputItem):
             InputItemValidateError: if the configuration does not exist
         """
         # First check if the configuration is being created anew by the same input file
-        input_config_names = [config.name for config in self.instance.input_configurations]
-        if self.configuration in input_config_names:
+        if self.configuration in self.instance.input_configuration_names:
             return
 
         try:
@@ -145,7 +141,7 @@ class InputSessionTemplate(BaseInputItem):
             InputItemValidateError: if the image cannot be verified to exist
         """
 
-    def get_bos_api_data(self):
+    def get_create_item_data(self):
         """Get the data to pass to the BOS API to create this session template.
 
         Returns:
@@ -159,11 +155,25 @@ class InputSessionTemplate(BaseInputItem):
         }
         for boot_set_name, boot_set_data in self.boot_sets.items():
             boot_set_api_data = self.bos_client.get_base_boot_set_data()
-            image_record = self.image_record
+            try:
+                image_record = self.image_record
+            except InputItemValidateError as err:
+                # If it's a dry-run, the image may not exist yet.
+                if self.instance.dry_run:
+                    boot_set_etag = 'TBD'
+                    boot_set_path = 'TBD'
+                    boot_set_type = 'TBD'
+                else:
+                    raise InputItemCreateError(str(err)) from err
+            else:
+                boot_set_etag = get_val_by_path(image_record, 'link.etag')
+                boot_set_path = get_val_by_path(image_record, 'link.path')
+                boot_set_type = get_val_by_path(image_record, 'link.type')
+
             boot_set_api_data.update({
-                'etag': get_val_by_path(image_record, 'link.etag'),
-                'path': get_val_by_path(image_record, 'link.path'),
-                'type': get_val_by_path(image_record, 'link.type')
+                'etag': boot_set_etag,
+                'path': boot_set_path,
+                'type': boot_set_type
             })
             boot_set_api_data.update(boot_set_data)
             api_data['boot_sets'][boot_set_name] = boot_set_api_data
@@ -197,14 +207,15 @@ class InputSessionTemplate(BaseInputItem):
             raise InputItemValidateError(f'An error occurred while querying the image record '
                                          f'with ID {ims_image_id}: {err}') from err
 
-    def create(self, dumper=None):
-        """Create the session template with a request to the BOS API."""
-        request_body = self.get_bos_api_data()
-        if dumper is not None:
-            dumper.write_request_body(self.name, request_body)
+    def create(self, payload):
+        """Create the session template with a request to the BOS API.
 
+        Args:
+            payload (dict): the payload to pass to the BOS API to create the
+                BOS session template
+        """
         try:
-            self.bos_client.create_session_template(request_body)
+            self.bos_client.create_session_template(payload)
         except APIError as err:
             raise SessionTemplateCreateError(f'Failed to create session template: {err}')
 
@@ -285,6 +296,7 @@ class InputSessionTemplateV2(InputSessionTemplate):
         elif self.image_ref:
             if self.image_ref_input_image:
                 # Found the image from the input instance by its ref
+                # Do not look up the image record in IMS in case this is a dry run.
                 image_name = self.image_ref_input_image.name
             else:
                 # If the image_ref does not exist in the input instance, this is an error
@@ -356,7 +368,8 @@ class InputSessionTemplateCollection(BaseInputItemCollection):
 
     item_class = InputSessionTemplate
 
-    def __init__(self, items_data, instance, jinja_env, bos_client, cfs_client, ims_client, **kwargs):
+    def __init__(self, items_data, instance, jinja_env, request_dumper,
+                 bos_client, cfs_client, ims_client, **kwargs):
         """Create a new InputSessionTemplateCollection.
 
         Args:
@@ -365,14 +378,16 @@ class InputSessionTemplateCollection(BaseInputItemCollection):
             instance (sat.bootprep.input.InputInstance): a reference to the
                 full instance loaded from the config file
             jinja_env (jinja2.Environment): the Jinja2 environment in which
-                fields supporting Jinja2 templating should be rendered.
+                fields supporting Jinja2 templating should be rendered
+            request_dumper (sat.cli.bootprep.output.RequestDumper): the dumper
+                for dumping request data to files.
             bos_client (sat.apiclient.BOSClientCommon): the BOS API client
             cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client
             ims_client (sat.apiclient.IMSClient): the IMS API client
             **kwargs: additional keyword arguments
         """
-        super().__init__(items_data, instance, jinja_env, bos_client=bos_client,
-                         cfs_client=cfs_client, ims_client=ims_client, **kwargs)
+        super().__init__(items_data, instance, jinja_env, request_dumper,
+                         bos_client=bos_client, cfs_client=cfs_client, ims_client=ims_client, **kwargs)
         self.bos_client = bos_client
         self.cfs_client = cfs_client
         self.ims_client = ims_client

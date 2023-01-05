@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -226,13 +226,13 @@ def _add_bootprep_run_subparser(subparsers):
     run_subparser.add_argument(
         '--dry-run', '-d', action='store_true',
         help='Do a dry-run. Do not actually create CFS configurations, '
-             'build images, customize images, or create BOS session templates, '
-             'but walk through all the other steps.'
+             'build images, customize images, or create BOS session templates.'
     )
     run_subparser.add_argument(
         '--save-files', '-s', action='store_true',
-        help='Save files that could be passed to the CFS and BOS to create CFS '
-             'configurations and BOS session templates, respectively.'
+        help='Save files containing the payloads to be passed to the CFS and '
+             'BOS APIs to create CFS configurations and BOS session templates, '
+             'respectively.'
     )
     run_subparser.add_argument(
         '--no-resolve-branches', action='store_false', dest='resolve_branches',
