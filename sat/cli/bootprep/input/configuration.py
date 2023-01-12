@@ -81,6 +81,7 @@ class InputConfigurationLayer(ABC):
         self.jinja_env = jinja_env
 
     @property
+    @jinja_rendered
     def playbook(self):
         """str or None: the playbook specified in the layer"""
         return self.layer_data.get('playbook')

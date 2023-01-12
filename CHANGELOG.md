@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a report to the output of `sat bootprep` which describes the
   configurations, images, and session templates which were created during the
   bootprep run.
+- The value of the `playbook` property of CFS configuration layers in `sat
+  bootprep` input files can now be rendered with Jinja2 templates.
 
 ### Changed
 - Refactored to use common `APIGatewayClient`, `CFSClient`, `HSMClient`, and
