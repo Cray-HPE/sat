@@ -339,19 +339,18 @@ def print_report(args, instance, created_images):
         return
 
     created_types_items = [
-        ('configurations', instance.input_configurations),
-        ('images', created_images),
-        ('session_templates', instance.input_session_templates),
+        (CONFIGURATIONS_KEY, instance.input_configurations),
+        (IMAGES_KEY, created_images),
+        (SESSION_TEMPLATES_KEY, instance.input_session_templates),
     ]
     bootprep_report = MultiReport(print_format=args.format)
     for item_type_name, items in created_types_items:
-        if item_type_name == 'images':
+        if item_type_name == IMAGES_KEY:
             # Special case for images since they are not BaseInputItems
             created = items
             item_class = IMSInputImage
         else:
             created = items.created
-            skipped = items.skipped_items
             item_class = items.item_class
 
         if not created:
