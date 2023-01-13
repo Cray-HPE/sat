@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -54,7 +54,7 @@ setup(
     author='Hewlett Packard Enterprise Development LP',
     license='MIT',
     packages=find_packages(exclude=['tests', 'tests.*', 'tools', 'tools.*']),
-    python_requires='>=3, <4',
+    python_requires='>=3.8, <4',
     # Top-level dependencies are parsed from requirements.txt
     install_requires=install_requires,
 

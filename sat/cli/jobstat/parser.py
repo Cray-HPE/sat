@@ -21,26 +21,26 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+"""
+The parser for the jobstat subcommand.
+"""
+import sat.parsergroups
 
-NAME ?= cray-sat
-VERSION ?= $(shell build_scripts/version.sh)
-DOCKER_BUILD = docker build . --pull $(DOCKER_ARGS)
-DEFAULT_TAG = '$(NAME):$(VERSION)'
-TEST_TAG = '$(NAME)-testing:$(VERSION)'
-CODESTYLE_TAG = '$(NAME)-codestyle:$(VERSION)'
-ifneq ($(wildcard ${HOME}/.netrc),)
-	DOCKER_ARGS ?= --secret id=netrc,src=${HOME}/.netrc
-endif
 
-all : unittest codestyle image
+def add_jobstat_subparser(subparsers):
+    """Add the jobstat parser to the parent parser.
+    Args:
+        subparsers: The argparse.ArgumentParser object returned by the
+            add_subparsers method.
+    Returns:
+        None
+    """
+    format_options = sat.parsergroups.create_format_options()
+    filter_options = sat.parsergroups.create_filter_options()
 
-unittest:
-		$(DOCKER_BUILD) --target testing --tag $(TEST_TAG)
-		docker run $(TEST_TAG)
-
-codestyle:
-		$(DOCKER_BUILD) --target codestyle --tag $(CODESTYLE_TAG)
-		docker run $(CODESTYLE_TAG)
-
-image:
-		$(DOCKER_BUILD) --tag $(DEFAULT_TAG)
+    jobstat_parser = subparsers.add_parser(
+        'jobstat',
+        help='Report job and application status.',
+        description='This command shows all jobs and relevant information pertaining to those applications.',
+        parents=[format_options, filter_options],
+    )

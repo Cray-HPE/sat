@@ -33,19 +33,16 @@ import json
 import logging
 import warnings
 
-from kubernetes.client.exceptions import ApiException
-from kubernetes.client import CoreV1Api
-from kubernetes.config import (
-    ConfigException,
-    load_kube_config
-)
+from csm_api_client.service.gateway import APIError
+from csm_api_client.service.hsm import HSMClient
 import inflect
+from kubernetes.client import CoreV1Api
+from kubernetes.client.exceptions import ApiException
+from kubernetes.config import ConfigException, load_kube_config
 from yaml import YAMLLoadWarning
 
-from sat.cached_property import cached_property
 from sat.apiclient.capmc import CAPMCClient
-from sat.apiclient.gateway import APIError
-from sat.apiclient.hsm import HSMClient
+from sat.cached_property import cached_property
 from sat.hms_discovery import (
     HMSDiscoveryCronJob,
     HMSDiscoveryError,
@@ -56,7 +53,6 @@ from sat.session import SATSession
 from sat.util import prompt_continue
 from sat.waiting import GroupWaiter, WaitingFailure
 from sat.xname import XName
-
 
 LOGGER = logging.getLogger(__name__)
 inf = inflect.engine()
@@ -252,18 +248,19 @@ class RedfishEndpointDiscoveryWaiter(GroupWaiter):
         return f'slots {", ".join(self.members)} populated'
 
     def member_has_completed(self, member):
-        try:
-            endpoint = self.hsm_client.get_redfish_endpoint_inventory(member)
-            if not endpoint:
-                raise WaitingFailure(f'No Redfish endpoint found for {member}')
-            return endpoint['DiscoveryInfo']['LastDiscoveryStatus'] == 'DiscoverOK'
-        except APIError as err:
-            # TODO: Should probably be a better way to determine cause of
-            # failure -- it is assumed that members are guaranteed to be valid
-            # RedfishEndpoints so if an invalid xname is given it will time out
-            # instead of giving a proper error
-            if not any('404' in arg for arg in err.args):
-                raise WaitingFailure(f'Could not query Redfish endpoint for {member}: {err}')
+        resp = self.hsm_client.get('Inventory', 'RedfishEndpoints', member, raise_not_ok=False)
+        # Missing endpoints may have not been discovered yet, in which case
+        # querying their xnames will simply return a 404.
+        if not resp.ok:
+            if resp.status_code != 404:
+                raise WaitingFailure(f'Could not query Redfish endpoint for {member}: {resp.reason}')
+            else:
+                return False
+
+        endpoint = resp.json()
+        if not endpoint:
+            raise WaitingFailure(f'No Redfish endpoint found for {member}')
+        return endpoint['DiscoveryInfo']['LastDiscoveryStatus'] == 'DiscoverOK'
 
 
 class SwapOutProcedure(BladeSwapProcedure):

@@ -1,6 +1,6 @@
 # Changelog
 
-(C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+(C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,54 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [3.20.0] - 2022-01-13
+
+### Added
+- Added new command `jobstat`, which provides system-wide view of application
+  status data.
+- Added a `sat bootprep list-vars` subcommand which lists the variables
+  available in bootprep input files at runtime.
+- Added a `sat bootsys reboot` subcommand which uses BOS to reboot nodes.
+- Added a report to the output of `sat bootprep` which describes the
+  configurations, images, and session templates which were created during the
+  bootprep run.
+- The value of the `playbook` property of CFS configuration layers in `sat
+  bootprep` input files can now be rendered with Jinja2 templates.
+- Added a new `--limit` option to `sat bootprep run` that allows limiting which
+  types of items from the input file are created.
+
+### Changed
+- Refactored to use common `APIGatewayClient`, `CFSClient`, `HSMClient`, and
+  `VCSRepo` classes and associated exception classes and utility functions from
+  the new `csm-api-client` Python library.
+- New common functionality in `csm-api-client` is now used to differentiate 404
+  errors to provided better error messages and clearer semantics in `sat swap
+  blade` and `sat bootprep`.
+- `sat bootprep` now prompts individually for each CFS configuration that already
+  exists.
+- Improved output when creating CFS configurations and BOS session templates with
+  `sat bootprep`.
+
+### Fixed
+- Fixed a bug which prevented `sat init` from creating a configuration file in
+  the current directory when not prefixed with `./`.
+- Updated `csm-api-client` dependency to version 1.1.0 to fix minor type
+  checking bug with `APIGatewayClient.set_timeout()`.
+- Fixed a bug in which `sat status` would fail with a traceback when using
+  BOS v2 and reporting components whose most recent image did not exist.
+- Improved the performance of `sat status` when using BOS v2.
+- Fixed a build issue where the `sat` container could contain a
+  different version of `kubectl` than is found in CSM.
+- Added missing description of the `--dry-run` option to `sat bootprep` man
+  page, and clarified its help text.
+- Corrected the man page description of the `--save-files` option to say that
+  BOS session templates will be saved in dry-run mode, though they may be
+  incomplete. Slightly reworded the help text for `--save-files`.
+
+### Security
+- Update the version of certifi from 2021.10.8 to 2022.12.7 to resolve a
+  medium-severity dependabot alert.
 
 ## [3.19.3] - 2022-09-29
 

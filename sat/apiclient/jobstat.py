@@ -21,26 +21,38 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+"""
+Client for querying the Job State Checker service
+"""
 
-NAME ?= cray-sat
-VERSION ?= $(shell build_scripts/version.sh)
-DOCKER_BUILD = docker build . --pull $(DOCKER_ARGS)
-DEFAULT_TAG = '$(NAME):$(VERSION)'
-TEST_TAG = '$(NAME)-testing:$(VERSION)'
-CODESTYLE_TAG = '$(NAME)-codestyle:$(VERSION)'
-ifneq ($(wildcard ${HOME}/.netrc),)
-	DOCKER_ARGS ?= --secret id=netrc,src=${HOME}/.netrc
-endif
+import logging
 
-all : unittest codestyle image
+from csm_api_client.service.gateway import APIError, APIGatewayClient
 
-unittest:
-		$(DOCKER_BUILD) --target testing --tag $(TEST_TAG)
-		docker run $(TEST_TAG)
+LOGGER = logging.getLogger(__name__)
 
-codestyle:
-		$(DOCKER_BUILD) --target codestyle --tag $(CODESTYLE_TAG)
-		docker run $(CODESTYLE_TAG)
 
-image:
-		$(DOCKER_BUILD) --tag $(DEFAULT_TAG)
+class JobstatClient(APIGatewayClient):
+    base_resource_path = 'statechecker/jobstat/'
+
+    def get_all(self):
+        """Get all results from Job State Checker.
+
+        Returns:
+            A list of dictionaries where each dictionary pertains to a
+            single job.
+
+        Raises:
+            APIError: if there is a failure querying the Job State Checker API
+                or getting the required information from the response.
+        """
+        err_prefix = 'Failed to get State Checker data'
+        try:
+            response = self.get('all').json()
+            return response['jobstat']
+        except APIError as err:
+            raise APIError(f'{err_prefix}: {err}')
+        except ValueError as err:
+            raise APIError(f'{err_prefix} due to bad JSON in response: {err}')
+        except KeyError as err:
+            raise APIError(f'{err_prefix} due to missing {err} key in response.')

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -37,6 +37,7 @@ from sat.apiclient import APIError
 from sat.cached_property import cached_property
 from sat.cli.bootprep.errors import ImageCreateError
 from sat.cli.bootprep.input.base import jinja_rendered, provides_context
+from sat.constants import MISSING_VALUE
 from sat.waiting import (
     DependencyGroupMember,
     WaitingFailure
@@ -52,7 +53,7 @@ class BaseInputImage(DependencyGroupMember, ABC):
         image_data (dict): the data for an image from the bootprep input file
         ims_client (sat.apiclient.IMSClient): the IMSClient to make requests to
             the IMS API
-        cfs_client (sat.apiclient.CFSClient): the CFSClient to make requests to
+        cfs_client (csm_api_client.service.cfs.CFSClient): the CFSClient to make requests to
             the CFS API
         public_key_id (str): the id of the public key in IMS to use when
             building the image
@@ -72,7 +73,9 @@ class BaseInputImage(DependencyGroupMember, ABC):
             and renaming have been completed, as applicable
     """
 
-    create_error_cls = ImageCreateError
+    description = 'IMS image'
+    template_render_err = ImageCreateError
+    report_attrs = ['name', 'preconfigured_image_id', 'final_image_id', 'configuration', 'configuration_group_names']
 
     def __init__(self, image_data, index, instance, jinja_env, product_catalog, ims_client, cfs_client):
         """Create a new InputImage
@@ -89,7 +92,7 @@ class BaseInputImage(DependencyGroupMember, ABC):
                 the product catalog object
             ims_client (sat.apiclient.IMSClient): the IMS API client to make
                 requests to the IMS API
-            cfs_client (sat.apiclient.CFSClient): the CFS API client to make
+            cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client to make
                 requests to the CFS API
         """
         super().__init__()
@@ -321,6 +324,9 @@ class BaseInputImage(DependencyGroupMember, ABC):
             return None
         return self.finished_job_details.get('resultant_image_id')
 
+    # Alias for more descriptive reporting
+    preconfigured_image_id = ims_resultant_image_id
+
     @property
     def image_id_to_configure(self):
         """str: the IMS id of the image to be configured"""
@@ -528,6 +534,19 @@ class BaseInputImage(DependencyGroupMember, ABC):
         return self.image_create_success and self.image_configure_success
 
     begin = begin_image_create
+
+    def report_row(self):
+        """Create a report row about the image.
+
+        Each row contains the attributes listed in `report_attrs` in order.
+
+        Returns:
+            a list containing the attributes from report_attrs
+        """
+        # TODO: This implementation is here to be compatible with BaseInputItems
+        #  due to structural typing. Once BaseInputImage is a subtype of BaseInputItem,
+        #  this method will no longer be necessary.
+        return [getattr(self, attr, MISSING_VALUE) for attr in self.report_attrs]
 
 
 class IMSInputImage(BaseInputImage):

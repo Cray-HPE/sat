@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@ import re
 
 from sat.apiclient import APIError
 from sat.cached_property import cached_property
+from sat.cli.bootprep.constants import CONFIGURATIONS_KEY, IMAGES_KEY
 from sat.cli.bootprep.input.base import (
     BaseInputItem,
     BaseInputItemCollection,
@@ -50,13 +51,11 @@ class InputSessionTemplate(BaseInputItem):
             requests to the BOS API
         ims_client (sat.apiclient.IMSClient): the IMS API client to make
             requests to the IMS API
-        cfs_client (sat.apiclient.CFSClient): the CFS API client to make
+        cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client to make
             requests to the CFS API
     """
     description = 'BOS session template'
-
-    # Use InputItemValidateError since fields are rendered in validation methods.
-    create_error_cls = InputItemValidateError
+    report_attrs = ['name', 'configuration']
 
     def __init__(self, data, instance, index, jinja_env, bos_client, cfs_client, ims_client, **kwargs):
         """Create a new InputSessionTemplate.
@@ -70,7 +69,7 @@ class InputSessionTemplate(BaseInputItem):
             jinja_env (jinja2.Environment): the Jinja2 environment in which
                 fields supporting Jinja2 templating should be rendered.
             bos_client (sat.apiclient.BOSClientCommon): the BOS API client
-            cfs_client (sat.apiclient.CFSClient): the CFS API client
+            cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client
             ims_client (sat.apiclient.IMSClient): the IMS API client
             **kwargs: additional keyword arguments
         """
@@ -115,17 +114,24 @@ class InputSessionTemplate(BaseInputItem):
         Raises:
             InputItemValidateError: if the configuration does not exist
         """
-        # First check if the configuration is being created anew by the same input file
-        input_config_names = [config.name for config in self.instance.input_configurations]
-        if self.configuration in input_config_names:
+        # Assume configs from input file exist when not being excluded and in dry-run mode
+        input_configs_exist = CONFIGURATIONS_KEY in self.instance.limit and self.instance.dry_run
+
+        # Check if the configuration would be created by the input file
+        if input_configs_exist and self.configuration in self.instance.input_configuration_names:
             return
 
         try:
-            self.cfs_client.get_configuration(self.configuration)
-        except APIError as err:
-            # TODO: should probably differentiate between 404 Not Found and other errors
-            raise InputItemValidateError(f'Configuration {self.configuration} specified for '
-                                         f'{self} does not exist: {err}')
+            resp = self.cfs_client.get('configurations', self.configuration, raise_not_ok=False)
+            if not resp.ok:
+                if resp.status_code == 404:
+                    raise InputItemValidateError(f'Configuration {self.configuration} specified for '
+                                                 f'{self} does not exist.')
+                else:
+                    self.cfs_client.raise_from_response(resp)
+        except (APIError, ValueError) as err:
+            raise InputItemValidateError(f'An error occurred while querying configuration '
+                                         f'{self.configuration}: {err}')
 
     @abstractmethod
     def validate_image_exists(self, **_):
@@ -140,7 +146,7 @@ class InputSessionTemplate(BaseInputItem):
             InputItemValidateError: if the image cannot be verified to exist
         """
 
-    def get_bos_api_data(self):
+    def get_create_item_data(self):
         """Get the data to pass to the BOS API to create this session template.
 
         Returns:
@@ -154,25 +160,67 @@ class InputSessionTemplate(BaseInputItem):
         }
         for boot_set_name, boot_set_data in self.boot_sets.items():
             boot_set_api_data = self.bos_client.get_base_boot_set_data()
-            image_record = self.image_record
+            try:
+                image_record = self.image_record
+            except InputItemValidateError as err:
+                # If it's a dry-run, the image may not exist yet.
+                if self.instance.dry_run:
+                    boot_set_etag = 'TBD'
+                    boot_set_path = 'TBD'
+                    boot_set_type = 'TBD'
+                else:
+                    raise InputItemCreateError(str(err)) from err
+            else:
+                boot_set_etag = get_val_by_path(image_record, 'link.etag')
+                boot_set_path = get_val_by_path(image_record, 'link.path')
+                boot_set_type = get_val_by_path(image_record, 'link.type')
+
             boot_set_api_data.update({
-                'etag': get_val_by_path(image_record, 'link.etag'),
-                'path': get_val_by_path(image_record, 'link.path'),
-                'type': get_val_by_path(image_record, 'link.type')
+                'etag': boot_set_etag,
+                'path': boot_set_path,
+                'type': boot_set_type
             })
             boot_set_api_data.update(boot_set_data)
             api_data['boot_sets'][boot_set_name] = boot_set_api_data
 
         return api_data
 
-    def create(self, dumper=None):
-        """Create the session template with a request to the BOS API."""
-        request_body = self.get_bos_api_data()
-        if dumper is not None:
-            dumper.write_request_body(self.name, request_body)
+    def get_image_record_by_id(self, ims_image_id):
+        """Look up an IMS image record by its ID.
 
+        Args:
+            ims_image_id (str): the UUID of the image
+
+        Returns:
+            dict: the IMS image ID corresponding to the given UUID
+
+        Raises:
+            InputItemValidateError: if there is an issue looking up the image
+                or if the image does not exist.
+        """
         try:
-            self.bos_client.create_session_template(request_body)
+            resp = self.ims_client.get('images', ims_image_id, raise_not_ok=False)
+            if not resp.ok:
+                if resp.status_code == 404:
+                    raise InputItemValidateError(f'No image with name or ID {ims_image_id} exists '
+                                                 f'for use by {self}')
+                else:
+                    self.ims_client.raise_from_response(resp)
+            else:
+                return resp.json()
+        except (APIError, ValueError) as err:
+            raise InputItemValidateError(f'An error occurred while querying the image record '
+                                         f'with ID {ims_image_id}: {err}') from err
+
+    def create(self, payload):
+        """Create the session template with a request to the BOS API.
+
+        Args:
+            payload (dict): the payload to pass to the BOS API to create the
+                BOS session template
+        """
+        try:
+            self.bos_client.create_session_template(payload)
         except APIError as err:
             raise SessionTemplateCreateError(f'Failed to create session template: {err}')
 
@@ -189,7 +237,10 @@ class InputSessionTemplateV1(InputSessionTemplate):
         """
         # First check if the image is being created anew by the same input file
         input_image_names = [image.name for image in self.instance.input_images]
-        if self.image in input_image_names:
+
+        # Assume images from the input file exist when not being excluded and in dry-run mode
+        input_images_exist = self.instance.dry_run and IMAGES_KEY in self.instance.limit
+        if input_images_exist and self.image in input_image_names:
             image_name = self.image
         else:
             # Accessing the image_record queries IMS to find the image
@@ -222,12 +273,7 @@ class InputSessionTemplateV1(InputSessionTemplate):
 
         if len(name_matches) == 0:
             if self.image_is_uuid:
-                try:
-                    return self.ims_client.get_image(self.image)
-                except APIError as err:
-                    # TODO: should probably differentiate between 404 Not Found and other errors
-                    raise InputItemValidateError(f'No image with name or ID {self.image} exists '
-                                                 f'for use by {self}: {err}')
+                return self.get_image_record_by_id(self.image)
             else:
                 raise InputItemValidateError(f'No image with name {self.image} exists for '
                                              f'use by session template {self}.')
@@ -253,12 +299,18 @@ class InputSessionTemplateV2(InputSessionTemplate):
         """
         # First check if the image is being created anew by the same input file
         input_image_names = [image.name for image in self.instance.input_images]
-        if self.ims_image_name and self.ims_image_name in input_image_names:
+        # Assume images from the input file exist when not being excluded and in dry-run mode
+        input_images_exist = self.instance.dry_run and IMAGES_KEY in self.instance.limit
+        if self.ims_image_name and input_images_exist and self.ims_image_name in input_image_names:
             image_name = self.ims_image_name
         elif self.image_ref:
             if self.image_ref_input_image:
-                # Found the image from the input instance by its ref
-                image_name = self.image_ref_input_image.name
+                if input_images_exist:
+                    image_name = self.image_ref_input_image.name
+                else:
+                    # Either not a dry-run or images are being skipped via --limit,
+                    # so look it up in IMS.
+                    image_name = self.image_record['name']
             else:
                 # If the image_ref does not exist in the input instance, this is an error
                 raise InputItemValidateError(f'No image exists with ref_name={self.image_ref} '
@@ -297,12 +349,7 @@ class InputSessionTemplateV2(InputSessionTemplate):
     def image_record(self):
         """dict: the image record from IMS if one can be found"""
         if self.ims_image_id:
-            try:
-                return self.ims_client.get_image(self.ims_image_id)
-            except APIError as err:
-                # TODO: should probably differentiate between 404 Not Found and other errors
-                raise InputItemValidateError(f'No image with ID {self.ims_image_id} exists '
-                                             f'for use by {self}: {err}')
+            return self.get_image_record_by_id(self.ims_image_id)
         else:
             # First, get the name of the image
             image_name = self.ims_image_name
@@ -334,7 +381,8 @@ class InputSessionTemplateCollection(BaseInputItemCollection):
 
     item_class = InputSessionTemplate
 
-    def __init__(self, items_data, instance, jinja_env, bos_client, cfs_client, ims_client, **kwargs):
+    def __init__(self, items_data, instance, jinja_env, request_dumper,
+                 bos_client, cfs_client, ims_client, **kwargs):
         """Create a new InputSessionTemplateCollection.
 
         Args:
@@ -343,14 +391,16 @@ class InputSessionTemplateCollection(BaseInputItemCollection):
             instance (sat.bootprep.input.InputInstance): a reference to the
                 full instance loaded from the config file
             jinja_env (jinja2.Environment): the Jinja2 environment in which
-                fields supporting Jinja2 templating should be rendered.
+                fields supporting Jinja2 templating should be rendered
+            request_dumper (sat.cli.bootprep.output.RequestDumper): the dumper
+                for dumping request data to files.
             bos_client (sat.apiclient.BOSClientCommon): the BOS API client
-            cfs_client (sat.apiclient.CFSClient): the CFS API client
+            cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client
             ims_client (sat.apiclient.IMSClient): the IMS API client
             **kwargs: additional keyword arguments
         """
-        super().__init__(items_data, instance, jinja_env, bos_client=bos_client,
-                         cfs_client=cfs_client, ims_client=ims_client, **kwargs)
+        super().__init__(items_data, instance, jinja_env, request_dumper,
+                         bos_client=bos_client, cfs_client=cfs_client, ims_client=ims_client, **kwargs)
         self.bos_client = bos_client
         self.cfs_client = cfs_client
         self.ims_client = ims_client

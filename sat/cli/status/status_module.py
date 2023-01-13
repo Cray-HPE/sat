@@ -30,10 +30,11 @@ from collections import defaultdict
 import logging
 from urllib.parse import urlparse
 
+from csm_api_client.service.cfs import CFSClient
+from csm_api_client.service.gateway import APIError
+from csm_api_client.service.hsm import HSMClient
+
 from sat.apiclient.bos import BOSClientCommon
-from sat.apiclient.cfs import CFSClient
-from sat.apiclient.gateway import APIError
-from sat.apiclient.hsm import HSMClient
 from sat.apiclient.ims import IMSClient
 from sat.apiclient.sls import SLSClient
 from sat.config import get_config_value
@@ -456,6 +457,12 @@ class BOSStatusModule(StatusModule):
     source_name = 'BOS'
     component_types = {'Node'}
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Cache mappings of images IDs to names and BOS IDs to BOS sessions to reduce calls to IMS and BOS.
+        self._cached_image_ids_to_names = {}
+        self._cached_bos_sessions = {}
+
     @staticmethod
     def can_use():
         if get_config_value('bos.api_version') != 'v2':
@@ -482,21 +489,25 @@ class BOSStatusModule(StatusModule):
         # this information anywhere else.
 
         ims_client = IMSClient(self.session)
-        booted_image = MISSING_VALUE
+        booted_image = None
 
         kernel_path = get_val_by_path(raw_component, 'actual_state.boot_artifacts.kernel')
         if kernel_path:
             img_id = urlparse(kernel_path).path.split('/')[1]
-            try:
-                booted_image = ims_client.get_image(img_id)['name']
+            if img_id in self._cached_image_ids_to_names:
+                booted_image = self._cached_image_ids_to_names[img_id]
+            else:
+                try:
+                    booted_image = ims_client.get_image(img_id)['name']
+                except APIError as err:
+                    LOGGER.warning('Could not retrieve image name for component %s: %s',
+                                   raw_component['id'], err)
+                except KeyError as err:
+                    LOGGER.warning('Image %s missing "%s" field in IMS response',
+                                   img_id, err)
+                self._cached_image_ids_to_names[img_id] = booted_image
 
-            except APIError as err:
-                LOGGER.warning('Could not retrieve image name for component %s: %s',
-                               raw_component['xname'], err)
-            except KeyError as err:
-                LOGGER.warning('Image %s missing "%s" field in IMS response',
-                               img_id, err)
-        return booted_image
+        return booted_image or MISSING_VALUE
 
     @property
     def rows(self):
@@ -535,11 +546,17 @@ class BOSStatusModule(StatusModule):
                                        component_xname)
                     continue
 
-                try:
-                    component_session = bos_client.get_session(session_id)
-                except APIError as err:
-                    LOGGER.warning('Could not retrieve BOS session for component %s: %s',
-                                   component_xname, err)
+                component_session = None
+                if session_id in self._cached_bos_sessions:
+                    component_session = self._cached_bos_sessions[session_id]
+                else:
+                    try:
+                        component_session = bos_client.get_session(session_id)
+                    except APIError as err:
+                        LOGGER.warning('Could not retrieve BOS session for component %s: %s',
+                                       component_xname, err)
+                    self._cached_bos_sessions[session_id] = component_session
+                if component_session is None:
                     continue
 
                 try:

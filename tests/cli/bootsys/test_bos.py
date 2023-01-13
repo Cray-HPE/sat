@@ -25,24 +25,22 @@
 Unit tests for the sat.cli.bootsys.bos module.
 """
 
-from argparse import Namespace
 import logging
 import math
 import shlex
 import subprocess
-from textwrap import indent
 import unittest
+from argparse import Namespace
+from textwrap import indent
+from typing import Any
 from unittest.mock import MagicMock, Mock, call, patch
 
-from sat.cli.bootsys.bos import (
-    BOSFailure,
-    BOSLimitString,
-    BOSSessionThread,
-    BOSV2SessionWaiter,
-    boa_job_successful,
-    do_bos_shutdowns,
-    get_session_templates
-)
+from sat.apiclient import APIError
+from sat.cli.bootsys.bos import (BOSFailure, BOSLimitString, BOSSessionThread,
+                                 BOSV2SessionWaiter, boa_job_successful,
+                                 do_bos_reboots, do_bos_shutdowns,
+                                 get_session_templates,
+                                 get_templates_needing_operation)
 from tests.common import ExtendedTestCase
 
 
@@ -325,6 +323,7 @@ class TestBOSSessionThread(unittest.TestCase):
         self.mock_bos_client = Mock()
         patch('sat.cli.bootsys.bos.BOSClientCommon.get_bos_client', return_value=self.mock_bos_client).start()
         patch('sat.cli.bootsys.bos.SATSession').start()
+        self.mock_get_config_value = patch('sat.cli.bootsys.bos.get_config_value').start()
 
         self.mock_session_id = '0123456789abcdef'
         self.mock_create_response = {
@@ -398,8 +397,10 @@ class TestBOSSessionThread(unittest.TestCase):
                 'row.'.format(bos_thread.max_consec_fails + 1)
             )
 
-    def test_create_session(self):
+    def test_create_session_bos_v1(self):
         """Test create_session method of BOSSessionThread."""
+        # TODO(CRAYSAT-1612): write a unit test for create_session with BOS v2 as well.
+        self.mock_get_config_value.return_value = 'v1'
         bos_thread = BOSSessionThread('cle-1.3.0', 'boot')
         bos_thread.create_session()
         self.assertEqual(self.mock_session_id, bos_thread.session_id)
@@ -492,6 +493,57 @@ class TestGetSessionTemplates(ExtendedTestCase):
         self.assertCountEqual(expected, actual)
 
 
+class TestGetTemplatesNeedingOperation(ExtendedTestCase):
+    """
+    Tests for the get_templates_needing_operation() function.
+    """
+    def setUp(self) -> None:
+        """Set up some mocks."""
+        self.mock_bos_client: Mock = Mock()
+        patch('sat.cli.bootsys.bos.BOSClientCommon.get_bos_client',
+              return_value=self.mock_bos_client).start()
+        patch('sat.cli.bootsys.bos.SATSession').start()
+
+    def tearDown(self):
+        """Stop all patches."""
+        patch.stopall()
+
+    def fake_get_nodes_by_state(self, states: list[str]) -> dict[Any, list[Any]]:
+        nodes_by_state: dict[Any, list[Any]] = dict()
+        for state in states:
+            nodes_by_state[state] = list("some data")
+        return nodes_by_state
+
+    def test_get_templates_needing_operation_unknown(self):
+        """Tests the operation checks"""
+        with self.assertRaisesRegex(ValueError, 'Unknown operation'):
+            get_templates_needing_operation(session_templates=[], operation="bad_op")
+
+    @patch('sat.cli.bootsys.bos.get_template_nodes_by_state')
+    def test_get_templates_needing_operation_always_needed_operations(self, mock_get_nodes_by_state):
+        """Tests that always needed operations add all the passed session templates"""
+        bos_templates: list[str] = ['cos-2.0.1', 'uan-2.0.1']
+        mock_get_nodes_by_state.return_value = self.fake_get_nodes_by_state(list(["Ready", "Off"]))
+        needed_templates: list[Any] = get_templates_needing_operation(
+            session_templates=bos_templates, operation="reboot")
+        assert needed_templates == bos_templates
+
+    @patch('sat.cli.bootsys.bos.get_template_nodes_by_state')
+    def test_get_templates_needing_operation_bos_error(self, mock_get_nodes_by_state):
+        """Tests that some templates fail and some templates succeed on bos_client calls"""
+        failed_bos_template: list[str] = list(['cos-2.0.1'])
+        success_bos_template: list[str] = list(['uan-2.0.1'])
+        expected_templates: list[str] = success_bos_template + failed_bos_template
+        mock_get_nodes_by_state.return_value = self.fake_get_nodes_by_state(list(["Ready", "Off"]))
+        self.mock_bos_client.get_session_template.side_effect = list([APIError, dict()])
+
+        templates: list[Any] = get_templates_needing_operation(
+            session_templates=expected_templates,
+            operation="shutdown"
+        )
+        assert sorted(templates) == sorted(expected_templates)
+
+
 class TestDoBosShutdowns(ExtendedTestCase):
     """Tests for the do_bos_shutdowns() function."""
     def setUp(self):
@@ -519,6 +571,40 @@ class TestDoBosShutdowns(ExtendedTestCase):
 
         self.mock_prompt.assert_not_called()
         self.mock_do_bos_ops.assert_called_once_with('shutdown', 60, limit=self.limit, recursive=False)
+
+
+class TestDoBosReboots(ExtendedTestCase):
+    """Tests for the do_bos_reboots() function."""
+
+    def setUp(self):
+        self.mock_prompt = patch('sat.cli.bootsys.bos.prompt_continue').start()
+        self.mock_do_bos_ops = patch(
+            'sat.cli.bootsys.bos.do_bos_operations').start()
+        self.mock_get_config = patch(
+            'sat.cli.bootsys.bos.get_config_value', side_effect=[60, 90]).start()
+
+        self.limit = None
+        self.args = Namespace(bos_limit=self.limit, recursive=False)
+        self.args.disruptive = False
+
+    def tearDown(self):
+        patch.stopall()
+
+    def test_do_bos_reboots_prompt(self):
+        """Test running BOS shutdown with prompting to continue."""
+        do_bos_reboots(self.args)
+        self.mock_prompt.assert_called_once()
+        self.mock_do_bos_ops.assert_called_once_with(
+            'reboot', 150, limit=self.limit, recursive=False)
+
+    def test_do_bos_reboots_without_prompt(self):
+        """Test running BOS shutdown without prompting."""
+        self.args.disruptive = True
+        do_bos_reboots(self.args)
+
+        self.mock_prompt.assert_not_called()
+        self.mock_do_bos_ops.assert_called_once_with(
+            'reboot', 150, limit=self.limit, recursive=False)
 
 
 if __name__ == '__main__':

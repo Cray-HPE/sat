@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -28,11 +28,11 @@ from collections import defaultdict, Counter
 import logging
 import math
 
-from sat.apiclient import APIError, CFSClient, IMSClient
+from sat.apiclient import APIError
+from sat.cli.bootprep.constants import CONFIGURATIONS_KEY, IMAGES_KEY
 from sat.cli.bootprep.errors import ImageCreateError
 from sat.cli.bootprep.input.image import DependentInputImage, IMSInputImage
 from sat.cli.bootprep.public_key import get_ims_public_key_id
-from sat.session import SATSession
 from sat.util import pester_choices
 from sat.waiting import (
     DependencyCycleError,
@@ -112,7 +112,7 @@ def validate_no_overwritten_ims_bases(input_images):
         for other_image in input_images:
             if other_image.name == name_based_image.ims_data['name']:
                 conflicts_exist = True
-                LOGGER.error(f'{name_based_image} uses {name_based_image.base_description}'
+                LOGGER.error(f'{name_based_image} uses {name_based_image.base_description} '
                              f'which conflicts with the image created by {other_image}.')
 
     if conflicts_exist:
@@ -324,34 +324,41 @@ def validate_image_ims_bases(input_images):
                                f'input images')
 
 
-def validate_image_configurations(input_images, cfs_client, input_config_names, dry_run):
+def validate_image_configurations(input_images, cfs_client, input_config_names, input_configs_exist):
     """Validate that the images refer to valid existing configurations.
 
     Args:
         input_images (list of sat.cli.bootprep.input.image.InputImage): the
             IMSImages which should have their configurations validated.
-        cfs_client (sat.apiclient.CFSClient): the CFS client to query to
+        cfs_client (csm_api_client.service.cfs.CFSClient): the CFS client to query to
             determine whether the configuration for the image exists.
         input_config_names (list of str): the list of configuration names that
             are defined in the input file
-        dry_run (bool): True if this is a dry run, False otherwise.
+        input_configs_exist (bool): True if we should assume configs from input file
+            exist. False if we must check for their existence in CFS regardless.
+
+    Raises:
+        ImageCreateError: if there is a failure to validate image configurations
     """
     failed_images = []
     for image in input_images:
         if not image.configuration:
             continue
 
-        # In the dry-run case, configurations will not actually be created, so
-        # we have to check against what would have been created.
-        if dry_run and image.configuration in input_config_names:
+        if input_configs_exist and image.configuration in input_config_names:
+            # It's okay for configs to only exist in input_config_names
             continue
 
-        try:
-            cfs_client.get_configuration(image.configuration)
-        except APIError as err:
-            # TODO: should probably differentiate between 404 Not Found and other errors
+        # Otherwise, all configurations must exist in CFS.
+        resp = cfs_client.get('configurations', image.configuration, raise_not_ok=False)
+        if not resp.ok:
+            if resp.status_code == 404:
+                LOGGER.error('Configuration %s not found for image %s',
+                             image.configuration, image.name)
+            else:
+                LOGGER.error('Could not query configuration %s for image %s: %s',
+                             image.configuration, image.name, resp.reason)
             failed_images.append(image)
-            LOGGER.error(f'Invalid configuration specified for image {image.name}: {err}')
 
     if failed_images:
         raise ImageCreateError(f'Failed to validate CFS configuration for {len(failed_images)} '
@@ -407,8 +414,8 @@ class ImageCreationGroupWaiter(DependencyGroupWaiter):
             raise WaitingFailure(f'status check failed: {err}')
 
 
-def create_images(instance, args):
-    """Create and customize IMS images defined in the given instance
+def validate_images(instance, args, cfs_client):
+    """Validate the IMS images defined in the given instance.
 
     Args:
         instance (sat.cli.bootprep.input.instance.InputInstance): the full bootprep
@@ -416,29 +423,18 @@ def create_images(instance, args):
             against the schema.
         args: The argparse.Namespace object containing the parsed arguments
             passed to the bootprep subcommand.
+        cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client to make
+            requests to the CFS API
 
     Returns: None
 
     Raises:
-        ImageCreateError: if there is a failure to create images
+        ImageCreateError: if there is a failure to validate images
     """
     input_images = instance.input_images
     if not input_images:
-        LOGGER.info('Given input did not define any IMS images')
+        LOGGER.debug('Given input file did not define any images, so skipping validation.')
         return
-
-    sat_session = SATSession()
-    ims_client = IMSClient(sat_session)
-    cfs_client = CFSClient(sat_session)
-
-    ims_public_key_id = get_ims_public_key_id(ims_client, public_key_id=args.public_key_id,
-                                              public_key_file_path=args.public_key_file_path,
-                                              dry_run=args.dry_run)
-    LOGGER.info(f'Using IMS public key with id {ims_public_key_id}')
-
-    # TODO (CRAYSAT-1275): Fix up this error-prone way of requiring that we set public_key_id later
-    for image in input_images:
-        image.public_key_id = ims_public_key_id
 
     validate_unique_image_ref_names(input_images)
     # Validate dependencies on the full set of input images
@@ -448,18 +444,48 @@ def create_images(instance, args):
     # Do this early to provide information required to render names.
     validate_image_ims_bases(input_images)
 
-    # Raises ImageCreateError if validation of CFS configurations fails
-    validate_image_configurations(input_images, cfs_client,
-                                  instance.input_configuration_names, args.dry_run)
+    # This validation is not necessary when images are skipped
+    if IMAGES_KEY in args.limit:
+        # When the configurations are not excluded via --limit, and it's a dry run,
+        # assume the configurations from the input file do exist.
+        input_configs_exist = CONFIGURATIONS_KEY in args.limit and args.dry_run
+        # Raises ImageCreateError if validation of CFS configurations fails
+        validate_image_configurations(input_images, cfs_client,
+                                      instance.input_configuration_names, input_configs_exist)
 
     # This is where name properties are first accessed and thus rendered
     validate_unique_image_names(input_images)
+    # Images must use image_ref to reference other images from input file
+    validate_no_overwritten_ims_bases(input_images)
+
+
+def create_images(instance, args, ims_client):
+    """Create and customize IMS images defined in the given instance
+
+    Args:
+        instance (sat.cli.bootprep.input.instance.InputInstance): the full bootprep
+            input instance loaded from the input file and already validated
+            against the schema.
+        args: The argparse.Namespace object containing the parsed arguments
+            passed to the bootprep subcommand.
+        ims_client (sat.apiclient.IMSClient): the IMS API client to make
+            requests to the IMS API
+
+    Returns:
+        Iterable[IMSInputImage]: images which were created or overwritten
+
+    Raises:
+        ImageCreateError: if there is a failure to create images
+    """
+    input_images = instance.input_images
+    if not input_images:
+        LOGGER.info('Given input did not define any IMS images')
+        return []
 
     images_to_create = handle_existing_images(ims_client, input_images, args.overwrite_images,
                                               args.skip_existing_images, args.dry_run)
 
-    validate_no_overwritten_ims_bases(images_to_create)
-
+    # TODO (CRAYSAT-1277): This part appears redundant with logic in DependencyGroupWaiter.__init__
     images_without_dependencies = [image for image in images_to_create
                                    if not image.has_dependencies()]
 
@@ -473,8 +499,21 @@ def create_images(instance, args):
 
     if args.dry_run:
         LOGGER.info("Dry run, not creating images.")
-        return
+        return []
 
+    ims_public_key_id = get_ims_public_key_id(ims_client, public_key_id=args.public_key_id,
+                                              public_key_file_path=args.public_key_file_path,
+                                              dry_run=args.dry_run)
+    LOGGER.info(f'Using IMS public key with id {ims_public_key_id}')
+
+    # TODO (CRAYSAT-1275): Fix up this error-prone way of requiring that we set public_key_id later
+    for image in input_images:
+        image.public_key_id = ims_public_key_id
+
+    # TODO (CRAYSAT-1277): Create subclass of BaseInputItemCollection
+    # I think we could take this part that creates the ImageCreationGroupWaiter and waits on
+    # it and generalize it into a BaseInputItemCollection subclass that creates its items in
+    # parallel using a subclass of the GroupWaiter class.
     # Default to no timeout since it's unknown how long image creation could take
     waiter = ImageCreationGroupWaiter(images_to_create, math.inf)
     LOGGER.info('Creating images')
@@ -487,3 +526,7 @@ def create_images(instance, args):
     if args.delete_ims_jobs:
         for image in images_to_create:
             image.clean_up_image_create_job()
+
+    # TODO: This is pretty ugly, and would probably be better for it to go in
+    #  the GroupWaiter class or the future InputImageCollection class.
+    return set(waiter.members) - set(waiter.pending | waiter.failed)

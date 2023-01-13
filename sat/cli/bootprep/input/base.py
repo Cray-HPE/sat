@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -35,6 +35,7 @@ from jinja2.sandbox import SecurityError
 
 from sat.cached_property import cached_property
 from sat.cli.bootprep.errors import InputItemCreateError, InputItemValidateError, UserAbortException
+from sat.constants import MISSING_VALUE
 from sat.util import pester_choices
 
 LOGGER = logging.getLogger(__name__)
@@ -84,7 +85,7 @@ def jinja_rendered(func):
 
     This decorator uses the following additional optional attributes of the instance:
 
-        create_error_cls: the exception class that should be raised if there is
+        template_render_err: the exception class that should be raised if there is
             an issue rendering the template. Defaults to InputItemValidateError
             if not set.
 
@@ -102,7 +103,7 @@ def jinja_rendered(func):
             return unrendered_result
 
         # Default to InputItemCreateError if no error class is specified
-        error_cls = getattr(self, 'create_error_cls', InputItemValidateError)
+        error_cls = getattr(self, 'template_render_err', InputItemValidateError)
 
         # Default to no additional context if not set
         context = getattr(self, 'jinja_context', {})
@@ -209,7 +210,11 @@ class BaseInputItem(Validatable, ABC):
     # The description for the input item, to be overridden by each subclass
     description = 'base input item'
 
-    create_error_cls = InputItemValidateError
+    # Attributes to corresponding to columns in report rows
+    report_attrs = []
+
+    # Template rendering generally occurs in validation methods
+    template_render_err = InputItemValidateError
 
     def __init__(self, data, instance, index, jinja_env, **_):
         """Create a new BaseInputItem.
@@ -276,13 +281,34 @@ class BaseInputItem(Validatable, ABC):
         pass
 
     @abstractmethod
-    def create(self):
+    def get_create_item_data(self):
+        """Get the data needed to create the item.
+
+        Raises:
+            InputItemCreateError: if there is a failure to get the data
+        """
+        pass
+
+    @abstractmethod
+    def create(self, payload):
         """Create the item.
+
+        Args:
+            payload (dict): the data to be passed to the API to create the item
 
         Raises:
             InputItemCreateError: if there is a failure to create the item
         """
         pass
+
+    def report_row(self):
+        """Create a report row about the item.
+
+        Each row contains the attributes listed in `report_attrs` in order.
+
+        Returns:
+            a list containing the attributes from report_attrs"""
+        return [getattr(self, attr, MISSING_VALUE) for attr in self.report_attrs]
 
 
 class BaseInputItemCollection(ABC, Validatable):
@@ -300,7 +326,7 @@ class BaseInputItemCollection(ABC, Validatable):
     """
     item_class = BaseInputItem
 
-    def __init__(self, items_data, instance, jinja_env, **kwargs):
+    def __init__(self, items_data, instance, jinja_env, request_dumper, **kwargs):
         """Create a new BaseInputItemCollection.
 
         Args:
@@ -310,6 +336,8 @@ class BaseInputItemCollection(ABC, Validatable):
                 full instance loaded from the config file
             jinja_env (jinja2.Environment): the Jinja2 environment in which
                 fields supporting Jinja2 templating should be rendered.
+            request_dumper (sat.cli.bootprep.output.RequestDumper): the dumper
+                for dumping request data to files.
             **kwargs: additional keyword arguments which are passed through to
                 the constructor of the class defined in the class attribute
                 `item_class`
@@ -320,7 +348,9 @@ class BaseInputItemCollection(ABC, Validatable):
         self.items = [constructor(item_data, instance, index, jinja_env, **kwargs)
                       for index, item_data in enumerate(items_data)]
         self.instance = instance
+        self.request_dumper = request_dumper
         self.items_to_create = []
+        self.created = []
         self.skipped_items = []
 
     def __str__(self):
@@ -373,7 +403,7 @@ class BaseInputItemCollection(ABC, Validatable):
         for item in self.items:
             try:
                 counts_by_name[item.name] += 1
-            except self.item_class.create_error_cls as err:
+            except self.item_class.template_render_err as err:
                 failed_name_renders += 1
                 LOGGER.error(f'Failed to render name of {item}: {err}')
 
@@ -391,7 +421,7 @@ class BaseInputItemCollection(ABC, Validatable):
                 f'{", ".join(non_unique_names)}'
             )
 
-    def handle_existing_items(self, overwrite_all, skip_all, dry_run):
+    def handle_existing_items(self, overwrite_all, skip_all):
         """Handle any existing items that have the same name as this item.
 
         Sets `self.skipped_items` to the list of items that should be skipped
@@ -401,7 +431,6 @@ class BaseInputItemCollection(ABC, Validatable):
             overwrite_all (bool): if True, all existing items should be
                 overwritten
             skip_all (bool): if True, all existing items should be skipped
-            dry_run (bool): whether this is a dry-run or not
 
         Returns:
             None
@@ -425,7 +454,7 @@ class BaseInputItemCollection(ABC, Validatable):
             LOGGER.debug(f'Found no conflicting items in {self}')
             return
 
-        verb = ('will be', 'would be')[dry_run]
+        verb = ('will be', 'would be')[self.instance.dry_run]
 
         for item in existing_input_items:
             conflicting_items = existing_items_by_name.get(item.name, [])
@@ -469,12 +498,8 @@ class BaseInputItemCollection(ABC, Validatable):
         """
         pass
 
-    def create_items(self, dumper=None):
+    def create_items(self):
         """Create the items in this collection of items.
-
-        Args:
-            dumper (None or sat.cli.bootprep.output.RequestDumper):
-                a dumper object to dump API request data.
 
         Raises:
             InputItemCreateError: if there is a failure to create one or more items
@@ -483,15 +508,32 @@ class BaseInputItemCollection(ABC, Validatable):
             LOGGER.info(f'Nothing to create in {self}')
             return
 
-        LOGGER.info(f'Creating {self.item_count_string(len(self.items_to_create))}')
+        create_verb = ('Creating', 'Would create')[self.instance.dry_run]
+
+        LOGGER.info(f'{create_verb} {self.item_count_string(len(self.items_to_create))}')
 
         failed_items = []
         for item in self.items_to_create:
+            # The 'name' attribute is rendered during validation, so it's safe to use here
+            item_description = f'{item} with name={item.name}'
+            LOGGER.info(f'{create_verb} {item_description}')
             try:
-                item.create(dumper=dumper)
+                item_data = item.get_create_item_data()
             except InputItemCreateError as err:
                 failed_items.append(item)
-                LOGGER.error(f'Failed to create {item}: {err}')
+                LOGGER.error(f'Failed to create {item_description}: {err}')
+                continue
+            self.request_dumper.write_request_body(type(item).description, item.name, item_data)
+
+            if not self.instance.dry_run:
+                try:
+                    item.create(item_data)
+                except InputItemCreateError as err:
+                    failed_items.append(item)
+                    LOGGER.error(f'Failed to create {item_description}: {err}')
+                else:
+                    self.created.append(item)
+                    LOGGER.info(f'Successfully created {item_description}')
 
         if failed_items:
             raise InputItemCreateError(

@@ -7,7 +7,7 @@ Prepare to boot nodes with images and configurations
 ----------------------------------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2021-2022 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2021-2023 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -27,7 +27,7 @@ ARGUMENTS
 
 **ACTION**
         Specify the action for sat bootprep to execute. This should be ``run``,
-        ``generate-docs``, ``generate-example``, or ``view-schema``.
+        ``generate-docs``, ``generate-example``, ``view-schema``, or ``list-vars``.
 
         **run**
                 Process an input file, creating CFS configurations, building and
@@ -56,7 +56,12 @@ ARGUMENTS
         **view-schema**
                 Print the raw JSON Schema definition which is used to validate
                 the schema of input files given to the ``run`` action.
-    
+
+        **list-vars**
+                Print the variables that ``sat bootprep`` will resolve when
+                processing an input file. Variables are sourced from the command
+                line, any vars files, and the HPC CSM Software Recipe in use, in
+                that order.
 
 RUN ARGUMENTS
 -------------
@@ -92,11 +97,26 @@ RUN OPTIONS
 
 These options only apply to the ``run`` action.
 
+**--limit {configurations,images,session_templates}**
+        Create only the given types of items from the input file. Specify this
+        option multiple times to specify multiple types of items to create. By
+        default, all items from the input file are created.
+
+        Validation of the other types of items in the input file is still
+        performed in order to ensure references from one type of item in the
+        input file to another type of item in the input file can be resolved.
+
+**-d, --dry-run**
+        Do a dry-run. Do not actually create CFS configurations, build
+        images, customize images, or create BOS session templates. This still
+        performs validation of the input file.
+
 **-s, --save-files**
-        Save files that could be passed to the CFS and BOS to create CFS
-        configurations and BOS session templates, respectively. If
-        ``--dry-run`` is specified, then only files for CFS configurations will
-        be saved.
+        Save files containing the payloads to be passed to the CFS and BOS
+        APIs to create CFS configurations and BOS session templates,
+        respectively. Note that if ``--dry-run`` is specified, the BOS session
+        template payloads may be incomplete if the images referenced by the BOS
+        session templates do not exist yet.
 
 **--no-resolve-branches**
         Do not look up the HEAD commits of branches name before creating CFS
@@ -118,20 +138,20 @@ These options only apply to the ``run`` action.
         The version of the BOS API to use when creating BOS session templates.
 
 **--recipe-version RECIPE_VERSION**
-        The HPC software recipe version, e.g. 22.03. This is used to obtain the
+        The HPC CSM Software Recipe version, e.g. 22.03. This is used to obtain the
         product versions which can be substituted for variables specified in
         fields in the input file. If not specified or if "latest" is specified,
-        use the latest available HPC software recipe.
+        use the latest available HPC CSM Software Recipe.
 
 **--vars-file VARS_FILE**
         A file containing variables that can be used in fields in the input
         file. Values from this file take precedence over values in the HPC
-        software recipe defaults.
+        CSM Software Recipe defaults.
 
 **--vars VARS**
         Variables that can be used in fields in the input file. Values specified
         here take precedence over values specified in any --vars-file or in the
-        HPC software recipe defaults.
+        HPC CSM Software Recipe defaults.
 
         Specify this option multiple times to specify values for multiple
         variables. Use dots to refer to keys in dictionaries. For example, to
@@ -173,6 +193,33 @@ These options only apply to the ``run`` action.
         specified, the default is to use the public key located at
         ~/.ssh/id_rsa.pub.
 
+LIST-VARS OPTIONS
+-----------------
+
+**--recipe-version RECIPE_VERSION**
+        The HPC CSM Software Recipe version, e.g. 22.03. This is used to obtain the
+        product versions which can be substituted for variables specified in
+        fields in the input file. If not specified or if "latest" is specified,
+        use the latest available HPC CSM Software Recipe.
+
+**--vars-file VARS_FILE**
+        A file containing variables that can be used in fields in the input
+        file. Values from this file take precedence over values in the HPC CSM
+        Software Recipe defaults.
+
+**--vars VARS**
+        Variables that can be used in fields in the input file. Values specified
+        here take precedence over values specified in any --vars-file or in the
+        HPC CSM Software Recipe defaults.
+
+        Specify this option multiple times to specify values for multiple
+        variables. Use dots to refer to keys in dictionaries. For example, to
+        override the value of the "version" key within the value of the "cos"
+        key, specify ``--vars cos.version=VALUE``.
+
+.. include:: _sat-format-opts.rst
+.. include:: _sat-filter-opts.rst
+
 EXAMPLES
 ========
 
@@ -184,7 +231,7 @@ session templates as described in the input file, ``bootprep_input.yaml``:
         # sat bootprep run bootprep_input.yaml
 
 Create CFS configurations, IMS images, and BOS session templates as described in
-the input file, using variables from HPC software recipe version 22.06 and
+the input file, using variables from HPC CSM Software Recipe version 22.06 and
 overrides from a file:
 
 ::
@@ -192,7 +239,7 @@ overrides from a file:
         # sat bootprep run --recipe-version 22.06 --vars-file overrides.yaml bootprep_input.yaml
 
 Create CFS configurations, IMS images, and BOS session templates as described in
-the input file, using variables from a HPC software recipe version 22.06 and
+the input file, using variables from a HPC CSM Software Recipe version 22.06 and
 overriding the variables ``cos.version`` and ``cpe.version``:
 
 ::
@@ -216,6 +263,30 @@ Generate an example bootprep input file:
 ::
 
         # sat bootprep generate-example
+
+View available variables and their values from the latest HPC CSM Software
+Recipe version:
+
+::
+
+        # sat bootprep list-vars --recipe-version latest
+
+View variables and their values as they will be resolved in an input file during
+processing when HPC CSM Software Recipe version 22.06 and the vars file
+``overrides.yaml`` are in use:
+
+::
+
+        # sat bootprep list-vars --recipe-version 22.06 --vars-file overrides.yaml
+
+View variables and their values as they will be resolved in an input file during
+processing when HPC CSM Software Recipe version 22.06 is in use and the variable
+``cos.version`` is overridden on the command line:
+
+::
+
+        # sat bootprep list-vars --recipe-version 22.06 --vars cos.version=2.1.65
+
 
 SEE ALSO
 ========

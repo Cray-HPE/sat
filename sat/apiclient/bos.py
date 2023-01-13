@@ -26,7 +26,8 @@ Client for querying the Boot Orchestration Service (BOS) API
 """
 import logging
 
-from sat.apiclient.gateway import APIError, APIGatewayClient
+from csm_api_client.service.gateway import APIError, APIGatewayClient
+
 from sat.config import get_config_value
 
 LOGGER = logging.getLogger(__name__)

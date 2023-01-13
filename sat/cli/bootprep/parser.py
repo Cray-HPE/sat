@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -27,12 +27,18 @@ The parser for the bootprep subcommand.
 from inflect import engine
 
 from sat.cli.bootprep.constants import (
+    ALL_KEYS,
     DEFAULT_PUBLIC_KEY_FILE,
     DOCS_ARCHIVE_FILE_NAME,
     EXAMPLE_FILE_NAME,
-    LATEST_VERSION_VALUE
+    LATEST_VERSION_VALUE,
 )
-from sat.parsergroups import StoreNestedVariable
+from sat.parsergroups import (
+    StoreNestedVariable,
+    create_filter_options,
+    create_format_options,
+)
+
 
 OUTPUT_DIR_OPTION = '--output-dir'
 
@@ -91,6 +97,29 @@ def add_output_dir_option(parser):
     )
 
 
+def add_vars_options(parser):
+    parser.add_argument(
+        '--recipe-version', default=LATEST_VERSION_VALUE,
+        help=f'The HPC software recipe version, e.g. 22.03. This is used to '
+             f'obtain the product versions which can be substituted for variables '
+             f'specified in fields in the input file. If not specified or if '
+             f'"{LATEST_VERSION_VALUE}" is specified, use the latest available HPC '
+             f'CSM Software Recipe version.'
+    )
+    parser.add_argument(
+        '--vars-file',
+        help='A file containing variables that can be used in fields in the '
+             'input file. Values from this file take precedence over values '
+             'in the HPC CSM Software Recipe defaults.'
+    )
+    parser.add_argument(
+        '--vars', action=StoreNestedVariable,
+        help='Variables that can be used in fields in the input file. Values '
+             'specified here take precedence over values specified in any '
+             '--vars-file or in the HPC CSM Software Recipe defaults.'
+    )
+
+
 def add_bootprep_subparser(subparsers):
     """Add the bootprep subparser to the parent parser.
 
@@ -117,6 +146,7 @@ def add_bootprep_subparser(subparsers):
     _add_bootprep_generate_docs_subparser(actions_subparsers)
     _add_bootprep_view_schema_subparser(actions_subparsers)
     _add_bootprep_example_subparser(actions_subparsers)
+    _add_bootprep_list_vars_subparser(actions_subparsers)
 
 
 def _add_bootprep_generate_docs_subparser(subparsers):
@@ -187,7 +217,7 @@ def _add_bootprep_run_subparser(subparsers):
         None
     """
     run_subparser = subparsers.add_parser(
-        'run', help='Run sat bootprep.',
+        'run', help='Run sat bootprep.', parents=[create_format_options()],
         description='Create images, configurations and session templates.'
     )
     run_subparser.add_argument(
@@ -195,15 +225,24 @@ def _add_bootprep_run_subparser(subparsers):
         help='Path to the input YAML file that defines the configurations, '
              'images, and session templates to create.')
     run_subparser.add_argument(
+        '--limit',
+        help='Create only the given types of items from the input file. Specify '
+             'this option multiple times to specify multiple types of items to '
+             'create. By default, all items from the input file are created.',
+        action='append',
+        choices=ALL_KEYS,
+        # Do not use default=ALL_KEYS here or it is impossible to omit keys.
+    )
+    run_subparser.add_argument(
         '--dry-run', '-d', action='store_true',
         help='Do a dry-run. Do not actually create CFS configurations, '
-             'build images, customize images, or create BOS session templates, '
-             'but walk through all the other steps.'
+             'build images, customize images, or create BOS session templates.'
     )
     run_subparser.add_argument(
         '--save-files', '-s', action='store_true',
-        help='Save files that could be passed to the CFS and BOS to create CFS '
-             'configurations and BOS session templates, respectively.'
+        help='Save files containing the payloads to be passed to the CFS and '
+             'BOS APIs to create CFS configurations and BOS session templates, '
+             'respectively.'
     )
     run_subparser.add_argument(
         '--no-resolve-branches', action='store_false', dest='resolve_branches',
@@ -220,27 +259,8 @@ def _add_bootprep_run_subparser(subparsers):
         choices=['v1', 'v2'],
         help='The version of the BOS API to use for BOS operations',
     )
-    run_subparser.add_argument(
-        '--recipe-version', default=LATEST_VERSION_VALUE,
-        help=f'The HPC software recipe version, e.g. 22.03. This is used to '
-             f'obtain the product versions which can be substituted for variables '
-             f'specified in fields in the input file. If not specified or if '
-             f'"{LATEST_VERSION_VALUE}" is specified, use the latest available HPC '
-             f'software recipe version.'
-    )
-    run_subparser.add_argument(
-        '--vars-file',
-        help='A file containing variables that can be used in fields in the '
-             'input file. Values from this file take precedence over values '
-             'in the HPC Software Recipe defaults.'
-    )
-    run_subparser.add_argument(
-        '--vars', action=StoreNestedVariable,
-        help='Variables that can be used in fields in the input file. Values '
-             'specified here take precedence over values specified in any '
-             '--vars-file or in the HPC software recipe defaults.'
-    )
 
+    add_vars_options(run_subparser)
     add_skip_and_overwrite_options(run_subparser, 'config', 'configuration')
     add_skip_and_overwrite_options(run_subparser, 'image', 'image')
     add_skip_and_overwrite_options(run_subparser, 'template', 'session template')
@@ -261,3 +281,18 @@ def _add_bootprep_run_subparser(subparsers):
         help=f'The id of the SSH public key stored in IMS to use when building images '
              f'with IMS. {default_behavior}'
     )
+
+
+def _add_bootprep_list_vars_subparser(subparsers):
+    format_options = create_format_options()
+    filter_options = create_filter_options()
+    vars_subparser = subparsers.add_parser(
+        'list-vars',
+        parents=[format_options, filter_options],
+        help='List the variables that may be used in bootprep input files.',
+        description='List the variables that are available during variable substitution '
+                    'when processing a bootprep input file. Variables are sourced from '
+                    'the command line, vars files, and the HPC CSM Software Recipe.',
+    )
+
+    add_vars_options(vars_subparser)

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -29,12 +29,17 @@ import logging
 from urllib.parse import urlparse, urlunparse
 
 from cray_product_catalog.query import ProductCatalogError
+from csm_api_client.service.gateway import APIError
+from csm_api_client.service.vcs import VCSError, VCSRepo
 
-from sat.apiclient.vcs import VCSError, VCSRepo
 from sat.cached_property import cached_property
 from sat.cli.bootprep.constants import LATEST_VERSION_VALUE
-from sat.cli.bootprep.errors import ConfigurationCreateError
-from sat.cli.bootprep.input.base import jinja_rendered
+from sat.cli.bootprep.errors import InputItemCreateError
+from sat.cli.bootprep.input.base import (
+    BaseInputItem,
+    BaseInputItemCollection,
+    jinja_rendered,
+)
 from sat.config import get_config_value
 
 LOGGER = logging.getLogger(__name__)
@@ -61,7 +66,8 @@ class InputConfigurationLayer(ABC):
     # for both GitCFSConfigurationLayers and ProductCFSConfigurationLayers.
     resolve_branches = True
 
-    create_error_cls = ConfigurationCreateError
+    # The jinja_rendered properties here are only rendered at item creation time
+    template_render_err = InputItemCreateError
 
     def __init__(self, layer_data, jinja_env):
         """Create a new configuration layer.
@@ -75,6 +81,7 @@ class InputConfigurationLayer(ABC):
         self.jinja_env = jinja_env
 
     @property
+    @jinja_rendered
     def playbook(self):
         """str or None: the playbook specified in the layer"""
         return self.layer_data.get('playbook')
@@ -111,7 +118,7 @@ class InputConfigurationLayer(ABC):
                 layer.
 
         Raises:
-            ConfigurationCreateError: if there was a failure to obtain the data
+            InputItemCreateError: if there was a failure to obtain the data
                 needed to create the layer in CFS.
         """
         cfs_layer_data = {cfs_property: getattr(self, self_property)
@@ -161,18 +168,18 @@ class InputConfigurationLayer(ABC):
             str: the commit hash corresponding to the HEAD commit of the branch.
 
         Raises:
-            ConfigurationCreateError: if there is no such branch on the remote
+            InputItemCreateError: if there is no such branch on the remote
                 repository.
         """
         try:
             commit_hash = VCSRepo(self.clone_url).get_commit_hash_for_branch(branch)
         except VCSError as err:
-            raise ConfigurationCreateError(f'Could not query VCS to resolve branch name "{branch}": '
-                                           f'{err}')
+            raise InputItemCreateError(f'Could not query VCS to resolve branch name "{branch}": '
+                                       f'{err}')
 
         if commit_hash is None:
-            raise ConfigurationCreateError(f'Could not retrieve HEAD commit for branch "{branch}"; '
-                                           'no matching branch was found on remote VCS repo.')
+            raise InputItemCreateError(f'Could not retrieve HEAD commit for branch "{branch}"; '
+                                       'no matching branch was found on remote VCS repo.')
         return commit_hash
 
 
@@ -236,14 +243,14 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
     def matching_product(self):
         """sat.software_inventory.products.InstalledProductVersion: the matching installed product"""
         if self.product_catalog is None:
-            raise ConfigurationCreateError(f'Product catalog data is not available.')
+            raise InputItemCreateError(f'Product catalog data is not available.')
 
         try:
             if self.product_version == LATEST_VERSION_VALUE:
                 return self.product_catalog.get_product(self.product_name)
             return self.product_catalog.get_product(self.product_name, self.product_version)
         except ProductCatalogError as err:
-            raise ConfigurationCreateError(f'Unable to get product data from product catalog: {err}')
+            raise InputItemCreateError(f'Unable to get product data from product catalog: {err}')
 
     @staticmethod
     def substitute_url_hostname(url):
@@ -262,8 +269,8 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
     @cached_property
     def clone_url(self):
         if self.matching_product.clone_url is None:
-            raise ConfigurationCreateError(f'No clone URL present for version {self.product_version} '
-                                           f'of product {self.product_name}')
+            raise InputItemCreateError(f'No clone URL present for version {self.product_version} '
+                                       f'of product {self.product_name}')
         return self.substitute_url_hostname(self.matching_product.clone_url)
 
     @cached_property
@@ -298,46 +305,46 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
             return None
 
         if self.matching_product.commit is None:
-            raise ConfigurationCreateError(f'No commit present for version {self.product_version} '
-                                           f'of product {self.product_name}')
+            raise InputItemCreateError(f'No commit present for version {self.product_version} '
+                                       f'of product {self.product_name}')
         return self.matching_product.commit
 
 
-class InputConfiguration:
+class InputConfiguration(BaseInputItem):
     """A CFS Configuration from a bootprep input file."""
+    description = 'CFS configuration'
 
-    create_error_cls = ConfigurationCreateError
+    report_attrs = ['name']
 
-    def __init__(self, configuration_data, jinja_env, product_catalog):
+    def __init__(self, data, instance, index, jinja_env, cfs_client,
+                 product_catalog, **kwargs):
         """Create a new InputConfiguration.
 
         Args:
-            configuration_data (dict): The data for a configuration, already
-                validated against the bootprep input file schema.
+            data (dict): the data defining the item from the input file, already
+                validated by the bootprep schema.
+            instance (sat.cli.bootprep.input.instance.InputInstance): a reference
+                to the full instance loaded from the input file
+            index (int): the index of the item in the collection in the instance
             jinja_env (jinja2.Environment): the Jinja2 environment in which
                 fields supporting Jinja2 templating should be rendered.
+            cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client
             product_catalog (cray_product_catalog.query.ProductCatalog):
                 the product catalog object
-
-        Raises:
-            ValueError: if any of the layers in the given `configuration_data`
-                have neither 'git' nor 'product' keys in their data. This won't
-                happen if the input is properly validated against the schema.
+            **kwargs: additional keyword arguments
         """
-        self.configuration_data = configuration_data
-        self.jinja_env = jinja_env
+        super().__init__(data, instance, index, jinja_env, **kwargs)
+        self.cfs_client = cfs_client
+        self.product_catalog = product_catalog
+
+        # Additional context to be used when rendering Jinja2 templated properties
+        self.jinja_context = {}
+
         # The 'layers' property is required and must be a list, but it can be empty
         self.layers = [InputConfigurationLayer.get_configuration_layer(layer_data, jinja_env, product_catalog)
-                       for layer_data in self.configuration_data['layers']]
+                       for layer_data in self.data['layers']]
 
-    @property
-    @jinja_rendered
-    def name(self):
-        """The name of the CFS configuration."""
-        # The 'name' property is required
-        return self.configuration_data['name']
-
-    def get_cfs_api_data(self):
+    def get_create_item_data(self):
         """Get the data to pass to the CFS API to create this configuration.
 
         Returns:
@@ -345,7 +352,7 @@ class InputConfiguration:
                 configuration.
 
         Raises:
-            ConfigurationCreateError: if there was a failure to obtain the data
+            InputItemCreateError: if there was a failure to obtain the data
                 needed to create the configuration in CFS.
         """
         cfs_api_data = {
@@ -355,13 +362,72 @@ class InputConfiguration:
         for idx, layer in enumerate(self.layers):
             try:
                 cfs_api_data['layers'].append(layer.get_cfs_api_data())
-            except ConfigurationCreateError as err:
+            except InputItemCreateError as err:
                 LOGGER.error(f'Failed to create layers[{idx}] of configuration '
                              f'{self.name}: {err}')
                 failed_layers.append(layer)
 
         if failed_layers:
-            raise ConfigurationCreateError(f'Failed to create {len(failed_layers)} layer(s) '
-                                           f'of configuration {self.name}')
+            raise InputItemCreateError(f'Failed to create {len(failed_layers)} layer(s) '
+                                       f'of configuration {self.name}')
 
         return cfs_api_data
+
+    def create(self, payload):
+        """Create the CFS configuration with a request to the CFS API.
+
+        Args:
+            payload (dict): the payload to pass to the CFS API to create the
+                CFS configuration
+        """
+        try:
+            # request_body guaranteed to have 'name' key, so no need to catch ValueError
+            self.cfs_client.put_configuration(self.name, payload)
+        except APIError as err:
+            raise InputItemCreateError(f'Failed to create configuration: {err}')
+
+
+class InputConfigurationCollection(BaseInputItemCollection):
+    """The collection of CFS configurations defined in the input file."""
+
+    item_class = InputConfiguration
+
+    def __init__(self, items_data, instance, jinja_env, request_dumper, cfs_client, **kwargs):
+        """Create a new InputConfigurationCollection.
+
+        Args:
+            items_data (list of dict): CFS configuration data from input file,
+                already validated by schema
+            instance (sat.bootprep.input.InputInstance): a reference to the
+                full instance loaded from the config file
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
+            request_dumper (sat.cli.bootprep.output.RequestDumper): the dumper
+                for dumping request data to files.
+            cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client
+            **kwargs: additional keyword arguments
+        """
+        super().__init__(items_data, instance, jinja_env, request_dumper,
+                         cfs_client=cfs_client, **kwargs)
+        self.cfs_client = cfs_client
+
+    def get_existing_items_by_name(self):
+        """Get existing CFS configurations by name.
+
+        See parent class for full docstring.
+        """
+        try:
+            # TODO: Add a get_configurations method to cfs_client?
+            configurations = self.cfs_client.get('configurations').json()
+        except APIError as err:
+            # TODO: Consider whether we need subclasses of InputItemCreateError
+            raise InputItemCreateError(f'Unable to get existing CFS configurations: {err}')
+        except ValueError as err:
+            raise InputItemCreateError(f'Unable to parse response when getting existing CFS '
+                                       f'configurations: {err}')
+
+        # CFS configurations have unique names, so this is safe
+        return {
+            configuration.get('name'): [configuration]
+            for configuration in configurations
+        }

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@ import logging
 import os
 
 from cray_product_catalog.query import ProductCatalog, ProductCatalogError
+import inflect
 from jinja2.sandbox import SandboxedEnvironment
 import yaml
 
@@ -37,22 +38,28 @@ from sat.cli.bootprep.errors import (
     BootPrepDocsError,
     BootPrepInternalError,
     BootPrepValidationError,
-    ConfigurationCreateError,
     ImageCreateError,
     InputItemCreateError,
     InputItemValidateError,
     UserAbortException
 )
+from sat.cli.bootprep.input.image import IMSInputImage
 from sat.cli.bootprep.input.instance import InputInstance
-from sat.cli.bootprep.configuration import create_configurations
-from sat.cli.bootprep.constants import EXAMPLE_FILE_NAME
+from sat.cli.bootprep.input.configuration import InputConfigurationLayer
+from sat.cli.bootprep.constants import (
+    ALL_KEYS,
+    CONFIGURATIONS_KEY,
+    EXAMPLE_FILE_NAME,
+    IMAGES_KEY,
+    SESSION_TEMPLATES_KEY
+)
 from sat.cli.bootprep.documentation import (
     display_schema,
     generate_docs_tarball,
     resource_absolute_path,
 )
 from sat.cli.bootprep.example import BootprepExampleError, get_example_cos_and_uan_data
-from sat.cli.bootprep.image import create_images
+from sat.cli.bootprep.image import create_images, validate_images
 from sat.cli.bootprep.output import ensure_output_directory, RequestDumper
 from sat.cli.bootprep.validate import (
     load_and_validate_instance,
@@ -60,10 +67,42 @@ from sat.cli.bootprep.validate import (
     SCHEMA_FILE_RELATIVE_PATH,
 )
 from sat.cli.bootprep.vars import VariableContext, VariableContextError
+from sat.config import get_config_value
+from sat.report import MultiReport, Report
 from sat.session import SATSession
 
 
 LOGGER = logging.getLogger(__name__)
+inf = inflect.engine()
+
+
+def load_vars_or_exit(recipe_version, vars_file_path, additional_vars):
+    """Load variables and construct the variable context.
+
+    This is a simple wrapper around VariableContext.load_vars()
+    which handles constructing the context and loading variables.
+    If there is a problem loading the variables, exit the program.
+
+    Args:
+        recipe_version (str): the version of the software recipe to
+            load from VCS
+        vars_file_path (str): the path to the vars file to load
+        additional_vars (dict): additional variables, e.g. from
+            the command line
+
+    Returns:
+        VariableContext: the context containing the loaded variables
+
+    Raises:
+        SystemExit: if the variables cannot be loaded.
+    """
+    try:
+        var_context = VariableContext(recipe_version, vars_file_path, additional_vars)
+        var_context.load_vars()
+        return var_context
+    except VariableContextError as err:
+        LOGGER.error(str(err))
+        raise SystemExit(1)
 
 
 def do_bootprep_docs(args):
@@ -157,6 +196,10 @@ def do_bootprep_run(schema_validator, args):
     Raises:
         SystemExit: If a fatal error is encountered.
     """
+    if args.limit is None:
+        # Default to creating all items from input file.
+        args.limit = ALL_KEYS
+
     LOGGER.info(f'Validating given input file {args.input_file}')
     try:
         instance_data = load_and_validate_instance(args.input_file, schema_validator)
@@ -173,6 +216,7 @@ def do_bootprep_run(schema_validator, args):
     # large images, so this IMSClient will not use a timeout on HTTP requests
     ims_client.set_timeout(None)
     bos_client = BOSClientCommon.get_bos_client(session)
+    request_dumper = RequestDumper(args.save_files, args.output_dir)
 
     try:
         product_catalog = ProductCatalog()
@@ -183,68 +227,160 @@ def do_bootprep_run(schema_validator, args):
         # data will fail. Otherwise, this is not a problem.
         product_catalog = None
 
-    var_context = VariableContext(args.recipe_version, args.vars_file, args.vars)
-    try:
-        var_context.load_vars()
-    except VariableContextError as err:
-        LOGGER.error(str(err))
-        raise SystemExit(1)
+    var_context = load_vars_or_exit(
+        args.recipe_version,
+        args.vars_file,
+        args.vars
+    )
+
     jinja_env = SandboxedEnvironment()
     jinja_env.globals = var_context.vars
 
-    instance = InputInstance(instance_data, cfs_client, ims_client, bos_client, jinja_env, product_catalog)
+    instance = InputInstance(instance_data, request_dumper, cfs_client, ims_client, bos_client,
+                             jinja_env, product_catalog, args.dry_run, args.limit)
+
+    # This is kind of an odd way to pass this through, but it works
+    InputConfigurationLayer.resolve_branches = args.resolve_branches
+    # Always validate CFS configurations. The names of CFS configurations from
+    # the input instance are used when validating images and session templates,
+    # and validation ensures the names render.
+    try:
+        instance.input_configurations.validate()
+    except InputItemValidateError as err:
+        LOGGER.error(str(err))
+        raise SystemExit(1)
+
+    if CONFIGURATIONS_KEY in args.limit:
+        try:
+            instance.input_configurations.handle_existing_items(args.overwrite_configs,
+                                                                args.skip_existing_configs)
+        except UserAbortException:
+            LOGGER.error('Aborted')
+            raise SystemExit(1)
+        except InputItemCreateError as err:
+            LOGGER.error(str(err))
+            raise SystemExit(1)
+
+        try:
+            instance.input_configurations.create_items()
+        except InputItemCreateError as err:
+            LOGGER.error(str(err))
+            raise SystemExit(1)
+    else:
+        LOGGER.info('Skipping creation of CFS configurations based on value of --limit option.')
 
     # TODO (CRAYSAT-1277): Refactor images to use BaseInputItemCollection
-    # TODO (CRAYSAT-1278): Refactor configurations to use BaseInputItemCollection
-    # As part of the above, do more in methods of those classes. Generally, we
-    # should do the following, perhaps in methods on `InputInstance`:
-    # - Validate the input file, which includes:
-    #   - Validate names of new objects are unique
-    #   - Validate that referenced configurations and images exist
-    # - Handle any existing objects of the same name
-    # - Create the objects, if this is not a dry-run (or validation-only run)
-    try:
-        create_configurations(instance, args)
-    except ConfigurationCreateError as err:
-        LOGGER.error(str(err))
-        raise SystemExit(1)
 
-    try:
-        create_images(instance, args)
-    except ImageCreateError as err:
-        LOGGER.error(str(err))
-        raise SystemExit(1)
+    # If images or session templates are being created we must validate images,
+    # so session templates that use IMS images from the input instance can find
+    # the corresponding IMS record.
+    if IMAGES_KEY in args.limit or SESSION_TEMPLATES_KEY in args.limit:
+        try:
+            validate_images(instance, args, cfs_client)
+        except ImageCreateError as err:
+            LOGGER.error(str(err))
+            raise SystemExit(1)
+
+    created_images = []
+    if IMAGES_KEY in args.limit:
+        try:
+            created_images = create_images(instance, args, ims_client)
+        except ImageCreateError as err:
+            LOGGER.error(str(err))
+            raise SystemExit(1)
+    else:
+        LOGGER.info('Skipping creation of IMS images based on value of --limit option.')
 
     # The IMSClient caches the list of images. Clear the cache so that we can find
     # newly created images when constructing session templates.
     ims_client.clear_resource_cache(resource_type='image')
 
-    # Must validate first because `handle_existing_items` must know the name of each
-    # item to be created, and validation will render names.
-    try:
-        instance.input_session_templates.validate(dry_run=args.dry_run)
-    except InputItemValidateError as err:
-        LOGGER.error(str(err))
-        raise SystemExit(1)
-
-    try:
-        instance.input_session_templates.handle_existing_items(args.overwrite_templates,
-                                                               args.skip_existing_templates,
-                                                               args.dry_run)
-    except UserAbortException:
-        LOGGER.error('Aborted')
-        raise SystemExit(1)
-    except InputItemCreateError as err:
-        LOGGER.error(str(err))
-        raise SystemExit(1)
-
-    if not args.dry_run:
+    if SESSION_TEMPLATES_KEY in args.limit:
+        # Skip validation if session templates are not being created. Otherwise, a
+        # validation error will occur when creating only CFS configurations because
+        # images required by session templates may not exist yet.
         try:
-            request_dumper = RequestDumper('BOS session template', args)
-            instance.input_session_templates.create_items(dumper=request_dumper)
+            instance.input_session_templates.validate()
+        except InputItemValidateError as err:
+            LOGGER.error(str(err))
+            raise SystemExit(1)
+        try:
+            # Validation renders the names, so must occur first.
+            instance.input_session_templates.handle_existing_items(args.overwrite_templates,
+                                                                   args.skip_existing_templates)
+        except UserAbortException:
+            LOGGER.error('Aborted')
+            raise SystemExit(1)
         except InputItemCreateError as err:
             LOGGER.error(str(err))
             raise SystemExit(1)
+
+        try:
+            instance.input_session_templates.create_items()
+        except InputItemCreateError as err:
+            LOGGER.error(str(err))
+            raise SystemExit(1)
+    else:
+        LOGGER.info('Skipping creation of BOS session templates based on value of --limit option.')
+
+    print_report(args, instance, created_images)
+
+
+def print_report(args, instance, created_images):
+    """Print a report about created items to stdout.
+
+    Args:
+        args (Namespace): parsed commandline arguments
+        instance (InputInstance): the parsed bootprep input file
+        created_images (Iterable[IMSInputImage]): the IMS
+            images which were created as part of the bootprep run
+    """
+    if args.dry_run:
+        return
+
+    created_types_items = [
+        (CONFIGURATIONS_KEY, instance.input_configurations),
+        (IMAGES_KEY, created_images),
+        (SESSION_TEMPLATES_KEY, instance.input_session_templates),
+    ]
+    bootprep_report = MultiReport(print_format=args.format)
+    for item_type_name, items in created_types_items:
+        if item_type_name == IMAGES_KEY:
+            # Special case for images since they are not BaseInputItems
+            created = items
+            item_class = IMSInputImage
+        else:
+            created = items.created
+            item_class = items.item_class
+
+        if not created:
+            continue
+
+        report_title = inf.plural_noun(item_class.description) if args.format == 'pretty' else item_type_name
+        current_report = bootprep_report.add_report(report_title, item_class.report_attrs)
+        for item in created:
+            current_report.add_row(item.report_row())
+
+    print(bootprep_report)
+
+
+def do_bootprep_list_available_vars(args):
+    var_context = load_vars_or_exit(
+        args.recipe_version,
+        args.vars_file,
+        args.vars
+    )
+    report = Report(
+        ['Variable name', 'Value', 'Source'], 'Bootprep Variables',
+        args.sort_by, args.reverse,
+        get_config_value('format.no_headings'),
+        get_config_value('format.no_borders'),
+        filter_strs=args.filter_strs,
+        display_headings=args.fields,
+        print_format=args.format
+    )
+    report.add_rows(var_context.enumerate_vars_and_sources())
+    print(report)
 
 
 def do_bootprep(args):
@@ -273,3 +409,5 @@ def do_bootprep(args):
         do_bootprep_schema(schema_file_contents)
     elif args.action == 'generate-example':
         do_bootprep_example(schema_validator, args)
+    elif args.action == 'list-vars':
+        do_bootprep_list_available_vars(args)

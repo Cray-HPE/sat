@@ -25,19 +25,19 @@
 Unit tests for sat.recipe module.
 """
 
-from unittest.mock import Mock, PropertyMock, patch
 import unittest
+from unittest.mock import Mock, PropertyMock, patch
 
+from csm_api_client.service.vcs import VCSError
 from semver import VersionInfo
 
-from sat.apiclient.vcs import VCSError
 from sat.recipe import (
+    HPC_SOFTWARE_RECIPE_REPO_NAME,
+    HPC_SOFTWARE_RECIPE_REPO_ORG,
+    HPC_SOFTWARE_RECIPE_REPO_PATH,
     HPCSoftwareRecipe,
     HPCSoftwareRecipeCatalog,
     HPCSoftwareRecipeError,
-    HPC_SOFTWARE_RECIPE_REPO_NAME,
-    HPC_SOFTWARE_RECIPE_REPO_ORG,
-    HPC_SOFTWARE_RECIPE_REPO_PATH
 )
 
 
