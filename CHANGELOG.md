@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a `sat bootprep list-vars` subcommand which lists the variables
   available in bootprep input files at runtime.
 - Added a `sat bootsys reboot` subcommand which uses BOS to reboot nodes.
+- Added a report to the output of `sat bootprep` which describes the
+  configurations, images, and session templates which were created during the
+  bootprep run.
 
 ### Changed
 - Refactored to use common `APIGatewayClient`, `CFSClient`, `HSMClient`, and

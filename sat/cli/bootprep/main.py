@@ -28,6 +28,7 @@ import logging
 import os
 
 from cray_product_catalog.query import ProductCatalog, ProductCatalogError
+import inflect
 from jinja2.sandbox import SandboxedEnvironment
 import yaml
 
@@ -42,6 +43,7 @@ from sat.cli.bootprep.errors import (
     InputItemValidateError,
     UserAbortException
 )
+from sat.cli.bootprep.input.image import IMSInputImage
 from sat.cli.bootprep.input.instance import InputInstance
 from sat.cli.bootprep.input.configuration import InputConfigurationLayer
 from sat.cli.bootprep.constants import EXAMPLE_FILE_NAME
@@ -60,11 +62,12 @@ from sat.cli.bootprep.validate import (
 )
 from sat.cli.bootprep.vars import VariableContext, VariableContextError
 from sat.config import get_config_value
-from sat.report import Report
+from sat.report import MultiReport, Report
 from sat.session import SATSession
 
 
 LOGGER = logging.getLogger(__name__)
+inf = inflect.engine()
 
 
 def load_vars_or_exit(recipe_version, vars_file_path, additional_vars):
@@ -260,7 +263,7 @@ def do_bootprep_run(schema_validator, args):
     # - Create the objects, if this is not a dry-run (or validation-only run)
 
     try:
-        create_images(instance, args)
+        created_images = create_images(instance, args)
     except ImageCreateError as err:
         LOGGER.error(str(err))
         raise SystemExit(1)
@@ -292,6 +295,47 @@ def do_bootprep_run(schema_validator, args):
     except InputItemCreateError as err:
         LOGGER.error(str(err))
         raise SystemExit(1)
+
+    print_report(args, instance, created_images)
+
+
+def print_report(args, instance, created_images):
+    """Print a report about created items to stdout.
+
+    Args:
+        args (Namespace): parsed commandline arguments
+        instance (InputInstance): the parsed bootprep input file
+        created_images (Iterable[IMSInputImage]): the IMS
+            images which were created as part of the bootprep run
+    """
+    if args.dry_run:
+        return
+
+    created_types_items = [
+        ('configurations', instance.input_configurations),
+        ('images', created_images),
+        ('session_templates', instance.input_session_templates),
+    ]
+    bootprep_report = MultiReport(print_format=args.format)
+    for item_type_name, items in created_types_items:
+        if item_type_name == 'images':
+            # Special case for images since they are not BaseInputItems
+            created = items
+            item_class = IMSInputImage
+        else:
+            created = items.created
+            skipped = items.skipped_items
+            item_class = items.item_class
+
+        if not created:
+            continue
+
+        report_title = inf.plural_noun(item_class.description) if args.format == 'pretty' else item_type_name
+        current_report = bootprep_report.add_report(report_title, item_class.report_attrs)
+        for item in created:
+            current_report.add_row(item.report_row())
+
+    print(bootprep_report)
 
 
 def do_bootprep_list_available_vars(args):

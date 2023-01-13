@@ -37,6 +37,7 @@ from sat.apiclient import APIError
 from sat.cached_property import cached_property
 from sat.cli.bootprep.errors import ImageCreateError
 from sat.cli.bootprep.input.base import jinja_rendered, provides_context
+from sat.constants import MISSING_VALUE
 from sat.waiting import (
     DependencyGroupMember,
     WaitingFailure
@@ -72,7 +73,9 @@ class BaseInputImage(DependencyGroupMember, ABC):
             and renaming have been completed, as applicable
     """
 
+    description = 'IMS image'
     template_render_err = ImageCreateError
+    report_attrs = ['name', 'preconfigured_image_id', 'final_image_id', 'configuration', 'configuration_group_names']
 
     def __init__(self, image_data, index, instance, jinja_env, product_catalog, ims_client, cfs_client):
         """Create a new InputImage
@@ -321,6 +324,9 @@ class BaseInputImage(DependencyGroupMember, ABC):
             return None
         return self.finished_job_details.get('resultant_image_id')
 
+    # Alias for more descriptive reporting
+    preconfigured_image_id = ims_resultant_image_id
+
     @property
     def image_id_to_configure(self):
         """str: the IMS id of the image to be configured"""
@@ -528,6 +534,19 @@ class BaseInputImage(DependencyGroupMember, ABC):
         return self.image_create_success and self.image_configure_success
 
     begin = begin_image_create
+
+    def report_row(self):
+        """Create a report row about the image.
+
+        Each row contains the attributes listed in `report_attrs` in order.
+
+        Returns:
+            a list containing the attributes from report_attrs
+        """
+        # TODO: This implementation is here to be compatible with BaseInputItems
+        #  due to structural typing. Once BaseInputImage is a subtype of BaseInputItem,
+        #  this method will no longer be necessary.
+        return [getattr(self, attr, MISSING_VALUE) for attr in self.report_attrs]
 
 
 class IMSInputImage(BaseInputImage):
