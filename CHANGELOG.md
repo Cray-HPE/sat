@@ -57,6 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a build issue where the `sat` container could contain a
   different version of `kubectl` than is found in CSM.
 
+### Security
+- Update the version of certifi from 2021.10.8 to 2022.12.7 to resolve a
+  medium-severity dependabot alert.
+
 ## [3.19.3] - 2022-09-29
 
 ### Changed
