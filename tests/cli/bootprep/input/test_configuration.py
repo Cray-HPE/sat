@@ -136,9 +136,11 @@ class TestGitInputConfigurationLayer(TestInputConfigurationLayerBase):
         self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = self.branch_head_commit
 
         self.mock_sat_version = '2.3.6'
+        self.mock_network_type = 'cassini'
         self.jinja_env = SandboxedEnvironment()
         self.jinja_env.globals = {
-            'sat': {'version': self.mock_sat_version}
+            'sat': {'version': self.mock_sat_version},
+            'shs': {'version': '2.1.0', 'network_type': self.mock_network_type}
         }
 
     def tearDown(self):
@@ -154,6 +156,12 @@ class TestGitInputConfigurationLayer(TestInputConfigurationLayerBase):
         del self.branch_layer_data['playbook']
         layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
         self.assertIsNone(layer.playbook)
+
+    def test_playbook_property_jinja_template(self):
+        """Test the playbook property when the playbook uses Jinja2 templating"""
+        self.branch_layer_data['playbook'] = 'shs_{{shs.network_type}}_install.yaml'
+        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
+        self.assertEqual(f'shs_{self.mock_network_type}_install.yaml', layer.playbook)
 
     def test_name_property_present(self):
         """Test the name property when the name is in the layer data"""
@@ -275,8 +283,10 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
 
         # Used to test variable substitution in Jinja2-templated fields
         self.jinja_env = SandboxedEnvironment()
+        self.mock_network_type = 'cassini'
         self.jinja_env.globals = {
-            self.product_name: {'version': self.product_version}
+            self.product_name: {'version': self.product_version},
+            'shs': {'version': '2.1.0', 'network_type': self.mock_network_type}
         }
 
         self.playbook = 'site.yaml'
@@ -328,6 +338,13 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
 
     def tearDown(self):
         patch.stopall()
+
+    def test_playbook_property_jinja_template(self):
+        """Test the playbook property when the playbook uses Jinja2 templating"""
+        self.branch_layer_data['playbook'] = 'shs_{{shs.network_type}}_install.yaml'
+        layer = ProductInputConfigurationLayer(self.branch_layer_data, self.jinja_env,
+                                               self.mock_product_catalog)
+        self.assertEqual(f'shs_{self.mock_network_type}_install.yaml', layer.playbook)
 
     def test_product_name_property(self):
         """Test the product_name property"""
