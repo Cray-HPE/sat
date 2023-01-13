@@ -25,7 +25,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.20.0] - 2022-01-13
 
 ### Added
 - Added new command `jobstat`, which provides system-wide view of application
@@ -59,6 +59,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved the performance of `sat status` when using BOS v2.
 - Fixed a build issue where the `sat` container could contain a
   different version of `kubectl` than is found in CSM.
+- Added missing description of the `--dry-run` option to `sat bootprep` man
+  page, and clarified its help text.
+- Corrected the man page description of the `--save-files` option to say that
+  BOS session templates will be saved in dry-run mode, though they may be
+  incomplete. Slightly reworded the help text for `--save-files`.
 
 ### Security
 - Update the version of certifi from 2021.10.8 to 2022.12.7 to resolve a
