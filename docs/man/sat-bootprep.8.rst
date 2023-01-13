@@ -97,6 +97,15 @@ RUN OPTIONS
 
 These options only apply to the ``run`` action.
 
+**--limit {configurations,images,session_templates}**
+        Create only the given types of items from the input file. Specify this
+        option multiple times to specify multiple types of items to create. By
+        default, all items from the input file are created.
+
+        Validation of the other types of items in the input file is still
+        performed in order to ensure references from one type of item in the
+        input file to another type of item in the input file can be resolved.
+
 **-d, --dry-run**
         Do a dry-run. Do not actually create CFS configurations, build
         images, customize images, or create BOS session templates. This still

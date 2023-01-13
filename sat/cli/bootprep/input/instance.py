@@ -25,6 +25,7 @@
 Defines a class for the input instance loaded from the input file.
 """
 from sat.cached_property import cached_property
+from sat.cli.bootprep.constants import CONFIGURATIONS_KEY, IMAGES_KEY, SESSION_TEMPLATES_KEY
 from sat.cli.bootprep.input.configuration import InputConfigurationCollection
 from sat.cli.bootprep.input.image import BaseInputImage
 from sat.cli.bootprep.input.session_template import InputSessionTemplateCollection
@@ -36,7 +37,7 @@ class InputInstance:
 
     def __init__(self, instance_dict, request_dumper,
                  cfs_client, ims_client, bos_client,
-                 jinja_env, product_catalog, dry_run):
+                 jinja_env, product_catalog, dry_run, limit):
         """Create a new InputInstance from the validated contents of an input file.
 
         Args:
@@ -55,6 +56,8 @@ class InputInstance:
             product_catalog (cray_product_catalog.query.ProductCatalog):
                 the product catalog object
             dry_run (bool): True if this is a dry run, False otherwise.
+            limit (list of str): the list of types of items from the input file
+                to be created.
         """
         self.instance_dict = instance_dict
         self.request_dumper = request_dumper
@@ -64,12 +67,13 @@ class InputInstance:
         self.jinja_env = jinja_env
         self.product_catalog = product_catalog
         self.dry_run = dry_run
+        self.limit = limit
 
     @cached_property
     def input_configurations(self):
         """InputConfigurationCollection: the configurations in the input instance"""
         return InputConfigurationCollection(
-            self.instance_dict.get('configurations', []),
+            self.instance_dict.get(CONFIGURATIONS_KEY, []),
             self,
             jinja_env=self.jinja_env,
             request_dumper=self.request_dumper,
@@ -82,13 +86,13 @@ class InputInstance:
         """list of InputImages: the images in the input instance"""
         return [BaseInputImage.get_image(image, index, self, self.jinja_env, self.product_catalog,
                                          self.ims_client, self.cfs_client)
-                for index, image in enumerate(self.instance_dict.get('images', []))]
+                for index, image in enumerate(self.instance_dict.get(IMAGES_KEY, []))]
 
     @cached_property
     def input_session_templates(self):
         """InputSessionTemplateCollection: the session templates in the input instance"""
         return InputSessionTemplateCollection(
-            self.instance_dict.get('session_templates', []),
+            self.instance_dict.get(SESSION_TEMPLATES_KEY, []),
             self,
             jinja_env=self.jinja_env,
             request_dumper=self.request_dumper,

@@ -27,10 +27,11 @@ The parser for the bootprep subcommand.
 from inflect import engine
 
 from sat.cli.bootprep.constants import (
+    ALL_KEYS,
     DEFAULT_PUBLIC_KEY_FILE,
     DOCS_ARCHIVE_FILE_NAME,
     EXAMPLE_FILE_NAME,
-    LATEST_VERSION_VALUE
+    LATEST_VERSION_VALUE,
 )
 from sat.parsergroups import (
     StoreNestedVariable,
@@ -223,6 +224,15 @@ def _add_bootprep_run_subparser(subparsers):
         'input_file',
         help='Path to the input YAML file that defines the configurations, '
              'images, and session templates to create.')
+    run_subparser.add_argument(
+        '--limit',
+        help='Create only the given types of items from the input file. Specify '
+             'this option multiple times to specify multiple types of items to '
+             'create. By default, all items from the input file are created.',
+        action='append',
+        choices=ALL_KEYS,
+        # Do not use default=ALL_KEYS here or it is impossible to omit keys.
+    )
     run_subparser.add_argument(
         '--dry-run', '-d', action='store_true',
         help='Do a dry-run. Do not actually create CFS configurations, '
