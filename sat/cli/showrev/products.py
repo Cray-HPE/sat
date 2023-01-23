@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -82,10 +82,9 @@ def get_product_versions():
     """
     product_key = 'product_name'
     version_key = 'product_version'
-    active_key = 'active'
     image_key = 'images'
     recipe_key = 'image_recipes'
-    headers = [product_key, version_key, active_key, image_key, recipe_key]
+    headers = [product_key, version_key, image_key, recipe_key]
 
     try:
         product_catalog = ProductCatalog()
@@ -97,8 +96,7 @@ def get_product_versions():
     for product in product_catalog.products:
         images = '\n'.join(sorted(image['name'] for image in product.images)) or '-'
         recipes = '\n'.join(sorted(recipe['name'] for recipe in product.recipes)) or '-'
-        active = str(product.active) if product.supports_active else 'N/A'
-        products.append([product.name, product.version, active, images, recipes])
+        products.append([product.name, product.version, images, recipes])
 
     return headers, products
 
