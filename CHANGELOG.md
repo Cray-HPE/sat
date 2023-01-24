@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed a bug in which `sat firmware` would fail with 400 Bad Request errors.
+- Fixed a bug in which API requests were not being logged.
 
 ## [3.20.0] - 2022-01-13
 
