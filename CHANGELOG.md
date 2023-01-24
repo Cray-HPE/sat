@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Removed the "active" field from the output of `sat showrev`.
 
+### Fixed
+- Fixed a bug in which `sat firmware` would fail with 400 Bad Request errors.
+
 ## [3.20.0] - 2022-01-13
 
 ### Added
