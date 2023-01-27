@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a bug in which `sat firmware` would fail with 400 Bad Request errors.
 - Fixed a bug in which API requests were not being logged.
 
+### Added
+- Added the `--staged-session` option to `sat bootsys` which can be used to
+  create staged BOS sessions.
+- Added descriptions for `--bos-limit` and `--recursive` to the `sat bootsys`
+  man page.
+
 ## [3.20.0] - 2022-01-13
 
 ### Added

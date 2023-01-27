@@ -7,7 +7,7 @@ Perform boot, shutdown, or reboot actions on the system
 -------------------------------------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2020-2022 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2020-2023 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -173,6 +173,29 @@ These options apply to both the ``shutdown`` and ``boot`` actions.
         config file. This option is deprecated in favor of ``--bos-templates``
         (above). If ``--bos-templates`` or its configuration-file equivalent is
         specified, then this option will be ignored.
+
+**--bos-limit** *XNAMES*
+        A comma-separated list of xnames, node groups, and roles which should be
+        included in the shutdown or boot action. If not specified, all
+        components in the specified BOS session template's boot sets will be
+        used.
+
+**--recursive**
+        If specified, then the xnames listed in the limit string for
+        ``--bos-limit`` will be expanded recursively into their constituent node
+        xnames. For instance, if a slot xname is given as part of
+        ``--bos-limit``, then that xname will be expanded into the node xnames
+        for all nodes in that slot.
+
+**--staged-session**
+        If specified, then create a "staged" BOS session. A staged session
+        differs from a normal BOS session in that a staged session does not
+        automatically change the state of any components targeted by the session
+        templates. Instead, a staged session will update components'
+        "staged_state", which can later be applied through the command
+        'cray bos v2 applystaged create', or through an API call to BOS. When
+        using this option, the command will not wait for completion of BOS
+        sessions. This option cannot be used with BOS v1.
 
 **--excluded-ncns** *EXCLUDED_NCNS*
         A comma-separated list of NCN hostnames that should be excluded from the

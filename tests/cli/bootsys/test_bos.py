@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -259,7 +259,7 @@ class TestBOSV2SessionWaiter(unittest.TestCase):
         self.mock_session_thread = MagicMock(session_id=self.session_id)
         self.mock_session_thread.stopped.return_value = False
 
-        self.waiter = BOSV2SessionWaiter(self.mock_session_thread, math.inf)
+        self.waiter = BOSV2SessionWaiter(self.mock_session_thread, timeout=math.inf)
 
     def tearDown(self):
         patch.stopall()
@@ -552,7 +552,7 @@ class TestDoBosShutdowns(ExtendedTestCase):
         self.mock_get_config = patch('sat.cli.bootsys.bos.get_config_value', return_value=60).start()
 
         self.limit = None
-        self.args = Namespace(bos_limit=self.limit, recursive=False)
+        self.args = Namespace(bos_limit=self.limit, recursive=False, staged_session=False)
         self.args.disruptive = False
 
     def tearDown(self):
@@ -562,7 +562,8 @@ class TestDoBosShutdowns(ExtendedTestCase):
         """Test running BOS shutdown with prompting to continue."""
         do_bos_shutdowns(self.args)
         self.mock_prompt.assert_called_once()
-        self.mock_do_bos_ops.assert_called_once_with('shutdown', 60, limit=self.limit, recursive=False)
+        self.mock_do_bos_ops.assert_called_once_with(
+            'shutdown', 60, limit=self.limit, recursive=False, stage=False)
 
     def test_do_bos_shutdowns_without_prompt(self):
         """Test running BOS shutdown without prompting."""
@@ -570,7 +571,8 @@ class TestDoBosShutdowns(ExtendedTestCase):
         do_bos_shutdowns(self.args)
 
         self.mock_prompt.assert_not_called()
-        self.mock_do_bos_ops.assert_called_once_with('shutdown', 60, limit=self.limit, recursive=False)
+        self.mock_do_bos_ops.assert_called_once_with(
+            'shutdown', 60, limit=self.limit, recursive=False, stage=False)
 
 
 class TestDoBosReboots(ExtendedTestCase):
@@ -584,7 +586,7 @@ class TestDoBosReboots(ExtendedTestCase):
             'sat.cli.bootsys.bos.get_config_value', side_effect=[60, 90]).start()
 
         self.limit = None
-        self.args = Namespace(bos_limit=self.limit, recursive=False)
+        self.args = Namespace(bos_limit=self.limit, recursive=False, staged_session=False)
         self.args.disruptive = False
 
     def tearDown(self):
@@ -595,7 +597,7 @@ class TestDoBosReboots(ExtendedTestCase):
         do_bos_reboots(self.args)
         self.mock_prompt.assert_called_once()
         self.mock_do_bos_ops.assert_called_once_with(
-            'reboot', 150, limit=self.limit, recursive=False)
+            'reboot', 150, limit=self.limit, recursive=False, stage=False)
 
     def test_do_bos_reboots_without_prompt(self):
         """Test running BOS shutdown without prompting."""
@@ -604,7 +606,7 @@ class TestDoBosReboots(ExtendedTestCase):
 
         self.mock_prompt.assert_not_called()
         self.mock_do_bos_ops.assert_called_once_with(
-            'reboot', 150, limit=self.limit, recursive=False)
+            'reboot', 150, limit=self.limit, recursive=False, stage=False)
 
 
 if __name__ == '__main__':
