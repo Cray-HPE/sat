@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -134,6 +134,9 @@ VALID_IMAGE_PRODUCT_WITH_CONFIG = {
     'configuration': COMPUTE_CONFIG_IMAGE_NAME,
     'configuration_group_names': ['Compute', 'Compute_GPU']
 }
+
+VALID_IMAGE_PRODUCT_WITH_PREFIX_AND_CONFIG = deepcopy(VALID_IMAGE_PRODUCT_WITH_CONFIG)
+VALID_IMAGE_PRODUCT_WITH_PREFIX_AND_CONFIG['base']['product']['filter'] = {'prefix': 'cray-shasta-compute'}
 
 VALID_IMAGE_REF_WITH_CONFIG = {
     'name': 'compute-{{ base.name }}',
@@ -500,6 +503,13 @@ class TestValidateInstance(ExtendedTestCase):
         """Valid image from a version of a product with config specified"""
         instance = {
             'images': [VALID_IMAGE_PRODUCT_WITH_CONFIG]
+        }
+        self.assert_valid_instance(instance)
+
+    def test_valid_image_product_with_prefix_and_config(self):
+        """Valid image from a version of a product with a prefix filter and config specified."""
+        instance = {
+            'images': [VALID_IMAGE_PRODUCT_WITH_PREFIX_AND_CONFIG]
         }
         self.assert_valid_instance(instance)
 

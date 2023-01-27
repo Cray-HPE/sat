@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2021,2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -82,7 +82,7 @@ class TestGetProducts(ExtendedTestCase):
                                               self.mock_uan_product,
                                               self.mock_pbs_product]
 
-        self.expected_headers = ['product_name', 'product_version', 'active', 'images', 'image_recipes']
+        self.expected_headers = ['product_name', 'product_version', 'images', 'image_recipes']
 
     def tearDown(self):
         """Stops all patches"""
@@ -91,9 +91,9 @@ class TestGetProducts(ExtendedTestCase):
     def test_get_product_versions(self):
         """Test a basic invocation of get_product_versions."""
         expected_fields = [
-            ['cos', '1.4.0', 'N/A', COS_IMAGE_NAME, COS_RECIPE_NAME],
-            ['uan', '2.0.0', 'N/A', UAN_IMAGE_NAME, UAN_RECIPE_NAME],
-            ['pbs', '0.1.0', 'N/A', '-', '-']
+            ['cos', '1.4.0', COS_IMAGE_NAME, COS_RECIPE_NAME],
+            ['uan', '2.0.0', UAN_IMAGE_NAME, UAN_RECIPE_NAME],
+            ['pbs', '0.1.0', '-', '-']
         ]
         actual_headers, actual_fields = get_product_versions()
         self.mock_product_catalog_cls.assert_called_once_with()
@@ -109,10 +109,10 @@ class TestGetProducts(ExtendedTestCase):
         self.mock_product_catalog.products.insert(2, new_uan_product)
 
         expected_fields = [
-            ['cos', '1.4.0', 'N/A', COS_IMAGE_NAME, COS_RECIPE_NAME],
-            ['uan', '2.0.0', 'N/A', UAN_IMAGE_NAME, UAN_RECIPE_NAME],
-            ['uan', '2.0.1', 'N/A', new_uan_image_name, new_uan_recipe_name],
-            ['pbs', '0.1.0', 'N/A', '-', '-']
+            ['cos', '1.4.0', COS_IMAGE_NAME, COS_RECIPE_NAME],
+            ['uan', '2.0.0', UAN_IMAGE_NAME, UAN_RECIPE_NAME],
+            ['uan', '2.0.1', new_uan_image_name, new_uan_recipe_name],
+            ['pbs', '0.1.0', '-', '-']
         ]
         actual_headers, actual_fields = get_product_versions()
         self.mock_product_catalog_cls.assert_called_once_with()
@@ -126,9 +126,9 @@ class TestGetProducts(ExtendedTestCase):
         self.mock_uan_product.recipes.append(get_fake_ims_data(other_uan_recipe))
 
         expected_fields = [
-            ['cos', '1.4.0', 'N/A', COS_IMAGE_NAME, COS_RECIPE_NAME],
-            ['uan', '2.0.0', 'N/A', f'{other_uan_image}\n{UAN_IMAGE_NAME}', f'{other_uan_recipe}\n{UAN_RECIPE_NAME}'],
-            ['pbs', '0.1.0', 'N/A', '-', '-']
+            ['cos', '1.4.0', COS_IMAGE_NAME, COS_RECIPE_NAME],
+            ['uan', '2.0.0', f'{other_uan_image}\n{UAN_IMAGE_NAME}', f'{other_uan_recipe}\n{UAN_RECIPE_NAME}'],
+            ['pbs', '0.1.0', '-', '-']
         ]
         actual_headers, actual_fields = get_product_versions()
         self.mock_product_catalog_cls.assert_called_once_with()
@@ -147,20 +147,13 @@ class TestGetProducts(ExtendedTestCase):
                                f'product catalog: {pc_err_msg}', logs.output)
 
     def test_get_product_versions_active_version(self):
-        """Test with two versions of a product, one of which is active, the other inactive"""
+        """Test that a product that appears "active" in the catalog does not generate a report with the active field."""
         self.mock_uan_product.supports_active = True
         self.mock_uan_product.active = False
-        new_uan_image_name = new_uan_recipe_name = 'new-uan-recipe-2.0.1'
-        new_uan_product = get_mock_installed_product_version('uan', '2.0.1',
-                                                             image_names=[new_uan_image_name],
-                                                             recipe_names=[new_uan_recipe_name],
-                                                             supports_active=True, active=True)
-        self.mock_product_catalog.products.insert(2, new_uan_product)
         expected_fields = [
-            ['cos', '1.4.0', 'N/A', COS_IMAGE_NAME, COS_RECIPE_NAME],
-            ['uan', '2.0.0', 'False', UAN_IMAGE_NAME, UAN_RECIPE_NAME],
-            ['uan', '2.0.1', 'True', new_uan_image_name, new_uan_recipe_name],
-            ['pbs', '0.1.0', 'N/A', '-', '-']
+            ['cos', '1.4.0', COS_IMAGE_NAME, COS_RECIPE_NAME],
+            ['uan', '2.0.0', UAN_IMAGE_NAME, UAN_RECIPE_NAME],
+            ['pbs', '0.1.0', '-', '-']
         ]
         actual_headers, actual_fields = get_product_versions()
         self.mock_product_catalog_cls.assert_called_once_with()

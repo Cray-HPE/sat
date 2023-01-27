@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -332,7 +332,7 @@ class FASClient(APIGatewayClient):
             payload['stateComponentFilter'] = {'xnames': xnames}
 
         try:
-            self.post('snapshots', payload=payload)
+            self.post('snapshots', json=payload)
         except APIError as err:
             raise APIError('Error when posting new snapshot: {}'.format(err))
 

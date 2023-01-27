@@ -25,6 +25,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.21.0] - 2023-01-27
+
+### Changed
+
+- Removed the "active" field from the output of `sat showrev`.
+
+### Fixed
+- Fixed a bug in which `sat firmware` would fail with 400 Bad Request errors.
+- Fixed a bug in which API requests were not being logged.
+
+### Added
+- Added the `--staged-session` option to `sat bootsys` which can be used to
+  create staged BOS sessions.
+- Added descriptions for `--bos-limit` and `--recursive` to the `sat bootsys`
+  man page.
+- Added ability to filter the images provided by a product using a prefix when
+  specifying the base of an image in a `sat bootprep` input file.
+- Added support for hyphenated product names in `sat bootprep` variables.
+
 ## [3.20.0] - 2022-01-13
 
 ### Added

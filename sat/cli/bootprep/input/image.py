@@ -38,6 +38,7 @@ from sat.cached_property import cached_property
 from sat.cli.bootprep.errors import ImageCreateError
 from sat.cli.bootprep.input.base import jinja_rendered, provides_context
 from sat.constants import MISSING_VALUE
+from sat.util import get_val_by_path
 from sat.waiting import (
     DependencyGroupMember,
     WaitingFailure
@@ -639,13 +640,44 @@ class ProductInputImage(BaseInputImage):
         return self.image_data['base']['product'].get('version')
 
     @property
-    def base_description(self):
-        """str: a human-readable description of the base we are starting from"""
+    def filter_prefix(self):
+        """str or None: the filter prefix to use for filtering images or recipes from the product"""
+        return get_val_by_path(self.image_data, 'base.product.filter.prefix')
+
+    def filter_func(self, name):
+        """Filter the given name.
+
+        Args:
+            name (str): the name to check against the filter.
+
+        Returns:
+            True if the filter matches the given name or there is no filter, False otherwise
+        """
+        return self.filter_prefix is None or name.startswith(self.filter_prefix)
+
+    @property
+    def unfiltered_base_description(self):
+        """str: a human-readable description of the base without filtering"""
         return (
             f'{self.base_resource_type} provided by '
             f'{f"version {self.product_version}" if self.product_version else "latest version"} '
             f'of product {self.product_name}'
         )
+
+    @property
+    def filter_description(self):
+        """str: a description of the requested filter"""
+        if self.filter_prefix is None:
+            return ''
+        return f'with name matching prefix "{self.filter_prefix}"'
+
+    @property
+    def base_description(self):
+        """str: a human-readable description of the base we are starting from"""
+        description = self.unfiltered_base_description
+        if self.filter_prefix is not None:
+            description += f' {self.filter_description}'
+        return description
 
     @cached_property
     def installed_product(self):
@@ -656,40 +688,52 @@ class ProductInputImage(BaseInputImage):
             raise ImageCreateError(f'Failed to find {self.base_description}: {err}')
 
     @cached_property
-    @provides_context('base')
-    def ims_base(self):
-        """dict: the data for the base IMS recipe or image to build and/or customize"""
+    def base_resource_id(self):
+        """str: the base resource IMS ID"""
         if self.base_is_recipe:
             ims_resources = self.installed_product.recipes
         else:
             ims_resources = self.installed_product.images
 
         if not ims_resources:
+            raise ImageCreateError(f'There is no {self.unfiltered_base_description}')
+
+        filtered_resources = [resource for resource in ims_resources
+                              if self.filter_func(resource['name'])]
+        if not filtered_resources:
             raise ImageCreateError(f'There is no {self.base_description}.')
-        elif len(ims_resources) > 1:
+        elif len(filtered_resources) > 1:
             raise ImageCreateError(f'There exists more than one {self.base_description}.')
-        ims_resource = ims_resources[0]
+        ims_resource = filtered_resources[0]
         ims_resource_desc = ', '.join(f'{key}={value}' for key, value in ims_resource.items())
 
         try:
-            matching_base_resources = self.ims_client.get_matching_resources(
-                self.base_resource_type, resource_id=ims_resource['id']
-            )
+            return ims_resource['id']
         except KeyError:
             raise ImageCreateError(
                 f'{self.base_description} with {ims_resource_desc} does not '
                 f'have an id in product catalog data.'
+            )
+
+    @cached_property
+    @provides_context('base')
+    def ims_base(self):
+        """dict: the data for the base IMS recipe or image to build and/or customize"""
+        resource_id = self.base_resource_id
+        try:
+            matching_base_resources = self.ims_client.get_matching_resources(
+                self.base_resource_type, resource_id=resource_id
             )
         except APIError as err:
             raise ImageCreateError(err)
 
         if not matching_base_resources:
             raise ImageCreateError(f'Found no matches in IMS for {self.base_description} '
-                                   f'with {ims_resource_desc}')
+                                   f'with id={resource_id}')
         elif len(matching_base_resources) > 1:
             # This really shouldn't happen given that we are querying by unique IMS id
             raise ImageCreateError(f'Found {len(matching_base_resources)} matches for '
-                                   f'{self.base_description} with {ims_resource_desc}')
+                                   f'{self.base_description} with id={resource_id}')
 
         return matching_base_resources[0]
 
