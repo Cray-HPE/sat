@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -123,3 +123,37 @@ class TestEnumeratingVars(unittest.TestCase):
             expected_elements = {('foo.version', '1.2.5', '--vars'),
                                  ('bar.version', '2.3.4', 'latest recipe')}
             self.assertEqual(set(self.context.enumerate_vars_and_sources()), expected_elements)
+
+    def test_getting_vars_with_hyphenated_keys(self):
+        """Test top-level hyphens are replaced with underscores when getting variables from any source."""
+        vars_file_path = 'some_path.yaml'
+        self.context.vars_file_path = vars_file_path
+        self.software_recipe_vars['some-product'] = {'version': '1.2.3'}
+        del self.software_recipe_vars['foo']
+        del self.software_recipe_vars['bar']
+
+        self.context.cli_vars = {
+            'some-other-product': {'version': '4.5.6'}
+        }
+        vars_file_content = dedent("""
+        yet-another-product:
+            version: 7.8.9
+        """)
+        self.context.recipe_version = LATEST_VERSION_VALUE
+        with patch('sat.cli.bootprep.vars.open', mock_open(read_data=vars_file_content)):
+            self.context.load_vars()
+
+        # Assert top-level keys have hyphens replaced with underscores from all sources,
+        # in enumerate_vars_and_sources (used by list-vars) as well as self.vars (used by
+        # bootprep run).
+        expected_enumerated_elements = {('some_other_product.version', '4.5.6', '--vars'),
+                                        ('some_product.version', '1.2.3', 'latest recipe'),
+                                        ('yet_another_product.version', '7.8.9', 'some_path.yaml')}
+        self.assertEqual(set(self.context.enumerate_vars_and_sources()), expected_enumerated_elements)
+
+        expected_vars = {
+            'some_product': {'version': '1.2.3'},
+            'yet_another_product': {'version': '7.8.9'},
+            'some_other_product': {'version': '4.5.6'}
+        }
+        self.assertEqual(self.context.vars, expected_vars)

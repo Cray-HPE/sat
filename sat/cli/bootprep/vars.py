@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -83,6 +83,13 @@ class VariableContext:
         deep_update_dict(self.vars, self.software_recipe_vars)
         deep_update_dict(self.vars, self.file_vars)
         deep_update_dict(self.vars, self.cli_vars)
+        # CRAYSAT-1653: Replace hyphens in top-level keys with underscores.
+        # This allows us to support hyphens in IUF product names, but note that
+        # this substitution is only done for top-level keys.
+        self.vars = {
+            key.replace('-', '_'): value
+            for key, value in self.vars.items()
+        }
 
     @cached_property
     def file_vars(self):
@@ -161,6 +168,13 @@ class VariableContext:
         for source, attr in var_attr_by_source.items():
             vars_from_source = getattr(self, attr)
             if vars_from_source:
+                # CRAYSAT-1653: Replace hyphens in top-level keys with underscores.
+                # This allows us to support hyphens in IUF product names, but note that
+                # this substitution is only done for top-level keys.
+                vars_from_source = {
+                    key.replace('-', '_'): value
+                    for key, value in vars_from_source.items()
+                }
                 variables = collapse_keys(vars_from_source)
                 for fq_var_name, var_value in variables.items():
                     if fq_var_name not in yielded_keys:

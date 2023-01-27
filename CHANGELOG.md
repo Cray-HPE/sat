@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   man page.
 - Added ability to filter the images provided by a product using a prefix when
   specifying the base of an image in a `sat bootprep` input file.
+- Added support for hyphenated product names in `sat bootprep` variables.
 
 ## [3.20.0] - 2022-01-13
 
