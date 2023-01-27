@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   create staged BOS sessions.
 - Added descriptions for `--bos-limit` and `--recursive` to the `sat bootsys`
   man page.
+- Added ability to filter the images provided by a product using a prefix when
+  specifying the base of an image in a `sat bootprep` input file.
 
 ## [3.20.0] - 2022-01-13
 

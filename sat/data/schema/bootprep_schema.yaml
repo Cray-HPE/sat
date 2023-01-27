@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -41,7 +41,7 @@ $schema: "https://json-schema.org/draft/2020-12/schema"
 # ... patch component when all input files that were valid under the old schema
 #     are still valid under the new schema
 #
-version: '1.0.2'
+version: '1.0.3'
 title: Bootprep Input File
 description: >
   A description of the set of CFS configurations to create, the set of IMS
@@ -269,6 +269,21 @@ properties:
                         Supports rendering as a Jinja template.
                     type:
                       $ref: '#/$defs/ImageBaseType'
+                    filter:
+                      type: object
+                      description: >
+                        Filter the image or recipe to use from the given version of the given product
+                        in case this product provides more than one image or recipe and one must be
+                        selected.
+                      required: ['prefix']
+                      additionalProperties: false
+                      properties:
+                        prefix:
+                          type: string
+                          description: >
+                            A prefix that must match the beginning of the name of an image or recipe
+                            from the given version of the given product. If there are multiple matches,
+                            or if there are no matches, it is an error.
             - type: object
               required: ['image_ref']
               additionalProperties: false
