@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -212,18 +212,19 @@ def boa_job_successful(boa_job_id):
 class BOSV2SessionWaiter(Waiter):
     """Waiter for monitoring the status of a BOS v2 session."""
 
-    def __init__(self, bos_session_thread, *args, **kwargs):
+    def __init__(self, bos_session_thread, target_state='complete', *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.bos_client = BOSClientCommon.get_bos_client(SATSession(),
                                                          version='v2')
         self.bos_session_thread = bos_session_thread
+        self.target_state = target_state
 
         self.pct_successful = 0.0
         self.pct_failed = 0.0
         self.error_summary = {}
 
     def condition_name(self):
-        return f'session {self.bos_session_thread.session_id} completed'
+        return f'session {self.bos_session_thread.session_id} reached target state {self.target_state}'
 
     def has_completed(self):
         if self.bos_session_thread.stopped():
@@ -231,8 +232,8 @@ class BOSV2SessionWaiter(Waiter):
 
         try:
             LOGGER.info(
-                'Waiting for BOS session %s to complete. Session template: %s',
-                self.bos_session_thread.session_id, self.bos_session_thread.session_template
+                'Waiting for BOS session %s to reach target state %s. Session template: %s',
+                self.bos_session_thread.session_id, self.target_state, self.bos_session_thread.session_template
             )
 
             session_status = self.bos_client.get_session_status(
@@ -252,7 +253,7 @@ class BOSV2SessionWaiter(Waiter):
             if session_status['error_summary']:
                 self.error_summary = session_status['error_summary']
 
-            if session_status['status'] == 'complete':
+            if session_status['status'] == self.target_state:
                 if not session_status.get('managed_components_count'):
                     LOGGER.warning(
                         'Session %s does not manage any components; another session '
@@ -278,7 +279,7 @@ class BOSV2SessionWaiter(Waiter):
 
 class BOSSessionThread(Thread):
 
-    def __init__(self, session_template, operation, limit=None):
+    def __init__(self, session_template, operation, limit=None, stage=False):
         """Create a new BOSSessionThread that creates and monitors a BOS session
 
         Args:
@@ -288,11 +289,14 @@ class BOSSessionThread(Thread):
                 session template.
             limit (str): a limit string to pass through to BOS as the `limit`
                 parameter in the POST payload when creating the BOS session
+            stage (bool): if True, create a 'staged' BOS session, which updates
+                components' staged state rather than their desired state.
         """
         super().__init__()
         self._stop_event = Event()
         self.session_template = session_template
         self.limit = limit
+        self.stage = stage
         self.operation = operation
         self.session_id = None
         self.boa_job_id = None
@@ -350,10 +354,15 @@ class BOSSessionThread(Thread):
         Returns:
             None
         """
+        bos_client_kwargs = {
+            'session_template': self.session_template,
+            'operation': self.operation,
+            'limit': self.limit,
+        }
+        if self.stage:
+            bos_client_kwargs['stage'] = self.stage
         try:
-            response = self.bos_client.create_session(self.session_template,
-                                                      self.operation,
-                                                      limit=self.limit).json()
+            response = self.bos_client.create_session(**bos_client_kwargs).json()
         except (APIError, ValueError) as err:
             self.mark_failed('Failed to create BOS session: {}'.format(str(err)))
             return
@@ -474,7 +483,8 @@ class BOSSessionThread(Thread):
         # Pass math.inf as the timeout since timeouts are handled by the
         # `do_parallel_bos_operations()` function, independent of the waiter
         # class here.
-        waiter = BOSV2SessionWaiter(self, math.inf,
+        waiter = BOSV2SessionWaiter(self, target_state='running' if self.stage else 'complete',
+                                    timeout=math.inf,
                                     poll_interval=PARALLEL_CHECK_INTERVAL)
 
         waiter.wait_for_completion()
@@ -526,7 +536,7 @@ class BOSSessionThread(Thread):
             self.monitor_status_kubectl()
 
 
-def do_parallel_bos_operations(session_templates, operation, timeout, limit=None):
+def do_parallel_bos_operations(session_templates, operation, timeout, limit=None, stage=False):
     """Perform BOS operation against the session templates in parallel.
 
     Args:
@@ -539,6 +549,8 @@ def do_parallel_bos_operations(session_templates, operation, timeout, limit=None
             roles, and groups to operate upon. This string will be passed
             through verbatim to BOS in the POST payload when sessions are
             created.
+        stage (bool): if True, create a 'staged' BOS session, which updates
+            components' staged state rather than their desired state.
 
     Returns:
         None
@@ -552,7 +564,7 @@ def do_parallel_bos_operations(session_templates, operation, timeout, limit=None
     LOGGER.debug('Doing parallel %s with %s: %s', operation, template_plural,
                  ', '.join(session_templates))
 
-    bos_session_threads = [BOSSessionThread(session_template, operation, limit=limit)
+    bos_session_threads = [BOSSessionThread(session_template, operation, limit=limit, stage=stage)
                            for session_template in session_templates]
 
     start_time = monotonic()
@@ -560,9 +572,12 @@ def do_parallel_bos_operations(session_templates, operation, timeout, limit=None
     for thread in bos_session_threads:
         thread.start()
 
-    LOGGER.info(f'Started {operation} operation on BOS '
+    started_verb = 'Staged' if stage else 'Started'
+    LOGGER.info(f'{started_verb} {operation} operation on BOS '
                 f'{template_plural}: {", ".join(session_templates)}.')
-    LOGGER.info(f'Waiting up to {timeout} seconds for {session_plural} to complete.')
+    completed_state = 'stage' if stage else 'complete'
+    completed_state_past_tense = 'staged' if stage else 'completed'
+    LOGGER.info(f'Waiting up to {timeout} seconds for {session_plural} to {completed_state}.')
 
     active_threads = {t.session_template: t for t in bos_session_threads}
     failed_session_templates = []
@@ -584,7 +599,7 @@ def do_parallel_bos_operations(session_templates, operation, timeout, limit=None
                 just_finished.append(session_template)
             elif thread.complete:
                 LOGGER.info(f'{operation.title()} with BOS session template '
-                            f'{session_template} completed.')
+                            f'{session_template} {completed_state_past_tense}.')
                 just_finished.append(session_template)
 
         for finished in just_finished:
@@ -614,7 +629,7 @@ def do_parallel_bos_operations(session_templates, operation, timeout, limit=None
             f'{", ".join(failed_session_templates)}'
         )
 
-    LOGGER.info('All BOS sessions completed.')
+    LOGGER.info(f'All BOS sessions {completed_state_past_tense}.')
 
 
 def get_template_nodes_by_state(session_template_data):
@@ -718,6 +733,10 @@ def get_templates_needing_operation(session_templates, operation):
             session templates or HSM fails to give us information about the
             states of nodes in the BOS session template boot sets.
     """
+    LOGGER.debug(f"Checking whether session "
+                 f"{INFLECTOR.plural('template', len(session_templates))} "
+                 f"still need the '{operation}' operation performed: "
+                 f"{', '.join(session_templates)}")
     # Get the state nodes should be in after the operation is performed
     # If the operation is a reboot, it should always be performed.
     if operation == REBOOT_OPERATION:
@@ -837,7 +856,7 @@ def get_session_templates_deprecated():
     return session_templates
 
 
-def do_bos_operations(operation, timeout, limit=None, recursive=False):
+def do_bos_operations(operation, timeout, limit=None, recursive=False, stage=False):
     """Perform a BOS operation on the compute node and UAN session templates.
 
     Args:
@@ -849,6 +868,8 @@ def do_bos_operations(operation, timeout, limit=None, recursive=False):
         recursive (bool): if True, expand non-node xnames in the limit string
             to the set of all nodes contained in the given xname. If False, do not
             expand xnames.
+        stage (bool): if True, create a 'staged' BOS session, which updates
+            components' staged state rather than their desired state.
 
     Returns:
         None
@@ -860,6 +881,9 @@ def do_bos_operations(operation, timeout, limit=None, recursive=False):
             failure action is 'abort'.
         ValueError: if given an invalid value for `operation`.
     """
+    if stage and get_config_value('bos.api_version').lower() == 'v1':
+        raise BOSFailure(f'--staged-session option may not be used with BOS v1.')
+
     if limit is not None:
         bos_limit_str = BOSLimitString.from_string(limit, recursive=recursive)
 
@@ -898,21 +922,18 @@ def do_bos_operations(operation, timeout, limit=None, recursive=False):
     session_templates = get_session_templates()
     # TODO (SAT-509): Validate computes and UANs in session templates
 
-    LOGGER.debug(f"Checking whether session "
-                 f"{INFLECTOR.plural('template', len(session_templates))} "
-                 f"still need the '{operation}' operation performed: "
-                 f"{', '.join(session_templates)}")
-
     # This will raise a BOSFailure if node status check fails, and the action
     # specified on the command-line or in the config file is 'abort'.
-    templates_to_use = get_templates_needing_operation(session_templates, operation)
+    templates_to_use = session_templates if stage else get_templates_needing_operation(session_templates, operation)
     LOGGER.debug(f"Found {INFLECTOR.no('session template', len(templates_to_use))} "
                  f"needing '{operation}' performed"
                  f"{': ' + ', '.join(templates_to_use) if templates_to_use else '.'}")
 
     if templates_to_use:
         # Let any exceptions raise to caller
-        do_parallel_bos_operations(templates_to_use, operation, timeout, limit=limit)
+        do_parallel_bos_operations(
+            templates_to_use, operation, timeout, limit=limit, stage=stage
+        )
 
 
 def do_bos_shutdowns(args):
@@ -923,12 +944,12 @@ def do_bos_shutdowns(args):
 
     Returns: None
     """
-    if not args.disruptive:
+    if not (args.disruptive or args.staged_session):
         prompt_continue('shutdown of compute nodes and UANs using BOS')
 
     try:
         do_bos_operations('shutdown', get_config_value('bootsys.bos_shutdown_timeout'),
-                          limit=args.bos_limit, recursive=args.recursive)
+                          limit=args.bos_limit, recursive=args.recursive, stage=args.staged_session)
     except BOSFailure as err:
         LOGGER.error(err)
         sys.exit(1)
@@ -945,7 +966,7 @@ def do_bos_boots(args):
     """
     try:
         do_bos_operations('boot', get_config_value('bootsys.bos_boot_timeout'),
-                          limit=args.bos_limit, recursive=args.recursive)
+                          limit=args.bos_limit, recursive=args.recursive, stage=args.staged_session)
     except BOSFailure as err:
         LOGGER.error(err)
         sys.exit(1)
@@ -960,7 +981,7 @@ def do_bos_reboots(args: Namespace):
 
     Returns: None
     """
-    if not args.disruptive:
+    if not (args.disruptive or args.staged_session):
         prompt_continue('reboot of compute nodes and UANs using BOS')
 
     try:
@@ -970,6 +991,7 @@ def do_bos_reboots(args: Namespace):
             get_config_value("bootsys.bos_shutdown_timeout"),
             limit=args.bos_limit,
             recursive=args.recursive,
+            stage=args.staged_session
         )
     except BOSFailure as err:
         LOGGER.error(err)

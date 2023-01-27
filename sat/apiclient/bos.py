@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -247,7 +247,7 @@ class BOSV2Client(BOSClientCommon):
     session_template_path = 'sessiontemplates'
     session_path = 'sessions'
 
-    def create_session(self, session_template, operation, limit=None):
+    def create_session(self, session_template, operation, limit=None, stage=False):
         """Create a BOS session from a session template with an operation.
 
         Args:
@@ -257,6 +257,8 @@ class BOSV2Client(BOSClientCommon):
                 one of boot, configure, reboot, shutdown.
             limit (str): a limit string to pass through to BOS as the `limit`
                 parameter in the POST payload when creating the BOS session
+            stage (bool): if True, create a 'staged' BOS session, which updates
+                components' staged state rather than their desired state.
 
         Returns:
             The response from the POST to 'sessions'.
@@ -266,7 +268,8 @@ class BOSV2Client(BOSClientCommon):
         """
         request_body = {
             'template_name': session_template,
-            'operation': operation
+            'operation': operation,
+            'stage': stage
         }
 
         if limit:
