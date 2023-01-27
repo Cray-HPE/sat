@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -444,7 +444,7 @@ class TestFASClient(ExtendedTestCase):
         exp_payload = {'name': exp_name, 'expirationTime': later.isoformat() + 'Z'}
 
         self.assertEqual(expected, actual)
-        self.mock_post.assert_called_once_with('snapshots', payload=exp_payload)
+        self.mock_post.assert_called_once_with('snapshots', json=exp_payload)
         self.mock_get.assert_has_calls([call('snapshots', exp_name)] * 2)
 
     def test_get_device_firmwares_with_xname(self):
@@ -490,7 +490,7 @@ class TestFASClient(ExtendedTestCase):
         }
 
         self.assertEqual(expected, actual)
-        self.mock_post.assert_called_once_with('snapshots', payload=exp_payload)
+        self.mock_post.assert_called_once_with('snapshots', json=exp_payload)
         self.mock_get.assert_has_calls([call('snapshots', exp_name)] * 2)
 
     def test_get_device_firmwares_post_api_error(self):
