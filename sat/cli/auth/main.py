@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@ Entry point for the auth subcommand.
 
 import getpass
 import logging
+import requests
 
 from sat.session import SATSession
 from sat.util import pester
@@ -61,10 +62,13 @@ def do_auth(args):
 
     password = getpass.getpass('Password for {}: '.format(session.username))
 
-    session.fetch_token(password)
-    if session.fetched_token:
-        LOGGER.info('Succeeded!')
-        session.save()
-    else:
-        LOGGER.error('Authentication Failed.')
-        raise SystemExit(1)
+    try:
+        session.fetch_token(password)
+        if session.fetched_token:
+            LOGGER.info('Succeeded!')
+            session.save()
+        else:
+            LOGGER.error('Authentication Failed.')
+            raise SystemExit(1)
+    except requests.exceptions.ConnectionError as err:
+        LOGGER.error(f"Failed to connect to the API gateway: {err}")
