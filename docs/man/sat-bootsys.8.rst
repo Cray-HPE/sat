@@ -298,6 +298,29 @@ These options set the timeouts of various parts of the stages of the
         Defaults to 900. Overrides the option
         bootsys.bos_boot_timeout in the config file.
 
+REBOOT TIMEOUT OPTIONS
+----------------------
+
+These options set the timeouts of various parts of the stages of the
+``reboot`` action.
+
+**--bos-shutdown-timeout** *BOS_SHUTDOWN_TIMEOUT*
+        Timeout, in seconds, to wait until compute and
+        application nodes have completed their BOS shutdown.
+        Defaults to 600. Overrides the option
+        bootsys.bos_shutdown_timeout in the config file.
+
+        For a reboot, the --bos-shutdown-timeout and
+        --bos-boot-timeout options are added.
+
+**--bos-boot-timeout** *BOS_BOOT_TIMEOUT*
+        Timeout, in seconds, to wait until compute and
+        application nodes have completed their BOS boot.
+        Defaults to 900. Overrides the option
+        bootsys.bos_boot_timeout in the config file.
+
+        For a reboot, the --bos-shutdown-timeout and
+        --bos-boot-timeout options are added.
 
 EXAMPLES
 ========
