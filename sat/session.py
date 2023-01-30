@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,8 @@ OAuth2 authentication support.
 import logging
 
 from csm_api_client.session import UserSession
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from sat.config import get_config_value
 from sat.util import get_resource_filename
@@ -50,6 +52,12 @@ class SATSession(UserSession):
         host = get_config_value('api_gateway.host')
         cert_verify = get_config_value('api_gateway.cert_verify')
         username = get_config_value('api_gateway.username')
+        retries = Retry(
+            total=get_config_value('api_gateway.retries'),
+            backoff_factor=get_config_value('api_gateway.backoff'),
+            status_forcelist=range(500, 601)
+        )
+        adapter = HTTPAdapter(max_retries=retries)
 
         token_filename = get_config_value('api_gateway.token_file')
         if token_filename == '':
@@ -58,6 +66,8 @@ class SATSession(UserSession):
                 '{}.{}.json'.format(host_as_filename, username), 'tokens')
 
         super().__init__(host, cert_verify, username, token_filename)
+        self.session.mount('http://', adapter)
+        self.session.mount('https://', adapter)
 
         if not (self.token or no_unauth_warn):
             LOGGER.warning('Session is not authenticated. ' +
