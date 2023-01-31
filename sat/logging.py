@@ -30,6 +30,7 @@ import os
 from sat.config import get_config_value
 
 CSM_CLIENT_MODULE_NAME = 'csm_api_client'
+URLLIB_MODULE_NAME = 'urllib3'
 CONSOLE_LOG_FORMAT = '%(levelname)s: %(message)s'
 FILE_LOG_FORMAT = '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
 LOGGER = logging.getLogger(__name__)
@@ -92,6 +93,10 @@ def configure_logging():
     # handlers and log levels as log messages from SAT.
     csm_client_logger = logging.getLogger(CSM_CLIENT_MODULE_NAME)
     csm_client_logger.setLevel(logging.DEBUG)
+    # Handle log messages from the urllib3 module, so that HTTP retries
+    # are logged.
+    urllib3_logger = logging.getLogger(URLLIB_MODULE_NAME)
+    urllib3_logger.setLevel(logging.DEBUG)
 
     log_file_name = get_config_value('logging.file_name')
     log_file_level = get_config_value('logging.file_level')
@@ -106,6 +111,7 @@ def configure_logging():
 
     _add_console_handler(sat_logger, log_stderr_level)
     _add_console_handler(csm_client_logger, log_stderr_level)
+    _add_console_handler(urllib3_logger, log_stderr_level)
 
     # Create log directories if needed
     log_dir = os.path.dirname(log_file_name)
@@ -125,3 +131,4 @@ def configure_logging():
         file_handler.setFormatter(file_formatter)
         sat_logger.addHandler(file_handler)
         csm_client_logger.addHandler(file_handler)
+        urllib3_logger.addHandler(file_handler)

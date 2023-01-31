@@ -40,13 +40,15 @@ class TestLogging(unittest.TestCase):
         Sets up by patching getLogger to return a logger of our own and by
         patching get_config_value to return values from a dict.
         """
-        # In the logging module, getLogger is called twice, once to get the main
-        # logger for SAT and once to get the logger for the csm_api_client library.
+        # In the logging module, getLogger is called 3 times, once to get the main
+        # logger for SAT, once to get the logger for the csm_api_client library,
+        # and once to get the logger for urllib3.
         self.logger = logging.getLogger(__name__)
-        self.sub_logger = logging.getLogger('submodule')
+        self.csm_api_logger = logging.getLogger('csm_api_client')
+        self.urllib3_logger = logging.getLogger('urllib3')
         self.mock_get_logger = mock.patch(
             'sat.logging.logging.getLogger',
-            side_effect=(self.logger, self.sub_logger)
+            side_effect=(self.logger, self.csm_api_logger, self.urllib3_logger)
         ).start()
 
         config_values = self.config_values = {
@@ -129,6 +131,8 @@ class TestLogging(unittest.TestCase):
         self.mock_get_logger.assert_any_call('sat')
         # And also the logger named 'csm_api_client'
         self.mock_get_logger.assert_any_call('csm_api_client')
+        # And finally the logger named 'urllib3'
+        self.mock_get_logger.assert_any_call('urllib3')
 
         log_dir = os.path.dirname(self.config_values['logging.file_name'])
         mock_makedirs.assert_called_once_with(log_dir, exist_ok=True)
@@ -158,7 +162,10 @@ class TestLogging(unittest.TestCase):
 
         # This should have gotten the logger named 'sat'
         self.mock_get_logger.assert_any_call('sat')
+        # And also the logger named 'csm_api_client'
         self.mock_get_logger.assert_any_call('csm_api_client')
+        # And finally the logger named 'urllib3'
+        self.mock_get_logger.assert_any_call('urllib3')
 
         # Exactly one handler of type StreamHandler should have been added.
         self.assertEqual(len(self.logger.handlers), 1)
