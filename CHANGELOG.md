@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.30.0] - 2024-08-09
 
 ### Changed
+- When customizing images with `sat bootprep`, pass the desired image name
+  directly to CFS when creating the image customization session, if supported by
+  the version of CFS on the system. This improves the performance and
+  reliability of `sat bootprep`.
 - Update to a new version of the `csm-api-client` that allows querying the CFS
   version from the CFS API.
 - Update to version 3.0.2 of the `semver` package. The only breaking change
