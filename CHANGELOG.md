@@ -25,11 +25,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.21.2] - 2023-02-13
+
+### Fixed
+- Updated `csm-api-client` library version to fix authentication with `sat auth`
+  for new tokens.
+
 ## [3.21.1] - 2023-01-30
 
 ### Fixed
 - Fixed missing `--bos-boot-timeout` and `--bos-shutdown-timeout` options
-  for `sat bootsys reboot`. 
+  for `sat bootsys reboot`.
 
 ## [3.21.0] - 2023-01-27
 
