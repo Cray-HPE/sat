@@ -25,7 +25,7 @@
 Loads configuration from a config file in INI format.
 """
 
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 import getpass
 import logging
 import os
@@ -127,6 +127,8 @@ SAT_CONFIG_SPEC = {
         'stderr_level': OptionSpec(str, 'INFO', validate_log_level, 'loglevel_stderr'),
     },
     's3': {
+        # TODO(CRAYSAT-926): Start verifying S3 HTTP requests by default.
+        'cert_verify': OptionSpec(bool, False, None, None),
         'endpoint': OptionSpec(str, 'https://rgw-vip.nmn', None, None),
         'bucket': OptionSpec(str, 'sat', None, None),
         'access_key_file': OptionSpec(str, '~/.config/sat/s3_access_key', None, None),
@@ -189,6 +191,11 @@ class SATConfig:
     fields in the config.
     """
 
+    cert_verify_warning_params = {
+        'api_gateway': 'cert_verify',
+        's3': 'cert_verify',
+    }
+
     def __init__(self, config_file_path, args=None):
         """Create the SATConfig object and load values from the given file path
 
@@ -200,6 +207,11 @@ class SATConfig:
         """
 
         self.sections = {}
+        # Track configuration parameters for which we have logged a warning,
+        # so that we do not warn more than once. Warnings will be logged when
+        # using the get() method, so that a warning is not logged unless the
+        # parameter deserving the warning is actually being used.
+        self.warned_config_parameters = defaultdict(list)
 
         config_contents = None
         try:
@@ -225,6 +237,34 @@ class SATConfig:
                         _option_value(args, self.sections[section].get(option), spec)
 
         self._validate_config()
+
+    def _log_cert_verify_warnings(self, section, option):
+        """Logs certificate verification warnings associated with this config.
+
+        If the api_gateway.cert_verify parameter is set to False, then log a
+        warning.
+
+        Returns:
+            None
+        """
+        if section not in self.cert_verify_warning_params:
+            return
+        if option not in self.cert_verify_warning_params[section]:
+            return
+        if section in self.warned_config_parameters and option in self.warned_config_parameters[section]:
+            return
+        cert_verify_param = self.sections[section][option]
+        if not cert_verify_param:
+            if section == 's3':
+                host_param = self.sections[section].get('endpoint')
+            else:
+                host_param = self.sections[section].get('host')
+            LOGGER.warning(
+                'Unverified HTTPS requests will be made to %s due to configuration '
+                'parameter "%s.%s" being False. Certificate verification is strongly '
+                'recommended.', host_param, section, option
+            )
+            self.warned_config_parameters[section].append(option)
 
     def _validate_config(self):
         """Validates the configuration values according to SAT_CONFIG_SPEC.
@@ -298,6 +338,7 @@ class SATConfig:
         elif option not in self.sections[section]:
             raise KeyError("Couldn't find option {} in section {}.".format(option, section))
         else:
+            self._log_cert_verify_warnings(section, option)
             return self.sections[section][option]
 
 

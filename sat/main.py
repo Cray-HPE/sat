@@ -31,6 +31,7 @@ import os
 import sys
 
 import argcomplete
+import urllib3
 
 from sat.config import ConfigFileExistsError, DEFAULT_CONFIG_PATH, generate_default_config, load_config
 from sat.logging import bootstrap_logging, configure_logging
@@ -38,6 +39,11 @@ from sat.parser import create_parent_parser
 from sat.util import ensure_permissions, get_resource_section_path
 
 LOGGER = logging.getLogger(__name__)
+
+# NOTE: SAT will still log a warning for unverified HTTPS requests
+# if api_gateway.cert_verify is set to False or if s3.cert_verify
+# is set to False. See _log_cert_verify_warnings in config.py.
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def main():

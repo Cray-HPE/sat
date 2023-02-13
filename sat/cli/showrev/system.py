@@ -29,7 +29,7 @@ import logging
 import warnings
 import shlex
 import subprocess
-from urllib3.exceptions import InsecureRequestWarning, MaxRetryError
+from urllib3.exceptions import MaxRetryError
 from collections import defaultdict
 
 from boto3.exceptions import Boto3Error
@@ -72,10 +72,7 @@ def get_site_data(sitefile):
 
     try:
         LOGGER.debug('Downloading %s from S3 (bucket: %s)', sitefile, s3_bucket)
-        # TODO(SAT-926): Start verifying HTTPS requests
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', category=InsecureRequestWarning)
-            s3.Object(s3_bucket, sitefile).download_file(sitefile)
+        s3.Object(s3_bucket, sitefile).download_file(sitefile)
     except (BotoCoreError, ClientError, Boto3Error) as err:
         LOGGER.error('Unable to download site info file %s from S3. Attempting to read from cached copy. '
                      'Error: %s', sitefile, err)

@@ -657,7 +657,7 @@ def get_s3_resource():
                 aws_access_key_id=access_key,
                 aws_secret_access_key=secret_key,
                 region_name='',
-                verify=False
+                verify=get_config_value('s3.cert_verify')
             )
     except OSError as err:
         LOGGER.error(f'Unable to load configuration: {err}')
