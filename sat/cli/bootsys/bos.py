@@ -437,9 +437,17 @@ class BOSSessionThread(Thread):
                 self.record_stat_failure()
                 continue
 
+            # Different versions of the k8s CLI say different things to mean "timed out".
+            # Scraping the output of the k8s CLI is not ideal and this could be done differently
+            # using `kubectl wait` without `timeout=0`. But, that would require a big refactor
+            # and this is all going away with BOS v2.
+            timed_out_output_messages = [
+                'timed out waiting',
+                'condition not met'
+            ]
             # This is either a timeout or some other failure
             if wait_proc.returncode != 0:
-                if 'timed out waiting' not in wait_proc.stderr:
+                if not any(msg in wait_proc.stderr for msg in timed_out_output_messages):
                     LOGGER.warning("The 'kubectl wait' command failed instead "
                                    "of timing out. stderr: %s",
                                    wait_proc.stderr.strip())
@@ -532,7 +540,7 @@ class BOSSessionThread(Thread):
             self.monitor_status()
         else:
             # Use 'kubectl wait', 'kubectl get', and 'kubectl logs' for BOS v1
-            # due to initial trouble with status endpoint (CAMSCMS-5532).
+            # due to initial trouble with status endpoint (CASMCMS-5532).
             self.monitor_status_kubectl()
 
 
@@ -632,6 +640,42 @@ def do_parallel_bos_operations(session_templates, operation, timeout, limit=None
     LOGGER.info(f'All BOS sessions {completed_state_past_tense}.')
 
 
+def _update_nodes_by_state(nodes_by_state, hsm_client, hsm_params):
+    """Update the nodes_by_state dictionary given an HSM client and query parameters.
+
+    Args:
+        nodes_by_state (defaultdict): The nodes_by_state dictionary to modify
+            in place.
+        hsm_client (HSMClient): The client used to query HSM.
+        hsm_params (dict): A dictionary of query parameters to their values.
+
+    Returns:
+        None. Modifies nodes_by_state in place.
+
+    Raises:
+        HSMFailure: If the query fails or is missing a required field.
+    """
+
+    try:
+        hsm_resp_json = hsm_client.get(
+            'State', 'Components',
+            params=hsm_params,
+        ).json()
+    except (APIError, ValueError) as err:
+        raise HSMFailure(err)
+
+    try:
+        node_states = hsm_resp_json['Components']
+    except KeyError as err:
+        raise HSMFailure("Missing '{}' key in HSM response.".format(err))
+
+    for node_state in node_states:
+        try:
+            nodes_by_state[node_state['State']].append(node_state['ID'])
+        except KeyError as err:
+            raise HSMFailure("Missing '{}' key in node state: {}".format(err, node_state))
+
+
 def get_template_nodes_by_state(session_template_data):
     """Get a mapping from states to node IDs for nodes in a session template.
 
@@ -674,12 +718,6 @@ def get_template_nodes_by_state(session_template_data):
                 # Boot sets may only have one of the keys specifying nodes
                 continue
 
-            msg_prefix = (
-                "Failed to get state of nodes with {}={} for boot set '{}' of "
-                "session template '{}'".format(hsm_param, bs_field_data,
-                                               bs_name, st_name)
-            )
-
             # Probably unlikely in practice to have one of the boot set fields
             # set to an empty list. If it does happen though, we would get back
             # all nodes from HSM, so skip these here instead.
@@ -689,25 +727,29 @@ def get_template_nodes_by_state(session_template_data):
                 continue
 
             try:
-                hsm_resp_json = hsm_client.get(
-                    'State', 'Components',
-                    params={'type': 'Node', hsm_param: bs_field_data}
-                ).json()
-            except (APIError, ValueError) as err:
-                raise HSMFailure('{}: {}'.format(msg_prefix, err))
+                if hsm_param == 'role' and any('_' in r for r in bs_field_data):
+                    # If there are any roles containing subroles in this bootset,
+                    # do separate queries for each role, applying subroles to the query
+                    # when they exist for that role.
+                    # Note: this could be slightly optimized in the future by doing one query
+                    # for all the roles that don't have subroles, followed by one query
+                    # per role that has a subrole.
+                    for role in bs_field_data:
+                        hsm_params = {'type': 'Node', hsm_param: [role.split('_')[0]]}
+                        if '_' in role:
+                            hsm_params['subrole'] = [role.split('_')[1]]
+                        _update_nodes_by_state(nodes_by_state, hsm_client, hsm_params)
+                else:
+                    hsm_params = {'type': 'Node', hsm_param: bs_field_data}
+                    _update_nodes_by_state(nodes_by_state, hsm_client, hsm_params)
 
-            try:
-                node_states = hsm_resp_json['Components']
-            except KeyError as err:
-                raise HSMFailure("{} due to missing '{}' key in HSM "
-                                 "response.".format(msg_prefix, err))
-
-            for node_state in node_states:
-                try:
-                    nodes_by_state[node_state['State']].append(node_state['ID'])
-                except KeyError as err:
-                    raise HSMFailure("{} due to missing '{}' key in node state"
-                                     ": {}".format(msg_prefix, err, node_state))
+            except HSMFailure as err:
+                msg_prefix = (
+                    "Failed to get state of nodes with {}={} for boot set '{}' of "
+                    "session template '{}'".format(hsm_param, bs_field_data,
+                                                   bs_name, st_name)
+                )
+                raise HSMFailure(f'{msg_prefix}: {err}')
 
     return dict(nodes_by_state)
 
@@ -765,8 +807,8 @@ def get_templates_needing_operation(session_templates, operation):
         try:
             nodes_by_state = get_template_nodes_by_state(st_data)
         except (BOSFailure, HSMFailure) as err:
-            LOGGER.error("Failed to get state of nodes in session template "
-                         "'%s': %s", session_template, err)
+            LOGGER.warning("Failed to get state of nodes in session template "
+                           "'%s': %s", session_template, err)
             failed_st.append(session_template)
             continue
 
