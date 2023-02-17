@@ -25,6 +25,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.21.7] - 2023-08-08
+
+### Added
+- Added a `cert_verify` parameter to the `s3` section of the configuration file.
+
+### Changed
+- Reduced the number of log messages when insecure HTTPS requests are made.
+
 ## [3.21.6] - 2023-06-23
 
 ### Changed
