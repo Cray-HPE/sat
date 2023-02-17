@@ -106,7 +106,7 @@ class TestLogging(unittest.TestCase):
         self.sub_logger = logging.getLogger('submodule')
         self.mock_get_logger = mock.patch(
             'sat.logging.logging.getLogger',
-            side_effect=(self.logger, self.sub_logger)
+            side_effect=(self.logger, self.sub_logger, self.sub_logger)
         ).start()
 
         config_values = self.config_values = {
@@ -189,6 +189,8 @@ class TestLogging(unittest.TestCase):
         self.mock_get_logger.assert_any_call('sat')
         # And also the logger named 'csm_api_client'
         self.mock_get_logger.assert_any_call('csm_api_client')
+        # And finally, the 'py.warnings' module
+        self.mock_get_logger.assert_any_call('py.warnings')
 
         log_dir = os.path.dirname(self.config_values['logging.file_name'])
         mock_makedirs.assert_called_once_with(log_dir, exist_ok=True)
@@ -219,6 +221,7 @@ class TestLogging(unittest.TestCase):
         # This should have gotten the logger named 'sat'
         self.mock_get_logger.assert_any_call('sat')
         self.mock_get_logger.assert_any_call('csm_api_client')
+        self.mock_get_logger.assert_any_call('py.warnings')
 
         # Exactly one handler of type StreamHandler should have been added.
         self.assertEqual(len(self.logger.handlers), 1)

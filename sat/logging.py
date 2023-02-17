@@ -32,6 +32,7 @@ from logging import Formatter, LogRecord
 from sat.config import get_config_value
 
 CSM_CLIENT_MODULE_NAME = 'csm_api_client'
+WARNINGS_MODULE_NAME = 'py.warnings'
 CONSOLE_LOG_FORMAT = '%(levelname)s: %(message)s'
 FILE_LOG_FORMAT = '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
 LOGGER = logging.getLogger(__name__)
@@ -101,10 +102,14 @@ def configure_logging():
     """
     sat_logger_name = __name__.split('.', 1)[0]
     sat_logger = logging.getLogger(sat_logger_name)
+
     # Handle log messages from the CSM API client with the same
     # handlers and log levels as log messages from SAT.
     csm_client_logger = logging.getLogger(CSM_CLIENT_MODULE_NAME)
     csm_client_logger.setLevel(logging.DEBUG)
+    # Handle log messages from the warnings module too
+    warnings_logger = logging.getLogger(WARNINGS_MODULE_NAME)
+    warnings_logger.setLevel(logging.WARNING)
 
     log_file_name = get_config_value('logging.file_name')
     log_file_level = get_config_value('logging.file_level')
@@ -119,6 +124,7 @@ def configure_logging():
 
     _add_console_handler(sat_logger, log_stderr_level)
     _add_console_handler(csm_client_logger, log_stderr_level)
+    _add_console_handler(warnings_logger, log_stderr_level)
 
     # Create log directories if needed
     log_dir = os.path.dirname(log_file_name)
@@ -138,3 +144,4 @@ def configure_logging():
         file_handler.setFormatter(file_formatter)
         sat_logger.addHandler(file_handler)
         csm_client_logger.addHandler(file_handler)
+        warnings_logger.addHandler(file_handler)

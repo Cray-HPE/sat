@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added ability to filter images provided by a product using a wildcard pattern
   to specify the base input image in a `sat bootprep` input file
+- Added a `cert_verify` parameter to the `s3` section of the configuration file.
 
 ### Changed
 - Changed logging in `sat bootsys` such that all sessions will have a logging
@@ -40,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Modified logging for SAT such that multi-line log messages will now be logged
   with consistent formatting for each line.
 - Updated unit test infrastructure to use `nose2`.
+- Reduced the number of log messages when insecure HTTPS requests are made.
 
 ### Fixed
 - Fixed a bug in the `bos-operations` stage of `sat bootsys` where a Bad Request

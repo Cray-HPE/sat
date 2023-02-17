@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -35,13 +35,12 @@ from tempfile import TemporaryDirectory
 import warnings
 
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 from boto3.exceptions import Boto3Error
 from csm_api_client.service.gateway import APIError, APIGatewayClient
 from inflect import engine
 from kubernetes.client import ApiException, CoreV1Api
 from kubernetes.config import ConfigException, load_kube_config
-from urllib3.exceptions import InsecureRequestWarning
 from yaml import YAMLLoadWarning
 
 from sat.cached_property import cached_property
@@ -113,14 +112,13 @@ class IMSClient(APIGatewayClient):
         """
         try:
             access_key, secret_key = self.s3_credentials
-            # TODO (CRAYSAT-926): Start verifying HTTPS requests (remove verify=False)
             return boto3.resource(
                 's3',
                 endpoint_url=get_config_value('s3.endpoint'),
                 aws_access_key_id=access_key,
                 aws_secret_access_key=secret_key,
                 region_name='',
-                verify=False
+                verify=get_config_value('s3.cert_verify')
             )
         except Boto3Error as err:
             raise APIError(f'Unable to get S3 resource: {err}')
@@ -368,12 +366,9 @@ class IMSClient(APIGatewayClient):
 
             s3_manifest_bucket, s3_manifest_key = self.split_s3_artifact_path(s3_manifest_path)
             try:
-                # TODO(SAT-926): Start verifying HTTPS requests
-                with warnings.catch_warnings():
-                    warnings.filterwarnings('ignore', category=InsecureRequestWarning)
-                    self.s3_resource.Object(s3_manifest_bucket,
-                                            s3_manifest_key).download_file(local_manifest_path)
-            except (Boto3Error, ClientError) as err:
+                self.s3_resource.Object(s3_manifest_bucket,
+                                        s3_manifest_key).download_file(local_manifest_path)
+            except (Boto3Error, ClientError, BotoCoreError) as err:
                 raise APIError(f'Failed to download manifest with key {s3_manifest_key} '
                                f'from bucket {s3_manifest_bucket}: {err}')
             try:
@@ -424,32 +419,28 @@ class IMSClient(APIGatewayClient):
             new_artifact_key = f'{new_image_id}/{artifact_name}'
 
             try:
-                # TODO (CRAYSAT-926): Start verifying HTTPS requests
-                with warnings.catch_warnings():
-                    warnings.filterwarnings('ignore', category=InsecureRequestWarning)
+                new_metadata = {
+                    'x-shasta-ims-image-id': new_image_id,
+                    'x-shasta-ims-image-name': new_name
+                    # No applicable 'x-shasta-ims-job-id' metadata
+                }
 
-                    new_metadata = {
-                        'x-shasta-ims-image-id': new_image_id,
-                        'x-shasta-ims-image-name': new_name
-                        # No applicable 'x-shasta-ims-job-id' metadata
-                    }
+                # md5sum is lost by REPLACE if we don't manually preserve it
+                old_object = self.s3_resource.Object(old_artifact_bucket, old_artifact_key)
+                md5sum = old_object.metadata.get('md5sum')
+                if md5sum:
+                    new_metadata['md5sum'] = md5sum
 
-                    # md5sum is lost by REPLACE if we don't manually preserve it
-                    old_object = self.s3_resource.Object(old_artifact_bucket, old_artifact_key)
-                    md5sum = old_object.metadata.get('md5sum')
-                    if md5sum:
-                        new_metadata['md5sum'] = md5sum
-
-                    new_object = self.s3_resource.Object(self.boot_images_bucket, new_artifact_key)
-                    LOGGER.debug(f'Created new S3 object: {new_object}')
-                    new_object.copy({
-                        'Bucket': old_artifact_bucket,
-                        'Key': old_artifact_key,
-                    })
-                    for key, value in new_metadata.items():
-                        new_object.metadata[key] = value
-                    LOGGER.debug(f'Successfully copied artifact {old_artifact_key} to {new_artifact_key}')
-            except (Boto3Error, ClientError) as err:
+                new_object = self.s3_resource.Object(self.boot_images_bucket, new_artifact_key)
+                LOGGER.debug(f'Created new S3 object: {new_object}')
+                new_object.copy({
+                    'Bucket': old_artifact_bucket,
+                    'Key': old_artifact_key,
+                })
+                for key, value in new_metadata.items():
+                    new_object.metadata[key] = value
+                LOGGER.debug(f'Successfully copied artifact {old_artifact_key} to {new_artifact_key}')
+            except (Boto3Error, ClientError, BotoCoreError) as err:
                 raise APIError(f'Failed to copy artifact {old_artifact_key} to {new_artifact_key}: {err}')
 
             new_artifact = copy.deepcopy(old_artifact)
@@ -493,13 +484,10 @@ class IMSClient(APIGatewayClient):
 
             manifest_key = f'{image_id}/manifest.json'
             try:
-                # TODO (CRAYSAT-926): Start verifying HTTPS requests
-                with warnings.catch_warnings():
-                    warnings.filterwarnings('ignore', category=InsecureRequestWarning)
-                    manifest_object = self.s3_resource.Object(self.boot_images_bucket, manifest_key)
-                    manifest_object.upload_file(local_manifest_path,
-                                                ExtraArgs={'Metadata': {'md5sum': md5sum_digest}})
-            except (Boto3Error, ClientError) as err:
+                manifest_object = self.s3_resource.Object(self.boot_images_bucket, manifest_key)
+                manifest_object.upload_file(local_manifest_path,
+                                            ExtraArgs={'Metadata': {'md5sum': md5sum_digest}})
+            except (Boto3Error, ClientError, BotoCoreError) as err:
                 raise APIError(f'Failed to upload manifest file to {manifest_key} '
                                f'in S3 bucket {self.boot_images_bucket}: {err}')
             LOGGER.debug(f'Created new S3 manifest object: {manifest_object}')
@@ -541,14 +529,11 @@ class IMSClient(APIGatewayClient):
             new_manifest = self.copy_manifest_artifacts(old_manifest, new_image_id, new_name)
             new_manifest_object = self.upload_image_manifest(new_image_id, new_manifest)
 
-            # TODO (CRAYSAT-926): Start verifying HTTPS requests
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=InsecureRequestWarning)
-                try:
-                    # For some reason the etag contains explicit quotes
-                    new_etag = new_manifest_object.e_tag.strip('"')
-                except (Boto3Error, ClientError) as err:
-                    raise APIError(f'Failed to get etag of new manifest object: {err}')
+            try:
+                # For some reason the etag contains explicit quotes
+                new_etag = new_manifest_object.e_tag.strip('"')
+            except (Boto3Error, ClientError, BotoCoreError) as err:
+                raise APIError(f'Failed to get etag of new manifest object: {err}')
 
             new_image_link_info = {
                 'etag': new_etag,
