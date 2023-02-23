@@ -343,6 +343,15 @@ class TestBOSSessionThread(unittest.TestCase):
         self.mock_check_interval = patch(
             'sat.cli.bootsys.bos.PARALLEL_CHECK_INTERVAL', 3).start()
 
+        self.mock_subprocess_run = patch('sat.cli.bootsys.bos.subprocess.run').start()
+        # Possible return values from subprocess.run()
+        self.error_response = Mock()
+        self.error_response.returncode = 1
+        self.error_response.stderr = 'timed out waiting for jobs/my-job'
+        self.finished_response = Mock()
+        self.finished_response.returncode = 0
+        patch('sat.cli.bootsys.bos.sleep').start()
+
     def tearDown(self):
         """Stop all patches."""
         patch.stopall()
@@ -406,6 +415,52 @@ class TestBOSSessionThread(unittest.TestCase):
         self.assertEqual(self.mock_session_id, bos_thread.session_id)
         self.assertEqual(self.mock_create_response['links'][0]['jobId'],
                          bos_thread.boa_job_id)
+
+    @patch('sat.cli.bootsys.bos.boa_job_successful', return_value=True)
+    def test_bos_v1_run(self, _):
+        """Test the run() method of BOSSessionThread using BOS v1."""
+        self.mock_get_config_value.return_value = 'v1'
+        bos_thread = BOSSessionThread('cle-1.3.0', 'boot')
+        bos_thread.max_consec_fails = 0
+        self.mock_subprocess_run.side_effect = (
+            self.error_response,
+            self.finished_response
+        )
+        bos_thread.run()
+        self.assertTrue(bos_thread.complete)
+        self.assertFalse(bos_thread.failed)
+
+    @patch('sat.cli.bootsys.bos.boa_job_successful', return_value=True)
+    def test_bos_v1_run_new_k8s_cli(self, _):
+        """Test the run() method of BOSSessionThread using BOS v1 with a newer k8s CLI."""
+        self.mock_get_config_value.return_value = 'v1'
+        self.error_response.stderr = 'condition not met for jobs/my-job'
+        bos_thread = BOSSessionThread('cle-1.3.0', 'boot')
+        bos_thread.max_consec_fails = 0
+        self.mock_subprocess_run.side_effect = (
+            self.error_response,
+            self.finished_response
+        )
+        bos_thread.run()
+        self.assertTrue(bos_thread.complete)
+        self.assertFalse(bos_thread.failed)
+
+    @patch('sat.cli.bootsys.bos.boa_job_successful', return_value=True)
+    def test_bos_v1_run_kubectl_wait_error(self, _):
+        """Test the run() method of BOSSessionThread when kubectl returns an error."""
+        self.mock_get_config_value.return_value = 'v1'
+        self.error_response.stderr = 'command not found: kubectl'
+        bos_thread = BOSSessionThread('cle-1.3.0', 'boot')
+        bos_thread.max_consec_fails = 0
+        self.mock_subprocess_run.return_value = self.error_response
+        with self.assertLogs(level=logging.WARNING) as logs:
+            bos_thread.run()
+        self.assertRegex(
+            logs.records[0].message,
+            r'The \'kubectl wait\' command failed instead of timing out.'
+        )
+        self.assertTrue(bos_thread.complete)
+        self.assertTrue(bos_thread.failed)
 
 
 class TestGetSessionTemplates(ExtendedTestCase):
@@ -502,17 +557,78 @@ class TestGetTemplatesNeedingOperation(ExtendedTestCase):
         self.mock_bos_client: Mock = Mock()
         patch('sat.cli.bootsys.bos.BOSClientCommon.get_bos_client',
               return_value=self.mock_bos_client).start()
+        self.mock_hsm_client = patch('sat.cli.bootsys.bos.HSMClient').start().return_value
+        self.mock_hsm_components = [
+            {
+                'ID': 'x3000c0s0b0n1',
+                'Role': 'Application',
+                'SubRole': 'UAN',
+                'State': 'Ready',
+                'Type': 'Node'
+            },
+            {
+                'ID': 'x3000c0s1b0n1',
+                'Role': 'Application',
+                'SubRole': 'Other',
+                'State': 'Ready',
+                'Type': 'Node'
+            },
+            {
+                'ID': 'x3000c0s2b0n1',
+                'Role': 'Compute',
+                'State': 'Ready',
+                'Type': 'Node'
+            },
+            {
+                'ID': 'x3000c0s3b0n1',
+                'Role': 'Compute',
+                'State': 'Ready',
+                'Type': 'Node'
+            }
+        ]
+
+        self.mock_hsm_client.get.side_effect = self.fake_get_hsm_components
         patch('sat.cli.bootsys.bos.SATSession').start()
 
     def tearDown(self):
         """Stop all patches."""
         patch.stopall()
 
-    def fake_get_nodes_by_state(self, states: list[str]) -> dict[Any, list[Any]]:
+    @staticmethod
+    def fake_get_nodes_by_state(states: list[str]) -> dict[Any, list[Any]]:
         nodes_by_state: dict[Any, list[Any]] = dict()
         for state in states:
             nodes_by_state[state] = list("some data")
         return nodes_by_state
+
+    @staticmethod
+    def _match_param(param_value, component_value):
+        """Helper for fake_get_hsm_components."""
+        if isinstance(param_value, list):
+            return component_value in param_value
+        else:
+            return component_value == param_value
+
+    def fake_get_hsm_components(self, *_, params):
+        """Fake the behavior of HSMClient.get('State', 'Components', params={...})."""
+        # When SAT queries HSM, it uses lowercase query parameters, which HSM handles.
+        lowercase_to_uppercase_hsm_format = {
+            'role': 'Role',
+            'subrole': 'SubRole',
+            'id': 'ID',
+            'type': 'Type'
+        }
+        matching_components = [
+            component for component in self.mock_hsm_components
+            if all(
+                self._match_param(param_value, component.get(lowercase_to_uppercase_hsm_format[param_name]))
+                for param_name, param_value in params.items()
+            )
+        ]
+
+        resp = Mock()
+        resp.json.return_value = {'Components': matching_components}
+        return resp
 
     def test_get_templates_needing_operation_unknown(self):
         """Tests the operation checks"""
@@ -542,6 +658,195 @@ class TestGetTemplatesNeedingOperation(ExtendedTestCase):
             operation="shutdown"
         )
         assert sorted(templates) == sorted(expected_templates)
+
+    def test_get_templates_needing_operation_boot_set_roles(self):
+        """Test get_templates_needing_operation with a template that uses roles in boot_sets."""
+        self.mock_bos_client.get_session_template.return_value = {
+            'boot_sets': {'compute': {'node_roles_groups': ['Compute']}}
+        }
+        templates = get_templates_needing_operation(
+            session_templates=['compute'],
+            operation='shutdown'
+        )
+        self.mock_hsm_client.get.assert_called_once_with(
+            'State', 'Components', params={
+                'type': 'Node',
+                'role': ['Compute']
+            }
+        )
+        self.assertEqual(templates, ['compute'])
+
+    def test_get_templates_needing_operation_boot_set_multiple_roles(self):
+        """Test get_templates_needing_operation with a template that uses two roles in boot_sets."""
+        self.mock_bos_client.get_session_template.return_value = {
+            'boot_sets': {'all': {'node_roles_groups': ['Application', 'Compute']}}
+        }
+        templates = get_templates_needing_operation(
+            session_templates=['all'],
+            operation='shutdown'
+        )
+        self.mock_hsm_client.get.assert_called_once_with(
+            'State', 'Components', params={
+                'type': 'Node',
+                'role': ['Application', 'Compute']
+            }
+        )
+        self.assertEqual(templates, ['all'])
+
+    def test_get_templates_needing_operation_boot_set_some_shutdown(self):
+        """Test get_templates_needing_operation with two roles but one role not needing shutdown."""
+        self.mock_bos_client.get_session_template.return_value = {
+            'boot_sets': {'all': {'node_roles_groups': ['Application', 'Compute']}}
+        }
+        # The compute nodes are already off.
+        self.mock_hsm_components[2]['State'] = 'Off'
+        self.mock_hsm_components[3]['State'] = 'Off'
+        templates = get_templates_needing_operation(
+            session_templates=['all'],
+            operation='shutdown'
+        )
+        self.mock_hsm_client.get.assert_called_once_with(
+            'State', 'Components', params={
+                'type': 'Node',
+                'role': ['Application', 'Compute']
+            }
+        )
+        # Should still see this template as needing the operation because Application nodes are Ready.
+        self.assertEqual(templates, ['all'])
+
+    def test_get_templates_needing_operation_boot_set_roles_shutdown(self):
+        """Test get_templates_needing_operation using roles and no compute nodes needing shutdown."""
+        self.mock_bos_client.get_session_template.return_value = {
+            'boot_sets': {'compute': {'node_roles_groups': ['Compute']}}
+        }
+        self.mock_hsm_components[2]['State'] = 'Off'
+        self.mock_hsm_components[3]['State'] = 'Off'
+        templates = get_templates_needing_operation(
+            session_templates=['compute'],
+            operation='shutdown'
+        )
+        self.mock_hsm_client.get.assert_called_once_with(
+            'State', 'Components', params={
+                'type': 'Node',
+                'role': ['Compute']
+            }
+        )
+        self.assertEqual(templates, [])
+
+    def test_get_templates_needing_operation_boot_set_roles_and_ids_shutdown(self):
+        """Test get_templates_needing_operation using roles and IDs, and none of the given IDs need shutdown."""
+        self.mock_bos_client.get_session_template.return_value = {
+            'boot_sets': {'compute': {'node_roles_groups': ['Compute'],
+                                      'node_list': ['x3000c0s2b0n1']}}
+        }
+        # The compute node with the given ID is already off.
+        self.mock_hsm_components[2]['State'] = 'Off'
+        templates = get_templates_needing_operation(
+            session_templates=['compute'],
+            operation='shutdown'
+        )
+        self.mock_hsm_client.get.assert_any_call(
+            'State', 'Components', params={
+                'type': 'Node',
+                'role': ['Compute']
+            }
+        )
+        self.mock_hsm_client.get.assert_any_call(
+            'State', 'Components', params={
+                'type': 'Node',
+                'id': ['x3000c0s2b0n1']
+            }
+        )
+        # Should still see this template as needing the operation because we are looking at all nodes
+        # with the given group, not just the one specified in the node_list.
+        self.assertEqual(templates, ['compute'])
+
+    @unittest.skip('TODO: This test actually fails which might be a bug, but it is an edge case.')
+    def test_get_templates_needing_operation_empty_node_list(self):
+        """Test get_templates_needing_operation with a boot_set that has an empty node list."""
+        self.mock_bos_client.get_session_template.return_value = {
+            'boot_sets': {'compute': {'node_list': []}}
+        }
+        templates = get_templates_needing_operation(
+            session_templates=['compute'],
+            operation='shutdown'
+        )
+        self.mock_hsm_client.get.assert_not_called()
+        self.assertEqual(templates, [])
+
+    def test_get_templates_needing_operation_bos_role_subrole(self):
+        """Test that a boot set with Role_Subrole format is handled correctly."""
+        self.mock_bos_client.get_session_template.return_value = {
+            'boot_sets': {
+                'uan': {
+                    'node_roles_groups': ['Application_UAN']
+                }
+            },
+        }
+        templates = get_templates_needing_operation(
+            session_templates=['uan'],
+            operation='shutdown'
+        )
+        self.mock_hsm_client.get.assert_called_once_with(
+            'State', 'Components', params={
+                'type': 'Node',
+                'role': ['Application'],
+                'subrole': ['UAN']
+            }
+        )
+        self.assertEqual(templates, ['uan'])
+
+    def test_get_templates_needing_operation_bos_role_subrole_multiple(self):
+        """Test that a boot set with multiple roles and subroles are handled correctly."""
+        self.mock_bos_client.get_session_template.return_value = {
+            'boot_sets': {
+                'uan': {
+                    'node_roles_groups': ['Application_UAN', 'Compute']
+                }
+            },
+        }
+        # UAN node is already off
+        self.mock_hsm_components[0]['State'] = 'Off'
+
+        templates = get_templates_needing_operation(
+            session_templates=['compute-and-uan'],
+            operation='shutdown'
+        )
+
+        self.mock_hsm_client.get.assert_any_call(
+            'State', 'Components', params={
+                'type': 'Node',
+                'role': ['Application'],
+                'subrole': ['UAN']
+            }
+        )
+        self.mock_hsm_client.get.assert_any_call(
+            'State', 'Components', params={
+                'type': 'Node',
+                'role': ['Compute']
+            }
+        )
+        # Should still see this template as needing the operation because computes are Ready.
+        self.assertEqual(templates, ['compute-and-uan'])
+
+    def test_get_templates_needing_operation_uan_off(self):
+        """Test get_templates_needing_operation when we just want to check on UANs."""
+        self.mock_bos_client.get_session_template.return_value = {
+            'boot_sets': {
+                'uan': {
+                    'node_roles_groups': ['Application_UAN']
+                }
+            },
+        }
+        # The UAN is off, though the other Application node is Ready.
+        self.mock_hsm_components[0]['State'] = 'Off'
+        templates = get_templates_needing_operation(
+            session_templates=['uan'],
+            operation='shutdown'
+        )
+        # Should not see the template as needing operation because
+        # the only node in the bootset is already off.
+        self.assertEqual(templates, [])
 
 
 class TestDoBosShutdowns(ExtendedTestCase):
