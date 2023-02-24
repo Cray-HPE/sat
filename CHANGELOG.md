@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Update the version of `cs-api-client` to improve config loading when running in
+  the Kubernetes cluster.
+
 ### Fixed
 - Fixed a bug in the `bos-operations` stage of `sat bootsys` where a Bad Request
   error could appear in the output when checking node states.
