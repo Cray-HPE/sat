@@ -26,7 +26,6 @@ Functions for obtaining system-level version information.
 """
 
 import logging
-import warnings
 import shlex
 import subprocess
 from urllib3.exceptions import MaxRetryError
@@ -34,9 +33,10 @@ from collections import defaultdict
 
 from boto3.exceptions import Boto3Error
 from botocore.exceptions import BotoCoreError, ClientError
-import kubernetes
+from csm_api_client.k8s import load_kube_api
+from kubernetes.client.exceptions import ApiException
+from kubernetes.config import ConfigException
 import yaml
-from kubernetes.client.rest import ApiException
 
 from sat.apiclient import APIError, HSMClient
 from sat.config import get_config_value
@@ -166,21 +166,14 @@ def get_slurm_version():
     """
 
     try:
-        with warnings.catch_warnings():
-            # Ignore YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated
-            # kubernetes/config/kube_config.py should use yaml.safe_load()
-            warnings.filterwarnings('ignore', category=yaml.YAMLLoadWarning)
-            kubernetes.config.load_kube_config()
-    except ApiException as err:
+        k8s_api = load_kube_api()
+    except ConfigException as err:
         LOGGER.error('Reading kubernetes config: {}'.format(err))
-        return None
-    except FileNotFoundError as err:
-        LOGGER.error('Kubernetes config not found: {}'.format(err))
         return None
 
     ns = 'user'
     try:
-        dump = kubernetes.client.CoreV1Api().list_namespaced_pod(ns, label_selector='app=slurmctld')
+        dump = k8s_api.list_namespaced_pod(ns, label_selector='app=slurmctld')
         pod = dump.items[0].metadata.name
     except MaxRetryError as err:
         LOGGER.error('Error connecting to Kubernetes to retrieve list of pods: %s', err)

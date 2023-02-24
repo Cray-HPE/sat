@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020, 2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -25,13 +25,11 @@
 Waits for k8s API availability and for k8s pods to appear to be healthy.
 """
 import logging
-import warnings
 
+from csm_api_client.k8s import load_kube_api
 import inflect
-from kubernetes.client import CoreV1Api
-from kubernetes.config import load_kube_config, ConfigException
+from kubernetes.config import ConfigException
 import urllib3
-from yaml import YAMLLoadWarning
 
 from sat.cached_property import cached_property
 from sat.cli.bootsys.state_recorder import PodStateRecorder, StateError
@@ -173,33 +171,6 @@ class KubernetesAPIAvailableWaiter(Waiter):
             return False
         else:
             return True
-
-
-def load_kube_api():
-    """Get a Kubernetes CoreV1Api object.
-
-    This helper function loads the kube config and then instantiates
-    an API object.
-
-    Returns:
-        CoreV1Api: the API object from the kubernetes library.
-
-    Raises:
-        kubernetes.config.config_exception.ConfigException: if failed to load
-            kubernetes configuration.
-    """
-    try:
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', category=YAMLLoadWarning)
-            load_kube_config()
-    # Earlier versions: FileNotFoundError; later versions: ConfigException
-    except (FileNotFoundError, ConfigException) as err:
-        raise ConfigException(
-            'Failed to load kubernetes config to get pod status: '
-            '{}'.format(err)
-        )
-
-    return CoreV1Api()
 
 
 def do_k8s_check(args):

@@ -29,14 +29,12 @@ import json
 import logging
 import os
 import sys
-import warnings
 from datetime import datetime
 
 from boto3.exceptions import Boto3Error
 from botocore.exceptions import BotoCoreError, ClientError
-from kubernetes.client import CoreV1Api
-from kubernetes.config import load_kube_config, ConfigException
-from yaml import YAMLLoadWarning
+from csm_api_client.k8s import load_kube_api
+from kubernetes.config import ConfigException
 
 from sat.apiclient import FabricControllerClient
 from sat.session import SATSession
@@ -276,14 +274,10 @@ class PodStateRecorder(StateRecorder):
         """
         # Load k8s configuration before trying to use API
         try:
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=YAMLLoadWarning)
-                load_kube_config()
-        # Earlier versions: FileNotFoundError; later versions: ConfigException
-        except (FileNotFoundError, ConfigException) as err:
-            raise PodStateError('Failed to load kubernetes config: {}'.format(err)) from err
+            k8s_api = load_kube_api()
+        except ConfigException as err:
+            raise PodStateError(f'Failed to load kubernetes config: {err}') from err
 
-        k8s_api = CoreV1Api()
         all_pods = k8s_api.list_pod_for_all_namespaces()
         return k8s_pods_to_status_dict(all_pods)
 
