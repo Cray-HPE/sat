@@ -26,12 +26,10 @@ Defines class for images defined in the input file.
 """
 from abc import ABC, abstractmethod
 import logging
-import warnings
 
 from cray_product_catalog.query import ProductCatalogError
-from kubernetes.client import CoreV1Api
-from kubernetes.config import load_kube_config, ConfigException
-from yaml import YAMLLoadWarning
+from csm_api_client.k8s import load_kube_api
+from kubernetes.config import ConfigException
 
 from sat.apiclient import APIError
 from sat.cached_property import cached_property
@@ -223,20 +221,14 @@ class BaseInputImage(DependencyGroupMember, ABC):
     def ims_base(self):
         """dict: the data for the base IMS recipe or image to build and/or customize"""
 
-    # TODO: Reduce duplication of code between here and ProductInputConfigurationLayer
     @cached_property
     def k8s_api(self):
         """kubernetes.client.CoreV1Api: a kubernetes core API client"""
         try:
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=YAMLLoadWarning)
-                load_kube_config()
-        # Earlier versions: FileNotFoundError; later versions: ConfigException
-        except (FileNotFoundError, ConfigException) as err:
+            return load_kube_api()
+        except ConfigException as err:
             raise ImageCreateError(f'Failed to load Kubernetes config which is required '
                                    f'to query image build status: {err}')
-
-        return CoreV1Api()
 
     def add_images_to_delete(self, images_to_delete):
         """Add IMS images that should be deleted after this image is created and configured.

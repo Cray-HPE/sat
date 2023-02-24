@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Reduced the number of log messages when insecure HTTPS requests are made.
+- Update the version of `csm-api-client` to 1.1.4 to simplify loading of the
+  Kubernetes configuration when running in a container inside the cluster and
+  remove code duplication.
 
 ## [3.21.6] - 2023-06-23
 
@@ -56,6 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   staged sessions as complete if the sessions did not apply to any components
   due to a `--bos-limit` parameter that did not overlap with the components in the
   session template.
+- Fixed a bug which caused the wrong container name to be logged when a CFS
+  image customization failed in newer versions of CSM.
 
 ## [3.21.3] - 2023-03-24
 

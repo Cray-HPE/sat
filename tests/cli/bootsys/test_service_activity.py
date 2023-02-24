@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2022, 2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -264,12 +264,11 @@ class TestBOSV1ActivityChecker(ExtendedTestCase):
                                     if pod.label_value == label_value])
             return MockPodList(self.pods)
 
-        self.mock_load_kube_config = patch(
-            'sat.cli.bootsys.service_activity.load_kube_config').start()
         self.mock_kube_client = Mock()
         self.mock_kube_client.list_namespaced_pod = mock_list_pods
-        patch('sat.cli.bootsys.service_activity.CoreV1Api',
-              return_value=self.mock_kube_client).start()
+        self.mock_load_kube_api = patch(
+            'sat.cli.bootsys.service_activity.load_kube_api',
+            return_value=self.mock_kube_client).start()
 
         self.bos_checker = BOSV1ActivityChecker()
 
@@ -378,18 +377,11 @@ class TestBOSV1ActivityChecker(ExtendedTestCase):
         """Test get_active_sessions with failure to load kube_config."""
         config_err_msg = 'invalid config'
         # Newer version of kubernetes raise this
-        self.mock_load_kube_config.side_effect = ConfigException(config_err_msg)
+        self.mock_load_kube_api.side_effect = ConfigException(config_err_msg)
         err_regex_template = ('^Unable to get active BOS sessions: Failed to '
                               'load kubernetes config to get BOA pod status: {}')
         err_regex = err_regex_template.format(config_err_msg)
 
-        with self.assertRaisesRegex(ServiceCheckError, err_regex):
-            self.bos_checker.get_active_sessions()
-
-        file_err_msg = 'file not found'
-        # Older versions of kubernetes raise this
-        self.mock_load_kube_config.side_effect = FileNotFoundError(file_err_msg)
-        err_regex = err_regex_template.format(file_err_msg)
         with self.assertRaisesRegex(ServiceCheckError, err_regex):
             self.bos_checker.get_active_sessions()
 

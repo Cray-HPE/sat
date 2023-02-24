@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -34,6 +34,8 @@ from unittest import mock
 from urllib3.exceptions import MaxRetryError
 
 from kubernetes.client.rest import ApiException
+from kubernetes.client import CoreV1Api
+from kubernetes.config import ConfigException
 from tests.test_util import ExtendedTestCase
 
 import sat.cli.showrev.system
@@ -54,6 +56,12 @@ class TestSystem(ExtendedTestCase):
         self.mock_open.return_value.__enter__.return_value = self.mock_file_obj
 
         self.mock_yaml_load = mock.patch('sat.cli.showrev.system.yaml.safe_load').start()
+
+        self.mock_kube_api = mock.MagicMock(autospec=CoreV1Api)
+        self.mock_load_kube_api = mock.patch(
+            'sat.cli.showrev.system.load_kube_api',
+            return_value=self.mock_kube_api
+        ).start()
 
     def tearDown(self):
         mock.patch.stopall()
@@ -84,23 +92,13 @@ class TestSystem(ExtendedTestCase):
     def test_get_slurm_version_config_exception(self):
         """get_slurm_version kubernetes config failure test.
         """
-        mock.patch(
-            'sat.cli.showrev.system.kubernetes.config.load_kube_config',
-            side_effect=ApiException).start()
-
+        self.mock_load_kube_api.side_effect = ConfigException
         self.assertIsNone(sat.cli.showrev.system.get_slurm_version())
 
     def test_get_slurm_version_pod_exception(self):
         """get_slurm_version kubernetes list pod exception test.
         """
-        mock.patch(
-            'sat.cli.showrev.system.kubernetes.config.load_kube_config',
-            return_value=None).start()
-
-        mock.patch(
-            'sat.cli.showrev.system.kubernetes.client.CoreV1Api.list_namespaced_pod',
-            side_effect=ApiException).start()
-
+        self.mock_kube_api.list_namespaced_pod.side_effect = ApiException
         self.assertIsNone(sat.cli.showrev.system.get_slurm_version())
 
     def test_get_slurm_version_subprocess_exception(self):
@@ -121,13 +119,7 @@ class TestSystem(ExtendedTestCase):
                     Pod('doesnt-matter')
                 ]
 
-        mock.patch(
-            'sat.cli.showrev.system.kubernetes.config.load_kube_config',
-            return_value=None).start()
-
-        mock.patch(
-            'sat.cli.showrev.system.kubernetes.client.CoreV1Api.list_namespaced_pod',
-            return_value=Pods()).start()
+        self.mock_kube_api.list_namespaced_pod.return_value = Pods()
 
         mock.patch(
             'sat.cli.showrev.system.subprocess.check_output',
@@ -135,22 +127,10 @@ class TestSystem(ExtendedTestCase):
 
         self.assertIsNone(sat.cli.showrev.system.get_slurm_version())
 
-    def test_get_slurm_version_kube_file_not_found(self):
-        """get_slurm_version FileNotFound error when reading kube config.
-        """
-        mock.patch(
-            'sat.cli.showrev.system.kubernetes.config.load_kube_config',
-            side_effect=FileNotFoundError).start()
-
-        self.assertIsNone(sat.cli.showrev.system.get_slurm_version())
-
     def test_get_slurm_version_kubernetes_max_retry_error(self):
         """get_slurm_version MaxRetryError when connecting to k8s.
         """
-        mock.patch('sat.cli.showrev.system.kubernetes.config.load_kube_config').start()
-        mock.patch(
-            'sat.cli.showrev.system.kubernetes.client.CoreV1Api'
-        ).start().return_value.list_namespaced_pod.side_effect = MaxRetryError(url='', pool=None)
+        self.mock_kube_api.list_namespaced_pod.side_effect = MaxRetryError(url='', pool=None)
 
         with self.assertLogs(level=logging.ERROR) as logs:
             self.assertIsNone(sat.cli.showrev.system.get_slurm_version())

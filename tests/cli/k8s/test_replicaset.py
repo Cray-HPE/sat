@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020, 2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -30,8 +30,9 @@ from argparse import Namespace
 from unittest import mock
 
 import kubernetes
-from kubernetes.config.config_exception import ConfigException
+from kubernetes.client import AppsV1Api
 from kubernetes.client.rest import ApiException
+from kubernetes.config.config_exception import ConfigException
 
 from sat.cli.k8s.replicaset import ReplicaSet
 
@@ -82,58 +83,32 @@ class FakePods:
 class TestReplicaset(unittest.TestCase):
     """Test cases for functions in sat k8s.
     """
+    def setUp(self):
+        self.mock_appsv1_api = mock.MagicMock(autospec=AppsV1Api)
+        self.mock_corev1_api = mock.patch('sat.cli.k8s.replicaset.kubernetes.client.CoreV1Api') \
+            .start() \
+            .return_value
+        self.mock_appsv1_api.list_replica_set_for_all_namespaces.return_value = \
+            FakeReplicaSets()
+        self.mock_corev1_api.list_namespaced_pod.return_value = FakePods()
+        self.mock_load_kube_api = mock.patch(
+            'sat.cli.k8s.replicaset.load_kube_api',
+            return_value=self.mock_appsv1_api
+        ).start()
+
     def tearDown(self):
         mock.patch.stopall()
 
     def test_get_all_replica_sets_config_exception(self):
         """It should re-raise the same exception as load_kube_config.
         """
-        mock.patch(
-            'sat.cli.k8s.replicaset.kubernetes.config.load_kube_config',
-            side_effect=ConfigException).start()
-
+        self.mock_load_kube_api.side_effect = ConfigException
         with self.assertRaises(ConfigException):
-            rs = ReplicaSet().get_all_replica_sets()
-
-    def test_get_all_replica_sets_config_exception(self):
-        """It should re-raise a ConfigException by load_kube_config.
-        """
-        mock.patch(
-            'sat.cli.k8s.replicaset.kubernetes.config.load_kube_config',
-            side_effect=ConfigException).start()
-
-        with self.assertRaises(ConfigException):
-            rs = ReplicaSet().get_all_replica_sets()
-
-    def test_get_all_replica_sets_file_not_found_exception(self):
-        """It should re-raise a FileNotFoundError by load_kube_config.
-
-        kubernetes.config.kube_config.open can raise FileNotFoundError.
-
-        TODO: Update this test as part of either SAT-468 or SAT-460.
-        """
-        mock.patch(
-            'sat.cli.k8s.replicaset.kubernetes.config.load_kube_config',
-            side_effect=FileNotFoundError).start()
-
-        with self.assertRaises(FileNotFoundError):
             rs = ReplicaSet().get_all_replica_sets()
 
     def test_pods(self):
         """The pods property should return all pods with matching hash.
         """
-        mock.patch(
-            'sat.cli.k8s.replicaset.kubernetes.config.load_kube_config',
-            return_value=None).start()
-
-        mock.patch(
-            'sat.cli.k8s.replicaset.kubernetes.client.AppsV1Api.list_replica_set_for_all_namespaces',
-            return_value=FakeReplicaSets()).start()
-
-        mock.patch(
-            'sat.cli.k8s.replicaset.kubernetes.client.CoreV1Api.list_namespaced_pod',
-            return_value=FakePods()).start()
-
         expected = FakePods().items
         actual = ReplicaSet.get_all_replica_sets()[0].pods[0:4]
 
@@ -143,18 +118,6 @@ class TestReplicaset(unittest.TestCase):
     def test_running_pods(self):
         """It should return all pods with status of "Running".
         """
-        mock.patch(
-            'sat.cli.k8s.replicaset.kubernetes.config.load_kube_config',
-            return_value=None).start()
-
-        mock.patch(
-            'sat.cli.k8s.replicaset.kubernetes.client.AppsV1Api.list_replica_set_for_all_namespaces',
-            return_value=FakeReplicaSets()).start()
-
-        mock.patch(
-            'sat.cli.k8s.replicaset.kubernetes.client.CoreV1Api.list_namespaced_pod',
-            return_value=FakePods()).start()
-
         expected = FakePods().items[0:3]
         actual = ReplicaSet.get_all_replica_sets()[0].running_pods
 
@@ -166,18 +129,6 @@ class TestReplicaset(unittest.TestCase):
 
         Replicas 'Running' on the same node should be returned.
         """
-        mock.patch(
-            'sat.cli.k8s.replicaset.kubernetes.config.load_kube_config',
-            return_value=None).start()
-
-        mock.patch(
-            'sat.cli.k8s.replicaset.kubernetes.client.AppsV1Api.list_replica_set_for_all_namespaces',
-            return_value=FakeReplicaSets()).start()
-
-        mock.patch(
-            'sat.cli.k8s.replicaset.kubernetes.client.CoreV1Api.list_namespaced_pod',
-            return_value=FakePods()).start()
-
         expected = FakePods().items[0:2]
         actual = ReplicaSet.get_all_replica_sets()[0].co_located_replicas
 
@@ -193,14 +144,7 @@ class TestReplicaset(unittest.TestCase):
         ApiException can be raised by the call to
         'list_replica_set_for_all_namespaces'.
         """
-        mock.patch(
-            'sat.cli.k8s.replicaset.kubernetes.config.load_kube_config',
-            return_value=None).start()
-
-        mock.patch(
-            'sat.cli.k8s.replicaset.kubernetes.client.AppsV1Api.list_replica_set_for_all_namespaces',
-            side_effect=ApiException).start()
-
+        self.mock_appsv1_api.list_replica_set_for_all_namespaces.side_effect = ApiException
         with self.assertRaises(ApiException):
             rs = ReplicaSet().get_all_replica_sets()
 

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -132,6 +132,12 @@ class BaseBladeSwapProcedureTest(unittest.TestCase):
 
         self.mock_sat_session = patch('sat.cli.swap.blade.SATSession').start()
 
+        self.mock_load_k8s_api = patch('sat.cli.swap.blade.load_kube_api').start()
+        self.pod_name = 'cray-dhcp-kea-123456789-cafe'
+        self.mock_pod = MagicMock()
+        self.mock_pod.metadata.name = self.pod_name
+        self.mock_load_k8s_api.return_value.list_namespaced_pod.return_value.items = [self.mock_pod]
+
         self.blade_xname = 'x1000c0s1'
         self.args = Namespace(
             xname=self.blade_xname,
@@ -173,13 +179,6 @@ class BaseBladeSwapProcedureTest(unittest.TestCase):
             for b in range(2)
             for n in range(2)
         ]
-
-        patch('sat.cli.swap.blade.load_kube_config').start()
-        self.mock_k8s_api = patch('sat.cli.swap.blade.CoreV1Api').start()
-        self.pod_name = 'cray-dhcp-kea-123456789-cafe'
-        self.mock_pod = MagicMock()
-        self.mock_pod.metadata.name = self.pod_name
-        self.mock_k8s_api.return_value.list_namespaced_pod.return_value.items = [self.mock_pod]
 
         self.mock_cron = patch('sat.cli.swap.blade.HMSDiscoveryCronJob').start()
 
@@ -708,7 +707,7 @@ class TestMappingIpMacAddresses(BaseBladeSwapProcedureTest):
 
     def test_bladeswaperror_on_k8s_apiexception(self):
         """Test that k8s ApiExceptions are re-raised as BladeSwapErrors"""
-        self.mock_k8s_api.return_value.list_namespaced_pod.side_effect = ApiException
+        self.mock_load_k8s_api.return_value.list_namespaced_pod.side_effect = ApiException
         with self.assertRaises(BladeSwapError):
             self.swap_in.map_ip_mac_addresses()
 

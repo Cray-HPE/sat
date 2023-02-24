@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -46,9 +46,8 @@ class TestHMSDiscoveryCronJob(unittest.TestCase):
 
     def setUp(self):
         """Set up some mocks."""
-        self.mock_load_config = patch('sat.hms_discovery.load_kube_config').start()
-        self.mock_batch_api_cls = patch('sat.hms_discovery.BatchV1beta1Api').start()
-        self.mock_batch_api = self.mock_batch_api_cls.return_value
+        self.mock_load_api = patch('sat.hms_discovery.load_kube_api').start()
+        self.mock_batch_api = self.mock_load_api.return_value
         self.hdcj = HMSDiscoveryCronJob()
 
     def tearDown(self):
@@ -58,26 +57,19 @@ class TestHMSDiscoveryCronJob(unittest.TestCase):
     def test_k8s_batch_api_success(self):
         """Test the k8s_batch_api property"""
         batch_api_return_vals = [Mock(), Mock()]
-        self.mock_batch_api_cls.side_effect = batch_api_return_vals
+        self.mock_load_api.side_effect = batch_api_return_vals
 
         k8s_batch_api = self.hdcj.k8s_batch_api
         # Call it again to check that it is cached properly
         second_k8s_batch_api = self.hdcj.k8s_batch_api
 
-        self.mock_load_config.assert_called_once_with()
+        self.mock_load_api.assert_called_once()
         self.assertEqual(batch_api_return_vals[0], k8s_batch_api)
         self.assertEqual(k8s_batch_api, second_k8s_batch_api)
 
-    def test_k8s_batch_api_config_file_not_found(self):
-        """Test the k8s_batch_api property when loading config raises FileNotFoundError"""
-        self.mock_load_config.side_effect = FileNotFoundError
-
-        with self.assertRaisesRegex(HMSDiscoveryError, 'Failed to load kubernetes config'):
-            _ = self.hdcj.k8s_batch_api
-
     def test_k8s_batch_api_config_exception(self):
         """Test the k8s_batch_api property when loading config file raises ConfigException"""
-        self.mock_load_config.side_effect = ConfigException
+        self.mock_load_api.side_effect = ConfigException
 
         with self.assertRaisesRegex(HMSDiscoveryError, 'Failed to load kubernetes config'):
             _ = self.hdcj.k8s_batch_api
