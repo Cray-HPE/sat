@@ -221,7 +221,7 @@ class BOSV2SessionWaiter(Waiter):
 
         self.pct_successful = 0.0
         self.pct_failed = 0.0
-        self.error_summary = {}
+        self.session_status = {}
 
     def condition_name(self):
         return f'session {self.bos_session_thread.session_id} reached target state {self.target_state}'
@@ -236,25 +236,22 @@ class BOSV2SessionWaiter(Waiter):
                 self.bos_session_thread.session_id, self.target_state, self.bos_session_thread.session_template
             )
 
-            session_status = self.bos_client.get_session_status(
+            self.session_status = self.bos_client.get_session_status(
                 self.bos_session_thread.session_id
             )
 
-            if (session_status['percent_successful'] != self.pct_successful
-                    or session_status['percent_failed'] != self.pct_failed):
+            if (self.session_status['percent_successful'] != self.pct_successful
+                    or self.session_status['percent_failed'] != self.pct_failed):
                 # Only log progress update when components succeed or fail
-                self.pct_successful = float(session_status['percent_successful'])
-                self.pct_failed = float(session_status['percent_failed'])
+                self.pct_successful = float(self.session_status['percent_successful'])
+                self.pct_failed = float(self.session_status['percent_failed'])
                 LOGGER.info(
                     'Session %s: %.0f%% components succeeded, %.0f%% components failed',
                     self.bos_session_thread.session_id, self.pct_successful, self.pct_failed
                 )
 
-            if session_status['error_summary']:
-                self.error_summary = session_status['error_summary']
-
-            if session_status['status'] == self.target_state:
-                if not session_status.get('managed_components_count'):
+            if self.session_status['status'] == self.target_state:
+                if not self.session_status.get('managed_components_count'):
                     LOGGER.warning(
                         'Session %s does not manage any components; another session '
                         'may have been started which targets the same components as '
@@ -272,8 +269,9 @@ class BOSV2SessionWaiter(Waiter):
         return False
 
     def post_wait_action(self):
-        if self.error_summary:
-            for err, summary in self.error_summary.items():
+        error_summary = self.session_status.get('error_summary')
+        if error_summary:
+            for err, summary in error_summary.items():
                 LOGGER.error('%s: %s', err, summary)
 
 
@@ -304,6 +302,7 @@ class BOSSessionThread(Thread):
         self.failed = False
         self.fail_msg = ''
         self.bos_client = BOSClientCommon.get_bos_client(SATSession())
+        self.bos_session_status = None
 
         # Keep track of how many times we fail to query status in a row.
         self.consec_stat_fails = 0
@@ -504,6 +503,8 @@ class BOSSessionThread(Thread):
         else:
             self.complete = True
 
+        self.bos_session_status = waiter.session_status
+
     def create_session_fake(self):
         """Fake the creation of a new BOS session.
 
@@ -627,8 +628,28 @@ def do_parallel_bos_operations(session_templates, operation, timeout, limit=None
         for thread in active_threads.values():
             thread.stop()
 
+    some_sessions_failed = False
     for thread in bos_session_threads:
         thread.join()
+
+        if thread.bos_session_status:
+            LOGGER.info(
+                'Session %s: %.0f%% components succeeded, %.0f%% components failed',
+                thread.session_id,
+                thread.bos_session_status['percent_successful'],
+                thread.bos_session_status['percent_failed']
+            )
+            error_summary = thread.bos_session_status.get('error_summary', {})
+            if error_summary:
+                some_sessions_failed = True
+
+            for error_message, components in error_summary.items():
+                LOGGER.warning(
+                    '%s (%d components): %s',
+                    error_message,
+                    int(components['count']),
+                    str(components['list']),
+                )
 
     if failed_session_templates:
         raise BOSFailure(
@@ -637,7 +658,10 @@ def do_parallel_bos_operations(session_templates, operation, timeout, limit=None
             f'{", ".join(failed_session_templates)}'
         )
 
-    LOGGER.info(f'All BOS sessions {completed_state_past_tense}.')
+    if some_sessions_failed:
+        LOGGER.warning('One or more BOS sessions had errors; see previous logs for details.')
+    else:
+        LOGGER.info(f'All BOS sessions {completed_state_past_tense}.')
 
 
 def _update_nodes_by_state(nodes_by_state, hsm_client, hsm_params):
