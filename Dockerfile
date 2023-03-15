@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -68,7 +68,8 @@ COPY sat sat
 COPY docs/man docs/man
 COPY tools tools
 
-RUN pip3 install --no-cache-dir pip && \
+RUN --mount=type=secret,id=netrc,target=/root/.netrc \
+    pip3 install --no-cache-dir pip && \
     pip3 install --no-cache-dir --timeout=300 . && \
     ./config-docker-sat.sh
 
