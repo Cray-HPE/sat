@@ -25,7 +25,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.21.3] - 2023-03-08
+
+### Changed
+- Changed logging in `sat bootsys` such that all sessions will have a logging
+  message printed at the end of the `sat bootsys` run. BOS sessions with
+  greater than 0% failed components will be logged as warning messages, and all
+  other session statuses will be logged as info messages.
 
 ### Fixed
 - Fixed a bug in the `bos-operations` stage of `sat bootsys` where a Bad Request
