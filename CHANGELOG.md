@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+- Added ability to filter images provided by a product using a wildcard pattern
+  to specify the base input image in a `sat bootprep` input file
+
 ### Changed
 - Changed logging in `sat bootsys` such that all sessions will have a logging
   message printed at the end of the `sat bootsys` run. BOS sessions with
