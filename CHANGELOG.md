@@ -25,6 +25,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.21.3] - 2023-03-24
+
+### Changed
+- Changed the default value of the config file option `bos.api_version` to "v2".
+
+### Security
+- Update the version of oauthlib from 3.2.1 to 3.2.2 to resolve a moderate
+  dependabot alert for CVE-2022-36087.
+- Update the version of cryptography from 36.0.1 to 39.0.1 to address
+  CVE-2023-23931.
+
 ## [3.21.2] - 2023-02-13
 
 ### Fixed
