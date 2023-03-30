@@ -60,7 +60,7 @@ RUN --mount=type=secret,id=netrc,target=/root/.netrc \
     pip3 install --no-cache-dir -U pip && \
     pip3 install -r requirements.txt
 
-COPY CHANGELOG.md README.md setup.cfg setup.py ./
+COPY CHANGELOG.md README.md setup.py ./
 # This file is used to get the version of docutils needed
 COPY requirements-dev.lock.txt requirements-dev.lock.txt
 COPY docker_scripts/config-docker-sat.sh ./
@@ -87,8 +87,9 @@ FROM ci_base as testing
 # when they succeed natively, so disable those in CI.
 ENV SAT_SKIP_PERF_TESTS=1
 COPY tests tests
-COPY setup.cfg setup.cfg
-CMD nosetests
+COPY unittest.cfg ./
+# Omit test coverage in CI, coverage reports are discarded anyway.
+CMD nose2 --exclude-plugin='nose2.plugins.coverage'
 
 # This stage runs pycodestyle in the container so we are again using the same
 # production environment to check our code style.
