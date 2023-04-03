@@ -26,6 +26,8 @@ Sets up logging for SAT.
 """
 import logging
 import os
+from copy import deepcopy
+from logging import Formatter, LogRecord
 
 from sat.config import get_config_value
 
@@ -33,6 +35,17 @@ CSM_CLIENT_MODULE_NAME = 'csm_api_client'
 CONSOLE_LOG_FORMAT = '%(levelname)s: %(message)s'
 FILE_LOG_FORMAT = '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
 LOGGER = logging.getLogger(__name__)
+
+
+class LineSplittingFormatter(Formatter):
+    """Formatter which splits multi-line messages and formats each line individually."""
+    def formatMessage(self, record: LogRecord) -> str:
+        formatted_records = []
+        for line in record.message.splitlines():
+            line_record = deepcopy(record)
+            line_record.message = line
+            formatted_records.append(super().formatMessage(line_record))
+        return '\n'.join(formatted_records)
 
 
 def _add_console_handler(logger, log_level):
@@ -44,7 +57,7 @@ def _add_console_handler(logger, log_level):
     """
     console_handler = logging.StreamHandler()
     console_handler.setLevel(log_level)
-    console_formatter = logging.Formatter(CONSOLE_LOG_FORMAT)
+    console_formatter = LineSplittingFormatter(CONSOLE_LOG_FORMAT)
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
 
@@ -121,7 +134,7 @@ def configure_logging():
         LOGGER.warning("Unable to write to log file: %s", err)
     else:
         file_handler.setLevel(log_file_level)
-        file_formatter = logging.Formatter(FILE_LOG_FORMAT)
+        file_formatter = LineSplittingFormatter(FILE_LOG_FORMAT)
         file_handler.setFormatter(file_formatter)
         sat_logger.addHandler(file_handler)
         csm_client_logger.addHandler(file_handler)
