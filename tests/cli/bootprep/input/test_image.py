@@ -21,7 +21,6 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-
 import unittest
 from unittest.mock import Mock, patch
 
@@ -71,7 +70,9 @@ class TestProductInputImage(unittest.TestCase):
     def tearDown(self):
         patch.stopall()
 
-    def get_product_input_image_data(self, filter_prefix=None):
+    def get_product_input_image_data(self, filter_prefix=None, filter_wildcard=None):
+        if filter_prefix and filter_wildcard:
+            raise ValueError('filter_prefix and filter_wildcard are mutually exclusive')
         data = {
             'name': 'configured-{{ base.name }}',
             'base': {
@@ -85,11 +86,13 @@ class TestProductInputImage(unittest.TestCase):
             data['base']['product']['version'] = self.product_version
         if filter_prefix is not None:
             data['base']['product']['filter'] = {'prefix': filter_prefix}
+        if filter_wildcard is not None:
+            data['base']['product']['filter'] = {'wildcard': filter_wildcard}
         return data
 
-    def get_product_input_image(self, data=None, index=0, filter_prefix=None):
+    def get_product_input_image(self, data=None, index=0, filter_prefix=None, filter_wildcard=None):
         if not data:
-            data = self.get_product_input_image_data(filter_prefix)
+            data = self.get_product_input_image_data(filter_prefix, filter_wildcard)
         return ProductInputImage(data, index, self.mock_input_instance, self.jinja_env,
                                  self.mock_product_catalog, self.mock_ims_client, self.mock_cfs_client)
 
@@ -128,6 +131,15 @@ class TestProductInputImage(unittest.TestCase):
         image = self.get_product_input_image(filter_prefix='other')
         self.assertEqual('other', image.filter_prefix)
 
+    def test_filter_wildcard_not_specified(self):
+        """Test filter_wildcard property of ProductInputImage when not specified."""
+        self.assertIsNone(self.product_input_image.filter_wildcard)
+
+    def test_filter_wildcard_specified(self):
+        """Test filter_wildcard property of ProductInputImage whcn specified"""
+        image = self.get_product_input_image(filter_wildcard='other*')
+        self.assertEqual('other*', image.filter_wildcard)
+
     def test_filter_func_not_specified(self):
         """Test filter_func method of ProductInputImage when filter prefix not specified."""
         unfiltered_list = ['list', 'of', 'names']
@@ -147,6 +159,20 @@ class TestProductInputImage(unittest.TestCase):
         self.assertTrue(image.filter_func('item'))
         self.assertTrue(image.filter_func('another_item'))
         self.assertTrue(image.filter_func('other_item'))
+
+    def test_filter_func_wildcard_specified_matches(self):
+        """Test filter_func method of ProductInputImage when a wildcard is specified"""
+        patterns_and_matches = {
+            'prefix*': ['prefix', 'prefix_matching', 'prefix_with_lots_of_text'],
+            '*suffix': ['suffix', 'matching_suffix', 'longer_text_with_suffix'],
+            '*infix*': ['infix', 'matching_infix', 'infix_matching', 'foo_infix_foo'],
+            'surr*ound': ['surround', 'surrrrrround', 'surr_oun_ound'],
+            'single?': ['singled', 'singles'],
+        }
+        for pattern, matches in patterns_and_matches.items():
+            for match in matches:
+                image = self.get_product_input_image(filter_wildcard=pattern)
+                self.assertTrue(image.filter_func(match))
 
     def test_base_description_no_version(self):
         """Test base_description property of ProductInputImage when no version specified."""
