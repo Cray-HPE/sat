@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed the default value of the config file option `bos.api_version` to "v2".
 - Modified logging for SAT such that multi-line log messages will now be logged
   with consistent formatting for each line.
+- Updated unit test infrastructure to use `nose2`.
 
 ### Fixed
 - Fixed a bug in the `bos-operations` stage of `sat bootsys` where a Bad Request
