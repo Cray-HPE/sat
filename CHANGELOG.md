@@ -47,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a bug where the `bos-operations` stage of `sat bootsys` would not correctly
   wait for a shutdown or boot operation to complete with BOS v1 and certain versions
   of the `kubectl` command.
+- Fixed a bug where the `bos-operations` stage of `sat bootsys` did not report
+  staged sessions as complete if the sessions did not apply to any components
+  due to a `--bos-limit` parameter that did not overlap with the components in the
+  session template.
 
 ### Security
 - Update the version of oauthlib from 3.2.1 to 3.2.2 to resolve a moderate
