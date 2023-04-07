@@ -212,19 +212,28 @@ def boa_job_successful(boa_job_id):
 class BOSV2SessionWaiter(Waiter):
     """Waiter for monitoring the status of a BOS v2 session."""
 
-    def __init__(self, bos_session_thread, target_state='complete', *args, **kwargs):
+    def __init__(self, bos_session_thread, target_states=None, *args, **kwargs):
+        """
+        Create a new BOSV2SessionWaiter.
+
+        Args:
+            bos_session_thread (BOSSessionThread): the BOS session thread
+            target_states (list, optional): the list of acceptable target state
+                strings. Defaults to ['complete']
+        """
         super().__init__(*args, **kwargs)
         self.bos_client = BOSClientCommon.get_bos_client(SATSession(),
                                                          version='v2')
         self.bos_session_thread = bos_session_thread
-        self.target_state = target_state
+        self.target_states = ['complete'] if target_states is None else target_states
+        self.target_states_desc = INFLECTOR.join(self.target_states, conj='or')
 
         self.pct_successful = 0.0
         self.pct_failed = 0.0
         self.error_summary = {}
 
     def condition_name(self):
-        return f'session {self.bos_session_thread.session_id} reached target state {self.target_state}'
+        return f'session {self.bos_session_thread.session_id} reached target state {self.target_states_desc}'
 
     def has_completed(self):
         if self.bos_session_thread.stopped():
@@ -233,7 +242,8 @@ class BOSV2SessionWaiter(Waiter):
         try:
             LOGGER.info(
                 'Waiting for BOS session %s to reach target state %s. Session template: %s',
-                self.bos_session_thread.session_id, self.target_state, self.bos_session_thread.session_template
+                self.bos_session_thread.session_id, self.target_states_desc,
+                self.bos_session_thread.session_template
             )
 
             session_status = self.bos_client.get_session_status(
@@ -253,12 +263,11 @@ class BOSV2SessionWaiter(Waiter):
             if session_status['error_summary']:
                 self.error_summary = session_status['error_summary']
 
-            if session_status['status'] == self.target_state:
+            if session_status['status'] in self.target_states:
                 if not session_status.get('managed_components_count'):
-                    LOGGER.warning(
-                        'Session %s does not manage any components; another session '
-                        'may have been started which targets the same components as '
-                        'this session.', self.bos_session_thread.session_id
+                    LOGGER.info(
+                        'Session %s did not manage any components.',
+                        self.bos_session_thread.session_id
                     )
                 return True
 
@@ -480,10 +489,18 @@ class BOSSessionThread(Thread):
         Returns:
             None
         """
+        target_states = ['complete']
+        # If staged, a BOS session will enter 'running' state if it affects a
+        # non-empty set of components. Otherwise (e.g. when the nodes specified
+        # in the bootsets do not intersect with the limit parameter), it will go
+        # straight to 'complete'.
+        if self.stage:
+            target_states.append('running')
+
         # Pass math.inf as the timeout since timeouts are handled by the
         # `do_parallel_bos_operations()` function, independent of the waiter
         # class here.
-        waiter = BOSV2SessionWaiter(self, target_state='running' if self.stage else 'complete',
+        waiter = BOSV2SessionWaiter(self, target_states=target_states,
                                     timeout=math.inf,
                                     poll_interval=PARALLEL_CHECK_INTERVAL)
 

@@ -25,6 +25,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.21.4] - 2023-04-07
+
+### Fixed
+- Fixed a bug where the `bos-operations` stage of `sat bootsys` did not report
+  staged sessions as complete if the sessions did not apply to any components
+  due to a `--bos-limit` parameter that did not overlap with the components in the
+  session template.
+
 ## [3.21.3] - 2023-03-24
 
 ### Changed
