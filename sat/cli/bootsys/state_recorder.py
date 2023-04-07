@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020,2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -29,7 +29,6 @@ import json
 import logging
 import os
 import sys
-from urllib3.exceptions import InsecureRequestWarning
 import warnings
 from datetime import datetime
 
@@ -205,10 +204,7 @@ class StateRecorder(ABC):
             raise StateError(f'Failed to write state to file {local_new_file_name}: {err}') from err
         try:
             LOGGER.debug('Uploading %s to S3', new_file_name)
-            # TODO(SAT-926): Start verifying HTTPS requests
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=InsecureRequestWarning)
-                self.s3.Object(self.bucket_name, new_file_name).upload_file(local_new_file_name)
+            self.s3.Object(self.bucket_name, new_file_name).upload_file(local_new_file_name)
         except (ClientError, BotoCoreError, Boto3Error) as err:
             raise PodStateError(f'Failed to dump state to S3: {err}')
         finally:
@@ -239,9 +235,7 @@ class StateRecorder(ABC):
         LOGGER.debug('Latest state file: %s', latest_state_file)
         self._ensure_local_dir_path_exists()
         try:
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=InsecureRequestWarning)
-                self.s3.Object(self.bucket_name, latest_state_file).download_file(latest_state_file_local_path)
+            self.s3.Object(self.bucket_name, latest_state_file).download_file(latest_state_file_local_path)
             LOGGER.debug('Downloaded %s to %s', latest_state_file, latest_state_file_local_path)
         except (BotoCoreError, ClientError, Boto3Error) as err:
             raise StateError(f'Unable to download {latest_state_file} from s3: {err}')

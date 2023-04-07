@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2021,2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -28,8 +28,6 @@ The main entry point for the setrev subcommand.
 import logging
 import os
 import sys
-from urllib3.exceptions import InsecureRequestWarning
-import warnings
 
 from boto3.exceptions import Boto3Error
 from botocore.exceptions import BotoCoreError, ClientError
@@ -61,10 +59,7 @@ def get_site_data(sitefile):
 
     try:
         LOGGER.debug('Downloading %s from S3 (bucket: %s)', sitefile, s3_bucket)
-        # TODO(SAT-926): Start verifying HTTPS requests
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', category=InsecureRequestWarning)
-            s3.Object(s3_bucket, sitefile).download_file(sitefile)
+        s3.Object(s3_bucket, sitefile).download_file(sitefile)
     except (BotoCoreError, ClientError, Boto3Error) as err:
         # It is not an error if this file doesn't already exist
         # TODO: it would be nice to differentiate between successfully connecting to S3
@@ -137,10 +132,7 @@ def write_site_data(sitefile, data):
         with open(sitefile, 'w') as of:
             of.write(yaml_dump(data))
         LOGGER.debug('Uploading %s to S3 (bucket: %s)', sitefile, s3_bucket)
-        # TODO(SAT-926): Start verifying HTTPS requests
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', category=InsecureRequestWarning)
-            s3.Object(s3_bucket, sitefile).upload_file(sitefile)
+        s3.Object(s3_bucket, sitefile).upload_file(sitefile)
         LOGGER.info(f'Successfully wrote site info file {sitefile} to S3.')
     except OSError as err:
         LOGGER.error('Unable to write %s. Error: %s', sitefile, err)

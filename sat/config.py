@@ -127,6 +127,8 @@ SAT_CONFIG_SPEC = {
         'stderr_level': OptionSpec(str, 'INFO', validate_log_level, 'loglevel_stderr'),
     },
     's3': {
+        # TODO (CRAYSAT-926): When rgw cert can be verified, change the default to True.
+        'cert_verify': OptionSpec(bool, False, None, None),
         'endpoint': OptionSpec(str, 'https://rgw-vip.nmn', None, None),
         'bucket': OptionSpec(str, 'sat', None, None),
         'access_key_file': OptionSpec(str, '~/.config/sat/s3_access_key', None, None),
