@@ -297,7 +297,7 @@ class TestBOSV2SessionWaiter(unittest.TestCase):
         })
         self.assertFalse(self.waiter.has_completed())
 
-    def test_session_superceded(self):
+    def test_session_superseded(self):
         """Test when the waiter's session has its managed components taken by another session"""
         self.mock_bos_client.get_session_status.return_value.update({
             'status': 'complete',
@@ -311,8 +311,66 @@ class TestBOSV2SessionWaiter(unittest.TestCase):
             'percent_successful': 0,
             'percent_failed': 0,
         })
-        with self.assertLogs(level='WARNING'):
+        with self.assertLogs(level='INFO'):
             self.assertTrue(self.waiter.has_completed())
+
+    def test_staged_session_not_complete(self):
+        """Test that a staged session still in pending state is not complete"""
+        self.mock_bos_client.get_session_status.return_value.update({
+            'status': 'pending',
+            'managed_components_count': 0,
+            'phases': {
+                'percent_complete': 0,
+                'percent_powering_on': 0,
+                'percent_powering_off': 0,
+                'percent_configuring': 0,
+            },
+            'percent_successful': 0,
+            'percent_failed': 0,
+        })
+        staged_waiter = BOSV2SessionWaiter(self.mock_session_thread, ['running', 'complete'],
+                                           timeout=math.inf)
+
+        self.assertFalse(staged_waiter.has_completed())
+
+    def test_staged_session_running_complete(self):
+        """Test that a staged session that has reached running state is complete."""
+        self.mock_bos_client.get_session_status.return_value.update({
+            'status': 'running',
+            'managed_components_count': 10,
+            'phases': {
+                'percent_complete': 0,
+                'percent_powering_on': 0,
+                'percent_powering_off': 0,
+                'percent_configuring': 0,
+            },
+            'percent_successful': 0,
+            'percent_failed': 0,
+        })
+        staged_waiter = BOSV2SessionWaiter(self.mock_session_thread, ['running', 'complete'],
+                                           timeout=math.inf)
+
+        self.assertTrue(staged_waiter.has_completed())
+
+    def test_staged_session_empty_complete(self):
+        """Test that a staged session with empty components in complete state is complete."""
+        self.mock_bos_client.get_session_status.return_value.update({
+            'status': 'complete',
+            'managed_components_count': 0,
+            'phases': {
+                'percent_complete': 0,
+                'percent_powering_on': 0,
+                'percent_powering_off': 0,
+                'percent_configuring': 0,
+            },
+            'percent_successful': 0,
+            'percent_failed': 0,
+        })
+        staged_waiter = BOSV2SessionWaiter(self.mock_session_thread, ['running', 'complete'],
+                                           timeout=math.inf)
+
+        with self.assertLogs(level='INFO'):
+            self.assertTrue(staged_waiter.has_completed())
 
 
 class TestBOSSessionThread(unittest.TestCase):
