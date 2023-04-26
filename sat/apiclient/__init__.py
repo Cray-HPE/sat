@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -40,12 +40,8 @@ from sat.apiclient.sls import SLSClient
 from sat.apiclient.telemetry import TelemetryAPIClient
 
 
-# The following simple API clients for CRUS, NMD, and SCSD only define their
+# The following simple API clients for NMD and SCSD only define their
 # base_resource_path, so they don't warrant having their own modules yet.
-
-class CRUSClient(APIGatewayClient):
-    base_resource_path = 'crus/'
-
 
 class NMDClient(APIGatewayClient):
     base_resource_path = 'v2/nmd/'
