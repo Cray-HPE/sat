@@ -32,16 +32,15 @@ import json
 import logging
 import os
 from tempfile import TemporaryDirectory
-import warnings
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from boto3.exceptions import Boto3Error
+from csm_api_client.k8s import load_kube_api
 from csm_api_client.service.gateway import APIError, APIGatewayClient
 from inflect import engine
-from kubernetes.client import ApiException, CoreV1Api
-from kubernetes.config import ConfigException, load_kube_config
-from yaml import YAMLLoadWarning
+from kubernetes.client import ApiException
+from kubernetes.config import ConfigException
 
 from sat.cached_property import cached_property
 from sat.config import get_config_value
@@ -79,15 +78,11 @@ class IMSClient(APIGatewayClient):
                 kubernetes secret containing IMS S3 credentials
         """
         try:
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=YAMLLoadWarning)
-                load_kube_config()
-        # Earlier versions: FileNotFoundError; later versions: ConfigException
-        except (FileNotFoundError, ConfigException) as err:
+            kube_client = load_kube_api()
+        except ConfigException as err:
             raise APIError(f'Failed to load Kubernetes config which is required '
                            f'to obtain IMS S3 credentials: {err}')
 
-        kube_client = CoreV1Api()
         try:
             secret = kube_client.read_namespaced_secret('ims-s3-credentials', 'ims')
         except ApiException as err:

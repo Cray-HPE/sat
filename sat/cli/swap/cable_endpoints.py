@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -31,12 +31,10 @@ import os
 import re
 import shlex
 import subprocess
-import warnings
-from yaml import YAMLLoadWarning
 
-from kubernetes.client import CoreV1Api
+from csm_api_client.k8s import load_kube_api
 from kubernetes.client.rest import ApiException
-from kubernetes.config import load_kube_config, ConfigException
+from kubernetes.config import ConfigException
 
 LOGGER = logging.getLogger(__name__)
 
@@ -61,11 +59,8 @@ class CableEndpoints:
         """
 
         try:
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=YAMLLoadWarning)
-                load_kube_config()
-        # Earlier versions: FileNotFoundError; later versions: ConfigException
-        except (FileNotFoundError, ConfigException) as err:
+            k8s_api = load_kube_api()
+        except ConfigException as err:
             LOGGER.error('Failed to load kubernetes config: {}'.format(err))
             return False
 
@@ -73,7 +68,7 @@ class CableEndpoints:
         container = 'slingshot-fabric-manager'
         pod_label = f'app.kubernetes.io/name={container}'
         try:
-            dump = CoreV1Api().list_namespaced_pod(namespace, label_selector=pod_label)
+            dump = k8s_api.list_namespaced_pod(namespace, label_selector=pod_label)
             pod = dump.items[0].metadata.name
         except ApiException as err:
             LOGGER.error('Could not retrieve list of pods: {}'.format(err))

@@ -42,6 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with consistent formatting for each line.
 - Updated unit test infrastructure to use `nose2`.
 - Reduced the number of log messages when insecure HTTPS requests are made.
+- Update the version of `csm-api-client` to 1.1.4 to simplify loading of the
+  Kubernetes configuration when running in a container inside the cluster and
+  remove code duplication.
 
 ### Fixed
 - Fixed a bug in the `bos-operations` stage of `sat bootsys` where a Bad Request
@@ -53,6 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   staged sessions as complete if the sessions did not apply to any components
   due to a `--bos-limit` parameter that did not overlap with the components in the
   session template.
+- Fixed a bug which caused the wrong container name to be logged when a CFS
+  image customization failed in newer versions of CSM.
 
 ### Security
 - Update the version of oauthlib from 3.2.1 to 3.2.2 to resolve a moderate

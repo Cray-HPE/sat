@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020, 2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -41,8 +41,7 @@ def generate_mock_pod(namespace, name, phase):
 
 class TestK8sPodWaiter(unittest.TestCase):
     def setUp(self):
-        self.mock_k8s_api = patch('sat.cli.bootsys.k8s.CoreV1Api').start()
-        self.mock_load_kube_config = patch('sat.cli.bootsys.k8s.load_kube_config').start()
+        self.mock_k8s_api = patch('sat.cli.bootsys.k8s.load_kube_api').start()
 
         self.mocked_pod_dump = {
             'galaxies': {
