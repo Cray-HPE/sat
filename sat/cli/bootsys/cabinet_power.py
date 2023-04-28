@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -63,6 +63,11 @@ def do_air_cooled_cabinets_power_off(args):
         raise SystemExit(1)
 
     node_xnames = list(set(river_nodes) - set(river_mgmt_nodes))
+
+    if not node_xnames:
+        LOGGER.info(f'No non-management nodes in air-cooled cabinets to power off.')
+        return
+
     LOGGER.info(f'Powering off {len(node_xnames)} non-management nodes in air-cooled cabinets.')
     capmc_client = CAPMCClient(SATSession())
     try:
