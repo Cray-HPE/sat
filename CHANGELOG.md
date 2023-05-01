@@ -59,6 +59,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a bug which caused the wrong container name to be logged when a CFS
   image customization failed in newer versions of CSM.
 
+### Removed
+- Removed support for CRUS.
+
 ### Security
 - Update the version of oauthlib from 3.2.1 to 3.2.2 to resolve a moderate
   dependabot alert for CVE-2022-36087.

@@ -39,7 +39,6 @@ from paramiko.ssh_exception import SSHException
 from sat.apiclient import (
     APIError,
     CFSClient,
-    CRUSClient,
     NMDClient
 )
 from sat.apiclient.bos import BOSClientCommon
@@ -406,46 +405,6 @@ class CFSActivityChecker(ServiceActivityChecker):
         ]
 
 
-class CRUSActivityChecker(ServiceActivityChecker):
-    """A class that checks for active CRUS sessions."""
-
-    def __init__(self):
-        """Create a new CRUSActivityChecker."""
-        super().__init__()
-        self.service_name = 'CRUS'
-        self.session_name = 'upgrade'
-        self.cray_cli_args = 'crus session describe'
-        self.id_field_name = 'upgrade_id'
-
-    def get_active_sessions(self):
-        """Get any active Compute Rolling Upgrade Service (CRUS) upgrades.
-
-        Returns:
-            A list of dictionaries representing the active CRUS upgrades.
-
-        Raises:
-            ServiceCheckError: if unable to get the active CRUS upgrades.
-        """
-        crus_client = CRUSClient(SATSession())
-        try:
-            upgrades = crus_client.get('session').json()
-        except (APIError, ValueError) as err:
-            raise self.get_err(str(err))
-
-        crus_upgrade_fields = [
-            self.id_field_name,
-            'state',
-            'completed',
-            'kind',
-            'upgrade_template_id'
-        ]
-
-        return [
-            get_new_ordered_dict(upgrade, crus_upgrade_fields, MISSING_VALUE)
-            for upgrade in upgrades if not upgrade.get('completed')
-        ]
-
-
 class FirmwareActivityChecker(ServiceActivityChecker):
     """A class that checks for active FAS sessions."""
 
@@ -597,7 +556,6 @@ def do_service_activity_check(args):
     service_activity_checkers = [
         bos_checker_cls(),
         CFSActivityChecker(),
-        CRUSActivityChecker(),
         FirmwareActivityChecker(),
         NMDActivityChecker(),
         SDUActivityChecker()
