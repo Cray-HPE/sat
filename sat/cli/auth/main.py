@@ -28,7 +28,6 @@ Entry point for the auth subcommand.
 import getpass
 import logging
 
-from sat.config import get_config_value
 from sat.session import SATSession
 from sat.util import pester
 
@@ -44,7 +43,7 @@ def do_auth(args):
     getpass.getuser() is called to get the system username of the user invoking sat.
 
     The token is saved to $HOME/.config/sat/tokens/hostname.username.json,
-    unless overriden by --token-file on the command line or in the config file.
+    unless overridden by --token-file on the command line or in the config file.
 
     Args:
         args: The argparse.Namespace object containing the parsed arguments

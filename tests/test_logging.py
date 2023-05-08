@@ -21,15 +21,75 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+""" Unit tests for sat.logging
 """
-Unit tests for sat.logging
-"""
+import itertools
 import logging
 import os
 import unittest
 from unittest import mock
 
-from sat.logging import bootstrap_logging, configure_logging
+from sat.logging import LineSplittingFormatter, bootstrap_logging, configure_logging
+
+
+class MockHandler(logging.Handler):
+    """Simple handler which records formatted messages in a list"""
+    def __init__(self, level):
+        super().__init__(level)
+        self.messages = []
+        self.records = []
+
+    def emit(self, record):
+        self.records.append(record)
+        self.messages.append(self.format(record))
+
+
+class TestLineSplittingFormatter(unittest.TestCase):
+    def setUp(self):
+        fmt = '%(levelname)s: %(message)s'  # Omit time since that complicates testing
+        self.logger = logging.getLogger(f'{__name__}:{type(self).__name__}')
+        self.handler = MockHandler(logging.INFO)
+        self.handler.setFormatter(LineSplittingFormatter(fmt))
+        self.logger.addHandler(self.handler)
+
+    def test_logging_single_lines(self):
+        """Test logging a single line"""
+        msg = 'something happened'
+        self.logger.info(msg)
+        self.assertEqual(len(self.handler.messages), 1)
+        self.assertEqual(self.handler.messages[0], f'INFO: {msg}')
+
+    def test_logging_multiple_lines(self):
+        """Test logging multiple lines with individual formatting"""
+        line1 = 'This is a test.'
+        line2 = 'There is no need to be alarmed.'
+        msg = f'{line1}\n{line2}'
+        self.logger.info(msg)
+        self.assertEqual(len(self.handler.messages), 1)
+        self.assertEqual(self.handler.messages[0], f"INFO: {line1}\nINFO: {line2}")
+
+    @mock.patch('logging.time.time', side_effect=itertools.count())
+    def test_logging_multiple_lines_with_dates(self, _):
+        """Test logging multiple lines with a date in the format string"""
+        fmt = '%(asctime)s - %(levelname)s - %(message)s'
+        line1 = 'This is a test.'
+        line2 = 'This is another line logged at the same time.'
+        msg = f'{line1}\n{line2}'
+        formatter = LineSplittingFormatter(fmt)
+        self.handler.setFormatter(formatter)
+
+        self.logger.info(msg)
+        self.assertEqual(len(self.handler.messages), 1)
+        self.assertEqual(len(self.handler.records), 1)
+        first_time = formatter.formatTime(self.handler.records[0])
+        self.assertEqual(self.handler.messages[0], f"{first_time} - INFO - {line1}\n{first_time} - INFO - {line2}")
+
+        self.logger.info(msg)
+        self.assertEqual(len(self.handler.messages), 2)
+        self.assertEqual(len(self.handler.records), 2)
+        second_time = formatter.formatTime(self.handler.records[1])
+        self.assertNotEqual(first_time, second_time)
+        self.assertEqual(self.handler.messages[1], f"{second_time} - INFO - {line1}\n{second_time} - INFO - {line2}")
 
 
 class TestLogging(unittest.TestCase):
@@ -46,7 +106,7 @@ class TestLogging(unittest.TestCase):
         self.sub_logger = logging.getLogger('submodule')
         self.mock_get_logger = mock.patch(
             'sat.logging.logging.getLogger',
-            side_effect=(self.logger, self.sub_logger)
+            side_effect=(self.logger, self.sub_logger, self.sub_logger)
         ).start()
 
         config_values = self.config_values = {
@@ -129,6 +189,8 @@ class TestLogging(unittest.TestCase):
         self.mock_get_logger.assert_any_call('sat')
         # And also the logger named 'csm_api_client'
         self.mock_get_logger.assert_any_call('csm_api_client')
+        # And finally, the 'py.warnings' module
+        self.mock_get_logger.assert_any_call('py.warnings')
 
         log_dir = os.path.dirname(self.config_values['logging.file_name'])
         mock_makedirs.assert_called_once_with(log_dir, exist_ok=True)
@@ -159,6 +221,7 @@ class TestLogging(unittest.TestCase):
         # This should have gotten the logger named 'sat'
         self.mock_get_logger.assert_any_call('sat')
         self.mock_get_logger.assert_any_call('csm_api_client')
+        self.mock_get_logger.assert_any_call('py.warnings')
 
         # Exactly one handler of type StreamHandler should have been added.
         self.assertEqual(len(self.logger.handlers), 1)

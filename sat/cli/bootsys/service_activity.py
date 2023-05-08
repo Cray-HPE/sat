@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -29,20 +29,16 @@ from collections import OrderedDict
 import logging
 import socket
 import sys
-import warnings
 
+from csm_api_client.k8s import load_kube_api
 from inflect import engine
-from kubernetes.client import CoreV1Api
 from kubernetes.client.rest import ApiException
-from kubernetes.config import load_kube_config
-from kubernetes.config.config_exception import ConfigException
+from kubernetes.config import ConfigException
 from paramiko.ssh_exception import SSHException
-from yaml import YAMLLoadWarning
 
 from sat.apiclient import (
     APIError,
     CFSClient,
-    CRUSClient,
     NMDClient
 )
 from sat.apiclient.bos import BOSClientCommon
@@ -279,16 +275,11 @@ class BOSV1ActivityChecker(ServiceActivityChecker):
         # doing a GET on the session ID. This is being improved in CASM-1348, but
         # for now, we have to look at BOA pod status.
         try:
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=YAMLLoadWarning)
-                load_kube_config()
-        # Earlier versions: FileNotFoundError; later versions: ConfigException
-        except (FileNotFoundError, ConfigException) as err:
-            raise self.get_err(
-                'Failed to load kubernetes config to get BOA pod status: '
-                '{}'.format(err)
-            )
-        k8s_client = CoreV1Api()
+            k8s_client = load_kube_api()
+        except ConfigException as err:
+            raise ServiceCheckError(f'Unable to get active BOS sessions: Failed to '
+                                    f'load kubernetes config to get BOA pod status: {err}') \
+                from err
 
         for session_id in session_ids:
             session_info = {}
@@ -411,46 +402,6 @@ class CFSActivityChecker(ServiceActivityChecker):
             for session in sessions
             # Possible values are 'pending', 'running', or 'complete'
             if get_val_by_path(session, 'status.session.status') != 'complete'
-        ]
-
-
-class CRUSActivityChecker(ServiceActivityChecker):
-    """A class that checks for active CRUS sessions."""
-
-    def __init__(self):
-        """Create a new CRUSActivityChecker."""
-        super().__init__()
-        self.service_name = 'CRUS'
-        self.session_name = 'upgrade'
-        self.cray_cli_args = 'crus session describe'
-        self.id_field_name = 'upgrade_id'
-
-    def get_active_sessions(self):
-        """Get any active Compute Rolling Upgrade Service (CRUS) upgrades.
-
-        Returns:
-            A list of dictionaries representing the active CRUS upgrades.
-
-        Raises:
-            ServiceCheckError: if unable to get the active CRUS upgrades.
-        """
-        crus_client = CRUSClient(SATSession())
-        try:
-            upgrades = crus_client.get('session').json()
-        except (APIError, ValueError) as err:
-            raise self.get_err(str(err))
-
-        crus_upgrade_fields = [
-            self.id_field_name,
-            'state',
-            'completed',
-            'kind',
-            'upgrade_template_id'
-        ]
-
-        return [
-            get_new_ordered_dict(upgrade, crus_upgrade_fields, MISSING_VALUE)
-            for upgrade in upgrades if not upgrade.get('completed')
         ]
 
 
@@ -605,7 +556,6 @@ def do_service_activity_check(args):
     service_activity_checkers = [
         bos_checker_cls(),
         CFSActivityChecker(),
-        CRUSActivityChecker(),
         FirmwareActivityChecker(),
         NMDActivityChecker(),
         SDUActivityChecker()

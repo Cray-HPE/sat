@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -26,12 +26,11 @@ Functionality related to the hms-discovery cronjob in k8s.
 """
 from datetime import datetime
 import logging
-import warnings
-from yaml import YAMLLoadWarning
 
 from croniter import croniter
+from csm_api_client.k8s import load_kube_api
 from dateutil.tz import tzutc
-from kubernetes.config import ConfigException, load_kube_config
+from kubernetes.config import ConfigException
 from kubernetes.client import BatchV1beta1Api
 from kubernetes.client.rest import ApiException
 
@@ -62,14 +61,9 @@ class HMSDiscoveryCronJob:
             HMSDiscoveryError: if there is an error loading k8s config
         """
         try:
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=YAMLLoadWarning)
-                load_kube_config()
-        # Earlier versions: FileNotFoundError; later versions: ConfigException
-        except (FileNotFoundError, ConfigException) as err:
+            return load_kube_api(api_cls=BatchV1beta1Api)
+        except ConfigException as err:
             raise HMSDiscoveryError('Failed to load kubernetes config: {}'.format(err)) from err
-
-        return BatchV1beta1Api()
 
     # Intentionally not cached so we can get live state
     @property

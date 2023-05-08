@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -644,14 +644,15 @@ class TestGetS3Resource(ExtendedTestCase):
         result = util.get_s3_resource()
         self.assertEqual([mock.call('s3.access_key_file'), mock.call('s3.secret_key_file')],
                          self.mock_read_config_value_file.mock_calls)
-        self.mock_get_config_value.assert_called_once_with('s3.endpoint')
+        self.mock_get_config_value.assert_any_call('s3.endpoint')
+        self.mock_get_config_value.assert_any_call('s3.cert_verify')
         self.mock_boto3.assert_called_once_with(
             's3',
             endpoint_url=self.mock_get_config_value.return_value,
             aws_access_key_id=self.access_key,
             aws_secret_access_key=self.secret_key,
             region_name='',
-            verify=False
+            verify=self.mock_get_config_value.return_value
         )
         self.assertEqual(result, self.mock_boto3.return_value)
 

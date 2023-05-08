@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -43,7 +43,6 @@ from sat.cli.bootsys.service_activity import (
     BOSV1ActivityChecker,
     BOSV2ActivityChecker,
     CFSActivityChecker,
-    CRUSActivityChecker,
     FirmwareActivityChecker,
     NMDActivityChecker,
     _report_active_sessions,
@@ -264,12 +263,11 @@ class TestBOSV1ActivityChecker(ExtendedTestCase):
                                     if pod.label_value == label_value])
             return MockPodList(self.pods)
 
-        self.mock_load_kube_config = patch(
-            'sat.cli.bootsys.service_activity.load_kube_config').start()
         self.mock_kube_client = Mock()
         self.mock_kube_client.list_namespaced_pod = mock_list_pods
-        patch('sat.cli.bootsys.service_activity.CoreV1Api',
-              return_value=self.mock_kube_client).start()
+        self.mock_load_kube_api = patch(
+            'sat.cli.bootsys.service_activity.load_kube_api',
+            return_value=self.mock_kube_client).start()
 
         self.bos_checker = BOSV1ActivityChecker()
 
@@ -378,18 +376,11 @@ class TestBOSV1ActivityChecker(ExtendedTestCase):
         """Test get_active_sessions with failure to load kube_config."""
         config_err_msg = 'invalid config'
         # Newer version of kubernetes raise this
-        self.mock_load_kube_config.side_effect = ConfigException(config_err_msg)
+        self.mock_load_kube_api.side_effect = ConfigException(config_err_msg)
         err_regex_template = ('^Unable to get active BOS sessions: Failed to '
                               'load kubernetes config to get BOA pod status: {}')
         err_regex = err_regex_template.format(config_err_msg)
 
-        with self.assertRaisesRegex(ServiceCheckError, err_regex):
-            self.bos_checker.get_active_sessions()
-
-        file_err_msg = 'file not found'
-        # Older versions of kubernetes raise this
-        self.mock_load_kube_config.side_effect = FileNotFoundError(file_err_msg)
-        err_regex = err_regex_template.format(file_err_msg)
         with self.assertRaisesRegex(ServiceCheckError, err_regex):
             self.bos_checker.get_active_sessions()
 
@@ -572,112 +563,6 @@ class TestCFSActivityChecker(unittest.TestCase):
             self.cfs_checker.get_active_sessions()
 
 
-class TestCRUSActivityChecker(unittest.TestCase):
-    """Test the CRUSActivityChecker class."""
-
-    def get_crus_upgrade(self, **kwargs):
-        """Get a CRUS session data structure.
-
-        Args:
-            **kwargs: Keyword arguments used as values in CRUS session.
-        """
-        crus_upgrade_fields = [
-            'upgrade_id',
-            'state',
-            'completed',
-            'kind',
-            'upgrade_template_id'
-        ]
-        return {
-            field: kwargs.get(field, self.defaults.get(field))
-            for field in crus_upgrade_fields
-        }
-
-    def setUp(self):
-        """Set up mocks and sample CRUS data."""
-        self.crus_checker = CRUSActivityChecker()
-
-        self.defaults = {
-            'upgrade_id': 'crus-upgrade-id',
-            'state': 'READY',
-            'completed': True,
-            'kind': 'ComputeUpgradeSession',
-            'upgrade_template_id': 'cle-1.3.0'
-        }
-
-        self.crus_sessions = [
-            self.get_crus_upgrade(name='crus-upgrade-{}'.format(num))
-            for num in range(5)
-        ]
-
-        # If not None, causes CRUSClient().get() to raise this
-        self.crus_err = None
-        # If not None, causes CRUSClient().get().json() to raise this
-        self.json_err = None
-
-        def mock_crus_get(*args):
-            if self.crus_err:
-                raise self.crus_err
-
-            def json():
-                if len(args) != 1 or args[0] != 'session':
-                    self.fail('Unexpected get to CRUSClient with args: {}'.format(args))
-                elif self.json_err:
-                    raise self.json_err
-                else:
-                    return self.crus_sessions
-            return Mock(json=json)
-
-        patch('sat.cli.bootsys.service_activity.SATSession').start()
-        self.mock_crus_client = patch(
-            'sat.cli.bootsys.service_activity.CRUSClient').start()
-        self.mock_crus_client.return_value.get = mock_crus_get
-
-    def tearDown(self):
-        """Stop mocks at the end of each unit test."""
-        patch.stopall()
-
-    def test_init(self):
-        """Test creation of a CRUSActivityChecker."""
-        self.assertEqual('CRUS', self.crus_checker.service_name)
-        self.assertEqual('upgrade', self.crus_checker.session_name)
-        self.assertEqual('crus session describe', self.crus_checker.cray_cli_args)
-        self.assertEqual('upgrade_id', self.crus_checker.id_field_name)
-
-    def test_get_active_sessions_two_active(self):
-        """Test get_active_sessions with two active sessions."""
-        active_session_indices = [0, -1]
-        expected_active_sessions = []
-        for idx in active_session_indices:
-            self.crus_sessions[idx]['completed'] = False
-            expected_active_sessions.append(OrderedDict([
-                ('upgrade_id', self.crus_sessions[idx]['upgrade_id']),
-                ('state', self.crus_sessions[idx]['state']),
-                ('completed', self.crus_sessions[idx]['completed']),
-                ('kind', self.crus_sessions[idx]['kind']),
-                ('upgrade_template_id', self.crus_sessions[idx]['upgrade_template_id'])
-            ]))
-
-        active_sessions = self.crus_checker.get_active_sessions()
-        self.assertEqual(expected_active_sessions, active_sessions)
-
-    def test_get_active_sessions_api_err(self):
-        """Test get_active_sessions with an API error."""
-        api_err_msg = 'service unavailable'
-        self.crus_err = APIError(api_err_msg)
-        err_regex = '^Unable to get active CRUS upgrades: {}'.format(api_err_msg)
-        with self.assertRaisesRegex(ServiceCheckError, err_regex):
-            self.crus_checker.get_active_sessions()
-
-    def test_get_active_sessions_value_err(self):
-        """Test get_active_sessions"""
-        val_err_msg = 'invalid json'
-        self.json_err = ValueError(val_err_msg)
-        err_regex = '^Unable to get active CRUS upgrades: {}'.format(val_err_msg)
-        with self.assertRaisesRegex(ServiceCheckError, err_regex):
-            self.crus_checker.get_active_sessions()
-
-
 class TestFirmwareActivityChecker(ExtendedTestCase):
     """Test the FirmwareActivityChecker class."""
 
@@ -695,7 +580,6 @@ class TestFirmwareActivityChecker(ExtendedTestCase):
         }
 
     def setUp(self):
-        """Set up mocks and sample CRUS data."""
         self.defaults = {
             'updateID': 'fus-update-id',
             'actionID': 'fas-action-id',
@@ -794,9 +678,7 @@ class TestNMDActivityChecker(unittest.TestCase):
             for num in range(5)
         ]
 
-        # If not None, causes CRUSClient().get() to raise this
         self.nmd_err = None
-        # If not None, causes CRUSClient().get().json() to raise this
         self.json_err = None
 
         def mock_nmd_get(*args):
@@ -1035,7 +917,7 @@ class TestDoServiceActivityCheck(ExtendedTestCase):
 
     def setUp(self):
         """Set up some mocks."""
-        checkers_to_patch = ['BOSV1', 'BOSV2', 'CFS', 'CRUS', 'Firmware', 'NMD', 'SDU']
+        checkers_to_patch = ['BOSV1', 'BOSV2', 'CFS', 'Firmware', 'NMD', 'SDU']
         self.checkers = []
         for checker in checkers_to_patch:
             path = 'sat.cli.bootsys.service_activity.{}ActivityChecker'.format(
@@ -1082,7 +964,7 @@ class TestDoServiceActivityCheck(ExtendedTestCase):
 
     def test_do_service_activity_check_active_and_failed(self):
         """Test do_service_activity_check with active services and failures."""
-        self.mock_report_active_sessions.return_value = ['CRUS', 'NMD'], ['BOS', 'CFS']
+        self.mock_report_active_sessions.return_value = ['NMD'], ['BOS', 'CFS']
 
         with self.assertRaises(SystemExit) as raises_cm, \
                 self.assertLogs(level=logging.ERROR) as logs_cm:
@@ -1093,7 +975,7 @@ class TestDoServiceActivityCheck(ExtendedTestCase):
                                'following services: BOS, CFS',
                                logs_cm.output)
         self.mock_print.assert_called_once_with(
-            'Active sessions exist for the following services: CRUS, NMD. Allow the '
+            'Active sessions exist for the following service: NMD. Allow the '
             'sessions to complete or cancel them before proceeding.'
         )
 

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -103,7 +103,7 @@ SAT_CONFIG_SPEC = {
         'api_timeout': OptionSpec(int, 60, None, 'api_timeout'),
     },
     'bos': {
-        'api_version': OptionSpec(str, 'v1', validate_bos_api_version, 'bos_version')
+        'api_version': OptionSpec(str, 'v2', validate_bos_api_version, 'bos_version')
     },
     'bootsys': {
         'max_hsn_states': OptionSpec(int, 10, None, None),
@@ -127,6 +127,8 @@ SAT_CONFIG_SPEC = {
         'stderr_level': OptionSpec(str, 'INFO', validate_log_level, 'loglevel_stderr'),
     },
     's3': {
+        # TODO (CRAYSAT-926): When rgw cert can be verified, change the default to True.
+        'cert_verify': OptionSpec(bool, False, None, None),
         'endpoint': OptionSpec(str, 'https://rgw-vip.nmn', None, None),
         'bucket': OptionSpec(str, 'sat', None, None),
         'access_key_file': OptionSpec(str, '~/.config/sat/s3_access_key', None, None),

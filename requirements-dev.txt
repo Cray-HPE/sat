@@ -20,6 +20,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 docutils
 sphinx >= 2.2.1, < 3.0.0
-nose
+nose2[coverage_plugin] >= 0.12.0
 coverage
 pycodestyle

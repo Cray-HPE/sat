@@ -25,13 +25,12 @@
 Defines class for images defined in the input file.
 """
 from abc import ABC, abstractmethod
+import fnmatch
 import logging
-import warnings
 
 from cray_product_catalog.query import ProductCatalogError
-from kubernetes.client import CoreV1Api
-from kubernetes.config import load_kube_config, ConfigException
-from yaml import YAMLLoadWarning
+from csm_api_client.k8s import load_kube_api
+from kubernetes.config import ConfigException
 
 from sat.apiclient import APIError
 from sat.cached_property import cached_property
@@ -223,20 +222,14 @@ class BaseInputImage(DependencyGroupMember, ABC):
     def ims_base(self):
         """dict: the data for the base IMS recipe or image to build and/or customize"""
 
-    # TODO: Reduce duplication of code between here and ProductInputConfigurationLayer
     @cached_property
     def k8s_api(self):
         """kubernetes.client.CoreV1Api: a kubernetes core API client"""
         try:
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=YAMLLoadWarning)
-                load_kube_config()
-        # Earlier versions: FileNotFoundError; later versions: ConfigException
-        except (FileNotFoundError, ConfigException) as err:
+            return load_kube_api()
+        except ConfigException as err:
             raise ImageCreateError(f'Failed to load Kubernetes config which is required '
                                    f'to query image build status: {err}')
-
-        return CoreV1Api()
 
     def add_images_to_delete(self, images_to_delete):
         """Add IMS images that should be deleted after this image is created and configured.
@@ -640,9 +633,16 @@ class ProductInputImage(BaseInputImage):
         return self.image_data['base']['product'].get('version')
 
     @property
+    @jinja_rendered
     def filter_prefix(self):
         """str or None: the filter prefix to use for filtering images or recipes from the product"""
         return get_val_by_path(self.image_data, 'base.product.filter.prefix')
+
+    @property
+    @jinja_rendered
+    def filter_wildcard(self):
+        """str or None: the filter pattern to use for filtering images or recipes from the product"""
+        return get_val_by_path(self.image_data, 'base.product.filter.wildcard')
 
     def filter_func(self, name):
         """Filter the given name.
@@ -653,7 +653,15 @@ class ProductInputImage(BaseInputImage):
         Returns:
             True if the filter matches the given name or there is no filter, False otherwise
         """
-        return self.filter_prefix is None or name.startswith(self.filter_prefix)
+        # Schema validation guarantees that there cannot be both a prefix and a wildcard,
+        # so it is possible to just check each individually and not worry about the case
+        # where both are present.
+        if self.filter_prefix:
+            return name.startswith(self.filter_prefix)
+        if self.filter_wildcard is not None:
+            return fnmatch.fnmatch(name, self.filter_wildcard)
+
+        return True
 
     @property
     def unfiltered_base_description(self):

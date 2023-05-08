@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020, 2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -413,14 +413,13 @@ class TestPodStateRecorder(unittest.TestCase):
                                            side_effect=self.fake_get_config_value).start()
         self.mock_s3 = patch('sat.cli.bootsys.state_recorder.get_s3_resource').start().return_value
 
-        self.mock_load_kube_config = patch('sat.cli.bootsys.state_recorder.load_kube_config').start()
         self.mock_pods = get_fake_pod_list([
             ('services', 'boa', 'complete'),
             ('services', 'cfs', 'complete'),
             ('sma', 'sma-cstream', 'initializing'),
             ('user', 'uai', 'running')
         ])
-        self.mock_k8s_api = patch('sat.cli.bootsys.state_recorder.CoreV1Api').start()
+        self.mock_k8s_api = patch('sat.cli.bootsys.state_recorder.load_kube_api').start()
         self.mock_k8s_client = self.mock_k8s_api.return_value
         self.mock_k8s_client.list_pod_for_all_namespaces.return_value = self.mock_pods
 
@@ -465,16 +464,9 @@ class TestPodStateRecorder(unittest.TestCase):
         state_data = dict(psr.get_state_data())
         self.assertEqual(expected, state_data)
 
-    def test_get_state_data_kube_config_not_found(self):
-        """Test get_state_data with a FileNotFoundError when loading k8s config."""
-        self.mock_load_kube_config.side_effect = FileNotFoundError
-
-        with self.assertRaisesRegex(PodStateError, 'Failed to load kubernetes config'):
-            PodStateRecorder().get_state_data()
-
     def test_get_state_data_kube_config_err(self):
         """Test get_state_data with a ConfigException when loading k8s config."""
-        self.mock_load_kube_config.side_effect = ConfigException
+        self.mock_k8s_api.side_effect = ConfigException
 
         with self.assertRaisesRegex(PodStateError, 'Failed to load kubernetes config'):
             PodStateRecorder().get_state_data()

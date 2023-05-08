@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -21,31 +21,12 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-"""
-Client for querying the API gateway.
-"""
-# Import these names so that they can still be imported from the apiclient package directly
 
-from csm_api_client.service.cfs import CFSClient
-from csm_api_client.service.gateway import APIError, APIGatewayClient, ReadTimeout
-from csm_api_client.service.hsm import HSMClient
+[run]
+source = sat
+omit = tests/*
+       tools/*
+       setup.py
 
-from sat.apiclient.bos import BOSV1Client
-from sat.apiclient.capmc import CAPMCClient, CAPMCError
-from sat.apiclient.fabric import FabricControllerClient
-from sat.apiclient.fas import FASClient
-from sat.apiclient.fox import FoxClient
-from sat.apiclient.ims import IMSClient
-from sat.apiclient.sls import SLSClient
-from sat.apiclient.telemetry import TelemetryAPIClient
-
-
-# The following simple API clients for NMD and SCSD only define their
-# base_resource_path, so they don't warrant having their own modules yet.
-
-class NMDClient(APIGatewayClient):
-    base_resource_path = 'v2/nmd/'
-
-
-class SCSDClient(APIGatewayClient):
-    base_resource_path = 'scsd/v1/'
+[html]
+directory = coverage

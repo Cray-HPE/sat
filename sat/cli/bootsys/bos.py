@@ -212,19 +212,28 @@ def boa_job_successful(boa_job_id):
 class BOSV2SessionWaiter(Waiter):
     """Waiter for monitoring the status of a BOS v2 session."""
 
-    def __init__(self, bos_session_thread, target_state='complete', *args, **kwargs):
+    def __init__(self, bos_session_thread, target_states=None, *args, **kwargs):
+        """
+        Create a new BOSV2SessionWaiter.
+
+        Args:
+            bos_session_thread (BOSSessionThread): the BOS session thread
+            target_states (list, optional): the list of acceptable target state
+                strings. Defaults to ['complete']
+        """
         super().__init__(*args, **kwargs)
         self.bos_client = BOSClientCommon.get_bos_client(SATSession(),
                                                          version='v2')
         self.bos_session_thread = bos_session_thread
-        self.target_state = target_state
+        self.target_states = ['complete'] if target_states is None else target_states
+        self.target_states_desc = INFLECTOR.join(self.target_states, conj='or')
 
         self.pct_successful = 0.0
         self.pct_failed = 0.0
-        self.error_summary = {}
+        self.session_status = {}
 
     def condition_name(self):
-        return f'session {self.bos_session_thread.session_id} reached target state {self.target_state}'
+        return f'session {self.bos_session_thread.session_id} reached target state {self.target_states_desc}'
 
     def has_completed(self):
         if self.bos_session_thread.stopped():
@@ -233,32 +242,29 @@ class BOSV2SessionWaiter(Waiter):
         try:
             LOGGER.info(
                 'Waiting for BOS session %s to reach target state %s. Session template: %s',
-                self.bos_session_thread.session_id, self.target_state, self.bos_session_thread.session_template
+                self.bos_session_thread.session_id, self.target_states_desc,
+                self.bos_session_thread.session_template
             )
 
-            session_status = self.bos_client.get_session_status(
+            self.session_status = self.bos_client.get_session_status(
                 self.bos_session_thread.session_id
             )
 
-            if (session_status['percent_successful'] != self.pct_successful
-                    or session_status['percent_failed'] != self.pct_failed):
+            if (self.session_status['percent_successful'] != self.pct_successful
+                    or self.session_status['percent_failed'] != self.pct_failed):
                 # Only log progress update when components succeed or fail
-                self.pct_successful = float(session_status['percent_successful'])
-                self.pct_failed = float(session_status['percent_failed'])
+                self.pct_successful = float(self.session_status['percent_successful'])
+                self.pct_failed = float(self.session_status['percent_failed'])
                 LOGGER.info(
                     'Session %s: %.0f%% components succeeded, %.0f%% components failed',
                     self.bos_session_thread.session_id, self.pct_successful, self.pct_failed
                 )
 
-            if session_status['error_summary']:
-                self.error_summary = session_status['error_summary']
-
-            if session_status['status'] == self.target_state:
-                if not session_status.get('managed_components_count'):
-                    LOGGER.warning(
-                        'Session %s does not manage any components; another session '
-                        'may have been started which targets the same components as '
-                        'this session.', self.bos_session_thread.session_id
+            if self.session_status['status'] in self.target_states:
+                if not self.session_status.get('managed_components_count'):
+                    LOGGER.info(
+                        'Session %s did not manage any components.',
+                        self.bos_session_thread.session_id
                     )
                 return True
 
@@ -272,8 +278,9 @@ class BOSV2SessionWaiter(Waiter):
         return False
 
     def post_wait_action(self):
-        if self.error_summary:
-            for err, summary in self.error_summary.items():
+        error_summary = self.session_status.get('error_summary')
+        if error_summary:
+            for err, summary in error_summary.items():
                 LOGGER.error('%s: %s', err, summary)
 
 
@@ -304,6 +311,7 @@ class BOSSessionThread(Thread):
         self.failed = False
         self.fail_msg = ''
         self.bos_client = BOSClientCommon.get_bos_client(SATSession())
+        self.bos_session_status = None
 
         # Keep track of how many times we fail to query status in a row.
         self.consec_stat_fails = 0
@@ -437,9 +445,17 @@ class BOSSessionThread(Thread):
                 self.record_stat_failure()
                 continue
 
+            # Different versions of the k8s CLI say different things to mean "timed out".
+            # Scraping the output of the k8s CLI is not ideal and this could be done differently
+            # using `kubectl wait` without `timeout=0`. But, that would require a big refactor
+            # and this is all going away with BOS v2.
+            timed_out_output_messages = [
+                'timed out waiting',
+                'condition not met'
+            ]
             # This is either a timeout or some other failure
             if wait_proc.returncode != 0:
-                if 'timed out waiting' not in wait_proc.stderr:
+                if not any(msg in wait_proc.stderr for msg in timed_out_output_messages):
                     LOGGER.warning("The 'kubectl wait' command failed instead "
                                    "of timing out. stderr: %s",
                                    wait_proc.stderr.strip())
@@ -480,10 +496,18 @@ class BOSSessionThread(Thread):
         Returns:
             None
         """
+        target_states = ['complete']
+        # If staged, a BOS session will enter 'running' state if it affects a
+        # non-empty set of components. Otherwise (e.g. when the nodes specified
+        # in the bootsets do not intersect with the limit parameter), it will go
+        # straight to 'complete'.
+        if self.stage:
+            target_states.append('running')
+
         # Pass math.inf as the timeout since timeouts are handled by the
         # `do_parallel_bos_operations()` function, independent of the waiter
         # class here.
-        waiter = BOSV2SessionWaiter(self, target_state='running' if self.stage else 'complete',
+        waiter = BOSV2SessionWaiter(self, target_states=target_states,
                                     timeout=math.inf,
                                     poll_interval=PARALLEL_CHECK_INTERVAL)
 
@@ -495,6 +519,8 @@ class BOSSessionThread(Thread):
             )
         else:
             self.complete = True
+
+        self.bos_session_status = waiter.session_status
 
     def create_session_fake(self):
         """Fake the creation of a new BOS session.
@@ -532,7 +558,7 @@ class BOSSessionThread(Thread):
             self.monitor_status()
         else:
             # Use 'kubectl wait', 'kubectl get', and 'kubectl logs' for BOS v1
-            # due to initial trouble with status endpoint (CAMSCMS-5532).
+            # due to initial trouble with status endpoint (CASMCMS-5532).
             self.monitor_status_kubectl()
 
 
@@ -619,8 +645,28 @@ def do_parallel_bos_operations(session_templates, operation, timeout, limit=None
         for thread in active_threads.values():
             thread.stop()
 
+    some_sessions_failed = False
     for thread in bos_session_threads:
         thread.join()
+
+        if thread.bos_session_status:
+            LOGGER.info(
+                'Session %s: %.0f%% components succeeded, %.0f%% components failed',
+                thread.session_id,
+                thread.bos_session_status['percent_successful'],
+                thread.bos_session_status['percent_failed']
+            )
+            error_summary = thread.bos_session_status.get('error_summary', {})
+            if error_summary:
+                some_sessions_failed = True
+
+            for error_message, components in error_summary.items():
+                LOGGER.warning(
+                    '%s (%d components): %s',
+                    error_message,
+                    int(components['count']),
+                    str(components['list']),
+                )
 
     if failed_session_templates:
         raise BOSFailure(
@@ -629,7 +675,46 @@ def do_parallel_bos_operations(session_templates, operation, timeout, limit=None
             f'{", ".join(failed_session_templates)}'
         )
 
-    LOGGER.info(f'All BOS sessions {completed_state_past_tense}.')
+    if some_sessions_failed:
+        LOGGER.warning('One or more BOS sessions had errors; see previous logs for details.')
+    else:
+        LOGGER.info(f'All BOS sessions {completed_state_past_tense}.')
+
+
+def _update_nodes_by_state(nodes_by_state, hsm_client, hsm_params):
+    """Update the nodes_by_state dictionary given an HSM client and query parameters.
+
+    Args:
+        nodes_by_state (defaultdict): The nodes_by_state dictionary to modify
+            in place.
+        hsm_client (HSMClient): The client used to query HSM.
+        hsm_params (dict): A dictionary of query parameters to their values.
+
+    Returns:
+        None. Modifies nodes_by_state in place.
+
+    Raises:
+        HSMFailure: If the query fails or is missing a required field.
+    """
+
+    try:
+        hsm_resp_json = hsm_client.get(
+            'State', 'Components',
+            params=hsm_params,
+        ).json()
+    except (APIError, ValueError) as err:
+        raise HSMFailure(err)
+
+    try:
+        node_states = hsm_resp_json['Components']
+    except KeyError as err:
+        raise HSMFailure("Missing '{}' key in HSM response.".format(err))
+
+    for node_state in node_states:
+        try:
+            nodes_by_state[node_state['State']].append(node_state['ID'])
+        except KeyError as err:
+            raise HSMFailure("Missing '{}' key in node state: {}".format(err, node_state))
 
 
 def get_template_nodes_by_state(session_template_data):
@@ -674,12 +759,6 @@ def get_template_nodes_by_state(session_template_data):
                 # Boot sets may only have one of the keys specifying nodes
                 continue
 
-            msg_prefix = (
-                "Failed to get state of nodes with {}={} for boot set '{}' of "
-                "session template '{}'".format(hsm_param, bs_field_data,
-                                               bs_name, st_name)
-            )
-
             # Probably unlikely in practice to have one of the boot set fields
             # set to an empty list. If it does happen though, we would get back
             # all nodes from HSM, so skip these here instead.
@@ -689,25 +768,29 @@ def get_template_nodes_by_state(session_template_data):
                 continue
 
             try:
-                hsm_resp_json = hsm_client.get(
-                    'State', 'Components',
-                    params={'type': 'Node', hsm_param: bs_field_data}
-                ).json()
-            except (APIError, ValueError) as err:
-                raise HSMFailure('{}: {}'.format(msg_prefix, err))
+                if hsm_param == 'role' and any('_' in r for r in bs_field_data):
+                    # If there are any roles containing subroles in this bootset,
+                    # do separate queries for each role, applying subroles to the query
+                    # when they exist for that role.
+                    # Note: this could be slightly optimized in the future by doing one query
+                    # for all the roles that don't have subroles, followed by one query
+                    # per role that has a subrole.
+                    for role in bs_field_data:
+                        hsm_params = {'type': 'Node', hsm_param: [role.split('_')[0]]}
+                        if '_' in role:
+                            hsm_params['subrole'] = [role.split('_')[1]]
+                        _update_nodes_by_state(nodes_by_state, hsm_client, hsm_params)
+                else:
+                    hsm_params = {'type': 'Node', hsm_param: bs_field_data}
+                    _update_nodes_by_state(nodes_by_state, hsm_client, hsm_params)
 
-            try:
-                node_states = hsm_resp_json['Components']
-            except KeyError as err:
-                raise HSMFailure("{} due to missing '{}' key in HSM "
-                                 "response.".format(msg_prefix, err))
-
-            for node_state in node_states:
-                try:
-                    nodes_by_state[node_state['State']].append(node_state['ID'])
-                except KeyError as err:
-                    raise HSMFailure("{} due to missing '{}' key in node state"
-                                     ": {}".format(msg_prefix, err, node_state))
+            except HSMFailure as err:
+                msg_prefix = (
+                    "Failed to get state of nodes with {}={} for boot set '{}' of "
+                    "session template '{}'".format(hsm_param, bs_field_data,
+                                                   bs_name, st_name)
+                )
+                raise HSMFailure(f'{msg_prefix}: {err}')
 
     return dict(nodes_by_state)
 
@@ -765,8 +848,8 @@ def get_templates_needing_operation(session_templates, operation):
         try:
             nodes_by_state = get_template_nodes_by_state(st_data)
         except (BOSFailure, HSMFailure) as err:
-            LOGGER.error("Failed to get state of nodes in session template "
-                         "'%s': %s", session_template, err)
+            LOGGER.warning("Failed to get state of nodes in session template "
+                           "'%s': %s", session_template, err)
             failed_st.append(session_template)
             continue
 

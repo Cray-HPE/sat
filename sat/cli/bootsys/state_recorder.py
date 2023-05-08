@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020,2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -29,15 +29,12 @@ import json
 import logging
 import os
 import sys
-from urllib3.exceptions import InsecureRequestWarning
-import warnings
 from datetime import datetime
 
 from boto3.exceptions import Boto3Error
 from botocore.exceptions import BotoCoreError, ClientError
-from kubernetes.client import CoreV1Api
-from kubernetes.config import load_kube_config, ConfigException
-from yaml import YAMLLoadWarning
+from csm_api_client.k8s import load_kube_api
+from kubernetes.config import ConfigException
 
 from sat.apiclient import FabricControllerClient
 from sat.session import SATSession
@@ -205,10 +202,7 @@ class StateRecorder(ABC):
             raise StateError(f'Failed to write state to file {local_new_file_name}: {err}') from err
         try:
             LOGGER.debug('Uploading %s to S3', new_file_name)
-            # TODO(SAT-926): Start verifying HTTPS requests
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=InsecureRequestWarning)
-                self.s3.Object(self.bucket_name, new_file_name).upload_file(local_new_file_name)
+            self.s3.Object(self.bucket_name, new_file_name).upload_file(local_new_file_name)
         except (ClientError, BotoCoreError, Boto3Error) as err:
             raise PodStateError(f'Failed to dump state to S3: {err}')
         finally:
@@ -239,9 +233,7 @@ class StateRecorder(ABC):
         LOGGER.debug('Latest state file: %s', latest_state_file)
         self._ensure_local_dir_path_exists()
         try:
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=InsecureRequestWarning)
-                self.s3.Object(self.bucket_name, latest_state_file).download_file(latest_state_file_local_path)
+            self.s3.Object(self.bucket_name, latest_state_file).download_file(latest_state_file_local_path)
             LOGGER.debug('Downloaded %s to %s', latest_state_file, latest_state_file_local_path)
         except (BotoCoreError, ClientError, Boto3Error) as err:
             raise StateError(f'Unable to download {latest_state_file} from s3: {err}')
@@ -282,14 +274,10 @@ class PodStateRecorder(StateRecorder):
         """
         # Load k8s configuration before trying to use API
         try:
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=YAMLLoadWarning)
-                load_kube_config()
-        # Earlier versions: FileNotFoundError; later versions: ConfigException
-        except (FileNotFoundError, ConfigException) as err:
-            raise PodStateError('Failed to load kubernetes config: {}'.format(err)) from err
+            k8s_api = load_kube_api()
+        except ConfigException as err:
+            raise PodStateError(f'Failed to load kubernetes config: {err}') from err
 
-        k8s_api = CoreV1Api()
         all_pods = k8s_api.list_pod_for_all_namespaces()
         return k8s_pods_to_status_dict(all_pods)
 

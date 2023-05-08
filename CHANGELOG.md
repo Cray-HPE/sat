@@ -25,6 +25,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.22.0] - 2023-05-08
+
+### Added
+- Added ability to filter images provided by a product using a wildcard pattern
+  to specify the base input image in a `sat bootprep` input file
+- Added a `cert_verify` parameter to the `s3` section of the configuration file.
+
+### Changed
+- Changed logging in `sat bootsys` such that all sessions will have a logging
+  message printed at the end of the `sat bootsys` run. BOS sessions with
+  greater than 0% failed components will be logged as warning messages, and all
+  other session statuses will be logged as info messages.
+- Changed the default value of the config file option `bos.api_version` to "v2".
+- Modified logging for SAT such that multi-line log messages will now be logged
+  with consistent formatting for each line.
+- Updated unit test infrastructure to use `nose2`.
+- Reduced the number of log messages when insecure HTTPS requests are made.
+- Update the version of `csm-api-client` to 1.1.4 to simplify loading of the
+  Kubernetes configuration when running in a container inside the cluster and
+  remove code duplication.
+
+### Fixed
+- Fixed a bug in the `bos-operations` stage of `sat bootsys` where a Bad Request
+  error could appear in the output when checking node states.
+- Fixed a bug where the `bos-operations` stage of `sat bootsys` would not correctly
+  wait for a shutdown or boot operation to complete with BOS v1 and certain versions
+  of the `kubectl` command.
+- Fixed a bug where the `bos-operations` stage of `sat bootsys` did not report
+  staged sessions as complete if the sessions did not apply to any components
+  due to a `--bos-limit` parameter that did not overlap with the components in the
+  session template.
+- Fixed a bug which caused the wrong container name to be logged when a CFS
+  image customization failed in newer versions of CSM.
+
+### Removed
+- Removed support for CRUS.
+
+### Security
+- Update the version of oauthlib from 3.2.1 to 3.2.2 to resolve a moderate
+  dependabot alert for CVE-2022-36087.
+- Update the version of cryptography from 36.0.1 to 39.0.1 to address
+  CVE-2023-23931.
+
 ## [3.21.2] - 2023-02-13
 
 ### Fixed
