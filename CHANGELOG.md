@@ -58,6 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   session template.
 - Fixed a bug which caused the wrong container name to be logged when a CFS
   image customization failed in newer versions of CSM.
+- Updated container build script to pull in the correct kubectl version from the
+  metal-provision repository instead of the csm-rpms repository.
 
 ### Removed
 - Removed support for CRUS.
@@ -67,6 +69,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dependabot alert for CVE-2022-36087.
 - Update the version of cryptography from 36.0.1 to 39.0.1 to address
   CVE-2023-23931.
+- Rebuilt the cray-sat container image to address CVE-2023-27536 in
+  curl/libcurl present in the cray-sat:3.21.4 container image.
 
 ## [3.21.2] - 2023-02-13
 
