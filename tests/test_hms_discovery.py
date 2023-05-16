@@ -24,21 +24,18 @@
 """
 Unit tests for the sat.cli.bootsys.discovery module.
 """
-from datetime import datetime, timedelta
-import logging
 import unittest
-from unittest.mock import Mock, patch
+from datetime import datetime, timedelta
+from unittest.mock import MagicMock, Mock, patch
 
 from dateutil.tz import tzutc
-from kubernetes.config import ConfigException
 from kubernetes.client.rest import ApiException
+from kubernetes.config import ConfigException
 
-from sat.hms_discovery import (
-    HMSDiscoveryCronJob,
-    HMSDiscoveryError,
-    HMSDiscoveryScheduledWaiter,
-    HMSDiscoverySuspendedWaiter,
-)
+from sat.hms_discovery import (HMSDiscoveryCronJob, HMSDiscoveryError,
+                               HMSDiscoveryScheduledWaiter,
+                               HMSDiscoverySuspendedWaiter)
+from sat.waiting import WaitingFailure
 
 
 class TestHMSDiscoveryCronJob(unittest.TestCase):
@@ -233,27 +230,18 @@ class TestHMSDiscoveryScheduledWaiter(unittest.TestCase):
     def test_has_completed_true(self):
         """Test has_completed method of HMSDiscoveryScheduledWaiter when it has completed."""
         # Make it look like the cronjob started right when expected.
-        last_schedule_time = self.next_sched_time
-        self.mock_hd_cron_job.get_last_schedule_time.return_value = last_schedule_time
-        self.assertTrue(self.hd_waiter.has_completed())
+        mock_job = MagicMock()
+        mock_job.metadata.creation_timestamp = self.start_time + timedelta(minutes=3)
+        self.mock_hd_cron_job.get_jobs.return_value = [mock_job]
 
-    def test_has_completed_no_last_schedule_time(self):
-        """Test has_completed method of HMSDiscoveryScheduledWaiter when the cronjob has no last schedule time."""
-        # Make it look like there is no last schedule time.
-        self.mock_hd_cron_job.get_last_schedule_time.return_value = None
-        with self.assertLogs(level=logging.DEBUG):
-            self.assertFalse(self.hd_waiter.has_completed())
+        self.assertTrue(self.hd_waiter.has_completed())
 
     def test_has_completed_error(self):
         """Test has_completed method of HMSDiscoveryScheduledWaiter when an error occurs."""
         msg = 'k8s failure'
-        self.mock_hd_cron_job.get_last_schedule_time.side_effect = HMSDiscoveryError(msg)
-        with self.assertLogs(level=logging.WARNING) as logs:
+        self.mock_hd_cron_job.get_jobs.side_effect = ApiException(msg)
+        with self.assertLogs(level='WARNING'):
             self.assertFalse(self.hd_waiter.has_completed())
-
-        self.assertEqual(logging.getLevelName(logging.WARNING), logs.records[0].levelname)
-        self.assertEqual(f'Failed to get last schedule time: {msg}',
-                         logs.records[0].message)
 
 
 class TestHMSDiscoverySuspendedWaiter(unittest.TestCase):

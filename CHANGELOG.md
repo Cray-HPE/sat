@@ -32,6 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sat bootsys shutdown --stage cabinet-power` when there are no non-management
   nodes in air-cooled cabinets.
 
+### Changed
+- Improved the check procedure to determine whether the `hms-discovery` cronjob
+  has been scheduled during the `cabinet-power` stage of `sat bootsys`, as well
+  as the `sat swap blade` subcommand.
+- Update the hms-discovery cronjob manipulation functionality to use the
+  BatchV1 Kubernetes API instead of the BatchV1beta1 API.
+
 ## [3.22.0] - 2023-05-08
 
 ### Added

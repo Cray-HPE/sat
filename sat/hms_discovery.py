@@ -24,18 +24,18 @@
 """
 Functionality related to the hms-discovery cronjob in k8s.
 """
-from datetime import datetime
 import logging
+from datetime import datetime
 
 from croniter import croniter
 from csm_api_client.k8s import load_kube_api
 from dateutil.tz import tzutc
-from kubernetes.config import ConfigException
-from kubernetes.client import BatchV1beta1Api
+from kubernetes.client import BatchV1Api
 from kubernetes.client.rest import ApiException
+from kubernetes.config import ConfigException
 
 from sat.cached_property import cached_property
-from sat.waiting import Waiter
+from sat.waiting import Waiter, WaitingFailure
 
 LOGGER = logging.getLogger(__name__)
 
@@ -55,20 +55,20 @@ class HMSDiscoveryCronJob:
 
     @cached_property
     def k8s_batch_api(self):
-        """BatchV1beta1Api: the k8s batch API client
+        """BatchV1Api: the k8s batch API client
 
         Raises:
             HMSDiscoveryError: if there is an error loading k8s config
         """
         try:
-            return load_kube_api(api_cls=BatchV1beta1Api)
+            return load_kube_api(api_cls=BatchV1Api)
         except ConfigException as err:
             raise HMSDiscoveryError('Failed to load kubernetes config: {}'.format(err)) from err
 
     # Intentionally not cached so we can get live state
     @property
     def data(self):
-        """V1beta1CronJob: the data describing the cronjob.
+        """V1CronJob: the data describing the cronjob.
 
         Raises:
             HMSDiscoveryError: if there is an error loading k8s config or querying
@@ -80,6 +80,13 @@ class HMSDiscoveryCronJob:
         except ApiException as err:
             raise HMSDiscoveryError(f'Failed to get data for '
                                     f'{self.FULL_NAME}: {err}') from err
+
+    @property
+    def job_label_selector(self):
+        """str: the label selector for querying jobs created by this cronjob"""
+        label_selector = 'cronjob-name'
+        selector_value = self.data.metadata.labels.get(label_selector, self.HMS_DISCOVERY_NAME)
+        return f'{label_selector}={selector_value}'
 
     def get_last_schedule_time(self):
         """Get the last scheduled time, i.e. the last time k8s scheduled the job.
@@ -171,6 +178,20 @@ class HMSDiscoveryCronJob:
         ci = croniter(self.data.spec.schedule, start_time=datetime.now(tz=tzutc()))
         return ci.get_next(datetime)
 
+    def get_jobs(self):
+        """Get a list of jobs scheduled by this cronjob
+
+        Returns:
+            List[V1Job]: the job objects associated with the hms-discovery cronjob
+
+        Raises:
+            ApiException: if an error occurs while accessing the Kubernetes API
+        """
+        return self.k8s_batch_api.list_namespaced_job(
+            self.HMS_DISCOVERY_NAMESPACE,
+            label_selector=self.job_label_selector
+        ).items
+
 
 class HMSDiscoveryScheduledWaiter(Waiter):
     """Waiter for HMS discovery cronjob to be scheduled by k8s."""
@@ -209,18 +230,18 @@ class HMSDiscoveryScheduledWaiter(Waiter):
         time we started this waiter.
         """
         try:
-            last_schedule_time = self.hd_cron_job.get_last_schedule_time()
-        except HMSDiscoveryError as err:
-            LOGGER.warning(f'Failed to get last schedule time: {err}')
-            return False
-
-        if not last_schedule_time:
-            LOGGER.debug(f'No record of {self.hd_cron_job.FULL_NAME} being scheduled.')
-            return False
-
-        if last_schedule_time >= self.start_time:
-            return True
-        else:
+            jobs = self.hd_cron_job.get_jobs()
+            return any(
+                job.metadata.creation_timestamp > self.start_time
+                for job in jobs
+            )
+        except ApiException as err:
+            LOGGER.warning(
+                'Error waiting for cronjob "%s" in namespace "%s" to be scheduled: %s',
+                self.hd_cron_job.HMS_DISCOVERY_NAME,
+                self.hd_cron_job.HMS_DISCOVERY_NAMESPACE,
+                err,
+            )
             return False
 
 
