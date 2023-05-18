@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added functionality to `sat bootsys boot --stage cabinet-power` to
+  automatically recreate Kubernetes cronjobs which are not being scheduled due
+  to missing too many scheduled start times.
+
 ### Fixed
 - Fixed an unnecessary CAPMC API request and a confusing warning message during
   `sat bootsys shutdown --stage cabinet-power` when there are no non-management

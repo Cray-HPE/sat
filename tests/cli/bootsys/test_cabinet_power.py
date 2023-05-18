@@ -29,8 +29,8 @@ import unittest
 from argparse import Namespace
 from unittest.mock import call, patch
 
-from sat.cli.bootsys.cabinet_power import do_air_cooled_cabinets_power_off, do_cabinets_power_off
-
+from sat.cli.bootsys.cabinet_power import (do_air_cooled_cabinets_power_off,
+                                           do_cabinets_power_off)
 from tests.common import ExtendedTestCase
 
 

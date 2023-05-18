@@ -35,7 +35,8 @@ from kubernetes.client.rest import ApiException
 from kubernetes.config import ConfigException
 
 from sat.cached_property import cached_property
-from sat.waiting import Waiter, WaitingFailure
+from sat.cronjob import recreate_cronjob
+from sat.waiting import Waiter
 
 LOGGER = logging.getLogger(__name__)
 
@@ -192,11 +193,15 @@ class HMSDiscoveryCronJob:
             label_selector=self.job_label_selector
         ).items
 
+    def recreate(self):
+        """Recreate the cronjob."""
+        recreate_cronjob(self.k8s_batch_api, self.data)
+
 
 class HMSDiscoveryScheduledWaiter(Waiter):
     """Waiter for HMS discovery cronjob to be scheduled by k8s."""
 
-    def __init__(self, poll_interval=5, grace_period=60):
+    def __init__(self, poll_interval=5, grace_period=60, retries=1):
         """Create a new HMSDiscoveryScheduledWaiter.
 
         Timeout is computed automatically based on the latest possible time
@@ -218,10 +223,15 @@ class HMSDiscoveryScheduledWaiter(Waiter):
         self.start_time = datetime.now(tz=tzutc())
         timeout = (next_time - self.start_time).seconds + grace_period
 
-        super().__init__(timeout, poll_interval)
+        super().__init__(timeout, poll_interval, retries)
 
     def condition_name(self):
         return 'HMS Discovery Scheduled'
+
+    def on_retry_action(self):
+        LOGGER.warning('Waiting for "%s" timed out, recreating cronjob.',
+                       self.hd_cron_job.FULL_NAME)
+        self.hd_cron_job.recreate()
 
     def has_completed(self):
         """Return whether the HMS Discovery job has been scheduled.

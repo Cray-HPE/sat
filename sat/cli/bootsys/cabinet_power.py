@@ -26,13 +26,18 @@ Powers on and off liquid-cooled compute cabinets.
 """
 import logging
 
+from csm_api_client.k8s import load_kube_api
+from kubernetes.client import BatchV1Api
+from kubernetes.config import ConfigException
+
 from sat.apiclient import APIError, CAPMCClient, HSMClient
 from sat.cli.bootsys.power import CAPMCPowerWaiter
 from sat.config import get_config_value
-from sat.hms_discovery import HMSDiscoveryCronJob, HMSDiscoveryError, HMSDiscoveryScheduledWaiter
+from sat.cronjob import recreate_namespaced_stuck_cronjobs
+from sat.hms_discovery import (HMSDiscoveryCronJob, HMSDiscoveryError,
+                               HMSDiscoveryScheduledWaiter)
 from sat.session import SATSession
 from sat.util import prompt_continue
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -200,6 +205,13 @@ def do_cabinets_power_on(args):
         LOGGER.error(f'Failed to start waiting on HMS discovery job being '
                      f'rescheduled after resume: {err}')
         raise SystemExit(1)
+
+    LOGGER.info('Recreating cronjobs which have failed to have been scheduled on time.')
+    try:
+        batch_api = load_kube_api(api_cls=BatchV1Api)
+        recreate_namespaced_stuck_cronjobs(batch_api, 'services')
+    except ConfigException as err:
+        LOGGER.warning('Could not load Kubernetes configuration: %s', err)
 
     hms_discovery_scheduled = hms_discovery_waiter.wait_for_completion()
     if not hms_discovery_scheduled:
