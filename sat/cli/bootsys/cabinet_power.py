@@ -206,13 +206,6 @@ def do_cabinets_power_on(args):
                      f'rescheduled after resume: {err}')
         raise SystemExit(1)
 
-    LOGGER.info('Recreating cronjobs which have failed to have been scheduled on time.')
-    try:
-        batch_api = load_kube_api(api_cls=BatchV1Api)
-        recreate_namespaced_stuck_cronjobs(batch_api, 'services')
-    except ConfigException as err:
-        LOGGER.warning('Could not load Kubernetes configuration: %s', err)
-
     hms_discovery_scheduled = hms_discovery_waiter.wait_for_completion()
     if not hms_discovery_scheduled:
         LOGGER.error(f'The {HMSDiscoveryCronJob.FULL_NAME} was not scheduled '

@@ -28,9 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added functionality to `sat bootsys boot --stage platform-services` to
+  automatically recreate all Kubernetes cronjobs which are not being scheduled
+  due to missing too many scheduled start times.
 - Added functionality to `sat bootsys boot --stage cabinet-power` to
-  automatically recreate Kubernetes cronjobs which are not being scheduled due
-  to missing too many scheduled start times.
+  automatically recreate the `hms-discovery` cronjob if it fails to be
+  scheduled on time.
 
 ### Fixed
 - Fixed an unnecessary CAPMC API request and a confusing warning message during
