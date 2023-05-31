@@ -34,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added functionality to `sat bootsys boot --stage cabinet-power` to
   automatically recreate the `hms-discovery` cronjob if it fails to be
   scheduled on time.
+- Added support for multitenancy, which can be configured with the
+  `api_gateway.tenant_name` config file option and `--tenant-name` command line
+  option.
 
 ### Fixed
 - Fixed an unnecessary CAPMC API request and a confusing warning message during

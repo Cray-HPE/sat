@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2021, 2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -24,8 +24,12 @@
 """
 A helper subclass of TestCase that implements additional assertions.
 """
+import contextlib
+import copy
 import re
 import unittest
+
+from sat.util import deep_update_dict
 
 
 class ExtendedTestCase(unittest.TestCase):
@@ -89,3 +93,22 @@ class ExtendedTestCase(unittest.TestCase):
                 return
         self.fail("Regex '{}' does not match any of the elements in "
                   "the given container.".format(regex_str))
+
+
+@contextlib.contextmanager
+def config(sections):
+    """Context manager which can be used to supply a custom config inside the context.
+
+    Args:
+        sections (dict): a nested dict representing the parsed structure of the
+            config file
+    """
+    import sat.config
+    try:
+        _saved = sat.config.CONFIG.sections
+        new = copy.deepcopy(sat.config.CONFIG.sections)
+        deep_update_dict(new, sections)
+        sat.config.CONFIG.sections = new
+        yield
+    finally:
+        sat.config.CONFIG.sections = _saved

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -167,6 +167,12 @@ def create_parent_parser():
              'complete before considering them failed.',
         metavar='TIMEOUT',
         type=int)
+
+    parser.add_argument(
+        '--tenant-name',
+        help='The name of the tenant against which to run administrative commands.',
+        metavar='NAME',
+    )
 
     subparsers = parser.add_subparsers(metavar='command', dest='command')
     sat.cli.build_out_subparsers(subparsers)
