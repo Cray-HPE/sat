@@ -31,9 +31,10 @@ from collections import namedtuple
 from threading import Thread
 
 from csm_api_client.k8s import load_kube_api
+from fabric import SerialGroup, ThreadingGroup
+from fabric.exceptions import GroupException
 from kubernetes.client import BatchV1Api
 from kubernetes.config import ConfigException
-from paramiko import SSHException
 
 from sat.cached_property import cached_property
 from sat.cli.bootsys.ceph import (
@@ -416,17 +417,40 @@ def do_stop_containers(ncn_groups):
         FatalPlatformError: if any nodes fail to stop containerd
     """
     k8s_ncns = ncn_groups['kubernetes']
-    # This currently stops all containers in parallel before stopping containerd
-    # on each ncn in parallel.  It probably could be faster if it was all in parallel.
-    container_stop_threads = [ContainerStopThread(ncn) for ncn in k8s_ncns]
-    for thread in container_stop_threads:
-        thread.start()
-    for thread in container_stop_threads:
-        thread.join()
+    stop_group = SerialGroup(*k8s_ncns)
+    failed_ncns = set()
 
-    failed_ncns = [thread.host for thread in container_stop_threads if not thread.success]
+    try:
+        is_active_results = stop_group.run('systemctl is-active containerd')
+        active_hosts = [
+            host for host, result in is_active_results.items()
+            if result.exited == 0
+        ]
+        if not active_hosts:
+            LOGGER.info('containerd is not active on any hosts; continuing.')
+            return
+        else:
+            LOGGER.debug('containerd appears to be active on the following NCNs: %s', active_hosts)
+    except GroupException as exc:
+        for failed_ncn, result in exc.result.failed.items():
+            LOGGER.warning('An error occurred while checking if containerd is active on node %s: %s',
+                           failed_ncn, result.stderr.strip())
+            failed_ncns.add(failed_ncn)
+
+        active_hosts = list(exc.result.succeeded.keys())
+
+    LOGGER.info('Stopping containers on the following NCNs: %s', active_hosts)
+    stop_group = ThreadingGroup(active_hosts)
+    try:
+        stop_group.run(CONTAINER_STOP_SCRIPT)
+    except GroupException as exc:
+        for failed_ncn, result in exc.result.failed.items():
+            LOGGER.warning('An error occurred while checking if containerd is active on node %s: %s',
+                           failed_ncn, result.stderr.strip())
+            failed_ncns.add(failed_ncn)
+
     if failed_ncns:
-        raise NonFatalPlatformError(f'Failed to stop containers on the following NCN(s): '
+        raise NonFatalPlatformError('Failed to stop containers on the following NCNs: '
                                     f'{", ".join(failed_ncns)}')
 
 
