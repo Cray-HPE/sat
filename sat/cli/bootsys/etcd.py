@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -52,11 +52,13 @@ class EtcdInactiveFailure(EtcdSnapshotFailure):
     pass
 
 
-def save_etcd_snapshot_on_host(hostname):
+def save_etcd_snapshot_on_host(hostname, host_keys=None):
     """Connect to the given host and save an etcd snapshot to a file.
 
     Args:
         hostname (str): the hostname to connect to
+        host_keys (paramiko.HostKeys or None): the hostkeys to use when
+            connecting over SSH
 
     Raises:
         EtcdInactiveFailure: if the etcd service is inactive, indicating that
@@ -64,7 +66,7 @@ def save_etcd_snapshot_on_host(hostname):
         EtcdSnapshotFailure: if there is a failure to create the directory for
             the snapshot or a failure to create the snapshot
     """
-    ssh_client = get_ssh_client()
+    ssh_client = get_ssh_client(host_keys=host_keys)
 
     try:
         ssh_client.connect(hostname)

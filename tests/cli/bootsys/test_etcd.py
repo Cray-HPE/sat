@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -30,11 +30,8 @@ from unittest import mock
 
 from paramiko import SSHException
 
-from sat.cli.bootsys.etcd import (
-    save_etcd_snapshot_on_host,
-    EtcdInactiveFailure,
-    EtcdSnapshotFailure
-)
+from sat.cli.bootsys.etcd import (EtcdInactiveFailure, EtcdSnapshotFailure,
+                                  save_etcd_snapshot_on_host)
 
 
 class TestSaveEtcdSnapshotOnHost(unittest.TestCase):
@@ -89,7 +86,7 @@ class TestSaveEtcdSnapshotOnHost(unittest.TestCase):
 
     def assert_ssh_client_connect(self):
         """Assert the SSHClient was created and connected to the hostname."""
-        self.mock_get_ssh_client.assert_called_once_with()
+        self.mock_get_ssh_client.assert_called_once()
         self.mock_ssh_client.connect.assert_called_once_with(self.hostname)
 
     def assert_exec_commands(self):
