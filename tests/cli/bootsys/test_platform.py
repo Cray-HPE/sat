@@ -24,6 +24,8 @@
 """
 Unit tests for the sat.cli.bootsys.platform module.
 """
+import os
+import tempfile
 from argparse import Namespace
 from contextlib import contextmanager
 import logging
@@ -32,6 +34,8 @@ import socket
 import threading
 import unittest
 from unittest import mock
+
+from paramiko.hostkeys import HostKeyEntry
 
 from sat.cli.bootsys.ceph import CephHealthCheckError
 from sat.cli.bootsys.etcd import EtcdInactiveFailure, EtcdSnapshotFailure
@@ -52,7 +56,7 @@ from sat.cli.bootsys.platform import (
     NonFatalPlatformError,
     PlatformServicesStep,
     RemoteServiceWaiter,
-    SERVICE_ACTION_TIMEOUT,
+    SERVICE_ACTION_TIMEOUT, FilteredHostKeys,
 )
 from sat.cli.bootsys.util import FatalBootsysError
 
@@ -73,7 +77,6 @@ class TestContainerStopThread(unittest.TestCase):
 
     def assert_ssh_connected(self):
         """Assert the SSHClient is created and connected."""
-        self.get_ssh_client.assert_called_once_with()
         self.ssh_client.connect.assert_called_once_with(self.host)
 
     @contextmanager
@@ -423,7 +426,6 @@ class TestRemoteServiceWaiter(unittest.TestCase):
 
     def assert_ssh_connected(self):
         """Assert the SSH client connected to the host."""
-        self.get_ssh_client.assert_called_once_with()
         self.ssh_client.connect.assert_called_once_with(self.host)
 
     def test_init(self):
@@ -741,7 +743,7 @@ class TestDoStopContainers(unittest.TestCase):
         class MockContainerStopThread(threading.Thread):
             """Mock the ContainerStopThread for these tests."""
 
-            def __init__(self, host):
+            def __init__(self, host, host_keys):
                 super().__init__()
                 self.host = host
                 self.success = False
@@ -751,6 +753,7 @@ class TestDoStopContainers(unittest.TestCase):
 
         self.ncn_groups = {'kubernetes': self.k8s_ncns}
         mock.patch('sat.cli.bootsys.platform.ContainerStopThread', MockContainerStopThread).start()
+        self.mock_host_keys = mock.patch('sat.cli.bootsys.platform.FilteredHostKeys').start()
 
     def tearDown(self):
         mock.patch.stopall()
@@ -763,7 +766,7 @@ class TestDoStopContainers(unittest.TestCase):
             mock_cst.side_effect = mock_threads
             do_stop_containers(self.ncn_groups)
 
-        self.assertEqual([mock.call(ncn) for ncn in self.k8s_ncns],
+        self.assertEqual([mock.call(ncn, host_keys=self.mock_host_keys.return_value) for ncn in self.k8s_ncns],
                          mock_cst.mock_calls)
         for mock_thread in mock_threads:
             self.assertEqual([mock.call.start(), mock.call.join()], mock_thread.mock_calls)
@@ -859,13 +862,16 @@ class TestDoServiceActionOnHosts(unittest.TestCase):
         self.mock_waiter = mock.patch('sat.cli.bootsys.platform.RemoteServiceWaiter',
                                       side_effect=self.mock_waiters).start()
 
+        self.mock_host_keys = mock.patch('sat.cli.bootsys.platform.FilteredHostKeys').start()
+
     def test_all_successful(self):
         """Test doing a service action when it is successful on all hosts."""
         do_service_action_on_hosts(self.hosts, self.service, self.target_state,
                                    target_enabled=self.target_enabled)
         self.mock_waiter.assert_has_calls([
             mock.call(host, self.service, target_state=self.target_state,
-                      timeout=SERVICE_ACTION_TIMEOUT, target_enabled=self.target_enabled)
+                      timeout=SERVICE_ACTION_TIMEOUT, target_enabled=self.target_enabled,
+                      host_keys=self.mock_host_keys.return_value)
             for host in self.hosts
         ])
         for waiter in self.mock_waiters:
@@ -883,7 +889,8 @@ class TestDoServiceActionOnHosts(unittest.TestCase):
                                        target_enabled=self.target_enabled)
         self.mock_waiter.assert_has_calls([
             mock.call(host, self.service, target_state=self.target_state,
-                      timeout=SERVICE_ACTION_TIMEOUT, target_enabled=self.target_enabled)
+                      timeout=SERVICE_ACTION_TIMEOUT, target_enabled=self.target_enabled,
+                      host_keys=self.mock_host_keys.return_value)
             for host in self.hosts
         ])
         for waiter in self.mock_waiters:
@@ -994,3 +1001,34 @@ class TestDoEtcdSnapshotStartStop(unittest.TestCase):
         self.mock_do_service_action.assert_called_once_with(self.managers, 'etcd',
                                                             target_state='active',
                                                             target_enabled='enabled')
+
+
+host_keys = b"""\
+host1,host1-alt ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILDDtImwzXDR/R6rYn56D1ycKuGRPx8mCLqqAVM/60z+
+host10,host10-alt ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOeEKLY8+G+TPZirATL6JlFYFw46KLdvOkxpJPlnt30E
+host100,host100-alt ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAN65RI9aIzKbBmreFlk7jB63+RAsWZ/CXDqX/h/Hyzs
+"""
+
+
+class TestFilteredHostKeys(unittest.TestCase):
+    """Tests for the FilteredHostKeys class"""
+    def setUp(self):
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp.write(host_keys)
+            self.known_hosts_path = tmp.name
+
+    def tearDown(self):
+        os.unlink(self.known_hosts_path)
+
+    def test_filtered_host_keys_loading(self):
+        """Test filtering a known_hosts file"""
+        hk = FilteredHostKeys(filename=self.known_hosts_path, hostnames=['host1'])
+        self.assertIn('host1', hk)
+        for host in ['host10', 'host100']:
+            self.assertNotIn(host, hk.keys())
+
+    def test_unfiltered_host_keys_loading(self):
+        """Test that filtering is opt-in"""
+        hk = FilteredHostKeys(filename=self.known_hosts_path)
+        for host in ['host1', 'host10', 'host100']:
+            self.assertIn(host, hk)

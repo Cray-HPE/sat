@@ -27,13 +27,15 @@ Start and stop platform services to boot and shut down a Shasta system.
 
 import logging
 import socket
+import tempfile
 from collections import namedtuple
-from threading import Thread
+from multiprocessing import Process
 
 from csm_api_client.k8s import load_kube_api
 from kubernetes.client import BatchV1Api
 from kubernetes.config import ConfigException
 from paramiko import SSHException
+from paramiko.hostkeys import HostKeyEntry, HostKeys
 
 from sat.cached_property import cached_property
 from sat.cli.bootsys.ceph import (
@@ -87,7 +89,7 @@ class RemoteServiceWaiter(Waiter):
     VALID_TARGET_STATE_VALUES = ('active', 'inactive')
     VALID_TARGET_ENABLED_VALUES = ('enabled', 'disabled')
 
-    def __init__(self, host, service_name, target_state, timeout, poll_interval=5, target_enabled=None):
+    def __init__(self, host, service_name, target_state, timeout, poll_interval=5, target_enabled=None, host_keys=None):
         """Construct a new RemoteServiceWaiter.
 
         Args:
@@ -100,6 +102,8 @@ class RemoteServiceWaiter(Waiter):
                 completion.
             target_enabled (str or None): If 'enabled', enable the service.
                 If 'disabled', disable the service. If None, do neither.
+            host_keys (paramiko.hostkeys.HostKeys): If not None, use the given host
+                keys object instead of loading the system host keys.
         """
         super().__init__(timeout, poll_interval=poll_interval)
 
@@ -115,7 +119,7 @@ class RemoteServiceWaiter(Waiter):
         self.service_name = service_name
         self.target_state = target_state
         self.target_enabled = target_enabled
-        self.ssh_client = get_ssh_client()
+        self.ssh_client = get_ssh_client(host_keys=host_keys)
 
     def _run_remote_command(self, command, nonzero_error=True):
         """Run the given command on the remote host.
@@ -220,16 +224,19 @@ class RemoteServiceWaiter(Waiter):
         return current_state == self.target_state
 
 
-class ContainerStopThread(Thread):
+class ContainerStopThread(Process):
     """A thread that will stop containers on hosts."""
-    def __init__(self, host):
+    def __init__(self, host, host_keys=None):
         """Create a thread to stop containers in containerd on the given host.
 
         Args:
             host (str): The host on which to stop containers in containerd
+            host_keys (paramiko.hostkeys.HostKeys): parsed known hosts file
+                containing keys for other hosts
         """
         super().__init__()
         self.host = host
+        self.host_keys = host_keys
         self.success = False
 
     @cached_property
@@ -240,7 +247,7 @@ class ContainerStopThread(Thread):
             SystemExit(1): if there is a failure to connect to `self.host`.
         """
         try:
-            ssh_client = get_ssh_client()
+            ssh_client = get_ssh_client(self.host_keys)
             ssh_client.connect(self.host)
             return ssh_client
         except (socket.error, SSHException) as err:
@@ -368,6 +375,8 @@ class ContainerStopThread(Thread):
             # containers have been stopped.
             LOGGER.warning(f'One or more "crictl stop" commands timed out on {self.host}')
 
+        self.ssh_client.close()
+
         # Check and see if they've all been stopped.
         running_containers = self._get_running_containers()
         if running_containers:
@@ -375,6 +384,54 @@ class ContainerStopThread(Thread):
                            f'Execute "crictl ps -q" on the host to view running containers.')
         else:
             self._success_exit(f'All containers stopped on {self.host}.')
+
+
+class FilteredHostKeys(HostKeys):
+    """
+    Host keys loader which filters all hosts except the specified ones.
+
+    This is needed to speed up known_hosts file parsing as paramiko's implementation
+    (up to and including 3.2.0) has quadratic time complexity. To get around this,
+    we can hackily cut down a large known hosts file to just a few hosts in linear
+    time before parsing, which should help tremendously in the case of a very large
+    known_hosts file.
+    """
+    def __init__(self, filename=None, hostnames=None):
+        """Construct a FilteredHostKeys object.
+
+        Args:
+            filename (str): path to the known hosts file
+            hostnames ([str]): list of hostnames for which to load host keys from the
+                known_hosts file
+        """
+        self.hostnames = hostnames
+        super().__init__(filename)
+
+    def load(self, filename):
+        """Load known hosts from the specified known_hosts file.
+
+        Args:
+            filename (str): path to the known_hosts file
+        """
+        if not self.hostnames:
+            return super().load(filename)
+
+        with open(filename) as known_hosts, \
+                tempfile.NamedTemporaryFile(mode='w+') as tmp_known_hosts:
+            for line in known_hosts:
+                entry = HostKeyEntry.from_line(line)
+                if any(hn in entry.hostnames for hn in self.hostnames):
+                    tmp_known_hosts.write(entry.to_line())
+            tmp_known_hosts.flush()
+            super().load(tmp_known_hosts.name)
+
+    def save(self, filename):
+        """(Don't) save the known_hosts file.
+
+        This is a no-op since we don't want to accidentally destructively
+        modify the user's known hosts file.
+        """
+        return NotImplemented
 
 
 def do_service_action_on_hosts(hosts, service, target_state,
@@ -395,8 +452,10 @@ def do_service_action_on_hosts(hosts, service, target_state,
     Raises:
         FatalPlatformError: if the service action fails on any of the given hosts
     """
+    host_keys = FilteredHostKeys(hostnames=hosts)
     service_action_waiters = [RemoteServiceWaiter(host, service, target_state=target_state,
-                                                  timeout=timeout, target_enabled=target_enabled)
+                                                  timeout=timeout, target_enabled=target_enabled,
+                                                  host_keys=host_keys)
                               for host in hosts]
     for waiter in service_action_waiters:
         waiter.wait_for_completion_async()
@@ -416,9 +475,10 @@ def do_stop_containers(ncn_groups):
         FatalPlatformError: if any nodes fail to stop containerd
     """
     k8s_ncns = ncn_groups['kubernetes']
+    host_keys = FilteredHostKeys(k8s_ncns)
     # This currently stops all containers in parallel before stopping containerd
     # on each ncn in parallel.  It probably could be faster if it was all in parallel.
-    container_stop_threads = [ContainerStopThread(ncn) for ncn in k8s_ncns]
+    container_stop_threads = [ContainerStopThread(ncn, host_keys=host_keys) for ncn in k8s_ncns]
     for thread in container_stop_threads:
         thread.start()
     for thread in container_stop_threads:

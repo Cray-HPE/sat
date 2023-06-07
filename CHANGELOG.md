@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an unnecessary CAPMC API request and a confusing warning message during
   `sat bootsys shutdown --stage cabinet-power` when there are no non-management
   nodes in air-cooled cabinets.
+- Fixed extreme slowness with the `sat bootsys shutdown --stage
+  platform-services` command when a large SSH `known_hosts` file is in use.
 
 ### Changed
 - Improved the check procedure to determine whether the `hms-discovery` cronjob

@@ -25,12 +25,12 @@
 Generic common utilities for the bootsys subcommand.
 """
 
-from collections import defaultdict
 import logging
 import re
+from collections import defaultdict
 
-from paramiko import SSHClient, WarningPolicy
 import yaml
+from paramiko import SSHClient, WarningPolicy
 
 from sat.util import pester_choices
 
@@ -215,7 +215,7 @@ def get_and_verify_ncn_groups(excluded_ncns=None):
     return incl_ncns_by_subrole
 
 
-def get_ssh_client():
+def get_ssh_client(host_keys=None):
     """Get a paramiko SSH client.
 
     Returns:
@@ -223,6 +223,8 @@ def get_ssh_client():
         missing host keys set to warn rather than fail.
     """
     ssh_client = SSHClient()
+    if host_keys is not None:
+        ssh_client._system_host_keys = host_keys
     ssh_client.load_system_host_keys()
     ssh_client.set_missing_host_key_policy(WarningPolicy)
 
