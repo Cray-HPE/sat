@@ -101,6 +101,7 @@ SAT_CONFIG_SPEC = {
         'username': OptionSpec(str, getpass.getuser, None, 'username'),
         'token_file': OptionSpec(str, '', None, 'token_file'),
         'api_timeout': OptionSpec(int, 60, None, 'api_timeout'),
+        'tenant_name': OptionSpec(str, '', None, 'tenant_name'),
     },
     'bos': {
         'api_version': OptionSpec(str, 'v2', validate_bos_api_version, 'bos_version')

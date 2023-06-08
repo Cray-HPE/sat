@@ -29,7 +29,7 @@ SATMANDIR=/usr/share/man/man8
 
 METAL_PROVISION_REPO="https://github.com/Cray-HPE/metal-provision.git"
 METAL_PROVISION_DIR="metal-provision"
-METAL_PROVISION_BASE_PACKAGES_PATH="roles/node-images-ncn-common/vars/packages/suse.yml"
+METAL_PROVISION_BASE_PACKAGES_PATH="roles/node_images_ncn_common/vars/packages/suse.yml"
 METAL_PROVISION_BRANCH="main"
 
 # create logging directory

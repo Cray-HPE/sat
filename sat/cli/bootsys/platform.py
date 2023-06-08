@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -25,14 +25,17 @@
 Start and stop platform services to boot and shut down a Shasta system.
 """
 
-from collections import namedtuple
 import logging
 import socket
-from paramiko import SSHException
+from collections import namedtuple
 from threading import Thread
 
+from csm_api_client.k8s import load_kube_api
+from kubernetes.client import BatchV1Api
+from kubernetes.config import ConfigException
+from paramiko import SSHException
+
 from sat.cached_property import cached_property
-from sat.config import get_config_value
 from sat.cli.bootsys.ceph import (
     check_ceph_health,
     toggle_ceph_freeze_flags,
@@ -41,8 +44,10 @@ from sat.cli.bootsys.ceph import (
 )
 from sat.cli.bootsys.etcd import save_etcd_snapshot_on_host, EtcdInactiveFailure, EtcdSnapshotFailure
 from sat.cli.bootsys.util import get_and_verify_ncn_groups, get_ssh_client, FatalBootsysError
-from sat.waiting import Waiter
+from sat.config import get_config_value
+from sat.cronjob import recreate_namespaced_stuck_cronjobs
 from sat.util import BeginEndLogger, pester_choices, prompt_continue
+from sat.waiting import Waiter
 
 LOGGER = logging.getLogger(__name__)
 
@@ -464,6 +469,15 @@ def do_kubelet_start(ncn_groups):
                                target_state='active', target_enabled='enabled')
 
 
+def do_recreate_cronjobs(_):
+    """Recreate cronjobs that are not being scheduled on time."""
+    try:
+        batch_api = load_kube_api(api_cls=BatchV1Api)
+        recreate_namespaced_stuck_cronjobs(batch_api, 'services')
+    except ConfigException as err:
+        LOGGER.warning('Could not load Kubernetes configuration: %s', err)
+
+
 def do_ceph_freeze(ncn_groups):
     """Check ceph health and freeze if healthy.
 
@@ -553,7 +567,8 @@ STEPS_BY_ACTION = {
                              do_etcd_start),
         PlatformServicesStep('Start inactive Ceph services, unfreeze Ceph cluster and wait for Ceph health.',
                              do_ceph_unfreeze),
-        PlatformServicesStep('Start and enable kubelet on all Kubernetes NCNs.', do_kubelet_start)
+        PlatformServicesStep('Start and enable kubelet on all Kubernetes NCNs.', do_kubelet_start),
+        PlatformServicesStep('Recreate cron jobs that have become stuck', do_recreate_cronjobs),
     ],
     # The ordered steps to stop platform services
     'stop': [

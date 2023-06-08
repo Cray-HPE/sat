@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -32,6 +32,7 @@ from csm_api_client.session import UserSession
 from sat.config import get_config_value
 from sat.util import get_resource_filename
 
+TENANT_HEADER_NAME = 'Cray-Tenant-Name'
 
 LOGGER = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ class SATSession(UserSession):
         host = get_config_value('api_gateway.host')
         cert_verify = get_config_value('api_gateway.cert_verify')
         username = get_config_value('api_gateway.username')
+        tenant_name = get_config_value('api_gateway.tenant_name')
 
         token_filename = get_config_value('api_gateway.token_file')
         if token_filename == '':
@@ -58,6 +60,8 @@ class SATSession(UserSession):
                 '{}.{}.json'.format(host_as_filename, username), 'tokens')
 
         super().__init__(host, cert_verify, username, token_filename)
+        if tenant_name:
+            self.session.headers[TENANT_HEADER_NAME] = tenant_name
 
         if not (self.token or no_unauth_warn):
             LOGGER.warning('Session is not authenticated. ' +

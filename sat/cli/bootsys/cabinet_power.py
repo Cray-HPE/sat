@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -26,13 +26,18 @@ Powers on and off liquid-cooled compute cabinets.
 """
 import logging
 
+from csm_api_client.k8s import load_kube_api
+from kubernetes.client import BatchV1Api
+from kubernetes.config import ConfigException
+
 from sat.apiclient import APIError, CAPMCClient, HSMClient
 from sat.cli.bootsys.power import CAPMCPowerWaiter
 from sat.config import get_config_value
-from sat.hms_discovery import HMSDiscoveryCronJob, HMSDiscoveryError, HMSDiscoveryScheduledWaiter
+from sat.cronjob import recreate_namespaced_stuck_cronjobs
+from sat.hms_discovery import (HMSDiscoveryCronJob, HMSDiscoveryError,
+                               HMSDiscoveryScheduledWaiter)
 from sat.session import SATSession
 from sat.util import prompt_continue
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -63,6 +68,11 @@ def do_air_cooled_cabinets_power_off(args):
         raise SystemExit(1)
 
     node_xnames = list(set(river_nodes) - set(river_mgmt_nodes))
+
+    if not node_xnames:
+        LOGGER.info(f'No non-management nodes in air-cooled cabinets to power off.')
+        return
+
     LOGGER.info(f'Powering off {len(node_xnames)} non-management nodes in air-cooled cabinets.')
     capmc_client = CAPMCClient(SATSession())
     try:

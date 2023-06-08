@@ -25,6 +25,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.23.0] - 2023-06-08
+
+### Added
+- Added functionality to `sat bootsys boot --stage platform-services` to
+  automatically recreate all Kubernetes cronjobs which are not being scheduled
+  due to missing too many scheduled start times.
+- Added functionality to `sat bootsys boot --stage cabinet-power` to
+  automatically recreate the `hms-discovery` cronjob if it fails to be
+  scheduled on time.
+- Added support for multitenancy, which can be configured with the
+  `api_gateway.tenant_name` config file option and `--tenant-name` command line
+  option.
+
+### Fixed
+- Fixed an unnecessary CAPMC API request and a confusing warning message during
+  `sat bootsys shutdown --stage cabinet-power` when there are no non-management
+  nodes in air-cooled cabinets.
+
+### Changed
+- Improved the check procedure to determine whether the `hms-discovery` cronjob
+  has been scheduled during the `cabinet-power` stage of `sat bootsys`, as well
+  as the `sat swap blade` subcommand.
+- Update the hms-discovery cronjob manipulation functionality to use the
+  BatchV1 Kubernetes API instead of the BatchV1beta1 API.
+
 ## [3.22.0] - 2023-05-08
 
 ### Added
@@ -58,6 +83,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   session template.
 - Fixed a bug which caused the wrong container name to be logged when a CFS
   image customization failed in newer versions of CSM.
+- Updated container build script to pull in the correct kubectl version from the
+  metal-provision repository instead of the csm-rpms repository.
 
 ### Removed
 - Removed support for CRUS.
@@ -67,6 +94,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dependabot alert for CVE-2022-36087.
 - Update the version of cryptography from 36.0.1 to 39.0.1 to address
   CVE-2023-23931.
+- Rebuilt the cray-sat container image to address CVE-2023-27536 in
+  curl/libcurl present in the cray-sat:3.21.4 container image.
 
 ## [3.21.2] - 2023-02-13
 
