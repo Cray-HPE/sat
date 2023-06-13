@@ -138,6 +138,12 @@ VALID_IMAGE_PRODUCT_WITH_CONFIG = {
 VALID_IMAGE_PRODUCT_WITH_PREFIX_AND_CONFIG = deepcopy(VALID_IMAGE_PRODUCT_WITH_CONFIG)
 VALID_IMAGE_PRODUCT_WITH_PREFIX_AND_CONFIG['base']['product']['filter'] = {'prefix': 'cray-shasta-compute'}
 
+VALID_IMAGE_PRODUCT_WITH_WILDCARD_AND_CONFIG = deepcopy(VALID_IMAGE_PRODUCT_WITH_CONFIG)
+VALID_IMAGE_PRODUCT_WITH_WILDCARD_AND_CONFIG['base']['product']['filter'] = {'wildcard': '*compute*'}
+
+VALID_IMAGE_PRODUCT_WITH_ARCH_AND_CONFIG = deepcopy(VALID_IMAGE_PRODUCT_WITH_CONFIG)
+VALID_IMAGE_PRODUCT_WITH_ARCH_AND_CONFIG['base']['product']['filter'] = {'arch': 'x86_64'}
+
 VALID_IMAGE_REF_WITH_CONFIG = {
     'name': 'compute-{{ base.name }}',
     'ref_name': 'compute-cos-image',
@@ -513,6 +519,20 @@ class TestValidateInstance(ExtendedTestCase):
         }
         self.assert_valid_instance(instance)
 
+    def test_valid_image_product_with_wildcard_and_config(self):
+        """Valid image from a version of a product with a wildcard filter and config specified."""
+        instance = {
+            'images': [VALID_IMAGE_PRODUCT_WITH_WILDCARD_AND_CONFIG]
+        }
+        self.assert_valid_instance(instance)
+
+    def test_valid_image_product_with_arch_and_config(self):
+        """Valid image from a version of a product with an arch filter and config specified."""
+        instance = {
+            'images': [VALID_IMAGE_PRODUCT_WITH_ARCH_AND_CONFIG]
+        }
+        self.assert_valid_instance(instance)
+
     def test_valid_image_ref_with_config(self):
         """Valid image using another image from bootprep input file as a base"""
         instance = {
@@ -558,6 +578,36 @@ class TestValidateInstance(ExtendedTestCase):
         boot_set = session_template['bos_parameters']['boot_sets']['compute']
         boot_set['node_list'] = ['x1000c0s0b0n0', 'x1000c0s0b0n1']
         boot_set['node_groups'] = ['compute_x86', 'compute_aarch']
+        instance = {
+            'session_templates': [session_template]
+        }
+        self.assert_valid_instance(instance)
+
+    def test_valid_session_template_top_level_arch(self):
+        """Valid session template with arch at the top level"""
+        session_template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE_V2)
+        session_template['arch'] = 'aarch64'
+        instance = {
+            'session_templates': [session_template]
+        }
+        self.assert_valid_instance(instance)
+
+    def test_valid_session_template_boot_set_arch(self):
+        """Valid session template with arch at the boot-set level"""
+        session_template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE_V2)
+        session_template['bos_parameters']['boot_sets']['compute']['arch'] = 'x86_64'
+        instance = {
+            'session_templates': [session_template]
+        }
+        self.assert_valid_instance(instance)
+
+    def test_valid_session_template_arch_at_both_levels(self):
+        """Valid session template with arch at both the top level and boot-set level"""
+        session_template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE_V2)
+        session_template['arch'] = 'x86_64'
+        aarch64_bootset = deepcopy(session_template['bos_parameters']['boot_sets']['compute'])
+        aarch64_bootset['arch'] = 'aarch64'
+        session_template['bos_parameters']['boot_sets']['compute_aarch64'] = aarch64_bootset
         instance = {
             'session_templates': [session_template]
         }

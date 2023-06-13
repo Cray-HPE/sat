@@ -30,6 +30,7 @@ import logging
 
 from cray_product_catalog.query import ProductCatalogError
 from csm_api_client.k8s import load_kube_api
+from inflect import engine
 from kubernetes.config import ConfigException
 
 from sat.apiclient import APIError
@@ -44,6 +45,7 @@ from sat.waiting import (
 )
 
 LOGGER = logging.getLogger(__name__)
+INF = engine()
 
 
 class BaseInputImage(DependencyGroupMember, ABC):
@@ -644,24 +646,38 @@ class ProductInputImage(BaseInputImage):
         """str or None: the filter pattern to use for filtering images or recipes from the product"""
         return get_val_by_path(self.image_data, 'base.product.filter.wildcard')
 
-    def filter_func(self, name):
-        """Filter the given name.
+    @property
+    @jinja_rendered
+    def filter_arch(self):
+        """str or None: the architecture to use for filtering images or recipes from the product"""
+        return get_val_by_path(self.image_data, 'base.product.filter.arch')
+
+    @property
+    def has_filter(self):
+        """bool: True if a filter is applied, false otherwise"""
+        return (self.filter_prefix is not None or
+                self.filter_wildcard is not None or
+                self.filter_arch is not None)
+
+    def filter_func(self, ims_resource):
+        """Filter the given IMS resource.
+
+        The bootprep input file schema allows multiple filters to be present,
+        in which case all filters must match.
 
         Args:
-            name (str): the name to check against the filter.
+            ims_resource (dict): the IMS resource (image or recipe) to filter
 
         Returns:
-            True if the filter matches the given name or there is no filter, False otherwise
+            True if the filter matches the given IMS resource or there is no filter, False otherwise
         """
-        # Schema validation guarantees that there cannot be both a prefix and a wildcard,
-        # so it is possible to just check each individually and not worry about the case
-        # where both are present.
-        if self.filter_prefix:
-            return name.startswith(self.filter_prefix)
-        if self.filter_wildcard is not None:
-            return fnmatch.fnmatch(name, self.filter_wildcard)
-
-        return True
+        ims_resource_name = ims_resource.get('name', '')
+        return all([
+            not self.filter_prefix or ims_resource_name.startswith(self.filter_prefix),
+            self.filter_wildcard is None or fnmatch.fnmatch(ims_resource_name, self.filter_wildcard),
+            # IMS images or recipes without the 'arch' field are assumed to be x86_64
+            self.filter_arch is None or ims_resource.get('arch', 'x86_64') == self.filter_arch
+        ])
 
     @property
     def unfiltered_base_description(self):
@@ -675,15 +691,24 @@ class ProductInputImage(BaseInputImage):
     @property
     def filter_description(self):
         """str: a description of the requested filter"""
-        if self.filter_prefix is None:
+        if not self.has_filter:
             return ''
-        return f'with name matching prefix "{self.filter_prefix}"'
+
+        filter_descriptions = []
+        if self.filter_prefix:
+            filter_descriptions.append(f'name matching prefix "{self.filter_prefix}"')
+        if self.filter_wildcard:
+            filter_descriptions.append(f'name matching wildcard "{self.filter_wildcard}"')
+        if self.filter_arch:
+            filter_descriptions.append(f'arch matching "{self.filter_arch}"')
+
+        return f'with {INF.join(filter_descriptions)}'
 
     @property
     def base_description(self):
         """str: a human-readable description of the base we are starting from"""
         description = self.unfiltered_base_description
-        if self.filter_prefix is not None:
+        if self.has_filter:
             description += f' {self.filter_description}'
         return description
 
@@ -696,52 +721,48 @@ class ProductInputImage(BaseInputImage):
             raise ImageCreateError(f'Failed to find {self.base_description}: {err}')
 
     @cached_property
-    def base_resource_id(self):
-        """str: the base resource IMS ID"""
+    def product_base_resource_ids(self):
+        """list of str: the possible base resource IDs from the product catalog"""
         if self.base_is_recipe:
-            ims_resources = self.installed_product.recipes
+            product_catalog_ims_resources = self.installed_product.recipes
         else:
-            ims_resources = self.installed_product.images
+            product_catalog_ims_resources = self.installed_product.images
 
-        if not ims_resources:
-            raise ImageCreateError(f'There is no {self.unfiltered_base_description}')
-
-        filtered_resources = [resource for resource in ims_resources
-                              if self.filter_func(resource['name'])]
-        if not filtered_resources:
-            raise ImageCreateError(f'There is no {self.base_description}.')
-        elif len(filtered_resources) > 1:
-            raise ImageCreateError(f'There exists more than one {self.base_description}.')
-        ims_resource = filtered_resources[0]
-        ims_resource_desc = ', '.join(f'{key}={value}' for key, value in ims_resource.items())
-
-        try:
-            return ims_resource['id']
-        except KeyError:
-            raise ImageCreateError(
-                f'{self.base_description} with {ims_resource_desc} does not '
-                f'have an id in product catalog data.'
-            )
+        return [ims_resource['id'] for ims_resource in product_catalog_ims_resources]
 
     @cached_property
     @provides_context('base')
     def ims_base(self):
-        """dict: the data for the base IMS recipe or image to build and/or customize"""
-        resource_id = self.base_resource_id
-        try:
-            matching_base_resources = self.ims_client.get_matching_resources(
-                self.base_resource_type, resource_id=resource_id
-            )
-        except APIError as err:
-            raise ImageCreateError(err)
+        """dict: the IMS data for the base recipe or image to build and/or customize"""
+        possible_resource_ids = self.product_base_resource_ids
 
+        # Failed to find any IMS resources of the given type from the product catalog
+        if not possible_resource_ids:
+            raise ImageCreateError(f'There is no {self.unfiltered_base_description}')
+
+        # Gather the list of IMS resources by querying IMS
+        possible_base_ims_resources = []
+        for resource_id in possible_resource_ids:
+            try:
+                # There should only be one since we query based on unique IMS id, but extend anyway
+                possible_base_ims_resources.extend(
+                    self.ims_client.get_matching_resources(self.base_resource_type, resource_id=resource_id)
+                )
+            except APIError as err:
+                raise ImageCreateError(err)
+
+        # Filter using the various filters specified in the input
+        matching_base_resources = [
+            base_ims_resource for base_ims_resource in possible_base_ims_resources
+            if self.filter_func(base_ims_resource)
+        ]
+
+        # Check if we got a single unique match. If not, it is an error.
         if not matching_base_resources:
-            raise ImageCreateError(f'Found no matches in IMS for {self.base_description} '
-                                   f'with id={resource_id}')
+            raise ImageCreateError(f'Found no matches in IMS for {self.base_description}')
         elif len(matching_base_resources) > 1:
-            # This really shouldn't happen given that we are querying by unique IMS id
-            raise ImageCreateError(f'Found {len(matching_base_resources)} matches for '
-                                   f'{self.base_description} with id={resource_id}')
+            raise ImageCreateError(f'Found {len(matching_base_resources)} matches '
+                                   f'for {self.base_description}.')
 
         return matching_base_resources[0]
 
