@@ -83,7 +83,7 @@ class TestInputSessionTemplateV2(unittest.TestCase):
 
     def get_input_and_expected_bos_data(self, name='my-session-template',
                                         image_name='my-image', configuration='my-config',
-                                        arch=None, arch_by_bootset=None):
+                                        arch_by_bootset=None):
         """Get input data and the expected BOS request payload with given parameters"""
         if not arch_by_bootset:
             arch_by_bootset = {'compute': None}
@@ -120,10 +120,6 @@ class TestInputSessionTemplateV2(unittest.TestCase):
             'boot_sets': bos_payload_bootsets
         }
 
-        if arch:
-            input_data['arch'] = arch
-            bos_payload['arch'] = arch
-
         return input_data, bos_payload
 
     def test_get_create_item_data_no_arch(self):
@@ -138,42 +134,11 @@ class TestInputSessionTemplateV2(unittest.TestCase):
         self.assertEqual(expected_bos_data,
                          input_session_template.get_create_item_data())
 
-    def test_get_create_item_data_top_level_arch(self):
-        """Test get_create_item_data method with architecture specified at top level"""
-        input_data, expected_bos_data = self.get_input_and_expected_bos_data(arch='aarch64')
-
-        input_session_template = self.simplified_session_template_v2(
-            input_data, self.input_instance, 0, self.jinja_env,
-            self.bos_client, self.cfs_client, self.ims_client
-        )
-
-        self.assertEqual(expected_bos_data,
-                         input_session_template.get_create_item_data())
-
     def test_get_create_item_data_arch_per_bootset(self):
         """Test get_create_item_data with a different arch per boot set"""
         input_data, expected_bos_data = self.get_input_and_expected_bos_data(
             arch_by_bootset={'compute_x86_64': 'x86_64',
                              'compute_aarch64': 'aarch64'}
-        )
-
-        input_session_template = self.simplified_session_template_v2(
-            input_data, self.input_instance, 0, self.jinja_env,
-            self.bos_client, self.cfs_client, self.ims_client
-        )
-
-        self.assertEqual(expected_bos_data,
-                         input_session_template.get_create_item_data())
-
-    def test_get_create_item_data_arch_with_bootset_override(self):
-        """Test get_create_item_data with a top-level arch overridden in one boot set."""
-        input_data, expected_bos_data = self.get_input_and_expected_bos_data(
-            arch='x86_64',
-            arch_by_bootset={
-                # Results in it not being specified in the input data for this boot set
-                'compute_x86_64': None,
-                # Results in it being specified in the input data for this boot set
-                'compute_aarch64': 'aarch64'}
         )
 
         input_session_template = self.simplified_session_template_v2(
