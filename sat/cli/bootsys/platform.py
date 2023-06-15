@@ -28,7 +28,7 @@ Start and stop platform services to boot and shut down a Shasta system.
 import logging
 import socket
 from collections import namedtuple
-from threading import Thread
+from multiprocessing import Process
 
 from csm_api_client.k8s import load_kube_api
 from kubernetes.client import BatchV1Api
@@ -43,6 +43,7 @@ from sat.cli.bootsys.ceph import (
     CephHealthWaiter
 )
 from sat.cli.bootsys.etcd import save_etcd_snapshot_on_host, EtcdInactiveFailure, EtcdSnapshotFailure
+from sat.cli.bootsys.hostkeys import FilteredHostKeys
 from sat.cli.bootsys.util import get_and_verify_ncn_groups, get_ssh_client, FatalBootsysError
 from sat.config import get_config_value
 from sat.cronjob import recreate_namespaced_stuck_cronjobs
@@ -87,7 +88,7 @@ class RemoteServiceWaiter(Waiter):
     VALID_TARGET_STATE_VALUES = ('active', 'inactive')
     VALID_TARGET_ENABLED_VALUES = ('enabled', 'disabled')
 
-    def __init__(self, host, service_name, target_state, timeout, poll_interval=5, target_enabled=None):
+    def __init__(self, host, service_name, target_state, timeout, poll_interval=5, target_enabled=None, host_keys=None):
         """Construct a new RemoteServiceWaiter.
 
         Args:
@@ -100,6 +101,8 @@ class RemoteServiceWaiter(Waiter):
                 completion.
             target_enabled (str or None): If 'enabled', enable the service.
                 If 'disabled', disable the service. If None, do neither.
+            host_keys (paramiko.hostkeys.HostKeys): If not None, use the given host
+                keys object instead of loading the system host keys.
         """
         super().__init__(timeout, poll_interval=poll_interval)
 
@@ -115,7 +118,7 @@ class RemoteServiceWaiter(Waiter):
         self.service_name = service_name
         self.target_state = target_state
         self.target_enabled = target_enabled
-        self.ssh_client = get_ssh_client()
+        self.ssh_client = get_ssh_client(host_keys=host_keys)
 
     def _run_remote_command(self, command, nonzero_error=True):
         """Run the given command on the remote host.
@@ -220,16 +223,19 @@ class RemoteServiceWaiter(Waiter):
         return current_state == self.target_state
 
 
-class ContainerStopThread(Thread):
-    """A thread that will stop containers on hosts."""
-    def __init__(self, host):
-        """Create a thread to stop containers in containerd on the given host.
+class ContainerStopProcess(Process):
+    """A process that will stop containers on hosts."""
+    def __init__(self, host, host_keys=None):
+        """Create a process to stop containers in containerd on the given host.
 
         Args:
             host (str): The host on which to stop containers in containerd
+            host_keys (paramiko.hostkeys.HostKeys): parsed known hosts file
+                containing keys for other hosts
         """
         super().__init__()
         self.host = host
+        self.host_keys = host_keys
         self.success = False
 
     @cached_property
@@ -240,7 +246,7 @@ class ContainerStopThread(Thread):
             SystemExit(1): if there is a failure to connect to `self.host`.
         """
         try:
-            ssh_client = get_ssh_client()
+            ssh_client = get_ssh_client(self.host_keys)
             ssh_client.connect(self.host)
             return ssh_client
         except (socket.error, SSHException) as err:
@@ -279,7 +285,7 @@ class ContainerStopThread(Thread):
             return exit_status, stdout_str, stderr_str
 
     def _err_exit(self, err_msg):
-        """Log an error message, mark failure, and exit thread.
+        """Log an error message, mark failure, and exit process.
 
         Args:
             err_msg (str): The error message to log.
@@ -292,7 +298,7 @@ class ContainerStopThread(Thread):
         raise SystemExit(1)
 
     def _success_exit(self, info_msg):
-        """Log an info message, mark success, and exit thread.
+        """Log an info message, mark success, and exit process.
 
         Args:
             info_msg (str): The info message to log.
@@ -318,7 +324,7 @@ class ContainerStopThread(Thread):
     def run(self):
         """Attempt to stop containers in containerd on the host.
 
-        If successful, the thread will exit with its `success` attribute set to
+        If successful, the process will exit with its `success` attribute set to
         True. If unsuccessful, the `success` attribute will be False.
 
         The following conditions are considered success:
@@ -336,7 +342,7 @@ class ContainerStopThread(Thread):
         Raises:
             SystemExit: if the container stop operation fails, raises a SystemExit
                 with code 1. If it's successful, raises a SystemExit with a code 0.
-                This is used to stop the thread.
+                This is used to stop the process.
         """
         exit_status, stdout, stderr = self._run_remote_command('systemctl is-active containerd',
                                                                err_on_non_zero=False)
@@ -370,6 +376,8 @@ class ContainerStopThread(Thread):
 
         # Check and see if they've all been stopped.
         running_containers = self._get_running_containers()
+        self.ssh_client.close()
+
         if running_containers:
             self._err_exit(f'Failed to stop {len(running_containers)} container(s) on {self.host}. '
                            f'Execute "crictl ps -q" on the host to view running containers.')
@@ -395,8 +403,10 @@ def do_service_action_on_hosts(hosts, service, target_state,
     Raises:
         FatalPlatformError: if the service action fails on any of the given hosts
     """
+    host_keys = FilteredHostKeys(hostnames=hosts)
     service_action_waiters = [RemoteServiceWaiter(host, service, target_state=target_state,
-                                                  timeout=timeout, target_enabled=target_enabled)
+                                                  timeout=timeout, target_enabled=target_enabled,
+                                                  host_keys=host_keys)
                               for host in hosts]
     for waiter in service_action_waiters:
         waiter.wait_for_completion_async()
@@ -416,15 +426,16 @@ def do_stop_containers(ncn_groups):
         FatalPlatformError: if any nodes fail to stop containerd
     """
     k8s_ncns = ncn_groups['kubernetes']
+    host_keys = FilteredHostKeys(hostnames=k8s_ncns)
     # This currently stops all containers in parallel before stopping containerd
     # on each ncn in parallel.  It probably could be faster if it was all in parallel.
-    container_stop_threads = [ContainerStopThread(ncn) for ncn in k8s_ncns]
-    for thread in container_stop_threads:
-        thread.start()
-    for thread in container_stop_threads:
-        thread.join()
+    container_stop_processes = [ContainerStopProcess(ncn, host_keys=host_keys) for ncn in k8s_ncns]
+    for process in container_stop_processes:
+        process.start()
+    for process in container_stop_processes:
+        process.join()
 
-    failed_ncns = [thread.host for thread in container_stop_threads if not thread.success]
+    failed_ncns = [process.host for process in container_stop_processes if not process.success]
     if failed_ncns:
         raise NonFatalPlatformError(f'Failed to stop containers on the following NCN(s): '
                                     f'{", ".join(failed_ncns)}')
@@ -525,12 +536,13 @@ def do_etcd_snapshot(ncn_groups):
         FatalPlatformError: if etcd snapshot command fails for another reason
     """
     managers = ncn_groups['managers']
+    host_keys = FilteredHostKeys(hostnames=managers)
     # A dict mapping from failed hostnames to EtcdSnapshotFailure instances
     snapshot_errs = {}
 
     for manager in managers:
         try:
-            save_etcd_snapshot_on_host(manager)
+            save_etcd_snapshot_on_host(manager, host_keys=host_keys)
         except EtcdSnapshotFailure as err:
             snapshot_errs[manager] = err
 
