@@ -25,9 +25,9 @@
 Tools for adding information to `sat status` output.
 """
 
+import logging
 from abc import ABC, abstractmethod
 from collections import defaultdict
-import logging
 from urllib.parse import urlparse
 
 from csm_api_client.service.cfs import CFSClient
@@ -40,7 +40,6 @@ from sat.apiclient.sls import SLSClient
 from sat.config import get_config_value
 from sat.constants import MISSING_VALUE
 from sat.util import get_val_by_path
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -442,13 +441,22 @@ class CFSStatusModule(StatusModule):
     def rows(self):
         cfs_client = CFSClient(self.session)
         try:
-            cfs_response = cfs_client.get('components').json()
+            cfs_response = cfs_client.get('v3', 'components', raise_not_ok=False)
+            if cfs_response.status_code == 404:
+                yield from cfs_client.get('components').json()
+            else:
+                cfs_response = cfs_response.json()
+                while cfs_response.get('next'):
+                    yield from cfs_response['components']
+                    cfs_response = cfs_client.get(
+                        'v3', 'components',
+                        params={'after_id': cfs_response['next']['after_id']}
+                    ).json()
+
         except APIError as err:
             raise StatusModuleException(f'Failed to query CFS for component information: {err}') from err
         except ValueError as err:
             raise StatusModuleException(f'Failed to parse JSON from CFS component response: {err}') from err
-
-        return cfs_response
 
 
 class BOSStatusModule(StatusModule):
