@@ -37,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - The ability to specify the architecture for BOS session templates, either
       at the top level or per boot set
 
+### Changed
+- Changed docker image build to query lts/csm-1.5 branch of metal-provision
+  repo for the kubectl version to use in the cray-sat container.
+
 ### Fixed
 - Fixed extreme slowness with the `sat bootsys shutdown --stage
   platform-services` command when a large SSH `known_hosts` file is in use.
