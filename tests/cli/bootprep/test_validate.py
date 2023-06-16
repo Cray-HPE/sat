@@ -583,35 +583,31 @@ class TestValidateInstance(ExtendedTestCase):
         }
         self.assert_valid_instance(instance)
 
-    def test_valid_session_template_top_level_arch(self):
-        """Valid session template with arch at the top level"""
-        session_template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE_V2)
-        session_template['arch'] = 'aarch64'
-        instance = {
-            'session_templates': [session_template]
-        }
-        self.assert_valid_instance(instance)
-
     def test_valid_session_template_boot_set_arch(self):
-        """Valid session template with arch at the boot-set level"""
+        """Valid session template with a valid arch specified for a boot set"""
         session_template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE_V2)
-        session_template['bos_parameters']['boot_sets']['compute']['arch'] = 'x86_64'
-        instance = {
-            'session_templates': [session_template]
-        }
-        self.assert_valid_instance(instance)
+        valid_arch_vals = ['X86', 'ARM', 'Other', 'Unknown']
+        for valid_arch in valid_arch_vals:
+            session_template['bos_parameters']['boot_sets']['compute']['arch'] = valid_arch
+            instance = {
+                'session_templates': [session_template]
+            }
+            self.assert_valid_instance(instance)
 
-    def test_valid_session_template_arch_at_both_levels(self):
-        """Valid session template with arch at both the top level and boot-set level"""
+    def test_invalid_session_template_boot_set_arch(self):
+        """Invalid session template with an invalid arch specified for a boot set"""
         session_template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE_V2)
-        session_template['arch'] = 'x86_64'
-        aarch64_bootset = deepcopy(session_template['bos_parameters']['boot_sets']['compute'])
-        aarch64_bootset['arch'] = 'aarch64'
-        session_template['bos_parameters']['boot_sets']['compute_aarch64'] = aarch64_bootset
-        instance = {
-            'session_templates': [session_template]
-        }
-        self.assert_valid_instance(instance)
+        invalid_arch_vals = ['aarch64', 'x86_64']
+        for invalid_arch in invalid_arch_vals:
+            session_template['bos_parameters']['boot_sets']['compute']['arch'] = invalid_arch
+            instance = {
+                'session_templates': [session_template]
+            }
+            expected_errs = [
+                (('session_templates', 0, 'bos_parameters', 'boot_sets', 'compute', 'arch'),
+                 f"'{invalid_arch}' is not one of", 1)
+            ]
+            self.assert_invalid_instance(instance, expected_errs)
 
     def test_valid_full_instance(self):
         """Valid instance with configurations, images, and session_templates"""

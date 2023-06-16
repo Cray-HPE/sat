@@ -462,14 +462,6 @@ properties:
 
             Supports rendering as a Jinja template.
           type: string
-        arch:
-          description: >
-            The architecture of the nodes that should be targeted by this BOS
-            session template. Can be overridden on a per-boot-set basis.
-
-            If omitted, all architectures will be targeted.
-          type: string
-          examples: ['x86_64', 'aarch64']
         bos_parameters:
           description: >
             The parameters specified here will be passed through to BOS.
@@ -496,12 +488,17 @@ properties:
                   arch:
                     description: >
                       The architecture of the nodes that should be targeted by this
-                      boot set. Overrides the architecture specified at the top level
-                      of the session template, if any.
+                      boot set. The valid values accepted by BOS are the same as the
+                      valid values in the components array returned by the Hardware
+                      State Manager (HSM) API's /State/Components endpoint.
 
-                      If omitted, all architectures will be targeted.
+                      If omitted, BOS will treat this as a boot set targeting nodes
+                      with architecture X86. This is done to preserve functionality
+                      of BOS session templates which were created prior to the addition
+                      of multi-architecture support in BOS.
                     type: string
-                    examples: ['x86_64', 'aarch64']
+                    enum: ['X86', 'ARM', 'Other', 'Unknown']
+                    default: 'X86'
                   kernel_parameters:
                     description: >
                       Starting in CSM 1.0, which is to be released in Shasta v1.5,

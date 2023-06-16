@@ -98,12 +98,6 @@ class InputSessionTemplate(BaseInputItem):
         return self.data['configuration']
 
     @property
-    @jinja_rendered
-    def arch(self):
-        """str or None: the architecture at the top level of the session template or None"""
-        return self.data.get('arch')
-
-    @property
     def boot_sets(self):
         """dict: the boot sets specified for the session template"""
         # the 'bos_parameters' property is required, and 'boot_sets' is required within that
@@ -165,9 +159,6 @@ class InputSessionTemplate(BaseInputItem):
             'name': self.name,
             'boot_sets': {}
         }
-
-        if self.arch:
-            api_data['arch'] = self.arch
 
         for boot_set_name, boot_set_data in self.boot_sets.items():
             # Must deepcopy to avoid every boot set sharing the same dict

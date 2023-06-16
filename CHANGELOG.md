@@ -34,8 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       architecture of the image or recipe in IMS
     - The ability to combine multiple base image or recipe filters when
       specifying a base image from a product
-    - The ability to specify the architecture for BOS session templates, either
-      at the top level or per boot set
+    - The ability to specify the architecture for each boot set in a BOS
+      session template
 
 ### Fixed
 - Fixed extreme slowness with the `sat bootsys shutdown --stage
