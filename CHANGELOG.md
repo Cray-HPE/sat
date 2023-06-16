@@ -27,10 +27,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.21.5] - 2023-05-08
 
-### Fixed
-- Updated container build script to pull in the correct kubectl version from the
-  metal-provision repository instead of the csm-rpms repository.
-
 ### Security
 - Rebuilt the cray-sat container image to address CVE-2023-27536 in
   curl/libcurl present in the cray-sat:3.21.4 container image.
