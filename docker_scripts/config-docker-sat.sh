@@ -2,7 +2,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -30,7 +30,7 @@ SATMANDIR=/usr/share/man/man8
 CSM_RPMS_REPO="https://github.com/Cray-HPE/csm-rpms.git"
 CSM_RPMS_DIR="csm-rpms"
 CSM_RPMS_BASE_PACKAGES_PATH="packages/node-image-ncn-common/base.packages"
-CSM_RPMS_BRANCH="main"
+CSM_RPMS_BRANCH="release/1.4"
 KUBERNETES_VERSION_REGEX="[0-9]+\.[0-9]+\.[0-9]+"
 
 # create logging directory
