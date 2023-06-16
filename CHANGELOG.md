@@ -41,6 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed extreme slowness with the `sat bootsys shutdown --stage
   platform-services` command when a large SSH `known_hosts` file is in use.
 
+### Security
+- Update the version of cryptography from 39.0.1 to 41.0.0 to address
+  CVE-2023-2650.
+- Update the version of requests from 2.27.0 to 2.31.0 to address
+  CVE-2023-32681.
+
 ## [3.23.0] - 2023-06-08
 
 ### Added
