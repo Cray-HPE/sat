@@ -27,10 +27,11 @@ LOGDIR=/var/log/cray/sat
 
 SATMANDIR=/usr/share/man/man8
 
-METAL_PROVISION_REPO="https://github.com/Cray-HPE/metal-provision.git"
-METAL_PROVISION_DIR="metal-provision"
-METAL_PROVISION_BASE_PACKAGES_PATH="roles/node-images-ncn-common/vars/packages/suse.yml"
-METAL_PROVISION_BRANCH="main"
+CSM_RPMS_REPO="https://github.com/Cray-HPE/csm-rpms.git"
+CSM_RPMS_DIR="csm-rpms"
+CSM_RPMS_BASE_PACKAGES_PATH="packages/node-image-ncn-common/base.packages"
+CSM_RPMS_BRANCH="release/1.4"
+KUBERNETES_VERSION_REGEX="[0-9]+\.[0-9]+\.[0-9]+"
 
 # create logging directory
 if [ ! -d "$LOGDIR" ]; then
@@ -62,36 +63,16 @@ echo "export PATH=$VIRTUAL_ENV/bin:\$PATH" > /etc/profile.d/sat_path.sh
 
 # install kubectl using same version used in ncn image
 cd /sat
-git clone $METAL_PROVISION_REPO $METAL_PROVISION_DIR
-cd $METAL_PROVISION_DIR
-git checkout $METAL_PROVISION_BRANCH
+git clone $CSM_RPMS_REPO $CSM_RPMS_DIR
+cd $CSM_RPMS_DIR
+git checkout $CSM_RPMS_BRANCH
 
-KUBERNETES_PULL_VERSION=$(python3 <<EOF
-import re
-import sys
-
-import semver
-import yaml
-
-
-with open("${METAL_PROVISION_BASE_PACKAGES_PATH}") as pkgs:
-    pkgs = yaml.safe_load(pkgs)
-    for line in pkgs.get("packages", []):
-        name, version = re.split(r'(?:(?:<|>)=?|=)', line)
-        if name == "kubectl":
-            version = semver.VersionInfo.parse(version).finalize_version()
-            print(str(version))
-            sys.exit(0)
-print("Could not determine kubectl version")
-sys.exit(1)
-EOF
-)
-
+KUBERNETES_PULL_VERSION="$(grep ^kubectl= "$CSM_RPMS_BASE_PACKAGES_PATH" | sed -E "s/.*=(${KUBERNETES_VERSION_REGEX})-.*/\1/")"
 if [ -z "$KUBERNETES_PULL_VERSION" ]; then
-    echo >&2 "Unable to determine version of kubectl to use from ${METAL_PROVISION_REPO}"
+    echo >&2 "Unable to determine version of kubectl to use from ${CSM_RPMS_REPO}"
     exit 1
 fi
 
-curl -fLO "https://storage.googleapis.com/kubernetes-release/release/v${KUBERNETES_PULL_VERSION#v}/bin/linux/amd64/kubectl"
+curl -LO "https://storage.googleapis.com/kubernetes-release/release/v${KUBERNETES_PULL_VERSION#v}/bin/linux/amd64/kubectl"
 chmod +x ./kubectl
 mv ./kubectl /usr/bin
