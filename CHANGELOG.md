@@ -25,7 +25,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.24.0] - 06-23-2023
 
 ### Added
 - Added support for multiple architectures to `sat bootprep`, which includes the
@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       specifying a base image from a product
     - The ability to specify the architecture for each boot set in a BOS
       session template
+
+### Changed
+- Changed docker image build to query lts/csm-1.5 branch of metal-provision
+  repo for the kubectl version to use in the cray-sat container.
 
 ### Fixed
 - Fixed extreme slowness with the `sat bootsys shutdown --stage
