@@ -25,6 +25,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.24.0] - 06-23-2023
+
+### Added
+- Added support for multiple architectures to `sat bootprep`, which includes the
+  following:
+    - The ability to filter the base image or recipe from a product based on the
+      architecture of the image or recipe in IMS
+    - The ability to combine multiple base image or recipe filters when
+      specifying a base image from a product
+    - The ability to specify the architecture for each boot set in a BOS
+      session template
+
+### Changed
+- Changed docker image build to query lts/csm-1.5 branch of metal-provision
+  repo for the kubectl version to use in the cray-sat container.
+
+### Fixed
+- Fixed extreme slowness with the `sat bootsys shutdown --stage
+  platform-services` command when a large SSH `known_hosts` file is in use.
+
+### Changed
+- Changed the `bos-operations` stage of `sat bootsys` to no longer check
+  whether BOS session templates need an operation performed before creating a
+  BOS session. BOS will handle ensuring idempotency instead.
+
+### Security
+- Update the version of cryptography from 39.0.1 to 41.0.0 to address
+  CVE-2023-2650.
+- Update the version of requests from 2.27.0 to 2.31.0 to address
+  CVE-2023-32681.
+
 ## [3.23.0] - 2023-06-08
 
 ### Added

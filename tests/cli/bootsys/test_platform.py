@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -24,56 +24,49 @@
 """
 Unit tests for the sat.cli.bootsys.platform module.
 """
-from argparse import Namespace
-from contextlib import contextmanager
 import logging
-from paramiko import SSHException, WarningPolicy
 import socket
 import threading
 import unittest
+from argparse import Namespace
+from contextlib import contextmanager
 from unittest import mock
+
+from paramiko import SSHException
 
 from sat.cli.bootsys.ceph import CephHealthCheckError
 from sat.cli.bootsys.etcd import EtcdInactiveFailure, EtcdSnapshotFailure
-from sat.cli.bootsys.platform import (
-    CONTAINER_STOP_SCRIPT,
-    ContainerStopThread,
-    do_ceph_freeze,
-    do_ceph_unfreeze,
-    do_etcd_snapshot,
-    do_etcd_start,
-    do_etcd_stop,
-    do_platform_action,
-    do_platform_start,
-    do_platform_stop,
-    do_service_action_on_hosts,
-    do_stop_containers,
-    FatalPlatformError,
-    NonFatalPlatformError,
-    PlatformServicesStep,
-    RemoteServiceWaiter,
-    SERVICE_ACTION_TIMEOUT,
-)
+from sat.cli.bootsys.platform import (CONTAINER_STOP_SCRIPT,
+                                      SERVICE_ACTION_TIMEOUT,
+                                      ContainerStopProcess, FatalPlatformError,
+                                      NonFatalPlatformError,
+                                      PlatformServicesStep,
+                                      RemoteServiceWaiter, do_ceph_freeze,
+                                      do_ceph_unfreeze, do_etcd_snapshot,
+                                      do_etcd_start, do_etcd_stop,
+                                      do_platform_action, do_platform_start,
+                                      do_platform_stop,
+                                      do_service_action_on_hosts,
+                                      do_stop_containers)
 from sat.cli.bootsys.util import FatalBootsysError
 
 
-class TestContainerStopThread(unittest.TestCase):
-    """Test the ContainerStopThread class."""
+class TestContainerStopProcess(unittest.TestCase):
+    """Test the ContainerStopProcess class."""
 
     def setUp(self):
-        """Set up some mocks and a ContainerStopThread"""
+        """Set up some mocks and a ContainerStopProcess"""
         self.host = 'ncn-w001'
         self.get_ssh_client = mock.patch('sat.cli.bootsys.platform.get_ssh_client').start()
         self.ssh_client = self.get_ssh_client.return_value
 
-        self.cst = ContainerStopThread(self.host)
+        self.cst = ContainerStopProcess(self.host)
 
     def tearDown(self):
         mock.patch.stopall()
 
     def assert_ssh_connected(self):
         """Assert the SSHClient is created and connected."""
-        self.get_ssh_client.assert_called_once_with()
         self.ssh_client.connect.assert_called_once_with(self.host)
 
     @contextmanager
@@ -121,7 +114,7 @@ class TestContainerStopThread(unittest.TestCase):
         self.assertEqual(0, raises_cm.exception.code)
 
     def test_init(self):
-        """Test the creation of a new ContainerStopThread."""
+        """Test the creation of a new ContainerStopProcess."""
         self.assertEqual(self.host, self.cst.host)
         self.assertFalse(self.cst.success)
 
@@ -138,7 +131,7 @@ class TestContainerStopThread(unittest.TestCase):
             self.cst._success_exit(info_msg)
 
     def test_ssh_client_success(self):
-        """Test the ssh_client property of ContainerStopThread."""
+        """Test the ssh_client property of ContainerStopProcess."""
         ssh_client = self.cst.ssh_client
         self.assertEqual(self.ssh_client, ssh_client)
         self.assert_ssh_connected()
@@ -423,7 +416,6 @@ class TestRemoteServiceWaiter(unittest.TestCase):
 
     def assert_ssh_connected(self):
         """Assert the SSH client connected to the host."""
-        self.get_ssh_client.assert_called_once_with()
         self.ssh_client.connect.assert_called_once_with(self.host)
 
     def test_init(self):
@@ -738,10 +730,10 @@ class TestDoStopContainers(unittest.TestCase):
         self.k8s_ncns = ['ncn-w001', 'ncn-w002', 'ncn-w003', 'ncn-m001', 'ncn-m002']
         self.failed_ncns = failed_ncns = []
 
-        class MockContainerStopThread(threading.Thread):
-            """Mock the ContainerStopThread for these tests."""
+        class MockContainerStopProcess(threading.Thread):
+            """Mock the ContainerStopProcess for these tests."""
 
-            def __init__(self, host):
+            def __init__(self, host, host_keys):
                 super().__init__()
                 self.host = host
                 self.success = False
@@ -750,7 +742,8 @@ class TestDoStopContainers(unittest.TestCase):
                 self.success = self.host not in failed_ncns
 
         self.ncn_groups = {'kubernetes': self.k8s_ncns}
-        mock.patch('sat.cli.bootsys.platform.ContainerStopThread', MockContainerStopThread).start()
+        mock.patch('sat.cli.bootsys.platform.ContainerStopProcess', MockContainerStopProcess).start()
+        self.mock_host_keys = mock.patch('sat.cli.bootsys.platform.FilteredHostKeys').start()
 
     def tearDown(self):
         mock.patch.stopall()
@@ -759,11 +752,11 @@ class TestDoStopContainers(unittest.TestCase):
         """Test that do_stop_containers calls thread methods appropriately."""
         mock_threads = [mock.Mock(host=ncn, success=True) for ncn in self.k8s_ncns]
 
-        with mock.patch('sat.cli.bootsys.platform.ContainerStopThread') as mock_cst:
+        with mock.patch('sat.cli.bootsys.platform.ContainerStopProcess') as mock_cst:
             mock_cst.side_effect = mock_threads
             do_stop_containers(self.ncn_groups)
 
-        self.assertEqual([mock.call(ncn) for ncn in self.k8s_ncns],
+        self.assertEqual([mock.call(ncn, host_keys=self.mock_host_keys.return_value) for ncn in self.k8s_ncns],
                          mock_cst.mock_calls)
         for mock_thread in mock_threads:
             self.assertEqual([mock.call.start(), mock.call.join()], mock_thread.mock_calls)
@@ -859,13 +852,16 @@ class TestDoServiceActionOnHosts(unittest.TestCase):
         self.mock_waiter = mock.patch('sat.cli.bootsys.platform.RemoteServiceWaiter',
                                       side_effect=self.mock_waiters).start()
 
+        self.mock_host_keys = mock.patch('sat.cli.bootsys.platform.FilteredHostKeys').start()
+
     def test_all_successful(self):
         """Test doing a service action when it is successful on all hosts."""
         do_service_action_on_hosts(self.hosts, self.service, self.target_state,
                                    target_enabled=self.target_enabled)
         self.mock_waiter.assert_has_calls([
             mock.call(host, self.service, target_state=self.target_state,
-                      timeout=SERVICE_ACTION_TIMEOUT, target_enabled=self.target_enabled)
+                      timeout=SERVICE_ACTION_TIMEOUT, target_enabled=self.target_enabled,
+                      host_keys=self.mock_host_keys.return_value)
             for host in self.hosts
         ])
         for waiter in self.mock_waiters:
@@ -883,7 +879,8 @@ class TestDoServiceActionOnHosts(unittest.TestCase):
                                        target_enabled=self.target_enabled)
         self.mock_waiter.assert_has_calls([
             mock.call(host, self.service, target_state=self.target_state,
-                      timeout=SERVICE_ACTION_TIMEOUT, target_enabled=self.target_enabled)
+                      timeout=SERVICE_ACTION_TIMEOUT, target_enabled=self.target_enabled,
+                      host_keys=self.mock_host_keys.return_value)
             for host in self.hosts
         ])
         for waiter in self.mock_waiters:
@@ -909,8 +906,10 @@ class TestDoEtcdSnapshotStartStop(unittest.TestCase):
 
     def test_do_etcd_snapshot_success(self):
         """Test do_etcd_snapshot in with no errors."""
-        do_etcd_snapshot(self.ncn_groups)
-        self.mock_save_snapshot.assert_has_calls([mock.call(manager) for manager in self.managers])
+        with mock.patch('sat.cli.bootsys.platform.FilteredHostKeys') as mock_hk:
+            do_etcd_snapshot(self.ncn_groups)
+            self.mock_save_snapshot.assert_has_calls([mock.call(manager, host_keys=mock_hk.return_value)
+                                                      for manager in self.managers])
 
     def test_do_etcd_snapshot_all_etcd_inactive(self):
         """Test do_etcd_snapshot when etcd is inactive on all managers."""

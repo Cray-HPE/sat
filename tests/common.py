@@ -91,8 +91,10 @@ class ExtendedTestCase(unittest.TestCase):
         for item in container:
             if regex.match(item):
                 return
-        self.fail("Regex '{}' does not match any of the elements in "
-                  "the given container.".format(regex_str))
+
+        container_elements = '\n'.join(container)
+        self.fail(f"Regex ({regex_str}) does not match any of the string "
+                  f"elements in the given container:\n{container_elements}")
 
 
 @contextlib.contextmanager

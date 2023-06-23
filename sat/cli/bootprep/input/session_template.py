@@ -25,6 +25,7 @@
 Defines class for session templates defined in the input file.
 """
 from abc import abstractmethod
+from copy import deepcopy
 import re
 
 from sat.apiclient import APIError
@@ -158,8 +159,10 @@ class InputSessionTemplate(BaseInputItem):
             'name': self.name,
             'boot_sets': {}
         }
+
         for boot_set_name, boot_set_data in self.boot_sets.items():
-            boot_set_api_data = self.bos_client.get_base_boot_set_data()
+            # Must deepcopy to avoid every boot set sharing the same dict
+            boot_set_api_data = deepcopy(self.bos_client.get_base_boot_set_data())
             try:
                 image_record = self.image_record
             except InputItemValidateError as err:
