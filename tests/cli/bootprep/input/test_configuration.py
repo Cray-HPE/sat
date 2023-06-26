@@ -212,7 +212,7 @@ class TestGitInputConfigurationLayer(TestInputConfigurationLayerBase):
         self.assertIsNone(layer.commit)
 
     def test_get_cfs_api_data_optional_properties(self):
-        """Test get_create_item_data method with all optional properties present."""
+        """Test get_create_item_data method with optional name and playbook properties present."""
         branch_layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
         commit_layer = GitInputConfigurationLayer(self.commit_layer_data, self.jinja_env)
         subtests = (('branch', branch_layer), ('commit', commit_layer))
@@ -226,6 +226,23 @@ class TestGitInputConfigurationLayer(TestInputConfigurationLayerBase):
                     expected[key] = value
                 del expected['git']
                 self.assertEqual(expected, layer.get_cfs_api_data())
+
+    def test_get_cfs_api_data_special_parameters(self):
+        """Test get_create_item_data method with special_parameters present."""
+        layer_data = deepcopy(self.branch_layer_data)
+        require_dkms = True
+        layer_data['special_parameters'] = {'ims_require_dkms': require_dkms}
+        layer = GitInputConfigurationLayer(layer_data, self.jinja_env)
+
+        expected_api_data = deepcopy(layer_data)
+        # Move these values to where CFS expects them
+        expected_api_data['cloneUrl'] = expected_api_data['git']['url']
+        expected_api_data['branch'] = expected_api_data['git']['branch']
+        del expected_api_data['git']
+        expected_api_data['specialParameters'] = {'imsRequireDkms': require_dkms}
+        del expected_api_data['special_parameters']
+
+        self.assertEqual(expected_api_data, layer.get_cfs_api_data())
 
     def test_commit_property_branch_commit_lookup(self):
         """Test looking up commit hash from branch in VCS when branch not supported in CSM"""

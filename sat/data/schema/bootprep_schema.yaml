@@ -41,7 +41,7 @@ $schema: "https://json-schema.org/draft/2020-12/schema"
 # ... patch component when all input files that were valid under the old schema
 #     are still valid under the new schema
 #
-version: '1.0.5'
+version: '1.0.6'
 title: Bootprep Input File
 description: >
   A description of the set of CFS configurations to create, the set of IMS
@@ -80,7 +80,7 @@ properties:
         current version.
 
       - If the input version matches the current version, it is compatible.
-    default: '1.0.5'
+    default: '1.0.6'
     type: string
 
   configurations:
@@ -120,6 +120,8 @@ properties:
                   $ref: '#/$defs/CFSLayerName'
                 playbook:
                   $ref: '#/$defs/CFSLayerPlaybook'
+                special_parameters:
+                  $ref: '#/$defs/CFSLayerSpecialParameters'
                 git:
                   oneOf:
                   - description: >
@@ -155,6 +157,8 @@ properties:
                   $ref: '#/$defs/CFSLayerName'
                 playbook:
                   $ref: '#/$defs/CFSLayerPlaybook'
+                special_parameters:
+                  $ref: '#/$defs/CFSLayerSpecialParameters'
                 product:
                   oneOf:
                   - description: >
@@ -375,7 +379,6 @@ properties:
           configuration_group_names:
             $ref: '#/$defs/ImageConfigurationGroupNames'
 
-
   session_templates:
     description: The BOS session templates to create.
     type: array
@@ -587,6 +590,16 @@ $defs:
 
       Supports rendering as a Jinja template.
     type: string
+  CFSLayerSpecialParameters:
+    type: object
+    additionalProperties: false
+    properties:
+      ims_require_dkms:
+        description: >
+          If true, any image customization sessions that use this configuration will
+          enable DKMS in IMS.
+        type: boolean
+        default: false
   ImageName:
     description: >
       The name of the image that will be created in IMS. The image name
