@@ -58,6 +58,9 @@ VALID_CONFIG_LAYER_PRODUCT_BRANCH = {
     'product': {
         'name': 'cos',
         'branch': 'integration'
+    },
+    'special_parameters': {
+        'ims_require_dkms': True
     }
 }
 
@@ -74,6 +77,9 @@ VALID_CONFIG_LAYER_GIT_COMMIT = {
     'git': {
         'url': 'https://api-gw-service-nmn.local/vcs/cray/analytics-config-management.git',
         'commit': '323fae03f4606ea9991df8befbb2fca795e648fa'
+    },
+    'special_parameters': {
+        'ims_require_dkms': True
     }
 }
 
