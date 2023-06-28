@@ -41,6 +41,7 @@ from sat.cli.bootprep.input.base import (
     jinja_rendered,
 )
 from sat.config import get_config_value
+from sat.util import get_val_by_path, set_val_by_path
 
 LOGGER = logging.getLogger(__name__)
 
@@ -54,11 +55,13 @@ class InputConfigurationLayer(ABC):
     }
     # Mapping from CFS property name to class property name for optional properties
     # If the property value is None, the property will be omitted from the CFS layer
+    # Nested CFS properties are specified by separating each property name with '.'
     OPTIONAL_CFS_PROPERTIES = {
         'branch': 'branch',
         'commit': 'commit',
         'name': 'name',
-        'playbook': 'playbook'
+        'playbook': 'playbook',
+        'specialParameters.imsRequireDkms': 'ims_require_dkms'
     }
 
     # CRAYSAT-1174: Specifying a 'branch' in a CFS configuration layer is not
@@ -91,6 +94,11 @@ class InputConfigurationLayer(ABC):
     def name(self):
         """str or None: the name specified for the layer"""
         return self.layer_data.get('name')
+
+    @property
+    def ims_require_dkms(self):
+        """str or None: whether to enable DKMS when this layer customizes an IMS image"""
+        return get_val_by_path(self.layer_data, 'special_parameters.ims_require_dkms')
 
     @property
     @abstractmethod
@@ -130,7 +138,7 @@ class InputConfigurationLayer(ABC):
 
             property_value = getattr(self, self_property)
             if property_value is not None:
-                cfs_layer_data[cfs_property] = property_value
+                set_val_by_path(cfs_layer_data, cfs_property, property_value)
 
         return cfs_layer_data
 
