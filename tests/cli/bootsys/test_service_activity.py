@@ -202,7 +202,7 @@ class TestBOSV1ActivityChecker(ExtendedTestCase):
         self.bos_session_details = {
             '1': {
                 'bos_launch': 'bos_launch_1',
-                'computes': 'boot_capmc_finished',
+                'computes': 'boot_pcs_finished',
                 'session_template_id': self.session_template_id,
                 'operation': 'shutdown',
                 'boa_launch': 'boa_launch_1',
@@ -210,7 +210,7 @@ class TestBOSV1ActivityChecker(ExtendedTestCase):
             },
             '2': {
                 'bos_launch': 'bos_launch_2',
-                'computes': 'boot_capmc_finished',
+                'computes': 'boot_pcs_finished',
                 'session_template_id': self.session_template_id,
                 'operation': 'configure',
                 'boa_launch': 'boa_launch_2',
@@ -218,7 +218,7 @@ class TestBOSV1ActivityChecker(ExtendedTestCase):
             },
             '3': {
                 'bos_launch': 'bos_launch_3',
-                'computes': 'boot_capmc_finished',
+                'computes': 'boot_pcs_finished',
                 'session_template_id': self.session_template_id,
                 'operation': 'reboot',
                 'boa_launch': 'boa_launch_3',

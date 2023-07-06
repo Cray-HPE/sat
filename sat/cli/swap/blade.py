@@ -38,7 +38,7 @@ from csm_api_client.service.hsm import HSMClient
 import inflect
 from kubernetes.client.exceptions import ApiException
 
-from sat.apiclient.capmc import CAPMCClient
+from sat.apiclient.pcs import PCSClient
 from sat.cached_property import cached_property
 from sat.hms_discovery import (
     HMSDiscoveryCronJob,
@@ -159,7 +159,7 @@ class BladeSwapProcedure(abc.ABC):
 
         session = SATSession()
         self.hsm_client = HSMClient(session)
-        self.capmc_client = CAPMCClient(session)
+        self.pcs_client = PCSClient(session)
 
     @cached_property
     def blade_nodes(self):
@@ -309,18 +309,18 @@ class SwapOutProcedure(BladeSwapProcedure):
 
     @blade_swap_stage('Power off slot')
     def power_off_slot(self):
-        """Powers off a slot using CAPMC
+        """Powers off a slot using PCS
 
         Raises:
-            BladeSwapError: if there is a problem powering off the slot with CAPMC
+            BladeSwapError: if there is a problem powering off the slot with PCS
         """
         if self.blade_class == 'river':
             # Power off nodes on the blade individually on River blades
-            xnames_on = self.capmc_client.get_xnames_power_state(
+            xnames_on = self.pcs_client.get_xnames_power_state(
                 [node['ID'] for node in self.blade_nodes]
             ).get('on')
             if xnames_on:
-                self.capmc_client.set_xnames_power_state(
+                self.pcs_client.set_xnames_power_state(
                     xnames_on, 'off',
                     recursive=True,
                     force=True,
@@ -330,7 +330,7 @@ class SwapOutProcedure(BladeSwapProcedure):
                 LOGGER.info('All nodes on River blade %s are already powered off, continuing', self.xname)
         else:
             # Power off the whole slot on Mountain
-            self.capmc_client.set_xnames_power_state(
+            self.pcs_client.set_xnames_power_state(
                 [self.xname], 'off',
                 recursive=True,
                 force=True,
@@ -565,7 +565,7 @@ class SwapInProcedure(BladeSwapProcedure):
 
     @blade_swap_stage('Power on slot')
     def power_on_slot(self):
-        """Power on the slot using CAPMC.
+        """Power on the slot using PCS.
 
         Raises:
             BladeSwapError: if the slot cannot be powered on
@@ -573,7 +573,7 @@ class SwapInProcedure(BladeSwapProcedure):
         params = {'recursive': True}
         if self.blade_class == 'river':
             params['force'] = True
-        self.capmc_client.set_xnames_power_state([self.xname], 'on', **params)
+        self.pcs_client.set_xnames_power_state([self.xname], 'on', **params)
 
     @blade_swap_stage('Enable nodes')
     def enable_nodes(self):

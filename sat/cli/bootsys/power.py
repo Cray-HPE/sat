@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020, 2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -22,13 +22,14 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 """
-Support for powering off computes/UANs with CAPMC.
+Support for powering off computes/UANs with PCS.
 """
 import logging
 
 from inflect import engine
 
-from sat.apiclient import APIError, CAPMCClient, CAPMCError, HSMClient
+from sat.apiclient import APIError, HSMClient
+from sat.apiclient.pcs import PCSClient, PCSError
 from sat.session import SATSession
 from sat.waiting import GroupWaiter
 
@@ -36,7 +37,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 def get_nodes_by_role_and_state(role, power_state):
-    """Get all the nodes matching the given role in HSM and power state in CAPMC.
+    """Get all the nodes matching the given role in HSM and power state in PCS.
 
     Args:
         role (str): the role to search for.
@@ -48,17 +49,17 @@ def get_nodes_by_role_and_state(role, power_state):
 
     Raises:
         APIError: if there is a failure to get the needed information from HSM
-            or CAPMC.
+            or PCS.
     """
     hsm_client = HSMClient(SATSession())
-    capmc_client = CAPMCClient(SATSession())
+    pcs_client = PCSClient(SATSession())
 
     role_nodes = hsm_client.get_component_xnames({'type': 'Node', 'role': role})
     LOGGER.debug('Found %s node(s) with role %s: %s', len(role_nodes), role, role_nodes)
     if not role_nodes:
         return role_nodes
 
-    nodes_by_power_state = capmc_client.get_xnames_power_state(role_nodes)
+    nodes_by_power_state = pcs_client.get_xnames_power_state(role_nodes)
     matching_nodes = nodes_by_power_state.get(power_state, [])
     LOGGER.debug('Found %s node(s) with role %s and power state %s: %s', len(matching_nodes),
                  role, power_state, matching_nodes)
@@ -66,11 +67,11 @@ def get_nodes_by_role_and_state(role, power_state):
     return matching_nodes
 
 
-class CAPMCPowerWaiter(GroupWaiter):
-    """Waits for all members to reach the given power state in CAPMC."""
+class PCSPowerWaiter(GroupWaiter):
+    """Waits for all members to reach the given power state in PCS."""
 
     def __init__(self, members, power_state, timeout, poll_interval=5, suppress_warnings=False):
-        """Create a new CAPMCPowerStateWaiter.
+        """Create a new PCSPowerStateWaiter.
 
         Args:
             members (list or set): the xnames to wait for.
@@ -81,15 +82,15 @@ class CAPMCPowerWaiter(GroupWaiter):
             suppress_warnings (bool): if True, suppress warnings when a query to
                 get_xname_status results in an error and node(s) in undefined
                 state. As an example, this is useful when waiting for a BMC or
-                node controller to be powered on since CAPMC will fail to query
+                node controller to be powered on since PCS will fail to query
                 the power status until it is powered on.
         """
         super().__init__(members, timeout, poll_interval)
         self.power_state = power_state
-        self.capmc_client = CAPMCClient(SATSession(), suppress_warnings=suppress_warnings)
+        self.pcs_client = PCSClient(SATSession())
 
     def condition_name(self):
-        return 'CAPMC power ' + self.power_state
+        return 'PCS power ' + self.power_state
 
     def member_has_completed(self, member):
         """Return whether the member xname has reached the desired power state.
@@ -99,12 +100,12 @@ class CAPMCPowerWaiter(GroupWaiter):
 
         Returns:
             bool: True if the xname has reached the desired power state
-                according to CAPMC.
+                according to PCS.
         """
         LOGGER.debug('Checking whether xname %s has reached desired power state %s',
                      member, self.power_state)
         try:
-            current_state = self.capmc_client.get_xname_power_state(member)
+            current_state = self.pcs_client.get_xname_power_state(member)
         except APIError as err:
             # When cabinets are powered off, the query will respond with 400 bad request
             # until components are reachable.
@@ -119,13 +120,13 @@ def do_nodes_power_off(timeout):
 
     Args:
         timeout (int): the timeout for waiting for nodes to reach powered off
-            state according to CAPMC after turning off their power.
+            state according to PCS after turning off their power.
 
     Returns:
         A tuple of:
             timed_out_nodes: a set of nodes that timed out waiting to reach
-                power state 'off' according to capmc.
-            failed_nodes: a set of nodes that failed to power off with capmc
+                power state 'off' according to pcs.
+            failed_nodes: a set of nodes that failed to power off with pcs
     """
     inf = engine()
     on_nodes = set(get_nodes_by_role_and_state('compute', 'on') +
@@ -141,10 +142,10 @@ def do_nodes_power_off(timeout):
 
     wait_nodes = on_nodes
     failed_nodes = set()
-    capmc_client = CAPMCClient(SATSession())
+    pcs_client = PCSClient(SATSession())
     try:
-        capmc_client.set_xnames_power_state(list(on_nodes), 'off', force=True)
-    except CAPMCError as err:
+        pcs_client.set_xnames_power_state(list(on_nodes), 'off', force=True)
+    except PCSError as err:
         LOGGER.warning(err)
         if err.xnames:
             failed_nodes = set(err.xnames)
@@ -156,8 +157,8 @@ def do_nodes_power_off(timeout):
 
     num_wait_nodes = len(wait_nodes)
     LOGGER.info(f'Waiting {timeout} seconds until {num_wait_nodes} {inf.plural("node", num_wait_nodes)} '
-                f'reach powered off state according to CAPMC.')
+                f'reach powered off state according to PCS.')
 
-    waiter = CAPMCPowerWaiter(wait_nodes, 'off', timeout)
+    waiter = PCSPowerWaiter(wait_nodes, 'off', timeout)
     timed_out_nodes = waiter.wait_for_completion()
     return timed_out_nodes, failed_nodes

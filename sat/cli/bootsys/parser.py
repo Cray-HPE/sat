@@ -33,8 +33,8 @@ TimeoutSpec = namedtuple('TimeoutSpec', ['option_prefix', 'applicable_actions',
 
 
 TIMEOUT_SPECS = [
-    TimeoutSpec('capmc', ['shutdown'], 120,
-                'components reach powered off state after they are shutdown with CAPMC.'),
+    TimeoutSpec('pcs', ['shutdown'], 120,
+                'components reach powered off state after they are shutdown with PCS.'),
     TimeoutSpec('discovery', ['boot'], 600,
                 'compute modules reach the powered on state '
                 'after the HMS Discovery cronjob is resumed.'),

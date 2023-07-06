@@ -26,14 +26,10 @@ Powers on and off liquid-cooled compute cabinets.
 """
 import logging
 
-from csm_api_client.k8s import load_kube_api
-from kubernetes.client import BatchV1Api
-from kubernetes.config import ConfigException
-
-from sat.apiclient import APIError, CAPMCClient, HSMClient
-from sat.cli.bootsys.power import CAPMCPowerWaiter
+from sat.apiclient import APIError, HSMClient
+from sat.apiclient.pcs import PCSClient
+from sat.cli.bootsys.power import PCSPowerWaiter
 from sat.config import get_config_value
-from sat.cronjob import recreate_namespaced_stuck_cronjobs
 from sat.hms_discovery import (HMSDiscoveryCronJob, HMSDiscoveryError,
                                HMSDiscoveryScheduledWaiter)
 from sat.session import SATSession
@@ -74,32 +70,32 @@ def do_air_cooled_cabinets_power_off(args):
         return
 
     LOGGER.info(f'Powering off {len(node_xnames)} non-management nodes in air-cooled cabinets.')
-    capmc_client = CAPMCClient(SATSession())
+    pcs_client = PCSClient(SATSession())
     try:
-        capmc_client.set_xnames_power_state(node_xnames, 'off', force=True)
+        pcs_client.set_xnames_power_state(node_xnames, 'off', force=True)
     except APIError as err:
         LOGGER.warning(f'Failed to power off all air-cooled non-management nodes: {err}')
 
     LOGGER.info(f'Waiting for {len(node_xnames)} non-management nodes in air-cooled cabinets '
                 f'to reach powered off state.')
-    capmc_waiter = CAPMCPowerWaiter(node_xnames, 'off',
-                                    get_config_value('bootsys.capmc_timeout'))
-    timed_out_xnames = capmc_waiter.wait_for_completion()
+    pcs_waiter = PCSPowerWaiter(node_xnames, 'off',
+                                get_config_value('bootsys.pcs_timeout'))
+    timed_out_xnames = pcs_waiter.wait_for_completion()
 
     if timed_out_xnames:
         LOGGER.error(f'The following non-management nodes failed to reach the powered off '
-                     f'state after powering off with CAPMC: {timed_out_xnames}')
+                     f'state after powering off with PCS: {timed_out_xnames}')
         raise SystemExit(1)
 
     LOGGER.info(f'All {len(node_xnames)} non-management nodes in air-cooled cabinets '
-                f'reached powered off state according to CAPMC.')
+                f'reached powered off state according to PCS.')
 
 
 def get_xnames_for_power_action(hsm_client):
     """Get xnames of RouterModules, ComputeModules, and Chassis.
 
     This helper function gets all the xnames used in a power action (turn on or
-    turn off) individually since CAPMC does not support recursively powering off
+    turn off) individually since PCS does not support recursively powering off
     disabled components in Shasta v1.5. See CRAYSAT-920.
 
     Returns:
@@ -131,9 +127,9 @@ def do_liquid_cooled_cabinets_power_off(args):
 
     LOGGER.info(f'Powering off all liquid-cooled chassis, compute modules, and router modules. '
                 f'({len(xnames_to_power_off)} components total)')
-    capmc_client = CAPMCClient(SATSession())
+    pcs_client = PCSClient(SATSession())
     try:
-        capmc_client.set_xnames_power_state(xnames_to_power_off, 'off')
+        pcs_client.set_xnames_power_state(xnames_to_power_off, 'off')
     except APIError as err:
         LOGGER.warning(f'Failed to power off all cabinets: {err}')
         if hasattr(err, '__cause__'):
@@ -141,17 +137,17 @@ def do_liquid_cooled_cabinets_power_off(args):
 
     LOGGER.info(f'Waiting for {len(xnames_to_power_off)} components to reach '
                 f'powered off state.')
-    capmc_waiter = CAPMCPowerWaiter(xnames_to_power_off, 'off',
-                                    get_config_value('bootsys.capmc_timeout'))
-    timed_out_xnames = capmc_waiter.wait_for_completion()
+    pcs_waiter = PCSPowerWaiter(xnames_to_power_off, 'off',
+                                get_config_value('bootsys.pcs_timeout'))
+    timed_out_xnames = pcs_waiter.wait_for_completion()
 
     if timed_out_xnames:
         LOGGER.error(f'The following components failed to reach the powered off '
-                     f'state after powering off with CAPMC: {timed_out_xnames}')
+                     f'state after powering off with PCS: {timed_out_xnames}')
         raise SystemExit(1)
 
     LOGGER.info(f'All {len(xnames_to_power_off)} liquid-cooled chassis components reached powered off '
-                f'state according to CAPMC.')
+                f'state according to PCS.')
 
 
 def do_cabinets_power_off(args):
@@ -181,9 +177,9 @@ def do_cabinets_power_off(args):
 def do_cabinets_power_on(args):
     """Power on the liquid-cooled compute cabinets in the system.
 
-    Do not do this with a manual call to CAPMC. Instead, restart the
+    Do not do this with a manual call to PCS. Instead, restart the
     hms-discovery cronjob in k8s, and let it do the power on for us. Then wait
-    for all the compute modules of type "Mountain" to be powered on in CAPMC.
+    for all the compute modules of type "Mountain" to be powered on in PCS.
 
     Args:
         args (argparse.Namespace): The parsed bootsys arguments.
@@ -221,11 +217,11 @@ def do_cabinets_power_on(args):
         raise SystemExit(1)
 
     # Once ComputeModules are powered on, it is possible to boot nodes with BOS.
-    # Suppress warnings about CAPMC state query errors because we expect the
+    # Suppress warnings about PCS state query errors because we expect the
     # compute modules to be unreachable until they are powered on.
-    module_waiter = CAPMCPowerWaiter(xnames_to_power_on, 'on',
-                                     get_config_value('bootsys.discovery_timeout'),
-                                     suppress_warnings=True)
+    module_waiter = PCSPowerWaiter(xnames_to_power_on, 'on',
+                                   get_config_value('bootsys.discovery_timeout'),
+                                   suppress_warnings=True)
     modules_timed_out = module_waiter.wait_for_completion()
 
     if modules_timed_out:

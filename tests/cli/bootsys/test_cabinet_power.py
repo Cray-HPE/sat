@@ -42,8 +42,8 @@ class TestAirCooledCabinetsPowerOff(unittest.TestCase):
         patch_prefix = 'sat.cli.bootsys.cabinet_power'
         self.mock_sat_session = patch(f'{patch_prefix}.SATSession').start().return_value
         self.mock_hsm_client = patch(f'{patch_prefix}.HSMClient').start().return_value
-        self.mock_capmc_client = patch(f'{patch_prefix}.CAPMCClient').start().return_value
-        self.mock_capmc_waiter = patch(f'{patch_prefix}.CAPMCPowerWaiter').start().return_value
+        self.mock_pcs_client = patch(f'{patch_prefix}.PCSClient').start().return_value
+        self.mock_pcs_waiter = patch(f'{patch_prefix}.PCSPowerWaiter').start().return_value
 
         # Mock as if we have nodes in slots 1-15 as Management nodes, and the node in slot 17 not
         self.mock_river_nodes = [f'x3000c0s{slot}b0n0' for slot in [1, 3, 5, 7, 9, 11, 13, 15, 17]]
@@ -62,7 +62,7 @@ class TestAirCooledCabinetsPowerOff(unittest.TestCase):
                 return []
 
         self.mock_hsm_client.get_component_xnames.side_effect = mock_get_component_xnames
-        self.mock_capmc_waiter.wait_for_completion.return_value = self.timed_out_xnames
+        self.mock_pcs_waiter.wait_for_completion.return_value = self.timed_out_xnames
 
     def tearDown(self):
         patch.stopall()
@@ -83,10 +83,10 @@ class TestAirCooledCabinetsPowerOff(unittest.TestCase):
             do_air_cooled_cabinets_power_off(self.args)
 
         self.assert_hsm_client_calls()
-        self.mock_capmc_client.set_xnames_power_state.assert_called_once_with(
+        self.mock_pcs_client.set_xnames_power_state.assert_called_once_with(
             self.mock_river_non_mgmt_nodes, 'off', force=True
         )
-        self.mock_capmc_waiter.wait_for_completion.assert_called_once_with()
+        self.mock_pcs_waiter.wait_for_completion.assert_called_once_with()
         self.assertEqual(3, len(logs_cm.records))
         self.assertRegex(logs_cm.records[0].message,
                          f'Powering off {self.num_non_mgmt_river_nodes}')
@@ -104,10 +104,10 @@ class TestAirCooledCabinetsPowerOff(unittest.TestCase):
                 do_air_cooled_cabinets_power_off(self.args)
 
         self.assert_hsm_client_calls()
-        self.mock_capmc_client.set_xnames_power_state.assert_called_once_with(
+        self.mock_pcs_client.set_xnames_power_state.assert_called_once_with(
             self.mock_river_non_mgmt_nodes, 'off', force=True
         )
-        self.mock_capmc_waiter.wait_for_completion.assert_called_once_with()
+        self.mock_pcs_waiter.wait_for_completion.assert_called_once_with()
         self.assertEqual(1, len(logs_cm.records))
         self.assertRegex(logs_cm.records[0].message,
                          'non-management nodes failed to reach the powered off state.*'
@@ -122,8 +122,8 @@ class TestAirCooledCabinetsPowerOff(unittest.TestCase):
             do_air_cooled_cabinets_power_off(self.args)
 
         self.assert_hsm_client_calls()
-        self.mock_capmc_client.set_xnames_power_state.assert_not_called()
-        self.mock_capmc_waiter.wait_for_completion.assert_not_called()
+        self.mock_pcs_client.set_xnames_power_state.assert_not_called()
+        self.mock_pcs_waiter.wait_for_completion.assert_not_called()
         self.assertEqual(logs_cm.records[0].message,
                          'No non-management nodes in air-cooled cabinets to power off.')
 
