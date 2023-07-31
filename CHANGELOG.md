@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Kubernetes configuration when running in a container inside the cluster and
   remove code duplication.
 
+### Fixed
+- Update PyYAML to 6.0.1 and csm-api-client to 1.1.5 to resolve build issues.
+
 ## [3.21.6] - 2023-06-23
 
 ### Changed
