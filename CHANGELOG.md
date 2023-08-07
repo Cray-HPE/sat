@@ -39,6 +39,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Update PyYAML to 6.0.1 and csm-api-client to 1.1.5 to resolve build issues.
 
+### Security
+- Update the version of cryptography from 41.0.0 to 41.0.3 to address
+  CVE-2023-38325.
+- Update the version of pygments from 2.11.2 to 2.15.0 to address
+  CVE-2022-40896.
+- Update the version of certifi from 2022.12.7 to 2023.7.22 to address
+  CVE-2023-37920.
+
 ## [3.21.6] - 2023-06-23
 
 ### Changed
