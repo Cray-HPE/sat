@@ -659,18 +659,16 @@ class TestGetS3Resource(ExtendedTestCase):
     def test_get_s3_resource_open_file_error(self):
         """Test get_s3_resource when opening a file fails"""
         self.mock_read_config_value_file.side_effect = OSError('Failed to open file')
-        with self.assertLogs(level=logging.ERROR) as logs:
-            with self.assertRaises(SystemExit):
-                util.get_s3_resource()
-        self.assert_in_element('Unable to load configuration: Failed to open file', logs.output)
+        expected_err = 'Unable to load configuration: Failed to open file'
+        with self.assertRaisesRegex(util.S3ResourceCreationError, expected_err):
+            util.get_s3_resource()
 
     def test_get_s3_resource_value_error(self):
         """Test get_s3_resource creating the S3 ServiceResource"""
         self.mock_boto3.side_effect = ValueError('Bad URL value')
-        with self.assertLogs(level=logging.ERROR) as logs:
-            with self.assertRaises(SystemExit):
-                util.get_s3_resource()
-        self.assert_in_element('Unable to load S3 API: Bad URL value', logs.output)
+        expected_err = 'Unable to load S3 API: Bad URL value'
+        with self.assertRaisesRegex(util.S3ResourceCreationError, expected_err):
+            util.get_s3_resource()
 
 
 class TestBeginEndLogger(ExtendedTestCase):

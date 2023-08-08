@@ -637,6 +637,10 @@ def get_new_ordered_dict(orig_dict, dotted_paths, default_value=None, strip_path
     ])
 
 
+class S3ResourceCreationError(Exception):
+    pass
+
+
 def get_s3_resource():
     """Helper function to load the S3 API from configuration variables.
 
@@ -644,7 +648,7 @@ def get_s3_resource():
         A boto3 ServiceResource object.
 
     Raises:
-        SystemExit: if unable to load the configuration values, or unable
+        S3ResourceCreationError: if unable to load the configuration values, or unable
             to create the boto3 ServiceResource object.
     """
     try:
@@ -660,13 +664,11 @@ def get_s3_resource():
                 verify=get_config_value('s3.cert_verify')
             )
     except OSError as err:
-        LOGGER.error(f'Unable to load configuration: {err}')
-        raise SystemExit(1)
+        raise S3ResourceCreationError(f'Unable to load configuration: {err}') from err
     except ValueError as err:
         # A ValueError is raised when an invalid value is given to boto3.resource,
         # e.g. an endpoint URL that is not a valid URL.
-        LOGGER.error(f'Unable to load S3 API: {err}')
-        raise SystemExit(1)
+        raise S3ResourceCreationError(f'Unable to load S3 API: {err}') from err
 
 
 class BeginEndLogger:

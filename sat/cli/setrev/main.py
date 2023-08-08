@@ -35,8 +35,7 @@ import yaml
 
 from sat.cli.setrev.site_fields import SITE_FIELDS
 from sat.config import get_config_value
-from sat.util import get_s3_resource, yaml_dump
-
+from sat.util import get_s3_resource, yaml_dump, S3ResourceCreationError
 
 LOGGER = logging.getLogger(__name__)
 
@@ -54,18 +53,21 @@ def get_site_data(sitefile):
     Raises:
         PermissionError: If the sitefile exists locally but could not be read.
     """
-    s3 = get_s3_resource()
-    s3_bucket = get_config_value('s3.bucket')
-
     try:
-        LOGGER.debug('Downloading %s from S3 (bucket: %s)', sitefile, s3_bucket)
-        s3.Object(s3_bucket, sitefile).download_file(sitefile)
-    except (BotoCoreError, ClientError, Boto3Error) as err:
-        # It is not an error if this file doesn't already exist
-        # TODO: it would be nice to differentiate between successfully connecting to S3
-        # and the file not existing versus failing to connect to S3, where the latter
-        # deserves at least a warning-level message.
-        LOGGER.debug('Unable to download site info file %s from S3: %s', sitefile, err)
+        s3 = get_s3_resource()
+    except S3ResourceCreationError as err:
+        LOGGER.warning('Error creating S3 resource: %s', err)
+    else:
+        s3_bucket = get_config_value('s3.bucket')
+        try:
+            LOGGER.debug('Downloading %s from S3 (bucket: %s)', sitefile, s3_bucket)
+            s3.Object(s3_bucket, sitefile).download_file(sitefile)
+        except (BotoCoreError, ClientError, Boto3Error) as err:
+            # It is not an error if this file doesn't already exist
+            # TODO: it would be nice to differentiate between successfully connecting to S3
+            # and the file not existing versus failing to connect to S3, where the latter
+            # deserves at least a warning-level message.
+            LOGGER.debug('Unable to download site info file %s from S3: %s', sitefile, err)
 
     try:
         with open(sitefile, 'r') as f:
@@ -124,20 +126,25 @@ def write_site_data(sitefile, data):
         Exception of unknown type if the write to the sitefile failed.
     """
 
-    s3 = get_s3_resource()
-    s3_bucket = get_config_value('s3.bucket')
-
-    # Write entries to file as yaml
     try:
-        with open(sitefile, 'w') as of:
-            of.write(yaml_dump(data))
-        LOGGER.debug('Uploading %s to S3 (bucket: %s)', sitefile, s3_bucket)
-        s3.Object(s3_bucket, sitefile).upload_file(sitefile)
-        LOGGER.info(f'Successfully wrote site info file {sitefile} to S3.')
-    except OSError as err:
-        LOGGER.error('Unable to write %s. Error: %s', sitefile, err)
-    except (BotoCoreError, ClientError, Boto3Error) as err:
-        LOGGER.error('Unable to upload site info file %s to S3. Error: %s', sitefile, err)
+        s3 = get_s3_resource()
+    except S3ResourceCreationError as err:
+        LOGGER.error('Error while creating S3 resource: %s', err)
+    else:
+        s3_bucket = get_config_value('s3.bucket')
+
+        # Write entries to file as yaml
+        try:
+            with open(sitefile, 'w') as of:
+                of.write(yaml_dump(data))
+            LOGGER.debug('Uploading %s to S3 (bucket: %s)', sitefile, s3_bucket)
+            if s3:
+                s3.Object(s3_bucket, sitefile).upload_file(sitefile)
+            LOGGER.info(f'Successfully wrote site info file {sitefile} to S3.')
+        except OSError as err:
+            LOGGER.error('Unable to write %s. Error: %s', sitefile, err)
+        except (BotoCoreError, ClientError, Boto3Error) as err:
+            LOGGER.error('Unable to upload site info file %s to S3. Error: %s', sitefile, err)
 
 
 def do_setrev(args):

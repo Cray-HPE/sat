@@ -42,7 +42,7 @@ from sat.apiclient import APIError, HSMClient
 from sat.config import get_config_value
 from sat.cli.setrev.site_fields import SITE_FIELDS
 from sat.session import SATSession
-from sat.util import get_s3_resource
+from sat.util import get_s3_resource, S3ResourceCreationError
 
 
 LOGGER = logging.getLogger(__name__)
@@ -61,21 +61,23 @@ def get_site_data(sitefile):
         If an error occurred while reading the sitefile, then the error
         will be logged and this dict will default its entries to 'ERROR'.
     """
-
-    s3 = get_s3_resource()
-    s3_bucket = get_config_value('s3.bucket')
     data = defaultdict(lambda: None)
     default = defaultdict(lambda: 'ERROR')
-
     if not sitefile:
         sitefile = get_config_value('general.site_info')
-
     try:
-        LOGGER.debug('Downloading %s from S3 (bucket: %s)', sitefile, s3_bucket)
-        s3.Object(s3_bucket, sitefile).download_file(sitefile)
-    except (BotoCoreError, ClientError, Boto3Error) as err:
-        LOGGER.error('Unable to download site info file %s from S3. Attempting to read from cached copy. '
-                     'Error: %s', sitefile, err)
+        s3 = get_s3_resource()
+    except S3ResourceCreationError as err:
+        LOGGER.warning('Error creating S3 resource: %s', err)
+    else:
+        s3_bucket = get_config_value('s3.bucket')
+
+        try:
+            LOGGER.debug('Downloading %s from S3 (bucket: %s)', sitefile, s3_bucket)
+            s3.Object(s3_bucket, sitefile).download_file(sitefile)
+        except (BotoCoreError, ClientError, Boto3Error) as err:
+            LOGGER.error('Unable to download site info file %s from S3. Attempting to read from cached copy. '
+                         'Error: %s', sitefile, err)
 
     try:
         with open(sitefile, 'r') as f:
