@@ -7,7 +7,7 @@ The System Admin Toolkit
 ------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2019-2023 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -257,6 +257,30 @@ LOGGING
         SAT also prints log messages to stderr, and this parameter sets the
         minimum log severity that will cause a log to be printed to stderr.
         Defaults to "INFO".
+
+S3
+--
+
+**endpoint**
+        The URL of the S3 endpoint. The default is "https://rgw-vip.nmn"
+
+**bucket**
+        The S3 bucket where SAT should store data. The default is "sat".
+
+**access_key**
+        The path to the S3 access key SAT should use to access S3. The default
+        is "~/.config/sat/s3_access_key".
+
+**secret_key**
+        The path to the S3 secret key SAT should use to access S3. The default
+        is "~/.config/sat/s3_secret_key".
+
+**cert_verify**
+        If "true", then SAT will validate the authenticity of the S3 host
+        via a signed certificate before communicating.
+
+        This parameter is set to "false" by default.
+
 
 SEE ALSO
 ========

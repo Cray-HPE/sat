@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -33,6 +33,7 @@ import sys
 import argcomplete
 
 from sat.config import ConfigFileExistsError, DEFAULT_CONFIG_PATH, generate_default_config, load_config
+from sat.warnings import configure_insecure_request_warnings
 from sat.logging import bootstrap_logging, configure_logging
 from sat.parser import create_parent_parser
 from sat.util import ensure_permissions, get_resource_section_path
@@ -96,6 +97,7 @@ def main():
                 pass
             load_config(args)
             configure_logging()
+            configure_insecure_request_warnings()
 
         # Dynamically importing here affords the following
         # advantages:

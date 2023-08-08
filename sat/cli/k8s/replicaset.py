@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020, 2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -26,13 +26,11 @@ ReplicaSet class
 """
 
 import logging
-import warnings
-import yaml
 from collections import defaultdict
 
-import kubernetes.client
+from csm_api_client.k8s import load_kube_api
+from kubernetes.client import AppsV1Api
 import kubernetes.config
-from kubernetes.config.config_exception import ConfigException
 from kubernetes.client.rest import ApiException
 
 from sat.cached_property import cached_property
@@ -117,21 +115,8 @@ class ReplicaSet(kubernetes.client.models.v1_replica_set.V1ReplicaSet):
         Raises:
             ApiException: An error occured while retrieving data.
             ConfigException: An error occured while reading the K8s config.
-            FileNotFoundError: The config didn't exist.
         """
-
-        try:
-            with warnings.catch_warnings():
-                # Ignore YAMLLoadWarning: calling yaml.load() without Loader=... is deprecated
-                # kubernetes/config/kube_config.py should use yaml.safe_load()
-                warnings.filterwarnings('ignore', category=yaml.YAMLLoadWarning)
-                kubernetes.config.load_kube_config()
-        except ConfigException as err:
-            raise ConfigException('Error reading kubernetes config: {}'.format(err))
-        except FileNotFoundError as err:
-            raise FileNotFoundError('Kubernetes configuration file not found: {}'.format(err))
-
-        appsv1 = kubernetes.client.AppsV1Api()
+        appsv1 = load_kube_api(api_cls=AppsV1Api)
 
         try:
             replica_sets = appsv1.list_replica_set_for_all_namespaces().items

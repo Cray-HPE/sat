@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -657,7 +657,7 @@ def get_s3_resource():
                 aws_access_key_id=access_key,
                 aws_secret_access_key=secret_key,
                 region_name='',
-                verify=False
+                verify=get_config_value('s3.cert_verify')
             )
     except OSError as err:
         LOGGER.error(f'Unable to load configuration: {err}')

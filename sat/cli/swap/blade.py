@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022-2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -31,15 +31,12 @@ import abc
 from functools import wraps
 import json
 import logging
-import warnings
 
+from csm_api_client.k8s import load_kube_api
 from csm_api_client.service.gateway import APIError
 from csm_api_client.service.hsm import HSMClient
 import inflect
-from kubernetes.client import CoreV1Api
 from kubernetes.client.exceptions import ApiException
-from kubernetes.config import ConfigException, load_kube_config
-from yaml import YAMLLoadWarning
 
 from sat.apiclient.capmc import CAPMCClient
 from sat.cached_property import cached_property
@@ -514,33 +511,7 @@ class SwapInProcedure(BladeSwapProcedure):
         super().__init__(args)
         self.src_mapping = args.src_mapping
         self.dst_mapping = args.dst_mapping
-
-    @cached_property
-    def k8s_api(self):
-        """Get a Kubernetes CoreV1Api object.
-
-        This helper function loads the kube config and then instantiates
-        an API object.
-
-        Returns:
-            CoreV1Api: the API object from the kubernetes library.
-
-        Raises:
-            kubernetes.config.config_exception.ConfigException: if failed to load
-                kubernetes configuration.
-        """
-        try:
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', category=YAMLLoadWarning)
-                load_kube_config()
-        # Earlier versions: FileNotFoundError; later versions: ConfigException
-        except (FileNotFoundError, ConfigException) as err:
-            raise ConfigException(
-                'Failed to load kubernetes config to get pod status: '
-                '{}'.format(err)
-            )
-
-        return CoreV1Api()
+        self.k8s_api = load_kube_api()
 
     def wait_for_endpoints(self, xnames):
         """Helper function to wait for Redfish endpoints to be discovered
