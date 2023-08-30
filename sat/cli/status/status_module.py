@@ -437,20 +437,24 @@ class CFSStatusModule(StatusModule):
             'errorCount': 'Error Count'
         }.get(heading, heading)
 
+    # What happens here when we make a property into a generator with yield? Does this work?
+    # Do all callers iterate over this property?
     @property
     def rows(self):
         cfs_client = CFSClient(self.session)
         try:
+            # Bug here: Can we really pass 'v3' as first path element? Won't it end up as /v2/v3/components?
             cfs_response = cfs_client.get('v3', 'components', raise_not_ok=False)
             if cfs_response.status_code == 404:
                 yield from cfs_client.get('components').json()
             else:
                 cfs_response = cfs_response.json()
+                # Bug in logic here: last page of components is never yielded
                 while cfs_response.get('next'):
                     yield from cfs_response['components']
                     cfs_response = cfs_client.get(
                         'v3', 'components',
-                        params={'after_id': cfs_response['next']['after_id']}
+                        params=cfs_response['next']
                     ).json()
 
         except APIError as err:
