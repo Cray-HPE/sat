@@ -29,7 +29,7 @@ SATMANDIR=/usr/share/man/man8
 
 METAL_PROVISION_REPO="https://github.com/Cray-HPE/metal-provision.git"
 METAL_PROVISION_DIR="metal-provision"
-METAL_PROVISION_BASE_PACKAGES_PATH="roles/node_images_ncn_common/vars/packages/suse.yml"
+METAL_PROVISION_BASE_PACKAGES_PATH="group_vars/all.yml"
 METAL_PROVISION_BRANCH="lts/csm-1.5"
 
 # create logging directory
@@ -67,21 +67,17 @@ cd $METAL_PROVISION_DIR
 git checkout $METAL_PROVISION_BRANCH
 
 KUBERNETES_PULL_VERSION=$(python3 <<EOF
-import re
 import sys
 
-import semver
 import yaml
 
 
 with open("${METAL_PROVISION_BASE_PACKAGES_PATH}") as pkgs:
     pkgs = yaml.safe_load(pkgs)
-    for line in pkgs.get("packages", []):
-        name, version = re.split(r'(?:(?:<|>)=?|=)', line)
-        if name == "kubectl":
-            version = semver.VersionInfo.parse(version).finalize_version()
-            print(str(version))
-            sys.exit(0)
+    version = pkgs.get("kubernetes_release")
+    if version:
+        print(version.strip())
+        sys.exit(0)
 print("Could not determine kubectl version")
 sys.exit(1)
 EOF
