@@ -28,8 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.25.3] - 2023-08-31
 
 ### Fixed
-- Fixed a build issue were the kubectl version ref file updated 
-  to pick from all.yml
+- Fixed a build issue which occurred when trying to get the kubectl version
+  from the `metal-provision` repo.
 
 ## [3.25.2] - 2023-08-07
 
