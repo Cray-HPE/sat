@@ -35,7 +35,7 @@ from csm_api_client.service.vcs import VCSError
 from jinja2.sandbox import SandboxedEnvironment
 
 from csm_api_client.service.cfs import CFSClient
-from sat.cli.bootprep.errors import InputItemCreateError
+from sat.cli.bootprep.errors import InputItemCreateError, InputItemValidateError
 from sat.cli.bootprep.input.configuration import (
     InputConfigurationLayer,
     GitInputConfigurationLayer,
@@ -538,6 +538,36 @@ class TestInputConfiguration(unittest.TestCase):
         config = InputConfiguration(self.config_data, self.mock_instance, self.index,
                                     self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
         self.assertEqual(f'compute-config-shasta-{self.shasta_version}', config.name)
+
+    def test_validate_name_length_hardcoded_valid(self):
+        """Test that a valid name validates against the length limitation"""
+        config = InputConfiguration(self.config_data, self.mock_instance, self.index,
+                                    self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
+        try:
+            config.validate_name_length()
+        except InputItemValidateError as err:
+            self.fail(f'Valid configuration name failed to validate with the following error: {err}')
+
+    def test_validate_name_length_rendered_valid(self):
+        """Test that a valid rendered name validates against the length limitation"""
+        self.config_data['name'] = 'compute-config-shasta-{{shasta.version}}'
+        config = InputConfiguration(self.config_data, self.mock_instance, self.index,
+                                    self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
+        try:
+            config.validate_name_length()
+        except InputItemValidateError as err:
+            self.fail(f'Valid configuration name failed to validate with the following error: {err}')
+
+    def test_validate_name_length_rendered_invalid(self):
+        """Test that a long rendered name fails to validate against the length limitation"""
+        self.jinja_env.globals['shasta']['version'] = '22.11.0-alpha.15.20230222113332-715762a'
+        self.config_data['name'] = 'compute-config-shasta-{{shasta.version}}-alice-upgrade'
+        err_regex = r'CFS configuration name ".*" length \(.*\) is longer than the maximum length \(63\)'
+        config = InputConfiguration(self.config_data, self.mock_instance, self.index,
+                                    self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
+
+        with self.assertRaisesRegex(InputItemValidateError, err_regex):
+            config.validate_name_length()
 
     def test_get_cfs_api_data(self):
         """Test successful case of get_create_item_data"""

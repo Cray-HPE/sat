@@ -33,11 +33,16 @@ from csm_api_client.service.gateway import APIError
 from csm_api_client.service.vcs import VCSError, VCSRepo
 
 from sat.cached_property import cached_property
-from sat.cli.bootprep.constants import LATEST_VERSION_VALUE
+from sat.cli.bootprep.constants import (
+    KUBERNETES_MAX_LABEL_LENGTH,
+    LATEST_VERSION_VALUE
+)
 from sat.cli.bootprep.errors import InputItemCreateError
 from sat.cli.bootprep.input.base import (
     BaseInputItem,
     BaseInputItemCollection,
+    InputItemValidateError,
+    Validatable,
     jinja_rendered,
 )
 from sat.config import get_config_value
@@ -351,6 +356,28 @@ class InputConfiguration(BaseInputItem):
         # The 'layers' property is required and must be a list, but it can be empty
         self.layers = [InputConfigurationLayer.get_configuration_layer(layer_data, jinja_env, product_catalog)
                        for layer_data in self.data['layers']]
+
+    @Validatable.validation_method()
+    def validate_name_length(self):
+        """Validate that the name length is within limits required by CFS
+
+        CFS v2 does not enforce a limit on CFS configuration name length, but
+        using a CFS configuration in an image customization session will fail if
+        the name is longer than 63 characters because this is the limit for K8s
+        labels, which are used by CFS.
+
+        CFS v3 enforces a limit of 63 characters on CFS configuration name length.
+
+        Raises:
+            InputItemValidateError: if CFS configuration name is too long
+        """
+        name_len = len(self.name)
+        if name_len > KUBERNETES_MAX_LABEL_LENGTH:
+            raise InputItemValidateError(
+                f'CFS configuration name "{self.name}" length ({name_len}) '
+                f'is longer than the maximum length ({KUBERNETES_MAX_LABEL_LENGTH}). '
+                f'Reduce name length and try again.'
+            )
 
     def get_create_item_data(self):
         """Get the data to pass to the CFS API to create this configuration.

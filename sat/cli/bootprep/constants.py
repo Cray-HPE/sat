@@ -50,3 +50,6 @@ CONFIGURATIONS_KEY = 'configurations'
 IMAGES_KEY = 'images'
 SESSION_TEMPLATES_KEY = 'session_templates'
 ALL_KEYS = [CONFIGURATIONS_KEY, IMAGES_KEY, SESSION_TEMPLATES_KEY]
+
+# The maximum length of a label allowed by Kubernetes
+KUBERNETES_MAX_LABEL_LENGTH = 63
