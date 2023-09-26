@@ -25,6 +25,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.25.4] - 2023-09-01
+
+### Fixed
+- Update `sat showrev` to log a warning and proceed to display other system
+  revision information when S3 credentials are not configured.
+- Update `sat setrev` and `sat bootsys` to handle missing S3 credentials more
+  gracefully.
+
 ## [3.25.3] - 2023-08-31
 
 ### Fixed

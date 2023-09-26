@@ -45,7 +45,7 @@ from sat.cli.bootsys.defaults import (
 )
 from sat.cli.bootsys.util import k8s_pods_to_status_dict
 from sat.config import get_config_value
-from sat.util import BeginEndLogger, get_s3_resource
+from sat.util import BeginEndLogger, get_s3_resource, S3ResourceCreationError
 
 
 LOGGER = logging.getLogger(__name__)
@@ -321,20 +321,24 @@ def do_state_capture(args):
     Raises:
         SystemExit: if there is a failure to capture state.
     """
-    state_recorders = [PodStateRecorder()]
-
-    failed = []
-    LOGGER.info('Capturing system state.')
-    with BeginEndLogger('system state capture'):
-        for sr in state_recorders:
-            try:
-                LOGGER.info(f'Capturing {sr.description}')
-                sr.dump_state()
-            except StateError as err:
-                LOGGER.error(f'Failed to capture {sr.description}: {err}')
-                failed.append(sr)
-
-    if failed:
+    try:
+        state_recorders = [PodStateRecorder()]
+    except S3ResourceCreationError as err:
+        LOGGER.error(f'Failed to initialize PodStateRecorder: {err}')
         sys.exit(1)
     else:
-        LOGGER.info('Finished capturing system state.')
+        failed = []
+        LOGGER.info('Capturing system state.')
+        with BeginEndLogger('system state capture'):
+            for sr in state_recorders:
+                try:
+                    LOGGER.info(f'Capturing {sr.description}')
+                    sr.dump_state()
+                except StateError as err:
+                    LOGGER.error(f'Failed to capture {sr.description}: {err}')
+                    failed.append(sr)
+
+        if failed:
+            sys.exit(1)
+        else:
+            LOGGER.info('Finished capturing system state.')
