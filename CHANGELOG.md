@@ -25,6 +25,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.25.5] - 2023-10-12
+
+### Security
+- Update the version of urllib3 from 1.26.8 to 1.26.17 to address
+  CVE-2023-43804.
+- Update the version of cryptography from 41.0.3 to 41.0.4 to address
+  a low-severity dependabot alert.
+
 ## [3.25.4] - 2023-09-01
 
 ### Fixed
