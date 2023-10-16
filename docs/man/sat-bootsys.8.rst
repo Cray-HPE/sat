@@ -247,7 +247,7 @@ These options set the timeouts of various parts of the stages of the
 **--ncn-shutdown-timeout** *NCN_SHUTDOWN_TIMEOUT*
         Timeout, in seconds, to wait until management NCNs
         have completed a graceful shutdown and have reached the
-        powered off state according to IPMI. Defaults to 300.
+        powered off state according to IPMI. Defaults to 900.
         Overrides the option bootsys.ncn_shutdown_timeout in
         the config file.
 
