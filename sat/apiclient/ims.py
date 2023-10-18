@@ -299,11 +299,13 @@ class IMSClient(APIGatewayClient):
         except ValueError as err:
             raise APIError(f'Failed to parse JSON response for image {image_id}: {err}')
 
-    def create_empty_image(self, name):
+    def create_empty_image(self, name, arch=None):
         """Create a new empty image record in IMS that has no link data yet.
 
         Args:
             name (str): the name of the image record to create
+            arch (str, Optional): the architecture of the image. If not
+                specified, IMS defaults to x86_64.
 
         Returns:
             dict: the created image record
@@ -312,8 +314,11 @@ class IMSClient(APIGatewayClient):
             APIError: if the request to create the new image fails or the
                 response is not valid JSON
         """
+        payload = {'name': name}
+        if arch:
+            payload['arch'] = arch
         try:
-            return self.post('images', json={'name': name}).json()
+            return self.post('images', json=payload).json()
         except APIError as err:
             raise APIError(f'Failed to create new empty image named {name}: {err}')
         except ValueError as err:
@@ -335,11 +340,11 @@ class IMSClient(APIGatewayClient):
         s3_host, bucket_path = path.split('://')
         return bucket_path.split('/', maxsplit=1)
 
-    def get_image_manifest(self, image_id):
+    def get_image_manifest(self, image):
         """Get the contents of the image manifest for the given image.
 
         Args:
-            image_id (str): the ID of the image to get the manifest for
+            image (dict): the image data to get the manifest from
 
         Returns:
             dict or None: the manifest for the given image or None if the image
@@ -349,7 +354,7 @@ class IMSClient(APIGatewayClient):
             APIError: if the image manifest cannot be obtained, either due to
                 errors accessing S3 or errors querying IMS for the manifest path
         """
-        image = self.get_image(image_id)
+        image_id = image.get('id')
         s3_manifest_path = get_val_by_path(image, 'link.path')
         if not s3_manifest_path:
             return None
@@ -507,14 +512,16 @@ class IMSClient(APIGatewayClient):
             APIError: if there is an error accessing S3 or making requests to
                 the IMS API
         """
-        new_image = self.create_empty_image(new_name)
+        old_image = self.get_image(image_id)
+
+        new_image = self.create_empty_image(new_name, old_image.get('arch'))
         try:
             new_image_id = new_image['id']
         except KeyError as err:
             raise APIError(f'Copy image failed due to missing "{err}" in new '
                            f'image named {new_name}')
 
-        old_manifest = self.get_image_manifest(image_id)
+        old_manifest = self.get_image_manifest(old_image)
         if not old_manifest:
             LOGGER.warning(f'Image with id {image_id} has no manifest file so '
                            f'no artifacts will be copied.')
