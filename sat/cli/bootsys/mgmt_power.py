@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2021,2023 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -38,7 +38,7 @@ from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger, ConsoleLoggingError
 from sat.cli.bootsys.util import get_and_verify_ncn_groups, get_ssh_client, FatalBootsysError
 from sat.waiting import GroupWaiter, WaitingFailure
 from sat.config import get_config_value
-from sat.util import BeginEndLogger, get_username_and_password_interactively, prompt_continue
+from sat.util import BeginEndLogger, get_username_and_password_interactively, pester_choices, prompt_continue
 
 LOGGER = logging.getLogger(__name__)
 INF = inflect.engine()
@@ -217,8 +217,8 @@ def finish_shutdown(hosts, username, password, ncn_shutdown_timeout, ipmi_timeou
 
     After start_shutdown is called, this checks that all the hosts
     have reached an IPMI "off" power state. If the shutdown has timed
-    out on a given host, an IPMI power off command is sent to hard
-    power off the host.
+    out on a given host, a prompt is shown to the user to decide whether
+    to proceed with hard power off.
 
     Args:
         hosts ([str]): a list of hostnames to power off.
@@ -236,16 +236,24 @@ def finish_shutdown(hosts, username, password, ncn_shutdown_timeout, ipmi_timeou
     pending_hosts = ipmi_waiter.wait_for_completion()
 
     if pending_hosts:
-        LOGGER.warning('Forcibly powering off nodes: %s', ', '.join(pending_hosts))
+        LOGGER.warning('The following nodes did not complete a graceful '
+                       'shutdown within the timeout: %s', ', '.join(pending_hosts))
 
         # Confirm all nodes have actually turned off.
-        failed_hosts = IPMIPowerStateWaiter(pending_hosts, 'off', ipmi_timeout, username, password,
-                                            send_command=True).wait_for_completion()
+        prompt_message = 'Do you want to forcibly power off the nodes that timedout?'
+        if pester_choices(prompt_message, ('yes', 'no')) == 'yes':
+            LOGGER.info('Proceeding with hard power off.')
 
-        if failed_hosts:
-            LOGGER.error('The following nodes failed to reach powered '
-                         'off state: %s', ', '.join(failed_hosts))
-            sys.exit(1)
+            failed_hosts = IPMIPowerStateWaiter(pending_hosts, 'off', ipmi_timeout, username, password,
+                                                send_command=True).wait_for_completion()
+
+            if failed_hosts:
+                LOGGER.error('The following nodes failed to reach powered '
+                             'off state: %s', ', '.join(failed_hosts))
+                sys.exit(1)
+        else:
+            LOGGER.info('User opted not to proceed with hard power off. Exiting.')
+            sys.exit(0)
 
 
 def do_mgmt_shutdown_power(ssh_client, username, password, excluded_ncns, ncn_shutdown_timeout, ipmi_timeout):
@@ -280,11 +288,10 @@ def do_mgmt_shutdown_power(ssh_client, username, password, excluded_ncns, ncn_sh
             start_shutdown(other_ncns, ssh_client)
             LOGGER.info(f'Waiting up to {ncn_shutdown_timeout} seconds for other NCNs to '
                         f'reach powered off state according to ipmitool: {", ".join(other_ncns)}.')
-            finish_shutdown(other_ncns, username, password,
-                            ncn_shutdown_timeout, ipmi_timeout)
-            LOGGER.info('Shutdown and power off of all other NCNs complete.')
+            finish_shutdown(other_ncns, username, password, ncn_shutdown_timeout, ipmi_timeout)
+            LOGGER.info('Shutdown of all other NCNs complete.')
     except ConsoleLoggingError as err:
-        LOGGER.error(f'Aborting shutdown of NCNs due failure to set up NCN console logging: {err}')
+        LOGGER.error(f'Aborting shutdown of NCNs due to failure to set up NCN console logging: {err}')
         raise SystemExit(1)
 
 

@@ -25,6 +25,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Updated `sat bootsys` to increase the default management NCN shutdown timeout
+  to 900 seconds.
+- Updated `sat bootsys` to include a prompt for input before proceeding with
+  hard power off of management NCNs after timeout.
+
 ## [3.25.5] - 2023-10-12
 
 ### Security
