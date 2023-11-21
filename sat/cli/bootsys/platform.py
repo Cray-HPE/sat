@@ -27,6 +27,7 @@ Start and stop platform services to boot and shut down a Shasta system.
 
 import logging
 import socket
+import urllib3.exceptions
 from collections import namedtuple
 from multiprocessing import Process
 
@@ -484,7 +485,20 @@ def do_recreate_cronjobs(_):
     """Recreate cronjobs that are not being scheduled on time."""
     try:
         batch_api = load_kube_api(api_cls=BatchV1Api)
-        recreate_namespaced_stuck_cronjobs(batch_api, 'services')
+        # Adding a retry
+        max_retries = 3
+        retries = 0
+        while retries < max_retries:
+            try:
+                recreate_namespaced_stuck_cronjobs(batch_api, 'services')
+                break  # Exit the loop if successful
+            except urllib3.exceptions.RequestError as e:
+                LOGGER.warning(f'Retrying due to Error: {e}')
+                LOGGER.info(f'Waiting for 10 seconds before retrying...')
+                retries += 1
+                time.sleep(10)
+        else:
+            LOGGER.error(f'Max retries exceeded. Could not recreate cron jobs.')
     except ConfigException as err:
         LOGGER.warning('Could not load Kubernetes configuration: %s', err)
 
