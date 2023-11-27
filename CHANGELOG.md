@@ -25,6 +25,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.26.1] - 2023-11-27
+
+### Security
+- Update the version of urllib3 from 1.26.17 to 1.26.18 to address
+  CVE-2023-45803
+
+## [3.26.0] - 2023-10-24
+
+### Changed
+- Added publishing of `cray-sat` container image to `csm-docker` in Artifactory
+  as well as `sat-docker`. This is more consistent with other CSM builds.
+
+## [3.25.6] - 2023-10-18
+
+### Fixed
+- Fixed `sat bootprep` to ensure image architecture is retained when customizing
+  IMS images.
+
 ## [3.25.5] - 2023-10-12
 
 ### Security
