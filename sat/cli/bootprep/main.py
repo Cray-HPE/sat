@@ -45,7 +45,7 @@ from sat.cli.bootprep.errors import (
 )
 from sat.cli.bootprep.input.image import IMSInputImage
 from sat.cli.bootprep.input.instance import InputInstance
-from sat.cli.bootprep.input.configuration import InputConfigurationLayer
+from sat.cli.bootprep.input.configuration import InputConfigurationLayerBase
 from sat.cli.bootprep.constants import (
     ALL_KEYS,
     CONFIGURATIONS_KEY,
@@ -240,7 +240,7 @@ def do_bootprep_run(schema_validator, args):
                              jinja_env, product_catalog, args.dry_run, args.limit)
 
     # This is kind of an odd way to pass this through, but it works
-    InputConfigurationLayer.resolve_branches = args.resolve_branches
+    InputConfigurationLayerBase.resolve_branches = args.resolve_branches
     # Always validate CFS configurations. The names of CFS configurations from
     # the input instance are used when validating images and session templates,
     # and validation ensures the names render.

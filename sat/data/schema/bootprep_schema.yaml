@@ -41,7 +41,7 @@ $schema: "https://json-schema.org/draft/2020-12/schema"
 # ... patch component when all input files that were valid under the old schema
 #     are still valid under the new schema
 #
-version: '1.0.6'
+version: '1.0.7'
 title: Bootprep Input File
 description: >
   A description of the set of CFS configurations to create, the set of IMS
@@ -196,6 +196,31 @@ properties:
                       commit:
                         description: The commit hash in the product's git repository.
                         type: string
+        additional_inventory:
+          oneOf:
+          - description: Additional inventory to include in the CFS configuration
+            type: object
+            required: [url, branch]
+            properties:
+              name:
+                $ref: '#/$defs/CFSAdditionalInventoryName'
+              url:
+                $ref: '#/$defs/CFSAdditionalInventoryURL'
+              branch:
+                description: The branch of the given repository to use.
+                type: string
+          - description: Additional inventory to include in the CFS configuration
+            type: object
+            required: [url, commit]
+            properties:
+              name:
+                $ref: '#/$defs/CFSAdditionalInventoryName'
+              url:
+                $ref: '#/$defs/CFSAdditionalInventoryURL'
+              commit:
+                description: The commit of the given repository to use.
+                type: string
+
 
   images:
     description: The images to create and customize.
@@ -600,6 +625,15 @@ $defs:
           enable DKMS in IMS.
         type: boolean
         default: false
+  CFSAdditionalInventoryName:
+    type: string
+    description: >
+      The name of the additional inventory. Specifying a name for the
+      additional inventory is optional.
+  CFSAdditionalInventoryURL:
+    type: string
+    description: >
+      The URL to the git repository which contains the additional Ansible inventory.
   ImageName:
     description: >
       The name of the image that will be created in IMS. The image name
