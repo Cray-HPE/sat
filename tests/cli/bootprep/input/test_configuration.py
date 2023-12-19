@@ -37,6 +37,7 @@ from jinja2.sandbox import SandboxedEnvironment
 from csm_api_client.service.cfs import CFSClient
 from sat.cli.bootprep.errors import InputItemCreateError
 from sat.cli.bootprep.input.configuration import (
+    AdditionalInventory,
     InputConfigurationLayer,
     GitInputConfigurationLayer,
     ProductInputConfigurationLayer,
@@ -104,7 +105,7 @@ class TestInputConfigurationLayerBase(unittest.TestCase):
 
     def patch_resolve_branches(self, value):
         """Patch InputConfigurationLayer.resolve branches to the given value"""
-        return patch(f'{self.module_path}.InputConfigurationLayer.resolve_branches', value)
+        return patch(f'{self.module_path}.InputConfigurationLayerBase.resolve_branches', value)
 
 
 class TestGitInputConfigurationLayer(TestInputConfigurationLayerBase):
@@ -490,6 +491,106 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
             self.assertEqual(self.commit_layer.commit, self.commit)
 
 
+class TestAdditionalInventory(TestInputConfigurationLayerBase):
+    """Tests for the AdditionalInventory class"""
+
+    def setUp(self):
+        super().setUp()
+
+        self.repo_url = 'https://api-gw-service.nmn.local/vcs/cray/inventory.git'
+        self.commit_hash = '3b18e512dba79e4c8300dd08aeb37f8e728b8dad'
+        self.branch = 'main'
+        self.name = 'inventory'
+        self.data_with_commit = {'url': self.repo_url, 'commit': self.commit_hash}
+        self.data_with_branch = {'url': self.repo_url, 'branch': self.branch}
+        self.data_with_name = {'url': self.repo_url, 'branch': self.branch, 'name': self.name}
+        self.jinja_env = SandboxedEnvironment()
+        self.branch_head_commit = 'e64ef6c370166285e6a674724b74e912a3f4a21e'
+        self.mock_vcs_repo = patch(f'{self.module_path}.VCSRepo').start()
+        self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = self.branch_head_commit
+
+    def test_clone_url_property(self):
+        """Test the clone_url property of AdditionalInventory"""
+        additional_inventory = AdditionalInventory(self.data_with_commit, self.jinja_env)
+        self.assertEqual(self.repo_url, additional_inventory.clone_url)
+
+    def test_commit_property_specified(self):
+        """Test the commit property when specified"""
+        additional_inventory = AdditionalInventory(self.data_with_commit, self.jinja_env)
+        self.assertEqual(self.commit_hash, additional_inventory.commit)
+
+    def test_commit_property_unspecified(self):
+        """Test the commit property when not specified"""
+        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env)
+        self.assertIsNone(additional_inventory.commit)
+
+    def test_commit_property_branch_commit_lookup(self):
+        """Test looking up commit hash from branch in VCS when branch not supported in CSM"""
+        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env)
+        with self.patch_resolve_branches(True):
+            self.assertEqual(additional_inventory.commit, self.branch_head_commit)
+
+    def test_commit_property_no_resolve_branches(self):
+        """Test that commit is None when branch is specified with no_resolve_branches"""
+        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env)
+        self.assertIsNone(additional_inventory.commit)
+
+    def test_commit_property_vcs_query_fails(self):
+        """Test looking up commit hash raises InputItemCreateError when VCS is inaccessible"""
+        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env)
+        self.mock_vcs_repo.return_value.get_commit_hash_for_branch.side_effect = VCSError
+        with self.patch_resolve_branches(True):
+            with self.assertRaises(InputItemCreateError):
+                _ = additional_inventory.commit
+
+    def test_commit_property_branch_lookup_fails(self):
+        """Test looking up commit hash for nonexistent branch"""
+        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env)
+        self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = None
+        with self.patch_resolve_branches(True):
+            with self.assertRaises(InputItemCreateError):
+                _ = additional_inventory.commit
+
+    def test_branch_property_specified(self):
+        """"Test the branch property when specified"""
+        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env)
+        self.assertEqual(self.branch, additional_inventory.branch)
+
+    def test_branch_property_not_specified(self):
+        """"Test the branch property when not specified"""
+        additional_inventory = AdditionalInventory(self.data_with_commit, self.jinja_env)
+        self.assertIsNone(additional_inventory.branch)
+
+    def test_name_property_specified(self):
+        """Test the name property when specified"""
+        additional_inventory = AdditionalInventory(self.data_with_name, self.jinja_env)
+        self.assertEqual(self.name, additional_inventory.name)
+
+    def test_name_property_not_specified(self):
+        """Test the name property when not specified"""
+        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env)
+        self.assertIsNone(additional_inventory.name)
+
+    def test_get_cfs_api_data_branch_no_resolve_branches(self):
+        """Test the get_cfs_api_data method with branch and name specified and no_resolve_branches"""
+        additional_inventory = AdditionalInventory(self.data_with_name, self.jinja_env)
+        expected = {'name': self.name, 'branch': self.branch, 'cloneUrl': self.repo_url}
+        self.assertEqual(expected, additional_inventory.get_cfs_api_data())
+
+    def test_get_cfs_api_data_branch_resolved(self):
+        """Test the get_cfs_api_data method with branch resolved to a commit hash"""
+        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env)
+        expected = {'commit': self.branch_head_commit, 'cloneUrl': self.repo_url}
+        with self.patch_resolve_branches(True):
+            self.assertEqual(expected, additional_inventory.get_cfs_api_data())
+
+    def test_get_cfs_api_data_commit(self):
+        """Test the get_cfs_api_data method with commit specified"""
+        additional_inventory = AdditionalInventory(self.data_with_commit, self.jinja_env)
+        expected = {'commit': self.commit_hash, 'cloneUrl': self.repo_url}
+        self.assertEqual(expected, additional_inventory.get_cfs_api_data())
+
+
 class TestInputConfiguration(unittest.TestCase):
     """Tests for the InputConfiguration class"""
 
@@ -504,6 +605,8 @@ class TestInputConfiguration(unittest.TestCase):
         self.layers = [Mock() for _ in range(self.num_layers)]
         self.mock_get_config_layer = patch_configuration('InputConfigurationLayer.get_configuration_layer').start()
         self.mock_get_config_layer.side_effect = self.layers
+        self.mock_additional_inventory_cls = patch_configuration('AdditionalInventory').start()
+        self.mock_additional_inventory = self.mock_additional_inventory_cls.return_value
         self.mock_product_catalog = Mock()
 
         self.shasta_version = '22.06'
@@ -520,11 +623,20 @@ class TestInputConfiguration(unittest.TestCase):
         patch.stopall()
 
     def test_init(self):
-        """Test creation of a InputConfiguration"""
+        """Test creation of an InputConfiguration"""
         config = InputConfiguration(self.config_data, self.mock_instance, self.index,
                                     self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
         self.assertEqual(self.config_name, config.name)
         self.assertEqual(self.layers, config.layers)
+
+    def test_init_with_additional_inventory(self):
+        """Test creation of an InputConfiguration when there is additional_inventory specified"""
+        additional_inventory_data = Mock()
+        self.config_data['additional_inventory'] = additional_inventory_data
+        config = InputConfiguration(self.config_data, self.mock_instance, self.index,
+                                    self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
+        self.mock_additional_inventory_cls.assert_called_once_with(additional_inventory_data, self.jinja_env)
+        self.assertEqual(self.mock_additional_inventory, config.additional_inventory)
 
     def test_name_property(self):
         """Test the name property of the InputConfiguration"""
@@ -539,7 +651,7 @@ class TestInputConfiguration(unittest.TestCase):
                                     self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
         self.assertEqual(f'compute-config-shasta-{self.shasta_version}', config.name)
 
-    def test_get_cfs_api_data(self):
+    def test_get_create_item_data(self):
         """Test successful case of get_create_item_data"""
         expected = {
             'layers': [layer.get_cfs_api_data.return_value
@@ -549,12 +661,28 @@ class TestInputConfiguration(unittest.TestCase):
                                     self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
         self.assertEqual(expected, config.get_create_item_data())
 
-    def test_get_cfs_api_data_one_failure(self):
+    def test_get_create_item_data_with_additional_inventory(self):
+        """Test successfully getting get_create_item_data with additional_inventory"""
+        additional_inventory_data = Mock()
+        self.config_data['additional_inventory'] = additional_inventory_data
+        expected = {
+            'layers': [layer.get_cfs_api_data.return_value
+                       for layer in self.layers],
+            'additional_inventory': self.mock_additional_inventory.get_cfs_api_data.return_value
+        }
+        config = InputConfiguration(self.config_data, self.mock_instance, self.index,
+                                    self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
+        self.mock_additional_inventory_cls.assert_called_once_with(additional_inventory_data,
+                                                                   self.jinja_env)
+        self.assertEqual(expected, config.get_create_item_data())
+
+    def test_get_create_item_data_one_layer_failure(self):
         """Test when there is a failure to get data for one layer"""
         failing_layer = self.layers[1]
         create_fail_msg = 'bad layer'
         failing_layer.get_cfs_api_data.side_effect = InputItemCreateError(create_fail_msg)
-        err_regex = fr'Failed to create 1 layer\(s\) of configuration {self.config_name}'
+        err_regex = (fr'Failed to create configuration {self.config_name} '
+                     fr'due to failure to create 1 layer\(s\)')
         config = InputConfiguration(self.config_data, self.mock_instance, self.index,
                                     self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
 
@@ -567,12 +695,13 @@ class TestInputConfiguration(unittest.TestCase):
                          f'{self.config_name}: {create_fail_msg}',
                          logs_cm.records[0].message)
 
-    def test_get_cfs_api_data_multiple_failures(self):
+    def test_get_create_item_data_multiple_layer_failures(self):
         """Test when there are failures to get data for multiple layers"""
-        create_fail_msg = 'bad layer'
+        create_fail_msg = 'bad layer again'
         for layer in self.layers:
             layer.get_cfs_api_data.side_effect = InputItemCreateError(create_fail_msg)
-        err_regex = fr'Failed to create 3 layer\(s\) of configuration {self.config_name}'
+        err_regex = (fr'Failed to create configuration {self.config_name} due to '
+                     fr'failure to create {len(self.layers)} layer\(s\)')
         config = InputConfiguration(self.config_data, self.mock_instance, self.index,
                                     self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
 
@@ -585,6 +714,54 @@ class TestInputConfiguration(unittest.TestCase):
             self.assertEqual(f'Failed to create layers[{idx}] of configuration '
                              f'{self.config_name}: {create_fail_msg}',
                              logs_cm.records[idx].message)
+
+    def test_get_create_item_data_additional_inventory_failure(self):
+        """Test when there is a failure to get the create data for additional_inventory"""
+        self.config_data['additional_inventory'] = {}
+        create_fail_msg = 'bad inventory'
+        self.mock_additional_inventory.get_cfs_api_data.side_effect = InputItemCreateError(create_fail_msg)
+        err_regex = (fr'Failed to create configuration {self.config_name} due to '
+                     fr'failure to resolve additional_inventory')
+        config = InputConfiguration(self.config_data, self.mock_instance, self.index,
+                                    self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
+
+        with self.assertLogs(level=logging.ERROR) as logs_cm:
+            with self.assertRaisesRegex(InputItemCreateError, err_regex):
+                config.get_create_item_data()
+
+        self.assertEqual(1, len(logs_cm.records))
+        self.assertEqual(f'Failed to resolve additional_inventory of configuration '
+                         f'{self.config_name}: {create_fail_msg}',
+                         logs_cm.records[0].message)
+
+    def test_get_create_item_data_multiple_failures(self):
+        """Test when there is a failure to get the create data for layers and additional_inventory"""
+        self.config_data['additional_inventory'] = {}
+
+        layer_fail_msg = 'layer failure'
+        inventory_fail_msg = 'inventory failure'
+        for layer in self.layers:
+            layer.get_cfs_api_data.side_effect = InputItemCreateError(layer_fail_msg)
+        self.mock_additional_inventory.get_cfs_api_data.side_effect = InputItemCreateError(inventory_fail_msg)
+        err_regex = (fr'Failed to create configuration {self.config_name} due to '
+                     fr'failure to create {len(self.layers)} layer\(s\) and failure '
+                     fr'to resolve additional_inventory')
+        config = InputConfiguration(self.config_data, self.mock_instance, self.index,
+                                    self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
+
+        with self.assertLogs(level=logging.ERROR) as logs_cm:
+            with self.assertRaisesRegex(InputItemCreateError, err_regex):
+                config.get_create_item_data()
+
+        # An error will be logged for each layer and for additional_inventory
+        self.assertEqual(self.num_layers + 1, len(logs_cm.records))
+        self.assertEqual(f'Failed to resolve additional_inventory of configuration '
+                         f'{self.config_name}: {inventory_fail_msg}',
+                         logs_cm.records[0].message)
+        for idx in range(self.num_layers):
+            self.assertEqual(f'Failed to create layers[{idx}] of configuration '
+                             f'{self.config_name}: {layer_fail_msg}',
+                             logs_cm.records[idx + 1].message)
 
 
 if __name__ == '__main__':
