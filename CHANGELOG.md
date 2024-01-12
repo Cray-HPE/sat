@@ -1,6 +1,6 @@
 # Changelog
 
-(C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+(C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [3.27.2] - 2024-01-16
+
+### Fixed
+- Fixed a lengthy traceback that occurs when logging parsing errors that occur
+  during parsing of `--filter` options.
 
 ## [3.27.1] - 2024-01-05
 
