@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -323,7 +323,7 @@ def parse_query_string(query_string, fields):
              a float if the value can be parsed as a number, or a
              string otherwise.
         """
-        content = yield lexeme(parsec.regex(r'(\w|[*?.])+'))
+        content = yield lexeme(parsec.regex(r'\S+'))
         try:
             return float(content)
         except ValueError:
@@ -359,7 +359,7 @@ def parse_query_string(query_string, fields):
         # be an issue, it probably isn't all that necessary.
         query_key = yield (tok_lhs ^ tok_quoted_str)
         comparator = yield tok_cmpr
-        cmpr_val = yield (tok_rhs ^ tok_quoted_str)
+        cmpr_val = yield (tok_quoted_str ^ tok_rhs)
 
         return ComparisonFilter(query_key, fields, comparator, cmpr_val)
 

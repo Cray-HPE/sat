@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed a lengthy traceback that occurs when logging parsing errors that occur
   during parsing of `--filter` options.
+- Fixed `--filter` option parsing to allow unquoted special characters (like the
+  dash, for example) on the right-hand side (value) of a comparison.
 
 ## [3.27.1] - 2024-01-05
 
