@@ -36,7 +36,7 @@ natsort==8.1.0
 nose2==0.12.0
 oauthlib==3.2.2
 packaging==21.3
-paramiko==2.11.0
+paramiko==3.4.0
 parsec==3.5
 prettytable==0.7.2
 pyasn1==0.4.8
