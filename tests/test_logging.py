@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2020,2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2020, 2023-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -67,6 +67,9 @@ class TestLineSplittingFormatter(unittest.TestCase):
         self.logger.info(msg)
         self.assertEqual(len(self.handler.messages), 1)
         self.assertEqual(self.handler.messages[0], f"INFO: {line1}\nINFO: {line2}")
+        # Assert that the original log record is not changed by the formatter
+        self.assertEqual(len(self.handler.records), 1)
+        self.assertEqual(self.handler.records[0].message, msg)
 
     @mock.patch('logging.time.time', side_effect=itertools.count())
     def test_logging_multiple_lines_with_dates(self, _):
