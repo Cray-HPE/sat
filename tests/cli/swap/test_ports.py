@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@ Unit tests for sat.cli.swap.ports
 """
 
 import logging
+import os
 import unittest
 from unittest import mock
 from unittest.mock import call
@@ -34,60 +35,138 @@ from sat.cli.swap.ports import PortManager
 from tests.common import ExtendedTestCase
 
 
+# Constants used in the tests
+EDGE_POLICY_LINK = '/fabric/port-policies/edge-policy'
+FABRIC_POLICY_LINK = '/fabric/port-policies/fabric-policy'
+QOS_POLICY_LINK = '/fabric/port-policies/qos-ll_be_bd_et-fabric-policy'
+
+
 class TestGetSwitchPortDataList(unittest.TestCase):
     """Unit test for Switch get_switch_port_data_list()."""
 
     def setUp(self):
         """Mock functions called."""
 
-        self.mock_sat_session = mock.Mock()
-        self.mock_fc_client_cls = mock.patch('sat.cli.swap.ports.SATSession').start()
-
-        # If a test wishes to change the mock_fc_data, the test can do something like:
-        #     self.mock_fc_response.json.return_value = {'foo': 'bar'}
-
-        # The data that will be returned for a port
-        # Example: https://api-gw-service-nmn.local/apis/fabric-manager/fabric/ports/x1000c6r7j100p0
-        self.mock_fc_data = {
-            'id': 'x1000c6r7a0l13',
-            'conn_port': 'x1000c6r7j100p0',
-            'portPolicyLinks': [
-                '/fabric/port-policies/edge-policy'
-            ]
+        # A switch with only an edge port
+        self.edge_switch = 'x1000c6r7'
+        # A lone edge port on a switch and the data returned by get_port on it
+        self.lone_edge_port = f'{self.edge_switch}j100p0'
+        self.lone_edge_port_link = f'/fabric/ports/{self.lone_edge_port}'
+        self.lone_edge_port_data = {
+            'conn_port': self.lone_edge_port,
+            'portPolicyLinks': [EDGE_POLICY_LINK]
         }
 
-        self.mock_fc_response = mock.Mock()
-        self.mock_fc_response.json.return_value = self.mock_fc_data
-        self.mock_fc_client = mock.Mock()
-        self.mock_fc_client.get.return_value = self.mock_fc_response
-        self.mock_fc_client_cls = mock.patch('sat.cli.swap.ports.FabricControllerClient',
-                                             return_value=self.mock_fc_client).start()
+        # A switch with only a fabric port
+        self.fabric_switch = 'x1000c1r3'
+        # A lone fabric port on a switch and the data returned by get_port on it
+        self.lone_fabric_port = f'{self.fabric_switch}j20p1'
+        self.lone_fabric_port_link = f'/fabric/ports/{self.lone_fabric_port}'
+        self.lone_fabric_port_data = {
+            'conn_port': self.lone_fabric_port,
+            'portPolicyLinks': [FABRIC_POLICY_LINK, QOS_POLICY_LINK]
+        }
+
+        # A switch with both fabric and edge ports
+        self.fabric_edge_switch = 'x1000c0r1'
+        self.fabric_port_1 = f'{self.fabric_edge_switch}j100p0'
+        self.fabric_port_1_link = f'/fabric/ports/{self.fabric_port_1}'
+        self.fabric_port_1_data = {
+            'conn_port': self.fabric_port_1,
+            'portPolicyLinks': [FABRIC_POLICY_LINK, QOS_POLICY_LINK]
+        }
+        self.fabric_port_2 = f'{self.fabric_edge_switch}j100p1'
+        self.fabric_port_2_link = f'/fabric/ports/{self.fabric_port_2}'
+        self.fabric_port_2_data = {
+            'conn_port': self.fabric_port_2,
+            'portPolicyLinks': [FABRIC_POLICY_LINK, QOS_POLICY_LINK]
+        }
+        self.edge_port = f'{self.fabric_edge_switch}j20p0'
+        self.edge_port_link = f'/fabric/ports/{self.edge_port}'
+        self.edge_port_data = {
+            'conn_port': self.edge_port,
+            'portPolicyLinks': [EDGE_POLICY_LINK]
+        }
+
+        self.mock_ports = {
+            self.lone_edge_port_link: self.lone_edge_port_data,
+            self.lone_fabric_port_link: self.lone_fabric_port_data,
+            self.fabric_port_1_link: self.fabric_port_1_data,
+            self.fabric_port_2_link: self.fabric_port_2_data,
+            self.edge_port_link: self.edge_port_data
+        }
+
+        self.mock_get_port = mock.patch('sat.cli.swap.ports.PortManager.get_port',
+                                        autospec=True).start()
+        self.mock_get_port.side_effect = lambda _, port_xname: self.mock_ports.get(port_xname)
 
         self.mock_get_switches = mock.patch('sat.cli.swap.ports.PortManager.get_switches',
                                             autospec=True).start()
         self.mock_get_switches.return_value = [
-            '/fabric/switches/x1000c6r7b0',
-            '/fabric/switches/x1000c0r7b1'
+            f'/fabric/switches/{self.edge_switch}b0',
+            f'/fabric/switches/{self.fabric_switch}b0',
+            f'/fabric/switches/{self.fabric_edge_switch}b0'
         ]
 
+        self.mock_switches = {
+            # Example switch with just an edge port
+            f'/fabric/switches/{self.edge_switch}b0': {
+                'edgePortLinks': [self.lone_edge_port_link],
+                'fabricPortLinks': []
+            },
+            # Example switch with just fabric ports
+            f'/fabric/switches/{self.fabric_switch}b0': {
+                'edgePortLinks': [],
+                'fabricPortLinks': [self.lone_fabric_port_link]
+            },
+            # Example switch with fabric and edge ports
+            f'/fabric/switches/{self.fabric_edge_switch}b0': {
+                'edgePortLinks': [self.edge_port_link],
+                'fabricPortLinks': [self.fabric_port_1_link, self.fabric_port_2_link]
+            }
+        }
         self.mock_get_switch = mock.patch('sat.cli.swap.ports.PortManager.get_switch',
                                           autospec=True).start()
-        self.mock_get_switch.return_value = {
-            'edgePortLinks': [
-                '/fabric/ports/x1000c6r7j100p0'
-            ],
-            'fabricPortLinks': []
-        }
+        self.mock_get_switch.side_effect = lambda _, switch_xname: self.mock_switches.get(switch_xname)
         self.pm = PortManager()
 
-    def test_basic(self):
-        """Test Switch: get_switch_port_data_list() basic"""
+    def test_switch_edge_ports_only(self):
+        """Test get_switch_port_data_list with a switch that only has edge ports"""
+        # It should work with or without the 'b0' on the end of the switch xname
+        for switch_xname in [self.edge_switch, f'{self.edge_switch}b0']:
+            result = self.pm.get_switch_port_data_list(switch_xname)
+            expected = [{'xname': 'x1000c6r7j100p0',
+                         'port_link': self.lone_edge_port_link,
+                         'policy_links': [EDGE_POLICY_LINK]}]
+            self.assertEqual(result, expected)
 
-        result = self.pm.get_switch_port_data_list('x1000c6r7')
-        expected = [{'xname': 'x1000c6r7j100p0',
-                     'port_link': '/fabric/ports/x1000c6r7j100p0',
-                     'policy_link': '/fabric/port-policies/edge-policy'}]
-        self.assertEqual(result, expected)
+    def test_switch_fabric_ports_only(self):
+        """Test get_switch_port_data_list with a switch that only has fabric ports"""
+        # It should work with or without the 'b0' on the end of the switch xname
+        for switch_xname in [self.fabric_switch, f'{self.fabric_switch}b0']:
+            result = self.pm.get_switch_port_data_list(switch_xname)
+            expected = [{'xname': self.lone_fabric_port,
+                         'port_link': self.lone_fabric_port_link,
+                         'policy_links': [FABRIC_POLICY_LINK, QOS_POLICY_LINK]}]
+            self.assertEqual(result, expected)
+
+    def test_switch_fabric_and_edge_ports(self):
+        """Test get_switch_port_data_list with a switch with fabric and edge ports"""
+        # It should work with or without the 'b0' on the end of the switch xname
+        for switch_xname in [self.fabric_edge_switch, f'{self.fabric_edge_switch}b0']:
+            result = self.pm.get_switch_port_data_list(switch_xname)
+            expected = [
+                {'xname': self.fabric_port_1,
+                 'port_link': self.fabric_port_1_link,
+                 'policy_links': [FABRIC_POLICY_LINK, QOS_POLICY_LINK]},
+                {'xname': self.fabric_port_2,
+                 'port_link': self.fabric_port_2_link,
+                 'policy_links': [FABRIC_POLICY_LINK, QOS_POLICY_LINK]},
+                {'xname': self.edge_port,
+                 'port_link': self.edge_port_link,
+                 'policy_links': [EDGE_POLICY_LINK]}
+            ]
+            self.assertCountEqual(result, expected)
 
     def tearDown(self):
         mock.patch.stopall()
@@ -107,24 +186,16 @@ class TestGetJackPortDataList(unittest.TestCase):
         self.mock_fc_client.get.return_value.json.side_effect = [
             {'id': 'x9000c1r3a0l14',
              'conn_port': 'x9000c1r3j16p0',
-             'portPolicyLinks': [
-                 '/fabric/port-policies/fabric-policy'
-             ]},
+             'portPolicyLinks': [FABRIC_POLICY_LINK, QOS_POLICY_LINK]},
             {'id': 'x9000c1r3a0l14',
              'conn_port': 'x9000c1r3j16p1',
-             'portPolicyLinks': [
-                 '/fabric/port-policies/fabric-policy'
-             ]},
+             'portPolicyLinks': [FABRIC_POLICY_LINK, QOS_POLICY_LINK]},
             {'id': 'x9000c3r3a2l13',
              'conn_port': 'x9000c3r5j16p0',
-             'portPolicyLinks': [
-                 '/fabric/port-policies/fabric-policy'
-             ]},
+             'portPolicyLinks': [FABRIC_POLICY_LINK, QOS_POLICY_LINK]},
             {'id': 'x9000c3r3a0214',
              'conn_port': 'x9000c3r5j16p1',
-             'portPolicyLinks': [
-                 '/fabric/port-policies/fabric-policy'
-             ]}
+             'portPolicyLinks': [FABRIC_POLICY_LINK, QOS_POLICY_LINK]},
         ]
 
         self.mock_cable_endpoints = mock.patch('sat.cli.swap.ports.CableEndpoints',
@@ -156,16 +227,16 @@ class TestGetJackPortDataList(unittest.TestCase):
         self.success_expected = [
             {'xname': 'x9000c1r3j16p0',
              'port_link': '/fabric/ports/x9000c1r3j16p0',
-             'policy_link': '/fabric/port-policies/fabric-policy'},
+             'policy_links': [FABRIC_POLICY_LINK, QOS_POLICY_LINK]},
             {'xname': 'x9000c1r3j16p1',
              'port_link': '/fabric/ports/x9000c1r3j16p1',
-             'policy_link': '/fabric/port-policies/fabric-policy'},
+             'policy_links': [FABRIC_POLICY_LINK, QOS_POLICY_LINK]},
             {'xname': 'x9000c3r5j16p0',
              'port_link': '/fabric/ports/x9000c3r5j16p0',
-             'policy_link': '/fabric/port-policies/fabric-policy'},
+             'policy_links': [FABRIC_POLICY_LINK, QOS_POLICY_LINK]},
             {'xname': 'x9000c3r5j16p1',
              'port_link': '/fabric/ports/x9000c3r5j16p1',
-             'policy_link': '/fabric/port-policies/fabric-policy'}
+             'policy_links': [FABRIC_POLICY_LINK, QOS_POLICY_LINK]}
         ]
 
         self.mock_cable_endpoints.load_cables_from_p2p_file.return_value = True
@@ -255,10 +326,10 @@ class TestGetJackPortDataList(unittest.TestCase):
         expected = [
             {'xname': 'x9000c1r3j16p0',
              'port_link': '/fabric/ports/x9000c1r3j16p0',
-             'policy_link': '/fabric/port-policies/fabric-policy'},
+             'policy_links': [FABRIC_POLICY_LINK, QOS_POLICY_LINK]},
             {'xname': 'x9000c1r3j16p1',
              'port_link': '/fabric/ports/x9000c1r3j16p1',
-             'policy_link': '/fabric/port-policies/fabric-policy'}
+             'policy_links': [FABRIC_POLICY_LINK, QOS_POLICY_LINK]}
         ]
         result = self.pm.get_jack_port_data_list(['x9000c1r3j16'], force=True)
         self.assertEqual(result, expected)
@@ -326,70 +397,54 @@ class TestGetJackPortDataList(unittest.TestCase):
         self.mock_fc_client.get.return_value.json.side_effect = [
             {'id': 'x9000c1r3a0l14',
              'conn_port': 'x9000c1r3j16p0',
-             'portPolicyLinks': [
-                 '/fabric/port-policies/fabric-policy'
-             ]},
+             'portPolicyLinks': [FABRIC_POLICY_LINK]},
             {'id': 'x9000c1r3a0l15',
              'conn_port': 'x9000c1r3j16p1',
-             'portPolicyLinks': [
-                 '/fabric/port-policies/fabric-policy'
-             ]},
+             'portPolicyLinks': [FABRIC_POLICY_LINK]},
             {'id': 'x9000c1r3a0l16',
              'conn_port': 'x9000c1r3j18p0',
-             'portPolicyLinks': [
-                 '/fabric/port-policies/fabric-policy'
-             ]},
+             'portPolicyLinks': [FABRIC_POLICY_LINK]},
             {'id': 'x9000c1r3a0l17',
              'conn_port': 'x9000c1r3j18p1',
-             'portPolicyLinks': [
-                 '/fabric/port-policies/fabric-policy'
-             ]},
+             'portPolicyLinks': [FABRIC_POLICY_LINK]},
             {'id': 'x9000c3r3a2l18',
              'conn_port': 'x9000c3r3j16p0',
-             'portPolicyLinks': [
-                 '/fabric/port-policies/fabric-policy'
-             ]},
+             'portPolicyLinks': [FABRIC_POLICY_LINK]},
             {'id': 'x9000c3r3a0219',
              'conn_port': 'x9000c3r3j16p1',
-             'portPolicyLinks': [
-                 '/fabric/port-policies/fabric-policy'
-             ]},
+             'portPolicyLinks': [FABRIC_POLICY_LINK]},
             {'id': 'x9000c3r3a2l13',
              'conn_port': 'x9000c3r5j16p0',
-             'portPolicyLinks': [
-                 '/fabric/port-policies/fabric-policy'
-             ]},
+             'portPolicyLinks': [FABRIC_POLICY_LINK]},
             {'id': 'x9000c3r3a0214',
              'conn_port': 'x9000c3r5j16p1',
-             'portPolicyLinks': [
-                 '/fabric/port-policies/fabric-policy'
-             ]}
+             'portPolicyLinks': [FABRIC_POLICY_LINK]}
         ]
         expected = [
             {'xname': 'x9000c1r3j16p0',
              'port_link': '/fabric/ports/x9000c1r3j16p0',
-             'policy_link': '/fabric/port-policies/fabric-policy'},
+             'policy_links': [FABRIC_POLICY_LINK]},
             {'xname': 'x9000c1r3j16p1',
              'port_link': '/fabric/ports/x9000c1r3j16p1',
-             'policy_link': '/fabric/port-policies/fabric-policy'},
+             'policy_links': [FABRIC_POLICY_LINK]},
             {'xname': 'x9000c1r3j18p0',
              'port_link': '/fabric/ports/x9000c1r3j18p0',
-             'policy_link': '/fabric/port-policies/fabric-policy'},
+             'policy_links': [FABRIC_POLICY_LINK]},
             {'xname': 'x9000c1r3j18p1',
              'port_link': '/fabric/ports/x9000c1r3j18p1',
-             'policy_link': '/fabric/port-policies/fabric-policy'},
+             'policy_links': [FABRIC_POLICY_LINK]},
             {'xname': 'x9000c3r3j16p0',
              'port_link': '/fabric/ports/x9000c3r3j16p0',
-             'policy_link': '/fabric/port-policies/fabric-policy'},
+             'policy_links': [FABRIC_POLICY_LINK]},
             {'xname': 'x9000c3r3j16p1',
              'port_link': '/fabric/ports/x9000c3r3j16p1',
-             'policy_link': '/fabric/port-policies/fabric-policy'},
+             'policy_links': [FABRIC_POLICY_LINK]},
             {'xname': 'x9000c3r5j16p0',
              'port_link': '/fabric/ports/x9000c3r5j16p0',
-             'policy_link': '/fabric/port-policies/fabric-policy'},
+             'policy_links': [FABRIC_POLICY_LINK]},
             {'xname': 'x9000c3r5j16p1',
              'port_link': '/fabric/ports/x9000c3r5j16p1',
-             'policy_link': '/fabric/port-policies/fabric-policy'}
+             'policy_links': [FABRIC_POLICY_LINK]}
         ]
         result = self.pm.get_jack_port_data_list(['x9000c1r3j16', 'x9000c1r3j18'], force=True)
         self.assertEqual(result, expected)
@@ -444,10 +499,13 @@ class TestCreateOfflinePortPolicy(ExtendedTestCase):
 
         self.mock_get_port_policies = mock.patch('sat.cli.swap.ports.PortManager.get_port_policies',
                                                  autospec=True).start()
+
+        self.offline_edge_policy = os.path.join(os.path.dirname(EDGE_POLICY_LINK),
+                                                f'sat-offline-{os.path.basename(EDGE_POLICY_LINK)}')
         self.mock_get_port_policies.return_value = [
-            '/fabric/port-policies/fabric-policy',
-            '/fabric/port-policies/edge-policy',
-            '/fabric/port-policies/sat-offline-edge-policy'
+            FABRIC_POLICY_LINK,
+            EDGE_POLICY_LINK,
+            self.offline_edge_policy
         ]
 
         self.mock_json_dumps = mock.patch('json.dumps', autospec=True).start()
@@ -459,8 +517,8 @@ class TestCreateOfflinePortPolicy(ExtendedTestCase):
     def test_basic(self):
         """Test create_offline_port_policy() that already exists"""
         with self.assertLogs(level=logging.INFO) as logs:
-            self.pm.create_offline_port_policy('/fabric/port-policies/edge-policy', 'sat-offline-')
-        self.assert_in_element('Using existing offline policy: /fabric/port-policies/sat-offline-edge-policy',
+            self.pm.create_offline_port_policy(EDGE_POLICY_LINK, 'sat-offline-')
+        self.assert_in_element(f'Using existing offline policy: {self.offline_edge_policy}',
                                logs.output)
         self.mock_get_port_policies.assert_called_once()
         self.mock_fc_client.post.assert_not_called()
@@ -468,8 +526,10 @@ class TestCreateOfflinePortPolicy(ExtendedTestCase):
     def test_new_policy(self):
         """Test create_offline_port_policy() that doesn't already exist"""
         with self.assertLogs(level=logging.DEBUG) as logs:
-            self.pm.create_offline_port_policy('/fabric/port-policies/fabric-policy', 'sat-offline-')
-        self.assert_in_element('Creating offline policy: /fabric/port-policies/sat-offline-fabric-policy',
+            self.pm.create_offline_port_policy(FABRIC_POLICY_LINK, 'sat-offline-')
+        offline_fabric_policy = os.path.join(os.path.dirname(FABRIC_POLICY_LINK),
+                                             f'sat-offline-{os.path.basename(FABRIC_POLICY_LINK)}')
+        self.assert_in_element(f'Creating offline policy: {offline_fabric_policy}',
                                logs.output)
         self.mock_get_port_policies.assert_called_once()
         self.mock_fc_client.post.assert_called_once()

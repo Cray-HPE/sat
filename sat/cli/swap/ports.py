@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -179,9 +179,9 @@ class PortManager:
             A list of dictionaries for ports or None if there is an error
                 Example: {"xname": "x3000c0r21j14p0",
                           "port_link": "/fabric/ports/x3000c0r21j14p0",
-                          "policy_link: "/fabric/port-policies/fabric-policy"}
+                          "policy_links: ["/fabric/port-policies/cassini-policy",
+                                          "/fabric/port-policies/qos-ll_be_bd_et-cassini-policy"]}
         """
-
         port_data_list = []
         for port_link in port_links:
             port = self.get_port(port_link)
@@ -194,7 +194,7 @@ class PortManager:
             try:
                 port_data['xname'] = port['conn_port']
                 port_data['port_link'] = port_link
-                port_data['policy_link'] = port['portPolicyLinks'][0]
+                port_data['policy_links'] = port['portPolicyLinks']
             except KeyError as err:
                 LOGGER.error('Key %s for port data missing from fabric manager switch information.', err)
                 return None
@@ -322,12 +322,12 @@ class PortManager:
 
         return port_data_list
 
-    def update_port_policy_link(self, port_link, policy_link):
+    def update_port_policy_links(self, port_link, policy_links):
         """Update a port to use a new policy
 
         Args:
             port_link (str): The full path of the port document link
-            policy_link (str): The full path of the new port policy
+            policy_links (list): The full paths of the new port policies
 
         Returns:
             True if update is successful
@@ -335,8 +335,7 @@ class PortManager:
         """
 
         # Example: {"portPolicyLinks":["/fabric/port-policies/edge-policy"]}
-        port_config = {}
-        port_config['portPolicyLinks'] = [policy_link]
+        port_config = {'portPolicyLinks': policy_links}
         config_json = json.dumps(port_config)
         LOGGER.debug(f'Updating port: {port_link}')
         LOGGER.debug(f'config_json: {config_json}')
