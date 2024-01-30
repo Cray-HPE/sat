@@ -78,7 +78,6 @@ class TestCableSwapper(ExtendedTestCase):
         self.swap_args: dict[str, typing.Any] = {
             'action': None,
             'component_id': ['x1000c6r7j101'],
-            'disruptive': True,
             'dry_run': True,
             'force': False,
             'save_ports': False
@@ -248,24 +247,6 @@ class TestCableSwapper(ExtendedTestCase):
         for msg in expected_logs:
             self.assert_in_element(msg, logs_cm.output)
 
-    def test_not_disruptive_not_dry(self):
-        """Test swap_component not disruptive and not dry run"""
-        self.swap_args['disruptive'] = False
-        self.swap_args['dry_run'] = False
-        self.swap_args['action'] = 'enable'
-        with self.assertLogs(level=logging.INFO) as logs_cm:
-            self.run_swap_component()
-        self.mock_port_manager.get_jack_port_data_list.assert_called_once()
-        self.mock_output_json.assert_not_called()
-        self.mock_port_manager.create_offline_port_policy.assert_not_called()
-        self.mock_port_manager.update_port_policy_links.assert_called()
-        xnames = self.mock_port_manager.get_jack_port_data_list.return_value
-        expected_logs = [f"Ports: {' '.join([p['xname'] for p in xnames])}",
-                         f"Enabling ports on cable {self.swap_args['component_id'][0]}",
-                         "Cable has been enabled."]
-        for msg in expected_logs:
-            self.assert_in_element(msg, logs_cm.output)
-
     def test_get_ports_data_error(self):
         """Test swap_component error getting ports data"""
         self.mock_port_manager.get_jack_port_data_list.return_value = None
@@ -376,7 +357,6 @@ class TestSwitchSwapper(ExtendedTestCase):
         self.swap_args: dict[str, typing.Any] = {
             'action': None,
             'component_id': 'x1000c6r7',
-            'disruptive': True,
             'dry_run': True,
             'force': False,
             'save_ports': False
@@ -451,24 +431,6 @@ class TestSwitchSwapper(ExtendedTestCase):
         expected_logs = [f"Ports: {' '.join([p['xname'] for p in xnames])}",
                          f"Disabling ports on switch {self.swap_args['component_id']}",
                          "Switch has been disabled and is ready for replacement."]
-        for msg in expected_logs:
-            self.assert_in_element(msg, logs_cm.output)
-
-    def test_not_disruptive_not_dry(self):
-        """Test swap_component not disruptive and not dry run"""
-        self.swap_args['disruptive'] = False
-        self.swap_args['dry_run'] = False
-        self.swap_args['action'] = 'enable'
-        with self.assertLogs(level=logging.INFO) as logs_cm:
-            self.run_swap_component()
-        self.mock_port_manager.get_switch_port_data_list.assert_called_once()
-        self.mock_output_json.assert_not_called()
-        self.mock_port_manager.create_offline_port_policy.assert_not_called()
-        self.mock_port_manager.update_port_policy_links.assert_called()
-        xnames = self.mock_port_manager.get_jack_port_data_list.return_value
-        expected_logs = [f"Ports: {' '.join([p['xname'] for p in xnames])}",
-                         f"Enabling ports on switch {self.swap_args['component_id']}",
-                         'Switch has been enabled.']
         for msg in expected_logs:
             self.assert_in_element(msg, logs_cm.output)
 
