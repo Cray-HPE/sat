@@ -172,13 +172,12 @@ class Swapper(metaclass=abc.ABCMeta):
 
         return success
 
-    def swap_component(self, action, component_id, disruptive, dry_run, save_ports, force=False):
+    def swap_component(self, action, component_id, dry_run, save_ports, force=False):
         """Enable or disable ports specified by self.component_id
 
         Args:
             action (str): the action to perform, ('enable' or 'disable')
             component_id (str, list): The xname or list of xnames
-            disruptive (bool): if True, do not confirm disable/enable
             dry_run (bool): if True, skip applying action to ports,
                 but still create the port set affected.
             save_ports (bool): if True, save port_data (xname, port_link, policy_link)
