@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2022, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -111,19 +111,18 @@ class Swapper(metaclass=abc.ABCMeta):
     def create_offline_port_policies(self, port_data_list):
         """Create port policies to be used to OFFLINE ports
 
+        For each policy applied to one of the ports in port_data_list, this will
+        create a new OFFLINE policy named with POL_PRE followed by the current
+        policy name, unless one already exists.
+
         Args:
             port_data_list (list): list of dictionaries with current port data
 
         Raises:
             SystemExit(4): if creating a new port policy fails
         """
-
-        # Create new policies to OFFLINE ports
-        # Name the new policies with POL_PRE followed by the current policy name
-        # unless the current policy name is already a POL_PRE policy
-        #
-        # Create a unique list of policies and create a new policy for each one
-        policy_list = list(set(p['policy_link'] for p in port_data_list))
+        # Create a list of unique policies referenced by the ports
+        policy_list = list(set(policy for port in port_data_list for policy in port['policy_links']))
         LOGGER.debug(f'policy_list: {policy_list}')
         for policy in policy_list:
             policy_name = policy.split('/')[-1]
@@ -151,32 +150,34 @@ class Swapper(metaclass=abc.ABCMeta):
         # Keeps updating the remaining ports if an error occurs for any single port
         success = True
         for port_data in port_data_list:
-            # Determine which policy to use depending on action and current policy
-            path_parts = port_data['policy_link'].split('/')
-            policy_name = path_parts[-1]
-            if action == "enable" and policy_name.startswith(POL_PRE):
-                # Remove prefix and use original policy
-                policy_name = policy_name[len(POL_PRE):]
-            elif action == "disable" and not policy_name.startswith(POL_PRE):
-                # Add prefix to policy
-                policy_name = POL_PRE + policy_name
+            new_policy_links = []
+            for policy_link in port_data['policy_links']:
+                # Determine which policy to use depending on action and current policy
+                path_parts = policy_link.split('/')
+                policy_name = path_parts[-1]
+                if action == "enable" and policy_name.startswith(POL_PRE):
+                    # Remove prefix and use original policy
+                    policy_name = policy_name[len(POL_PRE):]
+                elif action == "disable" and not policy_name.startswith(POL_PRE):
+                    # Add prefix to policy
+                    policy_name = POL_PRE + policy_name
+
+                new_policy_links.append('/'.join(path_parts[:-1]) + '/' + policy_name)
 
             port_link = port_data['port_link']
-            new_policy = '/'.join(path_parts[:-1]) + '/' + policy_name
-            LOGGER.debug(f'Updating {port_link} with policy: {new_policy}')
-            if not self.port_manager.update_port_policy_link(port_link, new_policy):
-                LOGGER.error(f'Error updating {port_link} with policy: {new_policy}')
+            LOGGER.debug(f'Updating {port_link} with policies: {new_policy_links}')
+            if not self.port_manager.update_port_policy_links(port_link, new_policy_links):
+                LOGGER.error(f'Error updating {port_link} with policies: {new_policy_links}')
                 success = False
 
         return success
 
-    def swap_component(self, action, component_id, disruptive, dry_run, save_ports, force=False):
+    def swap_component(self, action, component_id, dry_run, save_ports, force=False):
         """Enable or disable ports specified by self.component_id
 
         Args:
             action (str): the action to perform, ('enable' or 'disable')
             component_id (str, list): The xname or list of xnames
-            disruptive (bool): if True, do not confirm disable/enable
             dry_run (bool): if True, skip applying action to ports,
                 but still create the port set affected.
             save_ports (bool): if True, save port_data (xname, port_link, policy_link)
