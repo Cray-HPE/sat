@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -35,7 +35,6 @@ def set_options(namespace):
     """Set default options for Namespace."""
     namespace.xnames = ['x1000c6r7j101', 'x1000c6r8j102']
     namespace.action = None
-    namespace.disruptive = True
     namespace.dry_run = True
     namespace.force = False
     namespace.save_ports = False
@@ -62,7 +61,6 @@ class TestSwapCable(unittest.TestCase):
         swap_cable(self.fake_args)
         self.fake_swap_component.assert_called_once_with(self.fake_args.action,
                                                          self.fake_args.xnames,
-                                                         self.fake_args.disruptive,
                                                          self.fake_args.dry_run,
                                                          self.fake_args.save_ports,
                                                          self.fake_args.force)
