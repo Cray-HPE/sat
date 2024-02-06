@@ -1,6 +1,6 @@
 # Changelog
 
-(C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+(C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -25,11 +25,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.27.2] - 2024-02-05
+## [3.27.4] - 2024-02-06
 
 ### Security
 - Update the version of jinja2 from 3.0.3 to 3.1.3 to address
   CVE-2024-22195
+  
+## [3.27.3] - 2024-01-31
+
+### Fixed
+- Fixed `sat swap switch` and `sat swap cable` so that they preserve all
+  existing port policies applied to the ports on a switch or a cable across the
+  disable and enable actions. The old behavior was that only the first policy
+  would be preserved, which was a problem for ports with multiple policies
+  configured.
+
+## [3.27.2] - 2024-01-16
+
+### Fixed
+- Fixed a lengthy traceback that occurs when logging parsing errors that occur
+  during parsing of `--filter` options.
+- Fixed `--filter` option parsing to allow unquoted special characters (like the
+  dash, for example) on the right-hand side (value) of a comparison.
 
 ## [3.27.1] - 2024-01-05
 
