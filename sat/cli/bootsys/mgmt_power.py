@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021,2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2021, 2023-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -36,6 +36,7 @@ from paramiko.ssh_exception import BadHostKeyException, AuthenticationException,
 
 from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger, ConsoleLoggingError
 from sat.cli.bootsys.util import get_and_verify_ncn_groups, get_ssh_client, FatalBootsysError
+from sat.cli.bootsys.platform import do_ceph_freeze, FatalPlatformError
 from sat.waiting import GroupWaiter, WaitingFailure
 from sat.config import get_config_value
 from sat.util import BeginEndLogger, get_username_and_password_interactively, pester_choices, prompt_continue
@@ -263,36 +264,91 @@ def do_mgmt_shutdown_power(ssh_client, username, password, excluded_ncns, ncn_sh
         ssh_client (paramiko.SSHClient): a paramiko client object.
         username (str): IPMI username to use.
         password (str): IPMI password to use.
-        excluded_ncns (set of str): The set of ncn hostnames to exclude, in
-            addition to ncn-m001, which is always excluded.
-        ncn_shutdown_timeout (int): timeout, in seconds, after which to hard
-            power off.
-        ipmi_timeout (int): timeout, in seconds, for nodes to reach desired
-            power state after IPMI power off.
+        excluded_ncns (set of str): The set of NCN hostnames to exclude.
+        ncn_shutdown_timeout (int): Timeout, in seconds, after which to hard power off.
+        ipmi_timeout (int): Timeout, in seconds, for nodes to reach desired power state after IPMI power off.
     """
-    # Ensure we do not shut down the first master node yet, as it is the node
-    # where "sat bootsys" commands are being run.
-    # TODO: Is there a better way to get the hostname of the first master node?
     try:
         other_ncns_by_role = get_and_verify_ncn_groups(excluded_ncns.union({'ncn-m001'}))
     except FatalBootsysError as err:
         LOGGER.error(f'Not proceeding with NCN power off: {err}')
         raise SystemExit(1)
 
-    other_ncns = list({ncn for role in ('managers', 'storage', 'workers')
-                       for ncn in other_ncns_by_role[role]})
+    # Shutdown workers
+    worker_ncns = other_ncns_by_role.get('workers', [])
+    if worker_ncns:
+        try:
+            with IPMIConsoleLogger(worker_ncns, username, password):
+                LOGGER.info(f'Shutting down worker NCNs: {", ".join(worker_ncns)}')
+                start_shutdown(worker_ncns, ssh_client)
+                LOGGER.info(f'Waiting up to {ncn_shutdown_timeout} seconds for worker NCNs to shut down...')
+                finish_shutdown(worker_ncns, username, password, ncn_shutdown_timeout, ipmi_timeout)
+        except ConsoleLoggingError as err:
+            LOGGER.error(f'Aborting shutdown of worker NCNs due to failure to '
+                         f'set up NCN console logging: {err}')
+            raise SystemExit(1)
+    else:
+        LOGGER.info('No worker NCNs to shutdown.')
 
+    # Shutdown managers (except ncn-m001)
+    manager_ncns = other_ncns_by_role.get('managers', [])
+    if manager_ncns:
+        try:
+            with IPMIConsoleLogger(manager_ncns, username, password):
+                LOGGER.info(f'Shutting down manager NCNs: {", ".join(manager_ncns)}')
+                start_shutdown(manager_ncns, ssh_client)
+                LOGGER.info(f'Waiting up to {ncn_shutdown_timeout} seconds for manager NCNs to shut down...')
+                finish_shutdown(manager_ncns, username, password, ncn_shutdown_timeout, ipmi_timeout)
+        except ConsoleLoggingError as err:
+            LOGGER.error(f'Aborting shutdown of manager NCNs due to failure to '
+                         f'set up NCN console logging: {err}')
+            raise SystemExit(1)
+    else:
+        LOGGER.info('No Manager NCNs to shutdown.')
+
+    # Unmap RBD on ncn-m001
+    LOGGER.info('Unmapping and unmounting RBD devices on ncn-m001')
     try:
-        with IPMIConsoleLogger(other_ncns, username, password):
-            LOGGER.info(f'Sending shutdown command to other NCNs: {", ".join(other_ncns)}')
-            start_shutdown(other_ncns, ssh_client)
-            LOGGER.info(f'Waiting up to {ncn_shutdown_timeout} seconds for other NCNs to '
-                        f'reach powered off state according to ipmitool: {", ".join(other_ncns)}.')
-            finish_shutdown(other_ncns, username, password, ncn_shutdown_timeout, ipmi_timeout)
-            LOGGER.info('Shutdown of all other NCNs complete.')
-    except ConsoleLoggingError as err:
-        LOGGER.error(f'Aborting shutdown of NCNs due to failure to set up NCN console logging: {err}')
-        raise SystemExit(1)
+        # Execute rbdmap unmap-all command on ncn-m001
+        command = 'rbdmap unmap-all'
+        ssh_client.connect('ncn-m001')
+        stdin, stdout, stderr = ssh_client.exec_command(command)
+        exit_status = stdout.channel.recv_exit_status()
+        if exit_status != 0:
+            LOGGER.error(
+                f'Failed to unmap RBD on ncn-m001. '
+                f'Command "{command}" returned non-zero exit status: {exit_status}')
+            sys.exit(1)
+        else:
+            LOGGER.info('RBD unmapped successfully on ncn-m001')
+    except (SSHException, socket.error) as err:
+        LOGGER.error(f'Error occurred while connecting to ncn-m001 or executing command: {err}')
+        sys.exit(1)
+
+    # Freeze Ceph on storage nodes and then shutdown
+    storage_ncns = other_ncns_by_role.get('storage', [])
+    if storage_ncns:
+        LOGGER.info(f'Freezing Ceph and shutting down storage NCNs: {", ".join(storage_ncns)}')
+        try:
+            do_ceph_freeze()
+        except FatalPlatformError as err:
+            LOGGER.error(f'Failed to freeze Ceph on storage NCNs: {err}')
+            sys.exit(1)
+        LOGGER.info('Ceph freeze completed successfully on storage NCNs.')
+        try:
+            with IPMIConsoleLogger(storage_ncns, username, password):
+                start_shutdown(storage_ncns, ssh_client)
+                LOGGER.info(f'Waiting up to {ncn_shutdown_timeout} seconds for storage NCNs to shut down...')
+                finish_shutdown(storage_ncns, username, password, ncn_shutdown_timeout, ipmi_timeout)
+                LOGGER.info(f'Shutdown and power off of storage NCNs: {", ".join(storage_ncns)}')
+        except ConsoleLoggingError as err:
+            LOGGER.error(f'Aborting shutdown of storage NCNs due to failure to '
+                         f'set up NCN console logging: {err}')
+            raise SystemExit(1)
+    else:
+        LOGGER.info('No storage NCNs to shutdown.')
+
+    LOGGER.info('Shutdown and power off of all management NCNs complete.')
 
 
 def do_power_off_ncns(args):

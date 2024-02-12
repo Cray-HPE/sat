@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021, 2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2023, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -503,7 +503,7 @@ def do_recreate_cronjobs(_):
         LOGGER.warning('Could not load Kubernetes configuration: %s', err)
 
 
-def do_ceph_freeze(ncn_groups):
+def do_ceph_freeze():
     """Check ceph health and freeze if healthy.
 
     Raises:
@@ -604,7 +604,6 @@ STEPS_BY_ACTION = {
         PlatformServicesStep('Stop containers running under containerd on all Kubernetes NCNs.',
                              do_stop_containers),
         PlatformServicesStep('Stop containerd on all Kubernetes NCNs.', do_containerd_stop),
-        PlatformServicesStep('Check health of Ceph cluster and freeze state.', do_ceph_freeze)
     ]
 }
 

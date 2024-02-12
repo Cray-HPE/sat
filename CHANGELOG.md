@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Removed the step that freezes Ceph from the `platform-services` stage of `sat bootsys shutdown`
+- Modified the `ncn-power` stage of `sat bootsys shutdown` to shut down the NCNs
+  one group at a time instead of all simultaneously. The new order of this stage
+  is to shut down workers, shut down masters (except ncn-m001), unmap and
+  unmount all rbd devices on `ncn-m001`, and then shut down storage nodes.
+
 ### Fixed
 - Updated `sat bootsys` to increase the default management NCN shutdown timeout
   to 900 seconds.
