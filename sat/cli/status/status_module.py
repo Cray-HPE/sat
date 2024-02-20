@@ -35,7 +35,6 @@ from csm_api_client.service.gateway import APIError
 from csm_api_client.service.hsm import HSMClient
 
 from sat.apiclient.bos import BOSClientCommon
-from sat.apiclient.ims import IMSClient
 from sat.apiclient.sls import SLSClient
 from sat.config import get_config_value
 from sat.constants import MISSING_VALUE
@@ -459,9 +458,9 @@ class BOSStatusModule(StatusModule):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Cache mappings of images IDs to names and BOS IDs to BOS sessions to reduce calls to IMS and BOS.
-        self._cached_image_ids_to_names = {}
+        # Cache mappings of BOS IDs to BOS sessions to reduce calls to BOS.
         self._cached_bos_sessions = {}
+        self.missing_sessions = {}
 
     @staticmethod
     def can_use():
@@ -470,44 +469,25 @@ class BOSStatusModule(StatusModule):
         return (True, None)
 
     def get_image_for_component(self, raw_component):
-        """Helper function to query the image name given a component dict from BOS.
+        """Helper function to query the image ID given a component dict from BOS.
 
         Args:
             raw_component (dict): a component dictionary returned from BOS v2
 
         Returns:
-            str: the name of the IMS image currently booted on the given
+            str: the IMS image ID currently booted on the given
                 component, or MISSING_VALUE if it cannot be identified
         """
-
-        # To get a human readable name for each booted image, IMS is
-        # queried for images based on the path to the actual booted kernel.
-        # This depends on the fact that the IMS image ID is part of the
-        # path to the booted kernel in S3.
-        #
-        # TODO: This seems a bit fragile but BOS doesn't appear to provide
-        # this information anywhere else.
-
-        ims_client = IMSClient(self.session)
-        booted_image = None
+        # Get the IMS image ID from the path to the booted kernel in S3.
+        booted_image_id = None
 
         kernel_path = get_val_by_path(raw_component, 'actual_state.boot_artifacts.kernel')
         if kernel_path:
             img_id = urlparse(kernel_path).path.split('/')[1]
-            if img_id in self._cached_image_ids_to_names:
-                booted_image = self._cached_image_ids_to_names[img_id]
-            else:
-                try:
-                    booted_image = ims_client.get_image(img_id)['name']
-                except APIError as err:
-                    LOGGER.warning('Could not retrieve image name for component %s: %s',
-                                   raw_component['id'], err)
-                except KeyError as err:
-                    LOGGER.warning('Image %s missing "%s" field in IMS response',
-                                   img_id, err)
-                self._cached_image_ids_to_names[img_id] = booted_image
+            if img_id:
+                booted_image_id = img_id
 
-        return booted_image or MISSING_VALUE
+        return booted_image_id or MISSING_VALUE
 
     @property
     def rows(self):
@@ -553,10 +533,15 @@ class BOSStatusModule(StatusModule):
                     try:
                         component_session = bos_client.get_session(session_id)
                     except APIError as err:
-                        LOGGER.warning('Could not retrieve BOS session for component %s: %s',
-                                       component_xname, err)
+                        LOGGER.debug('Could not retrieve BOS session %s: %s',
+                                     session_id, err)
                     self._cached_bos_sessions[session_id] = component_session
                 if component_session is None:
+                    # Track missing sessions
+                    if session_id in self.missing_sessions:
+                        self.missing_sessions[session_id] += 1
+                    else:
+                        self.missing_sessions[session_id] = 1
                     continue
 
                 try:
@@ -569,5 +554,9 @@ class BOSStatusModule(StatusModule):
                 # This finally block always runs regardless of whether the
                 # loop was prematurely `continue`d or not.
                 components.append(component)
+        # Logging missing sessions
+        for session_id, count in self.missing_sessions.items():
+            LOGGER.debug('Session id %s which applies to %d nodes is missing',
+                         session_id, count)
 
         return components

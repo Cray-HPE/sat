@@ -339,19 +339,6 @@ class TestBOSStatusModule(BaseStatusModuleTestCase):
         patch('sat.cli.status.status_module.BOSClientCommon.get_bos_client',
               return_value=self.mock_bos_client).start()
 
-        self.mock_ims_client = MagicMock()
-        self.mock_ims_client.get_image.return_value = {
-            'created': '2022-01-01T00:00:00',
-            'id': self.img_id,
-            'link': {
-                'etag': 'abcdef123456789abcdef12345678909',
-                'path': f's3://boot-images/{self.img_id}/manifest.json',
-                'type': 's3',
-            },
-            'name': self.img_name,
-        }
-        patch('sat.cli.status.status_module.IMSClient', return_value=self.mock_ims_client).start()
-
         self.session = MagicMock()
 
     def test_can_use_in_bos_v1(self):
@@ -377,7 +364,7 @@ class TestBOSStatusModule(BaseStatusModuleTestCase):
             'xname': self.xname,
             'Boot Status': 'stable',
             'Most Recent BOS Session': self.bos_session,
-            'Most Recent Image': self.img_name,
+            'Most Recent Image': self.img_id,
             'Most Recent Session Template': self.bos_sessiontemplate,
         })
 
@@ -390,7 +377,7 @@ class TestBOSStatusModule(BaseStatusModuleTestCase):
             'xname': self.xname,
             'Boot Status': 'stable',
             'Most Recent BOS Session': MISSING_VALUE,
-            'Most Recent Image': self.img_name,
+            'Most Recent Image': self.img_id,
         })
 
     def test_no_session_key_for_component(self):
@@ -402,7 +389,7 @@ class TestBOSStatusModule(BaseStatusModuleTestCase):
             'xname': self.xname,
             'Boot Status': 'stable',
             'Most Recent BOS Session': MISSING_VALUE,
-            'Most Recent Image': self.img_name,
+            'Most Recent Image': self.img_id,
         })
 
     def test_session_key_empty_string(self):
@@ -413,7 +400,7 @@ class TestBOSStatusModule(BaseStatusModuleTestCase):
             'xname': self.xname,
             'Boot Status': 'stable',
             'Most Recent BOS Session': MISSING_VALUE,
-            'Most Recent Image': self.img_name,
+            'Most Recent Image': self.img_id,
         })
 
     def test_get_session_apierror(self):
@@ -425,7 +412,7 @@ class TestBOSStatusModule(BaseStatusModuleTestCase):
             'xname': self.xname,
             'Boot Status': 'stable',
             'Most Recent BOS Session': self.bos_session,
-            'Most Recent Image': self.img_name,
+            'Most Recent Image': self.img_id,
         })
 
     def test_get_session_missing_template_name(self):
@@ -443,5 +430,5 @@ class TestBOSStatusModule(BaseStatusModuleTestCase):
             'xname': self.xname,
             'Boot Status': 'stable',
             'Most Recent BOS Session': self.bos_session,
-            'Most Recent Image': self.img_name,
+            'Most Recent Image': self.img_id,
         })
