@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -560,15 +560,10 @@ class BOSStatusModule(StatusModule):
                     continue
 
                 try:
-                    template_name = component_session['template_name']
-                    component['Most Recent Session Template'] = bos_client.get_session_template(template_name)['name']
-                except APIError as err:
-                    LOGGER.warning('Could not retrieve BOS session template for component %s with session %s: %s',
-                                   component_xname, session_id, err)
-
+                    component['Most Recent Session Template'] = component_session['template_name']
                 except KeyError as err:
-                    LOGGER.warning('"%s" key missing from BOS response for component %s',
-                                   err, component_xname)
+                    LOGGER.warning('Unable to determine session template %s due to missing %s key,',
+                                   session_id, err)
                     continue
             finally:
                 # This finally block always runs regardless of whether the
