@@ -30,8 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Update the version of jinja2 from 3.0.3 to 3.1.3 to address
   CVE-2024-22195
-- Update the version of cryptography from 41.0.6 to 42.0.0 to resolve
-  CVE-2023-50782
+- Update the version of cryptography from 41.0.6 to 42.0.4 to resolve
+  CVE-2023-50782, CVE-2024-0727, and CVE-2024-26130
 
 ### Fixed
 - Remove unnecessary queries to BOS to get the name of the session template for 
