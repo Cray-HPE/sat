@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@ Tests for the sat.cli.status.status_module module.
 from abc import ABC
 import inspect
 import unittest
+import logging
 from unittest.mock import MagicMock, patch
 
 from csm_api_client.service.gateway import APIError
@@ -333,26 +334,10 @@ class TestBOSStatusModule(BaseStatusModuleTestCase):
             },
             'template_name': self.bos_sessiontemplate,
         }
-        self.mock_bos_client.get_session_template.return_value = {
-            'name': self.bos_sessiontemplate
-        }
 
         self.mock_bos_client.get_components.return_value = [self.bos_component]
         patch('sat.cli.status.status_module.BOSClientCommon.get_bos_client',
               return_value=self.mock_bos_client).start()
-
-        self.mock_ims_client = MagicMock()
-        self.mock_ims_client.get_image.return_value = {
-            'created': '2022-01-01T00:00:00',
-            'id': self.img_id,
-            'link': {
-                'etag': 'abcdef123456789abcdef12345678909',
-                'path': f's3://boot-images/{self.img_id}/manifest.json',
-                'type': 's3',
-            },
-            'name': self.img_name,
-        }
-        patch('sat.cli.status.status_module.IMSClient', return_value=self.mock_ims_client).start()
 
         self.session = MagicMock()
 
@@ -379,7 +364,7 @@ class TestBOSStatusModule(BaseStatusModuleTestCase):
             'xname': self.xname,
             'Boot Status': 'stable',
             'Most Recent BOS Session': self.bos_session,
-            'Most Recent Image': self.img_name,
+            'Most Recent Image': self.img_id,
             'Most Recent Session Template': self.bos_sessiontemplate,
         })
 
@@ -392,7 +377,7 @@ class TestBOSStatusModule(BaseStatusModuleTestCase):
             'xname': self.xname,
             'Boot Status': 'stable',
             'Most Recent BOS Session': MISSING_VALUE,
-            'Most Recent Image': self.img_name,
+            'Most Recent Image': self.img_id,
         })
 
     def test_no_session_key_for_component(self):
@@ -404,7 +389,7 @@ class TestBOSStatusModule(BaseStatusModuleTestCase):
             'xname': self.xname,
             'Boot Status': 'stable',
             'Most Recent BOS Session': MISSING_VALUE,
-            'Most Recent Image': self.img_name,
+            'Most Recent Image': self.img_id,
         })
 
     def test_session_key_empty_string(self):
@@ -415,7 +400,7 @@ class TestBOSStatusModule(BaseStatusModuleTestCase):
             'xname': self.xname,
             'Boot Status': 'stable',
             'Most Recent BOS Session': MISSING_VALUE,
-            'Most Recent Image': self.img_name,
+            'Most Recent Image': self.img_id,
         })
 
     def test_get_session_apierror(self):
@@ -427,28 +412,23 @@ class TestBOSStatusModule(BaseStatusModuleTestCase):
             'xname': self.xname,
             'Boot Status': 'stable',
             'Most Recent BOS Session': self.bos_session,
-            'Most Recent Image': self.img_name,
+            'Most Recent Image': self.img_id,
         })
 
-    def test_get_sessiontemplate_apierror(self):
-        """Test retrieving component boot status when no sessiontemplate found"""
-        self.mock_bos_client.get_session_template.side_effect = APIError
-        rows = BOSStatusModule(session=self.session).rows
+    def test_get_session_missing_template_name(self):
+        """Test retrieving component status when the session template is missing from the session"""
+        del self.mock_bos_client.get_session.return_value['template_name']
+        with self.assertLogs(level=logging.WARNING) as logs_cm:
+            rows = BOSStatusModule(session=self.session).rows
 
+        self.assertEqual(len(logs_cm.records), 1)
+        self.assertRegex(logs_cm.records[0].message,
+                         "Unable to determine session template .* due to missing 'template_name' key")
+
+        self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0], {
             'xname': self.xname,
             'Boot Status': 'stable',
             'Most Recent BOS Session': self.bos_session,
-            'Most Recent Image': self.img_name,
-        })
-
-    def test_get_sessiontemplate_keyerror(self):
-        """Test retrieving component boot status when sessiontemplate missing "name" key"""
-        self.mock_bos_client.get_session_template.return_value = {}
-        rows = BOSStatusModule(session=self.session).rows
-        self.assertEqual(rows[0], {
-            'xname': self.xname,
-            'Boot Status': 'stable',
-            'Most Recent BOS Session': self.bos_session,
-            'Most Recent Image': self.img_name,
+            'Most Recent Image': self.img_id,
         })
