@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021, 2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2023, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -787,7 +787,7 @@ class TestDoCephFreeze(unittest.TestCase):
 
     def test_do_ceph_freeze_success(self):
         """Test do_ceph_freeze in the successful case."""
-        do_ceph_freeze(self.ncn_groups)
+        do_ceph_freeze()
         self.check_ceph_health.assert_called_once_with()
         self.toggle_ceph_freeze_flags.assert_called_once_with(freeze=True)
 
@@ -795,7 +795,7 @@ class TestDoCephFreeze(unittest.TestCase):
         """When Ceph is not healthy, do not freeze Ceph."""
         self.check_ceph_health.side_effect = CephHealthCheckError
         with self.assertRaises(FatalPlatformError):
-            do_ceph_freeze(self.ncn_groups)
+            do_ceph_freeze()
         self.toggle_ceph_freeze_flags.assert_not_called()
 
 
