@@ -7,7 +7,7 @@ Print version information about the system
 ------------------------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2019-2021,2023 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2019-2021,2023,2024 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -114,9 +114,8 @@ These options must be specified after the subcommand.
         the other options are specified, this option is enabled by default.
 
 **--release-files**
-        Display version information installed in the ``/opt/cray/etc/release/``
-        directory. This option is not enabled by default and is included for
-        compatibility with previous releases.
+        The **--release-files** option is no longer supported. Use **--products** to
+        see installed product versions instead. This option is not enabled by default.
 
 **--all**
         Display everything. Equivalent to specifying **--system**,
@@ -144,10 +143,6 @@ site_info: /opt/cray/etc/site_info.yml
         is downloaded from the configured S3 bucket on every invocation of
         **sat showrev** if it is available, otherwise a local copy is used.
 
-release: /opt/cray/etc/release
-        Showrev parses the files in this directory to collect information for
-        the product releases. The fields shown in the output report are all
-        the fields found in these files, along with the product file name.
 
 EXAMPLES
 ========
