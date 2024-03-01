@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -33,7 +33,7 @@ from sat.apiclient import APIError, SCSDClient
 from sat.cli.bmccreds.constants import (
     BMC_USERNAME,
     RANDOM_PASSWORD_LENGTH,
-    VALID_BMC_PASSWORD_CHARACTERS
+    VALID_CHAR_SETS_STRING
 )
 from sat.report import Report
 from sat.xname import XName
@@ -62,17 +62,24 @@ class BMCCredsManager:
             BMC state.
         report_format (str): The format to print the report. Expected to
             be 'pretty', 'yaml', or 'json'.
+        length (int):Length of the random password .
+            (default: RANDOM_PASSWORD_LENGTH)
+        allowed_chars (str): allowed characters for the random password
+            (default: alpha, numeric and symbols)
     """
     NODE_BMC_XNAME_REGEX = re.compile(r'x\d+c\d+s\d+b\d+$')
     CHASSIS_BMC_XNAME_REGEX = re.compile(r'x\d+c\d+b\d+$')
     ROUTER_BMC_XNAME_REGEX = re.compile(r'x\d+c\d+r\d+b\d+$')
 
-    def __init__(self, password, xnames, domain, force, report_format):
+    def __init__(self, password, xnames, domain, force, report_format, length=RANDOM_PASSWORD_LENGTH,
+                 allowed_chars=VALID_CHAR_SETS_STRING):
         self.password = password
         self.xnames = [XName(xname) for xname in xnames]
         self.domain = domain
         self.force = force
         self.report_format = report_format
+        self.length = length
+        self.allowed_chars = allowed_chars
 
     @staticmethod
     def _get_bmc_type(bmc):
@@ -92,11 +99,18 @@ class BMCCredsManager:
             return 'RouterBMC'
         return 'Unknown'
 
-    @staticmethod
-    def _generate_random_password_string():
-        """Get a random string of letters and numbers that is RANDOM_PASSWORD_LENGTH characters long."""
+    def _generate_random_password_string(self):
+        """Generate a random password string of specified length using given allowed_chars.
+
+        Args:
+            length (int): The length of the password to be generated.
+            allowed_chars (str): The string of allowed characters from which password can be generated.
+
+        Returns:
+            str: The randomly generated password string
+        """
         return ''.join(
-            secrets.choice(VALID_BMC_PASSWORD_CHARACTERS) for _ in range(RANDOM_PASSWORD_LENGTH)
+            secrets.choice(self.allowed_chars) for _ in range(self.length)
         )
 
     def _create_globalcreds_request_body(self):

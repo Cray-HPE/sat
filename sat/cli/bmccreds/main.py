@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -32,8 +32,8 @@ from sat.cli.bmccreds.creds_manager import BMCCredsManager, BMCCredsException
 from sat.cli.bmccreds.constants import (
     BMC_USERNAME,
     MAX_XNAMES_TO_DISPLAY,
-    USER_PASSWORD_MAX_LENGTH,
-    VALID_BMC_PASSWORD_CHARACTERS
+    RANDOM_PASSWORD_LENGTH,
+    VALID_CHAR_SETS_STRING
 )
 from sat.session import SATSession
 from sat.util import format_long_list, get_username_and_password_interactively, pester
@@ -63,30 +63,17 @@ def validate_args(args):
         LOGGER.error('--no-hsm-check requires xnames to be specified.')
         raise SystemExit(1)
 
+    if args.password_length and not args.random_password:
+        LOGGER.error('--password-length is only valid with --random-password.')
+        raise SystemExit(1)
 
-def check_password_requirements(password):
-    """Check password requirements.
+    if args.password_chars and not args.random_password:
+        LOGGER.error('--password-chars is only valid with --random-password.')
+        raise SystemExit(1)
 
-    Check password is not longer than the maximum length and is
-    only comprised of allowed characters.
-
-    Args:
-        password (str): the password to check.
-
-    Returns:
-        None
-
-    Raises:
-        ValueError: if the password does not meet the requirements.
-    """
-    if len(password) > USER_PASSWORD_MAX_LENGTH:
-        raise ValueError(
-            f'Password must be less than or equal to {USER_PASSWORD_MAX_LENGTH} characters.'
-        )
-    if not all(char in VALID_BMC_PASSWORD_CHARACTERS for char in password):
-        raise ValueError(
-            f'Password may only contain letters, numbers and underscores.'
-        )
+    if args.password_char_sets and not args.random_password:
+        LOGGER.error('--password-char-sets is only valid with --random-password.')
+        raise SystemExit(1)
 
 
 def set_creds_with_retry(credentials_manager, retries, session):
@@ -167,13 +154,6 @@ def do_bmccreds(args):
         user_password = args.password or get_username_and_password_interactively(
             BMC_USERNAME, password_prompt='BMC password', confirm_password=True
         )[1]
-        try:
-            check_password_requirements(
-                user_password
-            )
-        except ValueError as err:
-            LOGGER.error(err)
-            raise SystemExit(1)
     else:
         user_password = None
 
@@ -183,5 +163,7 @@ def do_bmccreds(args):
         domain=args.pw_domain,
         force=args.no_hsm_check,
         report_format=args.format,
+        length=args.password_length or RANDOM_PASSWORD_LENGTH,
+        allowed_chars=args.password_chars or args.password_char_sets or VALID_CHAR_SETS_STRING
     )
     set_creds_with_retry(credentials_manager, args.retries, session)

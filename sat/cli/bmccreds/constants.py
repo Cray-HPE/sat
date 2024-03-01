@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -24,7 +24,6 @@
 """
 Constant values for the bmccreds subcommand.
 """
-
 import string
 
 # The username that bmccreds will always use
@@ -39,5 +38,10 @@ MAX_XNAMES_TO_DISPLAY = 20
 # The length of randomly-generated passwords
 RANDOM_PASSWORD_LENGTH = 8
 
-# The set of valid BMC password characters
-VALID_BMC_PASSWORD_CHARACTERS = string.ascii_letters + string.digits + '_'
+VALID_CHAR_SETS = {
+    'alpha': string.ascii_letters,
+    'numeric': string.digits,
+    'symbols': '!@#$%^&*'
+}
+
+VALID_CHAR_SETS_STRING = ''.join(VALID_CHAR_SETS.values())

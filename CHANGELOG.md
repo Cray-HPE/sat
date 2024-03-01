@@ -25,13 +25,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.27.14] - 2024-03-27
+
+### Changed
+- Remove the restrictions on the passwords that can be set with `sat bmccreds`
+  to allow for more complex passwords.
+- Improve the password generation logic in `sat bmccreds` to support generating
+  more complex passwords.
+
 ## [3.27.13] - 2024-03-25
 
 ### Updated
 - Updated the default grace period of the `HMSDiscoveryScheduledWaiter` to 3
   minutes to allow more time for a new job to be scheduled by the cronjob.
 
-## [3.27.12] - 2024-04-14
+## [3.27.12] - 2024-03-14
 
 ### Added
 - Added support for the Power Control Service (PCS). Functionality using CAPMC
