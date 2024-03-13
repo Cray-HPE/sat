@@ -33,40 +33,6 @@ from sat.xname import XName
 class PCSError(APIError):
     """An error occurred in PCS."""
 
-    def __init__(self, message, xname_errs=None):
-        """Create a new PCSError with the given message and info about the failing xnames.
-
-        Args:
-            message (str): the error message
-            xname_errs (list): a list of dictionaries representing the failures for
-                the individual components that failed. Each dict should have the
-                following keys:
-                    e: the error code
-                    err_msg: the error message
-                    xname: the actual xname which failed
-        """
-        self.message = message
-        self.xname_errs = xname_errs if xname_errs is not None else []
-        self.xnames = [xname_err['xname'] for xname_err in self.xname_errs
-                       if 'xname' in xname_err]
-
-    def __str__(self):
-        """Convert to str."""
-        if not self.xname_errs:
-            return self.message
-        else:
-            # A mapping from a tuple of (err_code, err_msg) to a list of xnames
-            # with that combination of err_code and err_msg.
-            xnames_by_err = defaultdict(list)
-            for xname_err in self.xname_errs:
-                xnames_by_err[(xname_err.get('e'), xname_err.get('err_msg'))].append(xname_err.get('xname'))
-
-            xname_err_summary = '\n'.join([f'xname(s) ({", ".join(xnames)}) failed with '
-                                           f'e={err_info[0]} and err_msg="{err_info[1]}"'
-                                           for err_info, xnames in xnames_by_err.items()])
-
-            return f'{self.message}\n{xname_err_summary}'
-
 
 class PCSClient(APIGatewayClient):
     """Client for the Power Control Service."""
@@ -81,7 +47,6 @@ class PCSClient(APIGatewayClient):
             power_state (str): the desired power state. Either "on" or "off".
             force (bool): if True, disable checks and force the power operation.
             recursive (bool): if True, power on component and its descendants.
-            prereq (bool): if True, power on component and its ancestors.
 
         Returns:
             None
@@ -111,6 +76,9 @@ class PCSClient(APIGatewayClient):
             try:
                 for xname in xnames:
                     xname_instance = XName(xname)
+                    # Current if block handles to fetch children of chassis & computemodule only.
+                    # TO DO: It will have to be updated to handle any other component type i/p
+                    # INFO: current sat swap usually is executed for computemodule only
                     if xname_instance.get_type() == 'Chassis':
                         target_xnames.update(
                             hsm_client.query_components(
@@ -134,8 +102,8 @@ class PCSClient(APIGatewayClient):
         try:
             self.post('transitions', json=params).json()
         except APIError as err:
-            raise PCSError(f'Power {power_state} operation failed for xname(s).',
-                           xname_errs=xnames) from err
+            raise PCSError(f'Power {power_state} operation failed for xname(s): '
+                           f'{", ".join(target_xnames)}.') from err
 
     def get_xnames_power_state(self, xnames):
         """Get the power state of the given xnames from PCS.

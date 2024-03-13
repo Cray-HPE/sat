@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020, 2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -29,8 +29,7 @@ import unittest
 from unittest.mock import patch
 
 from sat.apiclient import APIError
-from sat.cli.bootsys.power import (PCSError, PCSPowerWaiter,
-                                   do_nodes_power_off,
+from sat.cli.bootsys.power import (PCSPowerWaiter,
                                    get_nodes_by_role_and_state)
 from tests.common import ExtendedTestCase
 
@@ -94,156 +93,6 @@ class TestPCSPowerWaiter(ExtendedTestCase):
         with self.assertLogs(level=logging.DEBUG) as cm:
             self.assertFalse(self.waiter.member_has_completed(member))
         self.assert_in_element(f'Failed to query power state: {api_err_msg}', cm.output)
-
-
-class TestDoNodesPowerOff(ExtendedTestCase):
-    """Test the do_nodes_power_off function."""
-
-    def setUp(self):
-        """Set up some mocks."""
-        self.mock_pcs_client = patch('sat.cli.bootsys.power.PCSClient').start().return_value
-        self.mock_sat_session = patch('sat.cli.bootsys.power.SATSession').start()
-
-        self.timeout = 10  # does not actually affect duration; just for asserts
-        self.compute_nodes = ['x1000c0s0b0n0', 'x1000c0s0b0n1']
-        self.application_nodes = ['x3000c0s24b1n0', 'x3000c0s24b2n0']
-        self.all_nodes = set(self.compute_nodes + self.application_nodes)
-        self.timed_out_nodes = set()
-
-        def mock_get_nodes(role, _):
-            if role == 'compute':
-                return self.compute_nodes
-            elif role == 'application':
-                return self.application_nodes
-            else:
-                return []
-
-        self.mock_get_nodes = patch('sat.cli.bootsys.power.get_nodes_by_role_and_state',
-                                    mock_get_nodes).start()
-
-        self.mock_pcs_waiter_cls = patch('sat.cli.bootsys.power.PCSPowerWaiter').start()
-        self.mock_pcs_waiter = self.mock_pcs_waiter_cls.return_value
-        self.mock_pcs_waiter.wait_for_completion.return_value = self.timed_out_nodes
-
-        self.mock_print = patch('builtins.print').start()
-
-    def tearDown(self):
-        """Stop all patches."""
-        patch.stopall()
-
-    def assert_log_calls(self, logs, num_wait=None, include_wait_call=True):
-        """Assert that the expected logging calls are made.
-
-        Args:
-            logs (object): the recording object returned from the assertLogs()
-                context manager. has two attributes: `output` and `records`
-            num_wait (int): the number of nodes waited on. defaults to
-                len(self.all_nodes)
-            include_wait_call (bool): whether to include a print statement
-                for a wait.
-        """
-        num_wait = num_wait if num_wait is not None else len(self.all_nodes)
-        calls = [f'Forcing power off of {len(self.all_nodes)} compute or application '
-                 f'nodes still powered on: {", ".join(self.all_nodes)}']
-        if include_wait_call:
-            calls.append(f'Waiting {self.timeout} seconds until {num_wait} nodes '
-                         f'reach powered off state according to PCS.')
-        for c in calls:
-            self.assert_in_element(c, logs.output)
-
-    def assert_pcs_client_call(self):
-        """Assert the call is made to the PCSClient to power off nodes."""
-        self.mock_pcs_client.set_xnames_power_state.assert_called_once_with(
-            list(self.all_nodes), 'off', force=True
-        )
-
-    def test_do_nodes_power_off_already_off(self):
-        """Test do_nodes_power_off when all nodes are already off."""
-        self.compute_nodes = []
-        self.application_nodes = []
-        timed_out, failed = do_nodes_power_off(self.timeout)
-
-        self.assertEqual(set(), timed_out)
-        self.assertEqual(set(), failed)
-
-        self.mock_pcs_client.set_xnames_power_state.assert_not_called()
-        self.mock_pcs_waiter_cls.assert_not_called()
-
-    def test_do_nodes_power_off_success(self):
-        """Test do_nodes_power_off in the successful case."""
-        with self.assertLogs(level=logging.INFO) as cm:
-            timed_out, failed = do_nodes_power_off(self.timeout)
-
-        self.assert_pcs_client_call()
-        self.assertEqual(set(), timed_out)
-        self.assertEqual(set(), failed)
-        self.mock_pcs_waiter_cls.assert_called_once_with(
-            self.all_nodes, 'off', self.timeout
-        )
-        self.mock_pcs_waiter.wait_for_completion.assert_called_once_with()
-        self.assert_log_calls(cm)
-
-    def test_do_nodes_power_off_one_failed(self):
-        """Test do_nodes_power_off when one fails to power off and the rest succeed."""
-        expected_failed = {self.compute_nodes[0]}
-        failed_xname_errs = [
-            {
-                'e': 1,
-                'err_msg': 'NodeBMC unreachable',
-                'xname': self.compute_nodes[0]
-            }
-        ]
-        pcs_err_msg = 'Power off operation failed.'
-        pcs_err = PCSError(pcs_err_msg, xname_errs=failed_xname_errs)
-        self.mock_pcs_client.set_xnames_power_state.side_effect = pcs_err
-
-        with self.assertLogs(level=logging.INFO) as cm:
-            timed_out, failed = do_nodes_power_off(self.timeout)
-
-        self.assert_in_element(f'{pcs_err_msg}\n'
-                               f'xname(s) ({self.compute_nodes[0]}) failed with '
-                               f'e={failed_xname_errs[0]["e"]} and '
-                               f'err_msg="{failed_xname_errs[0]["err_msg"]}"',
-                               cm.output)
-        self.assert_pcs_client_call()
-        self.assertEqual(set(), timed_out)
-        self.assertEqual(expected_failed, failed)
-        self.mock_pcs_waiter_cls.assert_called_once_with(
-            self.all_nodes - expected_failed, 'off', self.timeout
-        )
-        self.mock_pcs_waiter.wait_for_completion.assert_called_once_with()
-        self.assert_log_calls(cm, num_wait=len(self.all_nodes - expected_failed))
-
-    def test_do_nodes_power_off_pcs_failed(self):
-        """Test do_nodes_power_off when the PCS power off request fails."""
-        pcs_err_msg = 'PCS did not respond'
-        pcs_err = PCSError(pcs_err_msg)
-        expected_failed = self.all_nodes
-        self.mock_pcs_client.set_xnames_power_state.side_effect = pcs_err
-
-        with self.assertLogs(level=logging.INFO) as cm:
-            timed_out, failed = do_nodes_power_off(self.timeout)
-
-        self.assert_in_element(pcs_err_msg, cm.output)
-        self.assert_pcs_client_call()
-        self.assertEqual(set(), timed_out)
-        self.assertEqual(expected_failed, failed)
-        self.mock_pcs_waiter_cls.assert_not_called()
-        self.assert_log_calls(cm, include_wait_call=False)
-
-    def test_do_nodes_power_off_one_timed_out(self):
-        """Test do_node_power_off when one node times out."""
-        expected_timed_out = {self.compute_nodes[0]}
-        self.mock_pcs_waiter.wait_for_completion.return_value = expected_timed_out
-
-        with self.assertLogs(level=logging.INFO) as cm:
-            timed_out, failed = do_nodes_power_off(self.timeout)
-
-        self.assert_pcs_client_call()
-        self.assertEqual(expected_timed_out, timed_out)
-        self.assertEqual(set(), failed)
-        self.mock_pcs_waiter_cls.assert_called_once_with(self.all_nodes, 'off', self.timeout)
-        self.assert_log_calls(cm)
 
 
 class TestGetNodesByRoleAndState(unittest.TestCase):

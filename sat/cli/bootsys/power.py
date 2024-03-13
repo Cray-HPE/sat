@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020, 2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -113,52 +113,3 @@ class PCSPowerWaiter(GroupWaiter):
             return False
 
         return current_state == self.power_state
-
-
-def do_nodes_power_off(timeout):
-    """Ensure the compute and application nodes (UANs) are powered off.
-
-    Args:
-        timeout (int): the timeout for waiting for nodes to reach powered off
-            state according to PCS after turning off their power.
-
-    Returns:
-        A tuple of:
-            timed_out_nodes: a set of nodes that timed out waiting to reach
-                power state 'off' according to pcs.
-            failed_nodes: a set of nodes that failed to power off with pcs
-    """
-    inf = engine()
-    on_nodes = set(get_nodes_by_role_and_state('compute', 'on') +
-                   get_nodes_by_role_and_state('application', 'on'))
-    num_on_nodes = len(on_nodes)
-
-    if not on_nodes:
-        # All nodes are already off
-        return set(), set()
-
-    LOGGER.info(f'Forcing power off of {num_on_nodes} compute or application '
-                f'{inf.plural("node")} still powered on: {", ".join(on_nodes)}')
-
-    wait_nodes = on_nodes
-    failed_nodes = set()
-    pcs_client = PCSClient(SATSession())
-    try:
-        pcs_client.set_xnames_power_state(list(on_nodes), 'off', force=True)
-    except PCSError as err:
-        LOGGER.warning(err)
-        if err.xnames:
-            failed_nodes = set(err.xnames)
-            # Only wait on the nodes that did not have an error powering off
-            wait_nodes = set(on_nodes) - failed_nodes
-        else:
-            # This probably indicates all nodes failed to be powered off
-            return set(), on_nodes
-
-    num_wait_nodes = len(wait_nodes)
-    LOGGER.info(f'Waiting {timeout} seconds until {num_wait_nodes} {inf.plural("node", num_wait_nodes)} '
-                f'reach powered off state according to PCS.')
-
-    waiter = PCSPowerWaiter(wait_nodes, 'off', timeout)
-    timed_out_nodes = waiter.wait_for_completion()
-    return timed_out_nodes, failed_nodes
