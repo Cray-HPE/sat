@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -201,7 +201,7 @@ class HMSDiscoveryCronJob:
 class HMSDiscoveryScheduledWaiter(Waiter):
     """Waiter for HMS discovery cronjob to be scheduled by k8s."""
 
-    def __init__(self, poll_interval=5, grace_period=60, retries=1):
+    def __init__(self, poll_interval=5, grace_period=180, retries=1):
         """Create a new HMSDiscoveryScheduledWaiter.
 
         Timeout is computed automatically based on the latest possible time
