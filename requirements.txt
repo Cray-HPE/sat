@@ -1,5 +1,5 @@
 # Top-level requirements for sat package to function.
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -22,7 +22,7 @@ argcomplete
 boto3
 botocore
 cray-product-catalog >= 1.6.0
-csm-api-client >= 1.1.4, <2.0
+csm-api-client >= 1.2.1, <2.0
 croniter >= 0.3, < 1.0
 inflect >= 0.2.5, < 3.0
 Jinja2 >= 3.0, < 4.0
