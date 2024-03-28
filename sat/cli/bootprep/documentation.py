@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -122,10 +122,16 @@ def generate_docs_tarball(schema_path, output_dir):
             tarball_output_path = os.path.join(output_dir, DOCS_ARCHIVE_FILE_NAME)
             with tarfile.open(name=tarball_output_path, mode=DEFAULT_TAR_MODE) as output_tar:
                 output_tar.add(tempdir, arcname=DOCS_ARCHIVE_NAME)
+
+            relative_tarball_path = os.path.relpath(str(tarball_output_path), output_dir)
+            full_tarball_path = os.path.join(output_dir, os.path.basename(str(tarball_output_path)))
+            if output_dir == os.getcwd():
+                LOGGER.info('Wrote input schema documentation to %s', relative_tarball_path)
+            else:
+                LOGGER.info('Wrote input schema documentation to %s', full_tarball_path)
+
     except OSError as err:
         raise BootPrepDocsError(f'Could not create documentation tarball: {err}') from err
-
-    LOGGER.info('Wrote input schema documentation to %s', output_tar.name)
 
 
 def display_schema(schema_contents):
