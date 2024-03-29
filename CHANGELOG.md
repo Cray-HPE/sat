@@ -25,6 +25,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.28.0] - 2024-04-09
+
+### Deprecated
+- Deprecate the `sat swap switch`, `sat swap cable`, and `sat switch` commands
+  and log a message referring the user to the Slingshot Orchestrated Maintenance
+  procedure instead. Prompt the user if they would still like to continue with
+  the given `sat` command.
+
 ## [3.27.18] - 2024-04-05
 
 ### Fixed

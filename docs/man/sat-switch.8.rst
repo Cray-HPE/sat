@@ -18,9 +18,9 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-Note: The 'sat switch' subcommand is deprecated and will be removed in
-a future release.  Please use the equivalent 'sat swap switch' command.
-For more information, please see sat-swap(8).
+Note: The 'sat switch' subcommand is deprecated and will be removed in a future
+release. Please use Slingshot Orchestrated Maintenance to perform switch and
+cable removal. See the HPE Slingshot Operations Guide for details.
 
 The switch subcommand disables the ports on a switch, or enables the
 ports on a switch. This can be used during switch replacement, or for
@@ -86,14 +86,22 @@ Disable the switch in preparation to replace it:
 :: 
 
     # sat switch --action disable x1000c6r7
-    Enable/disable of switch can impact system. Continue? (yes/[no]) yes
+    WARNING: The "sat switch" command has been deprecated and will be removed in a future release. Please use Slingshot Orchestrated Maintenance to perform switch and cable removal. See the HPE Slingshot Operations Guide for details.
+    You may still continue with "sat switch", but please begin migrating to Slingshot Orchestrated Maintenance.
+    Proceed with "sat switch"? [yes,no] yes
+    Proceeding with "sat switch".
     Switch has been disabled and is ready for replacement.
 
-Enable the switch after replacing it and skip the prompt:
+Enable the switch after replacing it and skip the prompt. Note that the prompt
+about the deprecation cannot be skipped.
 
 :: 
 
     # sat switch --action enable --disruptive x1000c6r7
+    WARNING: The "sat switch" command has been deprecated and will be removed in a future release. Please use Slingshot Orchestrated Maintenance to perform switch and cable removal. See the HPE Slingshot Operations Guide for details.
+    You may still continue with "sat switch", but please begin migrating to Slingshot Orchestrated Maintenance.
+    Proceed with "sat switch"? [yes,no] yes
+    Proceeding with "sat switch".
     Switch has been enabled.
 
 SEE ALSO

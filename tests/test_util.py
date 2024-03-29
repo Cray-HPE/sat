@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -32,7 +32,7 @@ import os
 from textwrap import dedent
 from unittest import mock
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from sat import util
 from tests.common import ExtendedTestCase
@@ -614,6 +614,18 @@ class TestPromptContinue(unittest.TestCase):
             util.prompt_continue(action_msg)
         self.mock_print.assert_called_once_with('Will not proceed with {}. '
                                                 'Exiting.'.format(action_msg))
+
+    def test_with_description(self):
+        """Test prompt_continue with an optional description."""
+        self.mock_pester_choices.return_value = 'yes'
+        action_msg = 'action'
+        description = 'description preceding the prompt'
+        util.prompt_continue(action_msg, description)
+
+        self.mock_print.assert_has_calls([
+            call(description),
+            call('Proceeding with {}.'.format(action_msg))
+        ])
 
 
 class TestGetS3Resource(ExtendedTestCase):

@@ -22,9 +22,17 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-The sat swap subcommand streamlines hardware component replacement by
-disabling components before removal and enabling the new components
-after installation.
+The sat swap subcommand streamlines hardware component replacement by disabling
+components before removal and enabling the new components after installation.
+
+The 'swap blade' subcommand disables or enables a compute or UAN blade. This can
+be used to replace a given blade with a different blade from the same system or
+another system.
+
+Note: The 'sat swap switch' and 'sat swap cable' commands are deprecated and
+will be removed in a future release. Please use Slingshot Orchestrated
+Maintenance to perform switch and cable removal. See the HPE Slingshot
+Operations Guide for details.
 
 The 'swap switch' subcommand disables or enables the ports on a switch
 This can be used during switch replacement, or for other purposes where
@@ -34,9 +42,6 @@ The 'swap cable' subcommand disables or enables the ports to which a cable
 is connected.  Given one or more jacks that a cable connects, the command
 will disable all ports connected by that cable.
 
-The 'swap blade' subcommand disables or enables a compute or UAN blade. This can
-be used to replace a given blade with a different blade from the same system or
-another system.
 
 ARGUMENTS
 =========
@@ -126,14 +131,23 @@ Disable a switch in preparation to replace it:
 ::
 
     # sat swap switch --action disable x1000c6r7
+    WARNING: The "sat swap switch" command has been deprecated and will be removed in a future release. Please use Slingshot Orchestrated Maintenance to perform switch and cable removal. See the HPE Slingshot Operations Guide for details.
+    You may still continue with "sat swap switch", but please begin migrating to Slingshot Orchestrated Maintenance.
+    Proceed with "sat swap switch"? [yes,no] yes
+    Proceeding with "sat swap switch".
     Enable/disable of switch can impact system. Continue? (yes/[no]) yes
     Switch has been disabled and is ready for replacement.
 
-Enable a switch after replacing it and skip the prompt:
+Enable a switch after replacing it and skip the prompt about the operation being
+disruptive. Note that the prompt about the deprecation cannot be skipped.
 
 ::
 
     # sat swap switch --action enable --disruptive x1000c6r7
+    WARNING: The "sat swap switch" command has been deprecated and will be removed in a future release. Please use Slingshot Orchestrated Maintenance to perform switch and cable removal. See the HPE Slingshot Operations Guide for details.
+    You may still continue with "sat swap switch", but please begin migrating to Slingshot Orchestrated Maintenance.
+    Proceed with "sat swap switch"? [yes,no] yes
+    Proceeding with "sat swap switch".
     Switch has been enabled.
 
 Disable a cable in preparation to replace it:
@@ -141,6 +155,10 @@ Disable a cable in preparation to replace it:
 ::
 
     # sat swap cable --action disable --disruptive x5000c1r3j16
+    WARNING: The "sat swap cable" command has been deprecated and will be removed in a future release. Please use Slingshot Orchestrated Maintenance to perform switch and cable removal. See the HPE Slingshot Operations Guide for details.
+    You may still continue with "sat swap cable", but please begin migrating to Slingshot Orchestrated Maintenance.
+    Proceed with "sat swap cable"? [yes,no] yes
+    Proceeding with "sat swap cable".
     Ports: x5000c1r3j16p0 x5000c3r7j18p0 x5000c1r3j16p1 x5000c3r7j18p1
     Cable has been disabled and is ready for replacement.
 
@@ -150,6 +168,10 @@ by the cable:
 ::
 
     # sat swap cable --action disable --disruptive x5000c1r3j16 x5000c3r7j18
+    WARNING: The "sat swap cable" command has been deprecated and will be removed in a future release. Please use Slingshot Orchestrated Maintenance to perform switch and cable removal. See the HPE Slingshot Operations Guide for details.
+    You may still continue with "sat swap cable", but please begin migrating to Slingshot Orchestrated Maintenance.
+    Proceed with "sat swap cable"? [yes,no] yes
+    Proceeding with "sat swap cable".
     Ports: x5000c3r7j18p0 x5000c1r3j16p0 x5000c3r7j18p1 x5000c1r3j16p1
     Cable has been disabled and is ready for replacement.
 
@@ -159,6 +181,10 @@ are not connected by a single cable:
 ::
 
     # sat swap cable --action disable --disruptive --force x5000c1r3j16 x5000c1r4j19
+    WARNING: The "sat swap cable" command has been deprecated and will be removed in a future release. Please use Slingshot Orchestrated Maintenance to perform switch and cable removal. See the HPE Slingshot Operations Guide for details.
+    You may still continue with "sat swap cable", but please begin migrating to Slingshot Orchestrated Maintenance.
+    Proceed with "sat swap cable"? [yes,no] yes
+    Proceeding with "sat swap cable".
     WARNING: Jacks x5000c1r3j16,x5000c1r4j19 are not connected by a single cable
     Ports: x5000c1r3j16p0 x5000c3r7j18p0 x5000c1r3j16p1 x5000c3r7j18p1 x5000c1r4j19p0 x5000c1r1j15p0 x5000c1r4j19p1 x5000c1r1j15p1
     Cable has been disabled and is ready for replacement.
@@ -168,6 +194,10 @@ Use **--dry-run** to determine all linked ports from a single jack:
 ::
 
     # sat swap cable --dry-run x5000c1r3j16
+    WARNING: The "sat swap cable" command has been deprecated and will be removed in a future release. Please use Slingshot Orchestrated Maintenance to perform switch and cable removal. See the HPE Slingshot Operations Guide for details.
+    You may still continue with "sat swap cable", but please begin migrating to Slingshot Orchestrated Maintenance.
+    Proceed with "sat swap cable"? [yes,no] yes
+    Proceeding with "sat swap cable".
     Ports: x5000c1r3j16p0 x5000c3r7j18p0 x5000c1r3j16p1 x5000c3r7j18p1
     Dry run completed with no action to enable/disable cable.
 
