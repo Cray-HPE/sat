@@ -591,8 +591,6 @@ STEPS_BY_ACTION = {
                              do_containerd_start),
         PlatformServicesStep('Ensure etcd is running and enabled on all Kubernetes manager NCNs.',
                              do_etcd_start),
-        PlatformServicesStep('Start inactive Ceph services, unfreeze Ceph cluster and wait for Ceph health.',
-                             do_ceph_unfreeze),
         PlatformServicesStep('Start and enable kubelet on all Kubernetes NCNs.', do_kubelet_start),
         PlatformServicesStep('Recreate cron jobs that have become stuck', do_recreate_cronjobs),
     ],
