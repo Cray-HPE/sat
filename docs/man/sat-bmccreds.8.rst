@@ -7,7 +7,7 @@ Set BMC passwords
 -----------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2021 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2021, 2024 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -21,20 +21,15 @@ DESCRIPTION
 The bmccreds subcommand sets BMC Redfish access passwords to user-defined or
 randomly generated values.
 
-When providing a user-defined password, the bmccreds subcommand will check
-the password against the following criteria:
-
-- The password is a maximum of 8 characters (this is due to BMC manufacturer
-  limitations).
-- The password consists only of letters, numbers and underscores (this is due
-  to BMC manufacturer limitations).
-
 When generating random passwords, the bmccreds subcommand can set components
 within the same chassis, cabinet or entire system to the same randomly-generated
 password, or it can use a different password for each component. This grouping
-is controlled using the ``--pw-domain`` argument. Randomly-generated
-passwords are 8-character strings made up of uppercase letters, lowercase
-letters, numbers and underscores.
+is controlled using the ``--pw-domain`` argument.
+
+The length of generated passwords and the characters allowed in generated
+passwords can be controlled with the options ``--password-length``,
+``--password-char-sets``, and ``--password-chars``. See below for a full
+description of those options.
 
 It is possible to provide xnames to set the password for specific BMCs, or
 to provide BMC types (e.g. NodeBMC, RouterBMC, ChassisBMC) to act on all BMCs
@@ -57,7 +52,24 @@ OPTIONS
     password. Not valid with **--random-password**.
 
 **--random-password**
-    Generate random BMC password(s). Not valid with **--password**.
+    Generate random BMC password(s). If this option is not specified and
+    **--password** is not given, then the user will be prompted to enter a
+    password.  Not valid with **--password**.
+
+**--password-length**
+    The desired length of the random BMC password. Only valid with
+    **--random-password**.
+
+**--password-char-sets**
+    A comma-separated list of allowed character sets to be used in a randomly
+    generated password. Only valid with **--random-password**.
+    Character sets are as follows: "alpha" includes all uppercase and lowercase
+    ASCII letters, "numeric" includes digits 0-9, and "symbols" includes the symbols
+    "!@#$%^&*".
+
+**--password-chars**
+    Specify explicit list of characters to generate random passwords. Only
+    valid with **--random-password**.
 
 **--pw-domain** *DOMAIN*
     Specify the domain or 'reach' of the password. Only valid with
@@ -166,6 +178,76 @@ Set every BMC password to the same randomly generated value:
   | x3000c0s26b3 | NodeBMC   | Random, domain: system | 200         | OK             |
   | x3000c0s28b2 | NodeBMC   | Random, domain: system | 200         | OK             |
   | x3000c0s15b0 | NodeBMC   | Random, domain: system | 200         | OK             |
+  ...
+
+
+Set every BMC password to the same randomly generated value of desired length:
+
+::
+
+  # sat bmccreds --random-password --password-length 20
+  +--------------+-----------+------------------------+-------------+----------------+
+  | xname        | Type      | Password Type          | Status Code | Status Message |
+  +--------------+-----------+------------------------+-------------+----------------+
+  | x3000c0s4b0  | NodeBMC   | Random, domain: system | 200         | OK             |
+  | x3000c0s18b0 | NodeBMC   | Random, domain: system | 200         | OK             |
+  | x3000c0s17b0 | NodeBMC   | Random, domain: system | 200         | OK             |
+  ...
+
+
+Set every BMC password to the same randomly generated value of desired char-sets:
+
+::
+
+  # sat bmccreds --random-password --password-char-sets alpha
+  +--------------+-----------+------------------------+-------------+----------------+
+  | xname        | Type      | Password Type          | Status Code | Status Message |
+  +--------------+-----------+------------------------+-------------+----------------+
+  | x3000c0s23b0 | NodeBMC   | Random, domain: system | 200         | OK             |
+  | x3000c0s29b0 | NodeBMC   | Random, domain: system | 200         | OK             |
+  | x3000c0s10b0 | NodeBMC   | Random, domain: system | 200         | OK             |
+  ...
+
+
+Set every BMC password to the same randomly generated value of desired length and char-sets:
+
+::
+
+  # sat bmccreds --random-password --password-length 10 --password-char-sets alpha,numeric,symbols
+  +--------------+-----------+------------------------+-------------+----------------+
+  | xname        | Type      | Password Type          | Status Code | Status Message |
+  +--------------+-----------+------------------------+-------------+----------------+
+  | x3000c0s27b0 | NodeBMC   | Random, domain: system | 200         | OK             |
+  | x3000c0s5b0  | NodeBMC   | Random, domain: system | 200         | OK             |
+  | x3000c0s9b0  | NodeBMC   | Random, domain: system | 200         | OK             |
+  ...
+
+
+Set every BMC password to the same randomly generated value with explicit characters:
+
+::
+
+  # sat bmccreds --random-password --password-chars 'abcd12134!@#'
+  +--------------+-----------+------------------------+-------------+----------------+
+  | xname        | Type      | Password Type          | Status Code | Status Message |
+  +--------------+-----------+------------------------+-------------+----------------+
+  | x3000c0s5b0  | NodeBMC   | Random, domain: system | 200         | OK             |
+  | x3000c0s24b0 | NodeBMC   | Random, domain: system | 200         | OK             |
+  | x3000c0s2b0  | NodeBMC   | Random, domain: system | 200         | OK             |
+  ...
+
+
+Set every BMC password to the same randomly generated value of desired length with explicit characters:
+
+::
+
+  # sat bmccreds --random-password --password-length 10 --password-chars '123abcd$^&*'
+  +--------------+-----------+------------------------+-------------+----------------+
+  | xname        | Type      | Password Type          | Status Code | Status Message |
+  +--------------+-----------+------------------------+-------------+----------------+
+  | x3000c0s23b0 | NodeBMC   | Random, domain: system | 200         | OK             |
+  | x3000c0s4b0  | NodeBMC   | Random, domain: system | 200         | OK             |
+  | x3000c0s10b0 | NodeBMC   | Random, domain: system | 200         | OK             |
   ...
 
 
