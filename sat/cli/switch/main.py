@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -25,16 +25,11 @@
 The main entry point for the switch subcommand.
 """
 
-import warnings
-
 from sat.cli.swap.switch import swap_switch
+from sat.cli.swap.main import log_deprecation_and_prompt
 
 
 def do_switch(args):
 
-    # DeprecationWarnings are ignored by default, so force this to be displayed
-    warnings.simplefilter('once', category=DeprecationWarning)
-    warnings.warn('The "sat switch" command is deprecated and will be removed in a future release. '
-                  'Please use "sat swap switch" instead.', DeprecationWarning)
-
+    log_deprecation_and_prompt('switch')
     swap_switch(args)
