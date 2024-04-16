@@ -27,6 +27,7 @@ Start and stop platform services to boot and shut down a Shasta system.
 
 import logging
 import socket
+import time
 import urllib3.exceptions
 from collections import namedtuple
 from multiprocessing import Process
