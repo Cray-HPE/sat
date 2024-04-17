@@ -235,9 +235,39 @@ VALID_UAN_CONFIGURATION = {
     ]
 }
 
+
+VALID_CONFIG_ADDITIONAL_INV_COMMIT = {
+    'name': 'config-with-additional-inventory-commit',
+    'layers': [],
+    'additional_inventory': {
+        'url': 'https://api-gw-service-nmn.local/vcs/cray/additional_inventory.git',
+        'commit': '257cc5642cb1a054f08cc83f2d943e56fd3ebe99'
+    }
+}
+
+VALID_CONFIG_ADDITIONAL_INV_BRANCH = {
+    'name': 'config-with-additional-inventory-branch',
+    'layers': [],
+    'additional_inventory': {
+        'url': 'https://api-gw-service-nmn.local/vcs/cray/additional_inventory.git',
+        'branch': 'main'
+    }
+}
+
 NOT_VALID_ANY_OF_MESSAGE = "Not valid under any of the given schemas"
 NOT_OF_TYPE_ARRAY_MESSAGE = "is not of type 'array'"
 NOT_OF_TYPE_STRING_MESSAGE = "is not of type 'string'"
+
+
+class TestBootprepSchema(unittest.TestCase):
+    """Test whether the bootprep_schema.yaml is valid in JSON Schema."""
+
+    def test_bootprep_schema_is_valid_json_schema(self):
+        """Test that the bootprep_schema.yaml is still valid against the JSON Schema metaschema"""
+        try:
+            load_bootprep_schema()
+        except BootPrepInternalError as e:
+            self.fail(f'Bootprep Schema file invalid against JSON Schema metaschema: {e}')
 
 
 class TestValidateInstanceSchemaVersion(unittest.TestCase):
@@ -460,6 +490,20 @@ class TestValidateInstance(ExtendedTestCase):
                 'name': 'valid-config-product-layer-playbook',
                 'layers': [layer]
             }]
+        }
+        self.assert_valid_instance(instance)
+
+    def test_valid_config_additional_inventory_commit(self):
+        """Valid configuration with additional inventory that uses a commit"""
+        instance = {
+            'configurations': [VALID_CONFIG_ADDITIONAL_INV_COMMIT]
+        }
+        self.assert_valid_instance(instance)
+
+    def test_valid_config_additional_inventory_branch(self):
+        """Valid configuration with additional inventory that uses a branch"""
+        instance = {
+            'configurations': [VALID_CONFIG_ADDITIONAL_INV_BRANCH]
         }
         self.assert_valid_instance(instance)
 

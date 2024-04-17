@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2022, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -31,7 +31,7 @@ from sat.cli.swap.blade import swap_blade
 from sat.cli.swap.cable import swap_cable
 from sat.cli.swap.errors import ERR_INVALID_OPTIONS
 from sat.cli.swap.switch import swap_switch
-from sat.util import pester
+from sat.util import pester, prompt_continue
 
 
 LOGGER = logging.getLogger(__name__)
@@ -62,6 +62,24 @@ def check_arguments(component_type, action, dry_run, disruptive):
         raise SystemExit(ERR_INVALID_OPTIONS)
 
 
+def log_deprecation_and_prompt(subcommand):
+    """Log a deprecation warning and prompt user to continue
+
+    Args:
+        subcommand (str): the deprecated command which was used
+    """
+    command = f'sat {subcommand}'
+
+    LOGGER.warning(f'The "{command}" command has been deprecated and will be removed '
+                   f'in a future release. Please use Slingshot Orchestrated '
+                   f'Maintenance to perform switch and cable removal. See the '
+                   f'HPE Slingshot Operations Guide for details.')
+
+    prompt_continue(f'"{command}"',
+                    f'You may still continue with "{command}", but please '
+                    f'begin migrating to Slingshot Orchestrated Maintenance.')
+
+
 def do_swap(args):
     """Perform the specified swap action
 
@@ -72,6 +90,10 @@ def do_swap(args):
         None
     """
     action = getattr(args, 'action', None)
+
+    if args.target in ('cable', 'switch'):
+        log_deprecation_and_prompt(f'swap {args.target}')
+
     check_arguments(args.target, action, args.dry_run, args.disruptive)
 
     if args.target == 'cable':

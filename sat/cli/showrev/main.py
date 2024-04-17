@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -46,15 +46,10 @@ def assign_default_args(args):
     Returns:
         None. Modifies args in place.
     """
-    if args.all:
+    if args.all or not any((args.system, args.products, args.local, args.release_files)):
         args.system = True
         args.products = True
         args.local = True
-        args.release_files = True
-    elif not any((args.system, args.products, args.local, args.release_files)):
-        args.local = True
-        args.system = True
-        args.products = True
 
 
 def do_showrev(args):
@@ -107,12 +102,8 @@ def do_showrev(args):
         )
 
     if args.release_files:
-        release_headings, release_data = products.get_release_file_versions()
-        append_report(
-            'Local Release Files',
-            release_headings,
-            release_data
-        )
+        LOGGER.warning('The --release-files option is no longer supported. Use '
+                       '--products to see installed product versions instead.')
 
     if args.products:
         product_headings, product_data = products.get_product_versions()

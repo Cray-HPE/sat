@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -39,6 +39,5 @@ def swap_switch(args):
 
     SwitchSwapper().swap_component(args.action,
                                    args.xname,
-                                   args.disruptive,
                                    args.dry_run,
                                    args.save_ports)

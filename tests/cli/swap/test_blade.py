@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -36,7 +36,7 @@ from csm_api_client.service.gateway import APIError
 from csm_api_client.service.hsm import HSMClient
 from kubernetes.client.exceptions import ApiException
 
-from sat.apiclient.capmc import CAPMCClient
+from sat.apiclient.pcs import PCSClient
 from sat.cli.swap.blade import (
     blade_swap_stage,
     BladeSwapError,
@@ -127,8 +127,8 @@ class BaseBladeSwapProcedureTest(unittest.TestCase):
         self.mock_hsm_client = MagicMock(autospec=HSMClient)
         patch('sat.cli.swap.blade.HSMClient', return_value=self.mock_hsm_client).start()
 
-        self.mock_capmc_client = MagicMock(autospec=CAPMCClient)
-        patch('sat.cli.swap.blade.CAPMCClient', return_value=self.mock_capmc_client).start()
+        self.mock_pcs_client = MagicMock(autospec=PCSClient)
+        patch('sat.cli.swap.blade.PCSClient', return_value=self.mock_pcs_client).start()
 
         self.mock_sat_session = patch('sat.cli.swap.blade.SATSession').start()
 
@@ -369,7 +369,7 @@ class TestPowerOffSlot(BaseBladeSwapProcedureTest):
     def test_slot_power_off_command_sent_mountain_blades(self):
         """Test that the slot power off command is sent properly for Mountain blades"""
         self.swap_out.power_off_slot()
-        self.mock_capmc_client.set_xnames_power_state.assert_called_once_with(
+        self.mock_pcs_client.set_xnames_power_state.assert_called_once_with(
             [self.blade_xname],
             'off',
             recursive=True,
@@ -382,10 +382,10 @@ class TestPowerOffSlot(BaseBladeSwapProcedureTest):
         patch('sat.cli.swap.blade.BladeSwapProcedure.blade_class', 'river').start()
 
         node_xnames = [n['ID'] for n in self.nodes]
-        self.mock_capmc_client.get_xnames_power_state.return_value = {'on': node_xnames}
+        self.mock_pcs_client.get_xnames_power_state.return_value = {'on': node_xnames}
 
         self.swap_out.power_off_slot()
-        self.mock_capmc_client.set_xnames_power_state.assert_called_once_with(
+        self.mock_pcs_client.set_xnames_power_state.assert_called_once_with(
             node_xnames,
             'off',
             recursive=True,
@@ -552,7 +552,7 @@ class TestPoweringOnSlot(BaseBladeSwapProcedureTest):
     def test_power_on_slot(self):
         """Test powering on the slot"""
         self.swap_in.power_on_slot()
-        self.mock_capmc_client.set_xnames_power_state.assert_called_once_with(
+        self.mock_pcs_client.set_xnames_power_state.assert_called_once_with(
             [self.blade_xname],
             'on',
             recursive=True,

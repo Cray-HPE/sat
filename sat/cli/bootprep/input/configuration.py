@@ -46,10 +46,8 @@ from sat.util import get_val_by_path, set_val_by_path
 LOGGER = logging.getLogger(__name__)
 
 
-class InputConfigurationLayer(ABC):
-    """A CFS configuration layer as defined in the bootprep input file"""
-
-    # Mapping from CFS property name to class property name for required property
+class InputConfigurationLayerBase(ABC):
+    """An object representing data in common between layers and additional inventory"""
     REQUIRED_CFS_PROPERTIES = {
         'cloneUrl': 'clone_url'
     }
@@ -59,9 +57,7 @@ class InputConfigurationLayer(ABC):
     OPTIONAL_CFS_PROPERTIES = {
         'branch': 'branch',
         'commit': 'commit',
-        'name': 'name',
-        'playbook': 'playbook',
-        'specialParameters.imsRequireDkms': 'ims_require_dkms'
+        'name': 'name'
     }
 
     # CRAYSAT-1174: Specifying a 'branch' in a CFS configuration layer is not
@@ -85,20 +81,9 @@ class InputConfigurationLayer(ABC):
 
     @property
     @jinja_rendered
-    def playbook(self):
-        """str or None: the playbook specified in the layer"""
-        return self.layer_data.get('playbook')
-
-    @property
-    @jinja_rendered
     def name(self):
         """str or None: the name specified for the layer"""
         return self.layer_data.get('name')
-
-    @property
-    def ims_require_dkms(self):
-        """str or None: whether to enable DKMS when this layer customizes an IMS image"""
-        return get_val_by_path(self.layer_data, 'special_parameters.ims_require_dkms')
 
     @property
     @abstractmethod
@@ -142,30 +127,6 @@ class InputConfigurationLayer(ABC):
 
         return cfs_layer_data
 
-    @staticmethod
-    def get_configuration_layer(layer_data, jinja_env, product_catalog):
-        """Get and return a new InputConfigurationLayer for the given layer data.
-
-        Args:
-            layer_data (dict): The data for a layer, already validated against
-                the bootprep input file schema.
-            jinja_env (jinja2.Environment): the Jinja2 environment in which
-                fields supporting Jinja2 templating should be rendered.
-            product_catalog (cray_product_catalog.query.ProductCatalog):
-                the product catalog object
-
-        Raises:
-            ValueError: if neither 'git' nor 'product' keys are present in the
-                input `layer_data`. This will not happen if the input is
-                properly validated against the schema.
-        """
-        if 'git' in layer_data:
-            return GitInputConfigurationLayer(layer_data, jinja_env)
-        elif 'product' in layer_data:
-            return ProductInputConfigurationLayer(layer_data, jinja_env, product_catalog)
-        else:
-            raise ValueError('Unrecognized type of configuration layer')
-
     def resolve_commit_hash(self, branch):
         """Query VCS to determine the commit hash at the head of the branch.
 
@@ -189,6 +150,53 @@ class InputConfigurationLayer(ABC):
             raise InputItemCreateError(f'Could not retrieve HEAD commit for branch "{branch}"; '
                                        'no matching branch was found on remote VCS repo.')
         return commit_hash
+
+
+class InputConfigurationLayer(InputConfigurationLayerBase, ABC):
+    """A CFS configuration layer as defined in the bootprep input file"""
+
+    OPTIONAL_CFS_PROPERTIES = {
+        'branch': 'branch',
+        'commit': 'commit',
+        'name': 'name',
+        'playbook': 'playbook',
+        'specialParameters.imsRequireDkms': 'ims_require_dkms'
+    }
+
+    @property
+    @jinja_rendered
+    def playbook(self):
+        """str or None: the playbook specified in the layer"""
+        return self.layer_data.get('playbook')
+
+    @property
+    def ims_require_dkms(self):
+        """str or None: whether to enable DKMS when this layer customizes an IMS image"""
+        return get_val_by_path(self.layer_data, 'special_parameters.ims_require_dkms')
+
+    @staticmethod
+    def get_configuration_layer(layer_data, jinja_env, product_catalog):
+        """Get and return a new InputConfigurationLayer for the given layer data.
+
+        Args:
+            layer_data (dict): The data for a layer, already validated against
+                the bootprep input file schema.
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
+            product_catalog (cray_product_catalog.query.ProductCatalog):
+                the product catalog object
+
+        Raises:
+            ValueError: if neither 'git' nor 'product' keys are present in the
+                input `layer_data`. This will not happen if the input is
+                properly validated against the schema.
+        """
+        if 'git' in layer_data:
+            return GitInputConfigurationLayer(layer_data, jinja_env)
+        elif 'product' in layer_data:
+            return ProductInputConfigurationLayer(layer_data, jinja_env, product_catalog)
+        else:
+            raise ValueError('Unrecognized type of configuration layer')
 
 
 class GitInputConfigurationLayer(InputConfigurationLayer):
@@ -318,6 +326,33 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
         return self.matching_product.commit
 
 
+class AdditionalInventory(InputConfigurationLayerBase):
+    """Additional inventory data for a CFS configuration"""
+
+    @property
+    def clone_url(self):
+        """str: the clone URL for the additional inventory"""
+        return self.layer_data['url']
+
+    @property
+    def commit(self):
+        """str or None: the commit hash or None if branch was specified instead"""
+        if self.resolve_branches and self.branch is not None:
+            # If given a branch, we can look up the commit dynamically.
+            return self.resolve_commit_hash(self.branch)
+        return self.layer_data.get('commit')
+
+    @property
+    def branch(self):
+        """str or None: the branch or None if commit was specified instead"""
+        return self.layer_data.get('branch')
+
+    @property
+    def name(self):
+        """str or None: the optional name of the additional inventory"""
+        return self.layer_data.get('name')
+
+
 class InputConfiguration(BaseInputItem):
     """A CFS Configuration from a bootprep input file."""
     description = 'CFS configuration'
@@ -352,6 +387,10 @@ class InputConfiguration(BaseInputItem):
         self.layers = [InputConfigurationLayer.get_configuration_layer(layer_data, jinja_env, product_catalog)
                        for layer_data in self.data['layers']]
 
+        self.additional_inventory = None
+        if 'additional_inventory' in self.data:
+            self.additional_inventory = AdditionalInventory(self.data['additional_inventory'], jinja_env)
+
     def get_create_item_data(self):
         """Get the data to pass to the CFS API to create this configuration.
 
@@ -366,6 +405,16 @@ class InputConfiguration(BaseInputItem):
         cfs_api_data = {
             'layers': []
         }
+
+        failed_inventory = False
+        if self.additional_inventory:
+            try:
+                cfs_api_data['additional_inventory'] = self.additional_inventory.get_cfs_api_data()
+            except InputItemCreateError as err:
+                LOGGER.error(f'Failed to resolve additional_inventory of '
+                             f'configuration {self.name}: {err}')
+                failed_inventory = True
+
         failed_layers = []
         for idx, layer in enumerate(self.layers):
             try:
@@ -375,9 +424,14 @@ class InputConfiguration(BaseInputItem):
                              f'{self.name}: {err}')
                 failed_layers.append(layer)
 
-        if failed_layers:
-            raise InputItemCreateError(f'Failed to create {len(failed_layers)} layer(s) '
-                                       f'of configuration {self.name}')
+        if failed_layers or failed_inventory:
+            failure_causes = []
+            if failed_layers:
+                failure_causes.append(f'failure to create {len(failed_layers)} layer(s)')
+            if failed_inventory:
+                failure_causes.append('failure to resolve additional_inventory')
+            raise InputItemCreateError(f'Failed to create configuration {self.name} '
+                                       f'due to {" and ".join(failure_causes)}')
 
         return cfs_api_data
 

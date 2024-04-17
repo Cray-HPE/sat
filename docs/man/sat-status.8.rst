@@ -174,18 +174,39 @@ Query all types of components:
   | x3000c0s5b0    | Ready | OK   | True    | X86  | River | Sling    |
   | x3000c0s7b0    | Ready | OK   | True    | X86  | River | Sling    |
 
-Possible Values
----------------
+OUTPUT FORMAT
+=============
 
+The following fields are displayed in the output of **sat status**
+
+|
+| *xname*
+|
+|   The xname of the component
+|
+| *Aliases*
+|
+|   The aliases associated with the component in the System Layout Service (SLS)
+|
 | *Type*
+|
+|   The Type of the component in HSM. Possible values are as follows:
 |
 |   Chassis, ChassisBMC, ComputeModule, HSNBoard, Node, NodeBMC, NodeEnclosure, RouterBMC, RouterModule
 |
+| *NID*
+|
+|   This is the integer Node ID if the component is a node
+|
 | *Flag*
 |
-|   OK, Warning, Alert
+|   The Flag on a component in HSM. Possible values are as follows:
+|
+|   OK, Warning, Alert, Locked
 |
 | *State*
+|
+|   The state of the component according to HSM. Possible values are as follows:
 |
 |   Unknown
 |    - Appears missing but has not been confirmed as empty.
@@ -210,6 +231,97 @@ Possible Values
 |
 |   Ready
 |    - Both On and Ready to provide its expected services, i.e. jobs.
+|
+| *Enabled*
+|
+|   A boolean value that says whether the component is enabled or not.
+|   True when enabled, false when disabled.
+|
+| *Arch*
+|
+|   The basic architecture of the component. Possible values: X86, ARM and others
+|
+| *Class*
+|
+|   The HSM hardware class of the component. Possible values are as follows:
+|
+|   River, Mountain, Hill
+|
+| *Role*
+|
+|   A possibly reconfigurable role for a component, especially a node. Valid values are:
+|
+|   Compute, Service, System, Application, Storage, Management
+|
+| *SubRole*
+|
+|   A possibly reconfigurable subrole for a component, especially a node. Valid values are:
+|
+|   Master, Worker, Storage
+|
+| *Net Type*
+|
+|   The type of high speed network the component is connected to, if it is an applicable component type
+|   and the interface is present, or the type of the system HSN.
+|
+|   Sling
+|    - Indicates the component is connected via a Slingshot network.
+|
+|   Infiniband
+|    - Indicates the component is connected via an Infiniband network.
+|
+|   Ethernet
+|    - Represents the component's connection through an Ethernet network.
+|
+|   OEM
+|    - Indicates the component's network type is OEM (Original Equipment Manufacturer) specific.
+|
+|   None
+|    - Denotes that the component is not connected to any specific network.
+|
+| *Desired Config*
+|
+|   The name of the node's desired configuration in the Configuration Framework Service (CFS).
+|
+| *Configuration Status*
+|
+|   A summary of the component's configuration state in CFS. Possible values are as follows:
+|
+|   unconfigured
+|    - The component is not configured
+|
+|   pending
+|    - Configuration is pending for the component
+|
+|   failed
+|    - Configuration attempt has failed for the component
+|
+|   configured
+|    - The component has successfully configured
+|
+| *Error Count*
+|
+|   An integer to count the number of failed configuration attempts in CFS.
+|
+| *Boot Status*
+|
+|   Current status of the component according to the Boot Orchestration Service (BOS).
+|   Possible values are:
+|
+|   Stable, Ready, failed
+|
+| *Most Recent BOS Session*
+|
+|   Most recent session ID from BOS
+|
+| *Most Recent Session Template*
+|
+|   Most recent session template for the respective BOS session
+|
+| *Most Recent Image*
+|
+|   Most recent image ID from BOS
+|
 
 SEE ALSO
 ========

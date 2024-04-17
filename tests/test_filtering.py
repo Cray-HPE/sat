@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -74,6 +74,33 @@ class TestFilterQueryStrings(unittest.TestCase):
 
         self.assertFalse(filter_fn({'foo': 'nothing'}))
 
+    @with_filter('guess = blo?d', ['guess'])
+    def test_query_with_single_char_wildcard(self, filter_fn):
+        """Test a query with a wildcard matching a single character."""
+        for guess in ['blood', 'blond', 'blo-d']:
+            self.assertTrue(filter_fn({'guess': guess}))
+
+        for guess in ['bloodhound', 'block', 'blot', 'apple']:
+            self.assertFalse(filter_fn({'guess': guess}))
+
+    @with_filter('guess = cla?p*', ['guess'])
+    def test_query_with_complex_wildcard(self, filter_fn):
+        """Test a query that uses both ? and * in its wildcard"""
+        for guess in ['clamp', 'clasp', 'clapped', 'clamped', 'clasp your hands say yeah']:
+            self.assertTrue(filter_fn({'guess': guess}))
+
+        for guess in ['clad in polyester', 'clap your hands']:
+            self.assertFalse(filter_fn({'guess': guess}))
+
+    @with_filter('guess = "??ou*"', ['guess'])
+    def test_query_with_quoted_wildcard(self, filter_fn):
+        """Test a query that puts a wildcard in optional double quotes"""
+        for guess in ['around', 'proud', 'thought', '"sound-of-silence"']:
+            self.assertTrue(filter_fn({'guess': guess}))
+
+        for guess in ['sound', 'found', 'tough', 'something else']:
+            self.assertFalse(filter_fn({'guess': guess}))
+
     @with_filter('mem_cap = 192', ['memory_capacity'])
     def test_query_subseq_key(self, filter_fn):
         """Test querying against key subsequencing."""
@@ -145,6 +172,11 @@ class TestFilterQueryStrings(unittest.TestCase):
                                    'flower': 'rose', 'vases': '3'}))
         self.assertFalse(filter_fn({'fruit': 'apple', 'baskets': '1',
                                     'flower': 'rose', 'vases': '2'}))
+
+    @with_filter('color = blue-green', ['thing', 'color'])
+    def test_equality_with_hyphenated_value(self, filter_fn):
+        self.assertTrue(filter_fn({'thing': 'ocean', 'color': 'blue-green'}))
+        self.assertFalse(filter_fn({'thing': 'sunset', 'color': 'red-orange'}))
 
     def test_combined_filters(self):
         """Test composing filtering functions with boolean combinators."""

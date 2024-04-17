@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -30,7 +30,7 @@ import unittest
 from unittest.mock import call, Mock, patch
 
 from sat.apiclient import APIError
-from sat.cli.bmccreds.constants import BMC_USERNAME
+from sat.cli.bmccreds.constants import BMC_USERNAME, RANDOM_PASSWORD_LENGTH, VALID_CHAR_SETS_STRING
 from sat.cli.bmccreds.creds_manager import BMCCredsException, BMCCredsManager
 from tests.common import ExtendedTestCase
 
@@ -51,9 +51,12 @@ class TestBMCCredsManager(unittest.TestCase):
         self.domain = None
         self.force = False
         self.report_format = 'pretty'
+        self.length = RANDOM_PASSWORD_LENGTH
+        self.allowed_chars = VALID_CHAR_SETS_STRING
 
         self.random_passwords = [
-            BMCCredsManager._generate_random_password_string() for _ in range(len(self.xnames))
+            BMCCredsManager._generate_random_password_string(self)
+            for _ in range(len(self.xnames))
         ]
         self.generate_random_password_string = patch.object(
             BMCCredsManager, '_generate_random_password_string', side_effect=self.random_passwords
@@ -70,7 +73,9 @@ class TestBMCCredsManager(unittest.TestCase):
             xnames=self.xnames,
             domain=self.domain,
             force=self.force,
-            report_format=self.report_format
+            report_format=self.report_format,
+            length=self.length,
+            allowed_chars=self.allowed_chars
         )
 
     def test_set_xnames_with_password(self):

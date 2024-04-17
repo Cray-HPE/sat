@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -35,7 +35,8 @@ from sat.apiclient import APIError
 from sat.constants import BMC_TYPES
 from sat.cli.bmccreds import parser as bmccreds_parser
 from sat.cli.bmccreds.main import do_bmccreds
-from sat.cli.bmccreds.constants import BMC_USERNAME, USER_PASSWORD_MAX_LENGTH
+from sat.cli.bmccreds.constants import (BMC_USERNAME, USER_PASSWORD_MAX_LENGTH, RANDOM_PASSWORD_LENGTH,
+                                        VALID_CHAR_SETS_STRING)
 from sat.cli.bmccreds.creds_manager import BMCCredsException
 from tests.common import ExtendedTestCase
 
@@ -111,6 +112,54 @@ class TestBMCCredsMain(ExtendedTestCase):
             '--pw-domain is only valid with --random-password.'
         )
 
+    def test_password_length_without_random_password(self):
+        """Giving --password-length without --random-password results in an error."""
+        self.cli_args = ['bmccreds', '--password-length', '3', '--password', 'foo']
+        self.assert_exits_with_error(
+            do_bmccreds, self.parse_args(),
+            '--password-length is only valid with --random-password.'
+        )
+
+    def test_password_length_without_random_password_or_password(self):
+        """Giving --password-length without --random-password results in an error."""
+        self.cli_args = ['bmccreds', '--password-length', '3']
+        self.assert_exits_with_error(
+            do_bmccreds, self.parse_args(),
+            '--password-length is only valid with --random-password.'
+        )
+
+    def test_password_char_sets_without_random_password(self):
+        """Giving --password-char-sets without --random-password results in an err."""
+        self.cli_args = ['bmccreds', '--password-char-sets', 'alpha,numeric,symbols', '--password', 'alpha']
+        self.assert_exits_with_error(
+            do_bmccreds, self.parse_args(),
+            '--password-char-sets is only valid with --random-password.'
+        )
+
+    def test_password_char_sets_without_random_password_or_password(self):
+        """Giving --password-char-sets without --random-password results in an err."""
+        self.cli_args = ['bmccreds', '--password-char-sets', 'alpha,numeric,symbols']
+        self.assert_exits_with_error(
+            do_bmccreds, self.parse_args(),
+            '--password-char-sets is only valid with --random-password.'
+        )
+
+    def test_password_chars_without_random_password(self):
+        """Giving --password-chars without --random-password results in an err."""
+        self.cli_args = ['bmccreds', '--password-chars', 'abc4&', '--password', 'foo']
+        self.assert_exits_with_error(
+            do_bmccreds, self.parse_args(),
+            '--password-chars is only valid with --random-password.'
+        )
+
+    def test_password_chars_without_random_password_or_password(self):
+        """Giving --password-chars without --random-password results in an err."""
+        self.cli_args = ['bmccreds', '--password-chars', 'abc4&']
+        self.assert_exits_with_error(
+            do_bmccreds, self.parse_args(),
+            '--password-chars is only valid with --random-password.'
+        )
+
     def test_no_hsm_check_without_xnames(self):
         """Giving --no-hsm-check without xnames results in an error."""
         self.cli_args = ['bmccreds', '--no-hsm-check']
@@ -134,7 +183,9 @@ class TestBMCCredsMain(ExtendedTestCase):
             xnames=self.mock_hsm_client.get_and_filter_bmcs.return_value,
             domain=None,
             force=False,
-            report_format='pretty'
+            report_format='pretty',
+            length=RANDOM_PASSWORD_LENGTH,
+            allowed_chars=VALID_CHAR_SETS_STRING
         )
 
     def test_random_password(self):
@@ -147,7 +198,9 @@ class TestBMCCredsMain(ExtendedTestCase):
             xnames=self.mock_hsm_client.get_and_filter_bmcs.return_value,
             domain=None,
             force=False,
-            report_format='pretty'
+            report_format='pretty',
+            length=RANDOM_PASSWORD_LENGTH,
+            allowed_chars=VALID_CHAR_SETS_STRING
         )
 
     def test_random_password_with_domain(self):
@@ -160,7 +213,71 @@ class TestBMCCredsMain(ExtendedTestCase):
             xnames=self.mock_hsm_client.get_and_filter_bmcs.return_value,
             domain='bmc',
             force=False,
-            report_format='pretty'
+            report_format='pretty',
+            length=RANDOM_PASSWORD_LENGTH,
+            allowed_chars=VALID_CHAR_SETS_STRING
+        )
+
+    def test_random_password_with_password_length(self):
+        """Supplying --random-password with a password length"""
+        self.cli_args = ['bmccreds', '--random-password', '--password-length', '10']
+        do_bmccreds(self.parse_args())
+        self.mock_get_username_and_password.assert_not_called()
+        self.bmccreds_cls.assert_called_once_with(
+            password=None,
+            xnames=self.mock_hsm_client.get_and_filter_bmcs.return_value,
+            domain=None,
+            force=False,
+            report_format='pretty',
+            length=10,
+            allowed_chars=VALID_CHAR_SETS_STRING
+        )
+
+    def test_random_password_with_password_char_sets(self):
+        """Supplying --random-password with a password character set"""
+        self.cli_args = ['bmccreds', '--random-password', '--password-char-sets', 'numeric']
+        do_bmccreds(self.parse_args())
+        self.mock_get_username_and_password.assert_not_called()
+        self.bmccreds_cls.assert_called_once_with(
+            password=None,
+            xnames=self.mock_hsm_client.get_and_filter_bmcs.return_value,
+            domain=None,
+            force=False,
+            report_format='pretty',
+            length=RANDOM_PASSWORD_LENGTH,
+            allowed_chars='0123456789'
+        )
+
+    def test_random_password_with_password_chars(self):
+        """Supplying --random-password with explicit password characters"""
+        self.cli_args = ['bmccreds', '--random-password', '--password-chars', 'abcdefgh']
+        do_bmccreds(self.parse_args())
+        self.mock_get_username_and_password.assert_not_called()
+        self.bmccreds_cls.assert_called_once_with(
+            password=None,
+            xnames=self.mock_hsm_client.get_and_filter_bmcs.return_value,
+            domain=None,
+            force=False,
+            report_format='pretty',
+            length=RANDOM_PASSWORD_LENGTH,
+            allowed_chars='abcdefgh'
+        )
+
+    def test_random_password_with_password_length_and_password_char_sets(self):
+        """Supplying --random-password with password length and password character set"""
+        self.cli_args = ['bmccreds', '--random-password', '--password-length', '14', '--password-char-sets',
+                         'alpha,numeric,symbols'
+                         ]
+        do_bmccreds(self.parse_args())
+        self.mock_get_username_and_password.assert_not_called()
+        self.bmccreds_cls.assert_called_once_with(
+            password=None,
+            xnames=self.mock_hsm_client.get_and_filter_bmcs.return_value,
+            domain=None,
+            force=False,
+            report_format='pretty',
+            length=14,
+            allowed_chars=VALID_CHAR_SETS_STRING
         )
 
     def test_with_type(self):
@@ -198,7 +315,9 @@ class TestBMCCredsMain(ExtendedTestCase):
             xnames={'x1000c0s0b0'},
             domain=None,
             force=True,
-            report_format='pretty'
+            report_format='pretty',
+            length=RANDOM_PASSWORD_LENGTH,
+            allowed_chars=VALID_CHAR_SETS_STRING
         )
         self.bmccreds.set_bmc_passwords.assert_called_once_with(
             self.mock_session
@@ -267,22 +386,6 @@ class TestBMCCredsMain(ExtendedTestCase):
         self.cli_args = ['bmccreds', '--disruptive']
         do_bmccreds(self.parse_args())
         self.mock_pester.assert_not_called()
-
-    def test_too_long_password(self):
-        """Test that a password that is too long can never be set."""
-        self.cli_args = ['bmccreds', '--password', 'passwordpassword']
-        self.assert_exits_with_error(
-            do_bmccreds, self.parse_args(),
-            f'Password must be less than or equal to {USER_PASSWORD_MAX_LENGTH} characters.'
-        )
-
-    def test_with_illegal_characters(self):
-        """Test that a password with disallowed characters can never be set."""
-        self.cli_args = ['bmccreds', '--password', 'pas$word']
-        self.assert_exits_with_error(
-            do_bmccreds, self.parse_args(),
-            'Password may only contain letters, numbers and underscores.'
-        )
 
 
 if __name__ == '__main__':

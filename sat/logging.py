@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2020,2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2020, 2023-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@ Sets up logging for SAT.
 """
 import logging
 import os
-from copy import deepcopy
+from copy import copy
 from logging import Formatter, LogRecord
 
 from sat.config import get_config_value
@@ -43,7 +43,7 @@ class LineSplittingFormatter(Formatter):
     def formatMessage(self, record: LogRecord) -> str:
         formatted_records = []
         for line in record.message.splitlines():
-            line_record = deepcopy(record)
+            line_record = copy(record)
             line_record.message = line
             formatted_records.append(super().formatMessage(line_record))
         return '\n'.join(formatted_records)

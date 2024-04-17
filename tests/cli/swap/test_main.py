@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2022, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 Unit tests for sat.cli.swap.main
 """
 
+import logging
 import itertools
 import unittest
 from unittest import mock
@@ -82,6 +83,9 @@ class TestSwapMain(unittest.TestCase):
     def setUp(self):
         self.fake_swap_cable = mock.patch('sat.cli.swap.main.swap_cable').start()
         self.fake_swap_switch = mock.patch('sat.cli.swap.main.swap_switch').start()
+        self.fake_pester_choices = mock.patch('sat.util.pester_choices').start()
+        self.fake_pester_choices.return_value = 'yes'
+
         self.fake_args = Namespace(
             action='enable',
             dry_run=False,
@@ -92,13 +96,53 @@ class TestSwapMain(unittest.TestCase):
     def tearDown(self):
         mock.patch.stopall()
 
-    def test_swap_cable(self):
-        """Running swap cable calls the swap cable function"""
-        do_swap(self.fake_args)
-        self.fake_swap_cable.assert_called_with(self.fake_args)
+    def test_swap_cable_continue(self):
+        """Running swap cable calls the swap cable function if user continues"""
+        with self.assertLogs(level=logging.WARNING) as logs_cm:
+            do_swap(self.fake_args)
 
-    def test_swap_switch(self):
-        """Running swap switch calls the swap switch function"""
+        self.fake_swap_cable.assert_called_with(self.fake_args)
+        self.assertEqual(1, len(logs_cm.records))
+        self.assertRegex(logs_cm.records[0].message,
+                         'The "sat swap cable" command has been deprecated')
+
+    def test_swap_cable_abort(self):
+        """Running swap cable aborts if user answers "no" to prompt"""
+        self.fake_pester_choices.return_value = 'no'
+
+        with self.assertRaises(SystemExit) as raises_cm:
+            with self.assertLogs(level=logging.WARNING) as logs_cm:
+                do_swap(self.fake_args)
+
+        self.fake_swap_cable.assert_not_called()
+        self.assertEqual(1, len(logs_cm.records))
+        self.assertRegex(logs_cm.records[0].message,
+                         'The "sat swap cable" command has been deprecated')
+        self.assertEqual(raises_cm.exception.code, 1)
+
+    def test_swap_switch_continue(self):
+        """Running swap switch calls the swap switch function if user continues"""
         self.fake_args.target = 'switch'
-        do_swap(self.fake_args)
+
+        with self.assertLogs(level=logging.WARNING) as logs_cm:
+            do_swap(self.fake_args)
         self.fake_swap_switch.assert_called_with(self.fake_args)
+
+        self.assertEqual(1, len(logs_cm.records))
+        self.assertRegex(logs_cm.records[0].message,
+                         'The "sat swap switch" command has been deprecated')
+
+    def test_swap_switch_abort(self):
+        """Running swap switch aborts if user answers "no" to prompt"""
+        self.fake_args.target = 'switch'
+        self.fake_pester_choices.return_value = 'no'
+
+        with self.assertRaises(SystemExit) as raises_cm:
+            with self.assertLogs(level=logging.WARNING) as logs_cm:
+                do_swap(self.fake_args)
+
+        self.fake_swap_switch.assert_not_called()
+        self.assertEqual(1, len(logs_cm.records))
+        self.assertRegex(logs_cm.records[0].message,
+                         'The "sat swap switch" command has been deprecated')
+        self.assertEqual(raises_cm.exception.code, 1)

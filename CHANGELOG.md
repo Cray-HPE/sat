@@ -1,6 +1,6 @@
 # Changelog
 
-(C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+(C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -39,6 +39,168 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to 900 seconds.
 - Updated `sat bootsys` to include a prompt for input before proceeding with
   hard power off of management NCNs after timeout.
+
+## [3.28.1] - 2024-04-10
+
+### Added
+- Updated the man page to include description of the new options implemented
+  for `sat bmccreds`.
+
+## [3.28.0] - 2024-04-09
+
+### Deprecated
+- Deprecate the `sat swap switch`, `sat swap cable`, and `sat switch` commands
+  and log a message referring the user to the Slingshot Orchestrated Maintenance
+  procedure instead. Prompt the user if they would still like to continue with
+  the given `sat` command.
+
+## [3.27.18] - 2024-04-05
+
+### Fixed
+- Improved the build of `python-csm-api-client` to take less time by
+  adding `poetry.lock` file that resolves the dependencies.
+
+## [3.27.17] - 2024-04-01
+
+### Fixed
+- Updated `generate_docs_tarball` to pass the correct log message in
+  `sat bootprep generate-docs` to output the relative path as given by the user.
+
+## [3.27.16] - 2024-03-28
+
+### Fixed
+- Update the `_update_container_status` method of the
+  CFSImageConfigurationSession class in csm_api_client.service.cfs to handle
+  the case when either `init_container_statuses` or `container_statuses` or
+  both are None.
+
+## [3.27.15] - 2024-03-27
+
+### Changed
+- Updated `begin_image_configure` to pass session name generated to address the
+  sat bootprep incorrect logging of 2 session names
+
+## [3.27.14] - 2024-03-27
+
+### Changed
+- Remove the restrictions on the passwords that can be set with `sat bmccreds`
+  to allow for more complex passwords.
+- Improve the password generation logic in `sat bmccreds` to support generating
+  more complex passwords.
+
+## [3.27.13] - 2024-03-25
+
+### Updated
+- Updated the default grace period of the `HMSDiscoveryScheduledWaiter` to 3
+  minutes to allow more time for a new job to be scheduled by the cronjob.
+
+## [3.27.12] - 2024-03-14
+
+### Added
+- Added support for the Power Control Service (PCS). Functionality using CAPMC
+  was changed to use PCS instead.
+
+## [3.27.11] - 2024-02-28
+
+### Fixed
+- Fixed for `sat showrev` to stop supporting `--release-files` option 
+  and log a warning message indicating that this option is no longer supported.
+
+## [3.27.10] - 2024-02-26
+
+### Added
+- Update the man-page of `sat status` providing descriptions to all the parameters.
+
+## [3.27.9] - 2024-02-22
+
+### Security
+- Update the version of cryptography from 42.0.2 to 42.0.4 to resolve
+  CVE-2024-26130
+
+## [3.27.8] - 2024-02-20
+
+### Security
+- Update the version of cryptography from 42.0.0 to 42.0.2 to resolve
+  CVE-2024-0727
+
+## [3.27.7] - 2024-02-20
+
+### Changed
+- Changed the WARNING messages about the deleted BOS sessions to DEBUG messages
+  for `sat status`
+- Changed the "Most Recent Image" column to show the IMS image ID instead of
+  image name for `sat status`
+
+## [3.27.6] - 2024-02-16
+
+### Fixed
+- Remove unnecessary queries to BOS to get the name of the session template for 
+  every single node component in the output of `sat status`.
+
+## [3.27.5] - 2024-02-07
+
+### Security
+- Update the version of cryptography from 41.0.6 to 42.0.0 to resolve
+  CVE-2023-50782
+
+## [3.27.4] - 2024-02-06
+
+### Security
+- Update the version of jinja2 from 3.0.3 to 3.1.3 to address
+  CVE-2024-22195
+  
+## [3.27.3] - 2024-01-31
+
+### Fixed
+- Fixed `sat swap switch` and `sat swap cable` so that they preserve all
+  existing port policies applied to the ports on a switch or a cable across the
+  disable and enable actions. The old behavior was that only the first policy
+  would be preserved, which was a problem for ports with multiple policies
+  configured.
+
+## [3.27.2] - 2024-01-16
+
+### Fixed
+- Fixed a lengthy traceback that occurs when logging parsing errors that occur
+  during parsing of `--filter` options.
+- Fixed `--filter` option parsing to allow unquoted special characters (like the
+  dash, for example) on the right-hand side (value) of a comparison.
+
+## [3.27.1] - 2024-01-05
+
+### Security
+- Update the version of paramiko from 2.11.0 to 3.4.0 to address
+  CVE-2023-48795
+
+## [3.27.0] - 2023-12-05
+
+### Added
+- Added the ability to specify `additional_inventory` when creating CFS
+  configurations with `sat bootprep`.
+
+## [3.26.2] - 2023-12-01
+
+### Security
+- Update the version of cryptography from 41.0.4 to 41.0.6 to address
+  CVE-2023-49083
+
+## [3.26.1] - 2023-11-27
+
+### Security
+- Update the version of urllib3 from 1.26.17 to 1.26.18 to address
+  CVE-2023-45803
+
+## [3.26.0] - 2023-10-24
+
+### Changed
+- Added publishing of `cray-sat` container image to `csm-docker` in Artifactory
+  as well as `sat-docker`. This is more consistent with other CSM builds.
+
+## [3.25.6] - 2023-10-18
+
+### Fixed
+- Fixed `sat bootprep` to ensure image architecture is retained when customizing
+  IMS images.
 
 ## [3.25.5] - 2023-10-12
 
