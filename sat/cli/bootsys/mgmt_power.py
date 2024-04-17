@@ -36,7 +36,7 @@ from paramiko.ssh_exception import BadHostKeyException, AuthenticationException,
 
 from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger, ConsoleLoggingError
 from sat.cli.bootsys.util import get_and_verify_ncn_groups, get_ssh_client, FatalBootsysError
-from sat.cli.bootsys.platform import do_ceph_freeze, FatalPlatformError
+from sat.cli.bootsys.platform import do_ceph_freeze, do_ceph_unfreeze, FatalPlatformError
 from sat.waiting import GroupWaiter, WaitingFailure
 from sat.config import get_config_value
 from sat.util import BeginEndLogger, get_username_and_password_interactively, pester_choices, prompt_continue
@@ -392,7 +392,7 @@ def do_power_on_ncns(args):
         LOGGER.error(f'Not proceeding with NCN power on: {err}')
         raise SystemExit(1)
 
-    ordered_boot_groups = [included_ncn_groups[role] for role in ('managers', 'storage', 'workers')]
+    ordered_boot_groups = [included_ncn_groups[role] for role in ('storage', 'managers', 'workers')]
     # flatten lists of ncn groups
     affected_ncns = list({ncn for sublist in ordered_boot_groups for ncn in sublist})
 
@@ -421,6 +421,15 @@ def do_power_on_ncns(args):
                         raise SystemExit(1)
                     else:
                         LOGGER.info(f'Powered on NCNs: {", ".join(ncn_group)}')
+                    # Unfreeze Ceph and wait for Ceph health after powering on the storage nodes
+                    if ncn_group == included_ncn_groups['storage']:
+                        try:
+                            do_ceph_unfreeze(included_ncn_groups)
+                        except FatalPlatformError as err:
+                            LOGGER.error(f'Failed to unfreeze Ceph on storage NCNs: {err}')
+                            sys.exit(1)
+                        LOGGER.info('Ceph freeze completed successfully on storage NCNs.')
+
         except ConsoleLoggingError as err:
             LOGGER.error(f'Aborting boot of NCNs due failure to set up NCN console logging: {err}')
             raise SystemExit(1)
