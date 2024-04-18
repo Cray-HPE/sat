@@ -42,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to 900 seconds.
 - Updated `sat bootsys` to include a prompt for input before proceeding with
   hard power off of management NCNs after timeout.
+- addressed the bug to import time to make the sleep time effective before retrying to create
+  cronjobs
 
 ## [3.28.1] - 2024-04-10
 
