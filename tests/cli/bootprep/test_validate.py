@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -50,7 +50,8 @@ VALID_CONFIG_LAYER_PRODUCT_VERSION = {
     'product': {
         'name': 'sma',
         'version': '1.4.2'
-    }
+    },
+    'playbook': 'sma-ldms-compute.yml'
 }
 
 VALID_CONFIG_LAYER_PRODUCT_BRANCH = {
@@ -59,6 +60,7 @@ VALID_CONFIG_LAYER_PRODUCT_BRANCH = {
         'name': 'cos',
         'branch': 'integration'
     },
+    'playbook': 'cos-compute.yml',
     'special_parameters': {
         'ims_require_dkms': True
     }
@@ -69,7 +71,8 @@ VALID_CONFIG_LAYER_GIT_BRANCH = {
     'git': {
         'url': 'https://api-gw-service-nmn.local/vcs/cray/cpe-config-management.git',
         'branch': 'integration'
-    }
+    },
+    'playbook': 'pe_deploy.yml'
 }
 
 VALID_CONFIG_LAYER_GIT_COMMIT = {
@@ -80,7 +83,8 @@ VALID_CONFIG_LAYER_GIT_COMMIT = {
     },
     'special_parameters': {
         'ims_require_dkms': True
-    }
+    },
+    'playbook': 'site.yml'
 }
 
 VALID_IMAGE_IMS_NAME_WITH_CONFIG_V1 = {
@@ -778,6 +782,17 @@ class TestValidateInstance(ExtendedTestCase):
             (('configurations', 0, 'layers', 0), NOT_VALID_ANY_OF_MESSAGE, 1),
             # The 'git' property is preferred because it's first in the schema
             (('configurations', 0, 'layers', 0), "'git' is a required property", 2),
+        ]
+        self.assert_invalid_instance(instance, expected_errs)
+
+    def test_invalid_config_layer_missing_playbook(self):
+        """Invalid configuration missing 'playbook' key"""
+        layer = deepcopy(VALID_CONFIG_LAYER_PRODUCT_VERSION)
+        del layer['playbook']
+        instance = self.get_instance_with_config_layer(layer)
+        expected_errs = [
+            (('configurations', 0, 'layers', 0), NOT_VALID_ANY_OF_MESSAGE, 1),
+            (('configurations', 0, 'layers', 0), "'playbook' is a required property", 2)
         ]
         self.assert_invalid_instance(instance, expected_errs)
 
