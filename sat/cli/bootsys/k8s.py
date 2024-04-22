@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020, 2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020, 2023, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -157,6 +157,7 @@ class KubernetesAPIAvailableWaiter(Waiter):
         super().__init__(timeout, poll_interval=poll_interval)
 
         self.k8s_api = load_kube_api()
+        self.unreachable_logged = False
 
     def condition_name(self):
         return 'Kubernetes API available'
@@ -167,10 +168,12 @@ class KubernetesAPIAvailableWaiter(Waiter):
         """
         try:
             self.k8s_api.get_api_resources()
-        except urllib3.exceptions.MaxRetryError:
-            return False
-        else:
             return True
+        except urllib3.exceptions.MaxRetryError:
+            if not self.unreachable_logged:
+                LOGGER.info("The Kubernetes API is currently unreachable.")
+                self.unreachable_logged = True  # Mark that the unreachable message has been logged
+        return False
 
 
 def do_k8s_check(args):

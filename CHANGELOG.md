@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Modified the sat bootsys platform services stage to not perform unfreeze ceph
 - Updated the power on order of node groups in sat bootsys ncn-power stage to storage,
   unfreezing of ceph, managers and then the worker nodes.
+- Added a wait on the Kubernetes API being reachable between the step that starts 
+  kubelet and the step that re-creates Kubernetes cronjobs in the
+  `platform-services` stage of `sat bootsys boot`.
 
 ### Fixed
 - Updated `sat bootsys` to increase the default management NCN shutdown timeout

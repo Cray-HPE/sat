@@ -46,6 +46,7 @@ from sat.cli.bootsys.ceph import (
 )
 from sat.cli.bootsys.etcd import save_etcd_snapshot_on_host, EtcdInactiveFailure, EtcdSnapshotFailure
 from sat.cli.bootsys.hostkeys import FilteredHostKeys
+from sat.cli.bootsys.k8s import KubernetesAPIAvailableWaiter
 from sat.cli.bootsys.util import get_and_verify_ncn_groups, get_ssh_client, FatalBootsysError
 from sat.config import get_config_value
 from sat.cronjob import recreate_namespaced_stuck_cronjobs
@@ -480,6 +481,11 @@ def do_kubelet_start(ncn_groups):
     """
     do_service_action_on_hosts(ncn_groups['kubernetes'], 'kubelet',
                                target_state='active', target_enabled='enabled')
+    LOGGER.info("Waiting up to 300 seconds for the Kubernetes API to become available")
+    kube_api_waiter = KubernetesAPIAvailableWaiter(timeout=300)  # Adjust timeout as needed
+    if not kube_api_waiter.wait_for_completion():
+        raise FatalPlatformError("Kubernetes API not available after timeout")
+    LOGGER.info("Kubernetes API is available")
 
 
 def do_recreate_cronjobs(_):
