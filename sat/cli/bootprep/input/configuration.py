@@ -46,8 +46,14 @@ from sat.util import get_val_by_path, set_val_by_path
 LOGGER = logging.getLogger(__name__)
 
 
+# TODO: Limit scope of InputConfigurationLayerBase to only interpreting contents of input file.
+#       This means it should not have knowledge of differences between CFS v2 and v3. It should
+#       just delegate that work to `CFSConfigurationLayer.req_payload`. It will need to know the
+#       version just to pass it along though.
 class InputConfigurationLayerBase(ABC):
     """An object representing data in common between layers and additional inventory"""
+
+    # TODO: This stuff should be abstracted out of this class
     REQUIRED_CFS_PROPERTIES = {
         'cloneUrl': 'clone_url'
     }
@@ -103,6 +109,9 @@ class InputConfigurationLayerBase(ABC):
         """str or None: the commit for this layer"""
         pass
 
+    # TODO: This will just call CFSConfigurationLayer.req_payload after calling its
+    #       resolve_branch_to_commit_hash method. Probably actually need to define on
+    #       Product and Git layers separately to call appropriate from_ static method
     def get_cfs_api_data(self):
         """Get the data to pass to the CFS API to create this layer.
 
@@ -127,6 +136,7 @@ class InputConfigurationLayerBase(ABC):
 
         return cfs_layer_data
 
+    # TODO: Remove this functionality and let CFSConfigurationLayer do this
     def resolve_commit_hash(self, branch):
         """Query VCS to determine the commit hash at the head of the branch.
 
@@ -155,6 +165,8 @@ class InputConfigurationLayerBase(ABC):
 class InputConfigurationLayer(InputConfigurationLayerBase, ABC):
     """A CFS configuration layer as defined in the bootprep input file"""
 
+    # TODO: Remove this and let CFSConfigurationLayer.req_payload handle it
+    #       Will need support added for ims_require_dkms field
     OPTIONAL_CFS_PROPERTIES = {
         'branch': 'branch',
         'commit': 'commit',
@@ -217,6 +229,7 @@ class GitInputConfigurationLayer(InputConfigurationLayer):
 
     @property
     def commit(self):
+        # TODO: Just return the data according to schema. CFSConfigurationLayer will resolve branch
         # The 'commit' property is optional
         if self.resolve_branches and self.branch is not None:
             # If given a branch, we can look up the commit dynamically.
@@ -255,6 +268,7 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
         # The 'version' property is optional. If not specified, assume latest
         return self.layer_data['product'].get('version', LATEST_VERSION_VALUE)
 
+    # TODO: Remove and let CFSConfigurationLayer handle this
     @cached_property
     def matching_product(self):
         """sat.software_inventory.products.InstalledProductVersion: the matching installed product"""
@@ -268,6 +282,7 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
         except ProductCatalogError as err:
             raise InputItemCreateError(f'Unable to get product data from product catalog: {err}')
 
+    # TODO: Remove and let CFSConfigurationLayer handle this
     @staticmethod
     def substitute_url_hostname(url):
         """Substitute the hostname in a URL with the configured API gateway hostname.
@@ -282,6 +297,7 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
             netloc=get_config_value('api_gateway.host')
         ))
 
+    # TODO: Remove and let CFSConfigurationLayer handle this
     @cached_property
     def clone_url(self):
         if self.matching_product.clone_url is None:
@@ -310,7 +326,7 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
         #   3. If neither a commit nor a branch was specified, then consult the
         #      product catalog for the an associated commit hash and return
         #      that.
-
+        # TODO: Remove branch resolution logic and let CFSConfigurationLayer handle this
         input_commit = self.layer_data['product'].get('commit')
         if input_commit:
             return input_commit
@@ -334,9 +350,12 @@ class AdditionalInventory(InputConfigurationLayerBase):
         """str: the clone URL for the additional inventory"""
         return self.layer_data['url']
 
+    # TODO: Once support for AdditionalInventory is added to csm_api_client, use that functionality
+    #       the same as it's used for layers above.
     @property
     def commit(self):
         """str or None: the commit hash or None if branch was specified instead"""
+        # TODO: Simplify this to just return the data according to the schema
         if self.resolve_branches and self.branch is not None:
             # If given a branch, we can look up the commit dynamically.
             return self.resolve_commit_hash(self.branch)
@@ -442,6 +461,7 @@ class InputConfiguration(BaseInputItem):
             payload (dict): the payload to pass to the CFS API to create the
                 CFS configuration
         """
+        # TODO: Consider using a method of the CFSConfiguration class from csm_api_client
         try:
             # request_body guaranteed to have 'name' key, so no need to catch ValueError
             self.cfs_client.put_configuration(self.name, payload)
