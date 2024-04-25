@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -34,6 +34,28 @@ from sat.session import SATSession
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def delete_snapshot(client, snapshots):
+    """Delete a snapshot using the FASClient.
+
+    Args:
+        client (FASClient): The FASClient to use.
+        snapshots (str or list): The name(s) of the snapshot(s) to be deleted.
+
+    Raises:
+            SystemExit: If there is an error while attempting to delete the snapshot(s).
+    """
+    if isinstance(snapshots, str):
+        snapshots = [snapshots]
+
+    for snapshot in snapshots:
+        try:
+            client.delete_snapshot(snapshot)
+            LOGGER.info('Snapshot %s deleted successfully.', snapshot)
+        except APIError as err:
+            LOGGER.error('Failed to delete snapshot %s: %s', snapshot, err)
+            raise SystemExit(1)
 
 
 def get_known_snapshots(client):
@@ -149,6 +171,10 @@ def do_firmware(args):
     """
     client = FASClient(SATSession())
 
+    if args.delete_snapshot:
+        delete_snapshot(client, args.delete_snapshot)
+        return
+
     if args.snapshots is not None:
         # --snapshots without any arguments means list snapshot names, while
         # --snapshots with arguments means generate a report about given snapshots.
@@ -177,3 +203,5 @@ def do_firmware(args):
     print_reports_from_tables(
         firmware_tables, args.sort_by, args.reverse, args.filter_strs, args.format, args.fields
     )
+
+    LOGGER.info(f'Use `sat firmware --delete-snapshot` to delete the snapshot if it is no longer needed')
