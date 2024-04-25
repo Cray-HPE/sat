@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -32,7 +32,7 @@ import unittest
 from unittest.mock import Mock, call, patch
 
 from sat.apiclient import APIError, APIGatewayClient
-from sat.apiclient.fas import FASClient, _now_and_later
+from sat.apiclient.fas import FASClient
 from sat.xname import XName
 from tests.test_util import ExtendedTestCase
 
@@ -119,7 +119,7 @@ class TestFASClient(ExtendedTestCase):
         self.mock_post = patch.object(APIGatewayClient, 'post').start()
         # Functions that sleep do not need to sleep.
         patch('sat.apiclient.fas.time.sleep').start()
-        # Mock datetime.utcnow() so the return values of _now_and_later are consistent
+        # Mock datetime.utcnow() so the return values are consistent
         patch('sat.apiclient.fas.datetime.utcnow', return_value=datetime(2021, 3, 7, 23, 35, 0, 403824))
         self.json_exception = None
 
@@ -405,10 +405,9 @@ class TestFASClient(ExtendedTestCase):
         """Positive test case for get_device_firmwares.
 
         A new snapshot formatted like 'SAT-year-month-day-hour-minute-sec
-        should be created, and the payload should tell the FAS to expire it
-        in 10 minutes.
+        should be created.
         """
-        now, later = _now_and_later(10)
+        now = datetime.utcnow().replace(microsecond=0)
         not_ready_response = Mock()
         not_ready_response.json.return_value = {'ready': False}
         ready_response = Mock()
@@ -441,7 +440,7 @@ class TestFASClient(ExtendedTestCase):
 
         exp_name = 'SAT-{}-{}-{}-{}-{}-{}'.format(
             now.year, now.month, now.day, now.hour, now.minute, now.second)
-        exp_payload = {'name': exp_name, 'expirationTime': later.isoformat() + 'Z'}
+        exp_payload = {'name': exp_name}
 
         self.assertEqual(expected, actual)
         self.mock_post.assert_called_once_with('snapshots', json=exp_payload)
@@ -450,7 +449,7 @@ class TestFASClient(ExtendedTestCase):
     def test_get_device_firmwares_with_xname(self):
         """Calling get_device_firmwares with an xname should create a snapshot filtered for that xname"""
         xname_to_query = 'x3000c0s17b1'
-        now, later = _now_and_later(10)
+        now = datetime.utcnow().replace(microsecond=0)
         # Mock the return values of get() to test that we wait for the snapshot to be ready
         not_ready_response = Mock()
         not_ready_response.json.return_value = {'ready': False}
@@ -485,7 +484,6 @@ class TestFASClient(ExtendedTestCase):
             now.year, now.month, now.day, now.hour, now.minute, now.second)
         exp_payload = {
             'name': exp_name,
-            'expirationTime': later.isoformat() + 'Z',
             'stateComponentFilter': {'xnames': [xname_to_query]}
         }
 

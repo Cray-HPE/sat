@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -49,7 +49,14 @@ def add_firmware_subparser(subparsers):
                     'are specified, then all xnames will be targeted.',
         parents=[xname_options, format_options, filter_options])
 
-    firmware_parser.add_argument(
+    firmware_snapshot = firmware_parser.add_mutually_exclusive_group()
+
+    firmware_snapshot.add_argument(
         '--snapshots', dest='snapshots', metavar='SNAPSHOT', nargs='*',
         help='Describe firmware snapshots. Provide no arguments to this '
              'option to list available snapshots.')
+
+    firmware_snapshot.add_argument(
+        '--delete-snapshot', dest='delete_snapshot', metavar='SNAPSHOT_NAME', nargs='+',
+        help='Delete a snapshot by providing the snapshot name.'
+    )
