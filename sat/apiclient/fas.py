@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -37,17 +37,6 @@ from sat.xname import XName
 
 inf = inflect.engine()
 LOGGER = logging.getLogger(__name__)
-
-
-def _now_and_later(minutes):
-    """Return now and now + minutes as a pair
-
-    Returns:
-        now, later: datetime pair.
-    """
-    now = datetime.utcnow().replace(microsecond=0)
-    later = now + timedelta(minutes=minutes)
-    return now, later
 
 
 class FASClient(APIGatewayClient):
@@ -300,8 +289,23 @@ class FASClient(APIGatewayClient):
 
         return {name: description for name, description in descriptions.items()}
 
-    def _create_temporary_snapshot(self, xnames=None):
-        """Create a temporary snapshot and return its data.
+    def delete_snapshot(self, snapshot):
+        """Delete a snapshot using the FAS API.
+
+        Args:
+            snapshot (str): The name of the snapshot to be deleted.
+
+        Raises:
+            APIError: If there is an error while attempting to delete the snapshot.
+        """
+        try:
+            self.delete(f'snapshots/{snapshot}')
+
+        except APIError:
+            raise APIError(FASClient.err_no_firmware_found)
+
+    def _create_snapshot(self, xnames=None):
+        """Create a snapshot and return its data.
 
         Args:
             xnames: A list of xnames for which to take the snapshot.
@@ -314,18 +318,17 @@ class FASClient(APIGatewayClient):
         Raises:
             APIError: if FAS returned an APIError when creating the snapshot.
                 This can also raise if:
-                    - The payload from creating the temporary snapshot was
+                    - The payload from creating the snapshot was
                       missing either a 'ready' field while polling, or a
                       'devices' field.
                     - The FAS did not indicate if the snapshot was ready.
         """
-        now, later = _now_and_later(10)
+        now = datetime.utcnow().replace(microsecond=0)
         name = 'SAT-{}-{}-{}-{}-{}-{}'.format(
             now.year, now.month, now.day, now.hour, now.minute, now.second
         )
 
-        # create a system snapshot set to expire in 10 minutes
-        payload = {'name': name, 'expirationTime': later.isoformat() + 'Z'}
+        payload = {'name': name}
 
         # filter on xnames if provided.
         if xnames:
@@ -339,13 +342,22 @@ class FASClient(APIGatewayClient):
         # retrieve it and poll until ready
         response = None
         ready = False
+        consecutive_failures = 0
         while not ready:
-            time.sleep(1)
+            time.sleep(5)
 
             try:
                 response = self.get('snapshots', name).json()
+                consecutive_failures = 0  # Reset consecutive failures on successful response
             except APIError as err:
-                raise APIError('Error when polling the snapshot for "ready" status: {}'.format(err))
+                consecutive_failures += 1
+                if consecutive_failures == 5:  # Maximum consecutive failures
+                    raise APIError('Error when polling the snapshot {}: Exceeded maximum consecutive failures',
+                                   format(err))
+                else:
+                    LOGGER.debug('Error when polling the snapshot {}: Retrying...'.format(err))
+                    continue
+
             except ValueError as err:
                 raise APIError('The JSON received was invalid: {}'.format(err))
 
@@ -375,7 +387,7 @@ class FASClient(APIGatewayClient):
                 was malformed.
         """
         # This can raise APIError
-        response = self._create_temporary_snapshot(xnames)
+        response = self._create_snapshot(xnames)
         try:
             devices = response['devices']
             missing_xnames = set(xnames or []) - set(device.get('xname') for device in devices)
