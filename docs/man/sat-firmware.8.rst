@@ -7,7 +7,7 @@ Show firmware version
 ---------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2020-2021 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2020-2021, 2024 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -45,6 +45,10 @@ These options must be specified after the subcommand.
         names. Provide this option with no arguments to print a list of
         available snapshots.
 
+**--delete-snapshot** *SNAPSHOT-NAME*
+        Delete a snapshot by providing the snapshot name, if it is no
+        longer needed.
+
 .. include:: _sat-xname-opts.rst
 .. include:: _sat-format-opts.rst
 .. include:: _sat-filter-opts.rst
@@ -70,6 +74,7 @@ Get a report of all the firmware versions on the system (note: output truncated)
   | x3000c0s2b0  | 10         | Power Management Controller FW Bootloader       | 1.1                     |
   | x3000c0s2b0  | 7          | Power Supply Firmware                           | 1.00                    |
   ...
+  INFO: Use `sat firmware --delete-snapshot` to delete the snapshot if it is no longer needed
 
 Get a report of all the firmware versions associated with a particular xname:
 
@@ -86,6 +91,7 @@ Get a report of all the firmware versions associated with a particular xname:
   | x3000c0r39b0 | FPGA0      | sFPGA-ROS                                       | 1.08                    |
   | x3000c0r39b0 | BMC        | BMC                                             | sc.1.4.409              |
   +--------------+------------+-------------------------------------------------+-------------------------+
+  INFO: Use `sat firmware --delete-snapshot` to delete the snapshot if it is no longer needed
 
 Get a report of all the firmware versions associated with a particular snapshot
 (note: output truncated):
@@ -137,6 +143,13 @@ List all firmware snapshot names:
   # sat firmware --snapshots
   firmware-2021-3-2-23-45-52
   firmware-2021-3-2-20-41-55
+
+Delete the firmware snapshot if it is no longer needed:
+
+::
+
+  # sat firmware --delete-snapshot SAT-2024-4-25-6-44-6
+  INFO: Snapshot SAT-2024-4-25-6-44-6 deleted successfully.
 
 SEE ALSO
 ========

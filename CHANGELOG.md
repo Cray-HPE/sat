@@ -25,6 +25,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.28.4] - 2024-05-08
+
+### Fixed
+- Polling the snapshot in `sat firmware` resulted in HTTP errors in large clusters.
+  Hence, adding the retry option when it consecutively fails for up to 5 times.
+- Remove expiration time and add `--delete-snapshot` option to delete the snapshot
+  if it is no longer needed. By default, log a message referring the user how to
+  delete the snapshot.
+
 ## [3.28.3] - 2024-05-03
 
 ### Security
