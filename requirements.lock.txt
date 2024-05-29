@@ -8,7 +8,7 @@ certifi==2023.7.22
 cffi==1.15.0
 charset-normalizer==2.0.12
 click==8.0.4
-cray-product-catalog==2.1.0
+cray-product-catalog==1.9.0
 croniter==0.3.37
 cryptography==42.0.4
 csm-api-client==1.2.4
