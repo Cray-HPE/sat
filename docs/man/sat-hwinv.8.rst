@@ -163,6 +163,21 @@ These options list components of certain types in the system.
 **--list-cmm-rectifiers**
         List all the CMM rectifiers in the system.
 
+**--list-node-bmcs**
+        List all the node BMCs in the system.
+
+**--list-router-bmcs**
+        List all the router BMCs in the system.
+
+**--list-mgmt-switches**
+        List all the mgmt switches in the system.
+
+**--list-cabinet-pdus**
+        List all the cabinet PDUs in the system.
+
+**--list-cabinet-pdu-power-connectors**
+        List all the cabinet PDU power connectors in the system.
+
 **--node-fields** *NODE_FIELDS*
         Display the given comma-separated list of fields for each node. Omit
         this option to display all fields. This option only has an effect if
@@ -214,6 +229,21 @@ These options list components of certain types in the system.
 
 **--cmm-rectifier-fields** *CMM_RECTIFIER_FIELDS*
         Same as **--node-fields** but for CMM rectifiers.
+
+**--node-bmc-fields** *NODE_BMC_FIELDS*
+        Same as **--node-fields** but for NodeBMCs.
+
+**--router-bmc-fields** *ROUTER_BMC_FIELDS*
+        Same as **--node-fields** but for RouterBMCs.
+
+**--mgmt-switch-fields** *MGMT_SWITCH_FIELDS*
+        Same as **--node-fields** but for Mgmt Switches.
+
+**--cabinet-pdu-fields** *CABINET_PDU_FIELDS*
+        Same as **--node-fields** but for Cabinet PDUs.
+
+**--cabinet-pdu-power-connector-fields** *CABINET_PDU_POWER_CONNECTOR_FIELDS*
+        Same as **--node-fields** but for Cabinet PDU Power Connectors.
 
 .. include:: _sat-format-opts.rst
 .. include:: _sat-filter-opts.rst

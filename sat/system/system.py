@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2020, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -43,6 +43,11 @@ from sat.system.node_accel import NodeAccel
 from sat.system.node_accel_riser import NodeAccelRiser
 from sat.system.node_hsn_nic import NodeHsnNic
 from sat.system.router_module import RouterModule
+from sat.system.node_bmc import NodeBMC
+from sat.system.router_bmc import RouterBMC
+from sat.system.mgmt_switch import MgmtSwitch
+from sat.system.cabinet_pdu import CabinetPDU
+from sat.system.cabinet_pdu_power_connector import CabinetPDUPowerConnector
 from sat.xname import XName
 
 LOGGER = logging.getLogger(__name__)
@@ -75,7 +80,12 @@ class System:
             NodeAccel: {},
             NodeAccelRiser: {},
             NodeHsnNic: {},
-            RouterModule: {}
+            RouterModule: {},
+            NodeBMC: {},
+            RouterBMC: {},
+            MgmtSwitch: {},
+            CabinetPDU: {},
+            CabinetPDUPowerConnector: {}
         }
 
         for component in self.complete_raw_data:

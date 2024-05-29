@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2020, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -40,6 +40,11 @@ NODE_HSN_NIC_XNAME = 'x1000c0s0b0n0h0'
 MEMORY_MODULE_XNAME = 'x1000c0s0b0n0d0'
 DRIVE_XNAME = 'x1000c0s0b0n0g1k1'
 CMM_RECTIFIER_XNAME = 'x1000c0t0'
+NODE_BMC_XNAME = 'x8000c0s0b0'
+ROUTER_BMC_XNAME = 'x8000c0r1b0'
+MGMT_SWITCH_XNAME = 'x8000c0w0'
+CABINET_PDU_XNAME = 'x3000m0p0'
+CABINET_PDU_POWER_CONNECTOR_XNAME = 'x3000m0p0v1'
 
 # Default values for component raw data.
 DEFAULT_HSM_TYPE = 'Sample'

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2020, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -49,6 +49,11 @@ NODE_HSN_NIC_TYPE = 'NodeHsnNic'
 NODE_TYPE = 'Node'
 PROCESSOR_TYPE = 'Processor'
 ROUTER_MODULE_TYPE = 'RouterModule'
+NODE_BMC_TYPE = 'NodeBMC'
+ROUTER_BMC_TYPE = 'RouterBMC'
+MGMT_SWITCH_TYPE = 'MgmtSwitch'
+CABINET_PDU_TYPE = 'CabinetPDU'
+CABINET_PDU_POWER_CONNECTOR_TYPE = 'CabinetPDUPowerConnector'
 
 # The types of cabinets are C-Series and S-Series.
 # C-Series is densely liquid cooled.
