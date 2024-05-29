@@ -21,7 +21,7 @@
 argcomplete
 boto3
 botocore
-cray-product-catalog >= 1.6.0
+cray-product-catalog >= 2.1.0
 csm-api-client >= 1.2.4, <2.0
 croniter >= 0.3, < 1.0
 inflect >= 0.2.5, < 3.0
