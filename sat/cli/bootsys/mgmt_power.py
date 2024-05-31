@@ -428,10 +428,70 @@ def do_power_on_ncns(args):
                         except FatalPlatformError as err:
                             LOGGER.error(f'Failed to unfreeze Ceph on storage NCNs: {err}')
                             sys.exit(1)
-                        LOGGER.info('Ceph freeze completed successfully on storage NCNs.')
+                        LOGGER.info('Ceph unfreeze completed successfully on storage NCNs.')
+
+                        # Mount Ceph and S3FS filesystems on ncn-m001
+                        try:
+                            ssh_client = get_ssh_client()
+                            mount_filesystems_on_ncn(ssh_client, 'ncn-m001')
+                        except MountError as err:
+                            LOGGER.error(f'Failed to mount filesystems on ncn-m001: {err}')
+                            sys.exit(1)
 
         except ConsoleLoggingError as err:
             LOGGER.error(f'Aborting boot of NCNs due failure to set up NCN console logging: {err}')
             raise SystemExit(1)
 
     LOGGER.info('Succeeded with {}.'.format(action_msg))
+
+
+def mount_filesystems_on_ncn(ssh_client, ncn):
+    """Mount Ceph and S3FS filesystems on a given NCN via SSH.
+
+    Args:
+        ssh_client (paramiko.SSHClient): a paramiko client object.
+        ncn: The hostname of the NCN where the filesystems will be mounted.
+
+    Raises:
+        MountError: If mounting any filesystem fails.
+    """
+    filesystems = {
+        "ceph": "awk '{ if ($3 == \"ceph\") { print $2; }}' /etc/fstab",
+        "fuse.s3fs": "awk '{ if ($3 == \"fuse.s3fs\") { print $2; }}' /etc/fstab"
+    }
+
+    try:
+        # Establish SSH connection
+        ssh_client.connect(ncn)
+
+        for fs_type, awk_command in filesystems.items():
+            # Execute awk command to get mount points
+            stdin, stdout, stderr = ssh_client.exec_command(awk_command)
+            mount_points = stdout.read().decode().splitlines()
+
+            for mount_point in mount_points:
+                LOGGER.info(f'Checking whether {fs_type} filesystem is mounted on {mount_point}.')
+
+                # Check if the mount point is already mounted
+                stdin, stdout, stderr = ssh_client.exec_command(f"mountpoint {mount_point}")
+                if stdout.channel.recv_exit_status() != 0:  # If not a mountpoint, try to mount it
+                    LOGGER.info(f'Mounting {fs_type} filesystem on {mount_point}.')
+                    stdin, stdout, stderr = ssh_client.exec_command(f"mount {mount_point}")
+                    if stdout.channel.recv_exit_status() != 0:
+                        error_msg = stderr.read().decode()
+                        raise MountError(f"Failed to mount {fs_type} filesystem on {ncn}: {error_msg}")
+                    LOGGER.info(f'Successfully mounted {fs_type} filesystem on {mount_point}.')
+                else:
+                    LOGGER.info(f'{fs_type} filesystem is already mounted on {mount_point}.')
+
+    except paramiko.SSHException as e:
+        raise MountError(f"SSH connection failed: {str(e)}")
+
+# Ensure to close the connection after mounting
+    finally:
+        ssh_client.close()
+
+
+class MountError(Exception):
+    """Custom exception for mount errors."""
+    pass
