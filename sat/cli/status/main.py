@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -198,16 +198,17 @@ def do_status(args):
                 modules.append(module_cls)
             seen_module_names.add(module_name)
 
-    types = COMPONENT_TYPES if 'all' in args.types else args.types
+    # Safeguard against `args.types` being None even though the default value is ["Node"]
+    types = COMPONENT_TYPES if args.types is None or 'all' in args.types else args.types
     multiple_reports = len(types) != 1
     report_strings = []
 
     components = StatusModule.get_populated_rows(
         primary_key='xname',
-        primary_key_type=XName,
-        limit_modules=modules,
         session=session,
         component_types=types,
+        limit_modules=modules,
+        primary_key_type=XName,
     )
 
     for component_type, components_by_type in group_dicts_by('Type', components).items():
