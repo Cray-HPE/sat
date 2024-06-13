@@ -24,6 +24,7 @@
 """
 Waits for k8s API availability and for k8s pods to appear to be healthy.
 """
+from collections import defaultdict
 import logging
 
 from csm_api_client.k8s import load_kube_api
@@ -173,6 +174,54 @@ class KubernetesAPIAvailableWaiter(Waiter):
             if not self.unreachable_logged:
                 LOGGER.info("The Kubernetes API is currently unreachable.")
                 self.unreachable_logged = True  # Mark that the unreachable message has been logged
+        return False
+
+
+class KyvernoReadyWaiter(Waiter):
+    """A waiter which waits for Kyverno pods to become Ready.
+
+    This waits for the pods to enter a "Running" state and for the "kyverno"
+    container within that pod to become Ready based on its readinessProbe.
+    """
+
+    def __init__(self, timeout, poll_interval=10):
+        """Initialize the KyvernoReadyWaiter."""
+
+        super().__init__(timeout, poll_interval=poll_interval)
+
+        # Load k8s configuration before trying to use API
+        self.k8s_api = load_kube_api()
+
+    def condition_name(self):
+        return 'Kyverno pods running and ready'
+
+    def has_completed(self):
+        """Check if Kyverno pods are running and ready."""
+        # Currently these are the only pods in the namespace, but add a label selector anyway
+        kyverno_pods = self.k8s_api.list_namespaced_pod(
+            'kyverno',
+            label_selector='app.kubernetes.io/name=kyverno'
+        )
+
+        pods_by_status = defaultdict(list)
+        for pod in kyverno_pods.items:
+            pod_name = pod.metadata.name
+            if pod.status.phase == 'Running':
+                for container in pod.status.container_statuses:
+                    if container.name == 'kyverno' and container.ready:
+                        pods_by_status['ready'].append(pod_name)
+                    else:
+                        pods_by_status['running but not ready'].append(pod_name)
+            else:
+                pods_by_status['not running'].append(pod_name)
+
+        total_pods = len(kyverno_pods.items)
+        for status, pod_list in pods_by_status.items():
+            LOGGER.debug(f'{len(pod_list)}/{total_pods} Kyverno pods are {status}.')
+
+        if not (pods_by_status['running but not ready'] or pods_by_status['not running']):
+            # All pods must be ready
+            return True
         return False
 
 
