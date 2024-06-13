@@ -33,7 +33,9 @@ from collections import namedtuple
 from multiprocessing import Process
 
 from csm_api_client.k8s import load_kube_api
+from kubernetes import client, config
 from kubernetes.client import BatchV1Api
+from kubernetes.client.rest import ApiException
 from kubernetes.config import ConfigException
 from paramiko import SSHException
 
@@ -486,6 +488,42 @@ def do_kubelet_start(ncn_groups):
     if not kube_api_waiter.wait_for_completion():
         raise FatalPlatformError("Kubernetes API not available after timeout")
     LOGGER.info("Kubernetes API is available")
+
+    # Wait for Kyverno pods to be ready
+    wait_for_kyverno_pods()
+
+
+def wait_for_kyverno_pods(timeout=300, interval=10):
+    """Wait for Kyverno pods to be up and running.
+
+    Args:
+        timeout (int): Maximum time to wait for the pods to be ready.
+        interval (int): Time interval between checks.
+
+    Raises:
+        FatalPlatformError: if Kyverno pods are not ready after timeout.
+    """
+    config.load_kube_config()  # Ensure your kubeconfig is properly set up
+    v1 = client.CoreV1Api()
+    namespace = 'kyverno'
+    end_time = time.time() + timeout
+
+    LOGGER.info(f"Waiting up to {timeout} seconds for Kyverno pods to be ready in namespace {namespace}")
+
+    while time.time() < end_time:
+        try:
+            pods = v1.list_namespaced_pod(namespace)
+            all_running = all(pod.status.phase == 'Running' for pod in pods.items)
+            if all_running:
+                LOGGER.info("All Kyverno pods are up and running")
+                return True
+        except ApiException as e:
+            LOGGER.error(f"Exception when checking Kyverno pods: {e}")
+
+        LOGGER.info(f"Kyverno pods are not ready yet. Waiting for {interval} seconds before retrying...")
+        time.sleep(interval)
+
+    raise FatalPlatformError(f"Kyverno pods not ready after {timeout} seconds")
 
 
 def do_recreate_cronjobs(_):
