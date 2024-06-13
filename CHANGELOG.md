@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a wait on the Kubernetes API being reachable between the step that starts 
   kubelet and the step that re-creates Kubernetes cronjobs in the
   `platform-services` stage of `sat bootsys boot`.
+- Added a function to mount s3fs and ceph post ceph health status check on ncn-m001 in 
+  ncn power stage
 
 ### Fixed
 - Updated `sat bootsys` to increase the default management NCN shutdown timeout
