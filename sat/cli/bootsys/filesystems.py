@@ -24,14 +24,13 @@
 """
 Manage the mounting and unmounting of filesystems during shutdown and boot.
 """
-from collections import namedtuple
 import json
 import logging
+import socket
 
-from paramiko.ssh_exception import BadHostKeyException, AuthenticationException, SSHException
+from inflect import engine
+from paramiko.ssh_exception import SSHException
 
-from sat.cli.bootsys.hostkeys import FilteredHostKeys
-from sat.cli.bootsys.util import get_and_verify_ncn_groups, get_ssh_client, FatalBootsysError
 from sat.util import prompt_continue
 
 LOGGER = logging.getLogger(__name__)
@@ -42,7 +41,49 @@ class FilesystemError(OSError):
     pass
 
 
-RBDDeviceMount = namedtuple('RBDDeviceMount', ['rbd_device_path', 'mount_point'])
+def modify_ensure_ceph_mounts_cron_job(ssh_client, hostname, enabled=False):
+    """Enable or disable the cron job that ensures ceph and s3fs filesystems are mounted.
+
+    There is a cronjob defined at `/etc/cron.d/ensure-ceph-mounts` that runs
+    every minute and ensures all filesystems of type fuse.s3fs and one specific
+    ceph filesystem is mounted. This function either enables or disables that
+    cronjob by commenting out or uncommenting the crontab entry in this file.
+
+    Args:
+        ssh_client (paramiko.SSHClient): the SSH client to use to connect to the host
+        hostname (str): the hostname to connect to
+        enabled (bool): if True, then ensure the cron job is enabled. If False,
+            then ensure the cron job is disabled.
+
+    Raises:
+        FilesystemError: if there is an error executing the command to disable
+            the automatic filesystem mounting job
+    """
+    cron_file_path = '/etc/cron.d/ensure-ceph-mounts'
+    stdin, stdout, stderr = ssh_client.exec_command(f'test -e {cron_file_path}')
+    exit_code = stdout.channel.recv_exit_status()
+    if exit_code:
+        LOGGER.info(f'Cron job {cron_file_path} does not exist on the system.')
+        return
+
+    magic_string = 'COMMENTED_BY_SAT'
+    if enabled:
+        # Only uncomment lines containing magic_string, which indicates SAT commented them out
+        sed_cmd = fr"sed -i 's/^# {magic_string} //' {cron_file_path}"
+    else:
+        # Add magic_string to allow us to see which lines were commented out by SAT
+        sed_cmd = fr"sed -i 's/^\([^#]\)/# {magic_string} \1/' {cron_file_path}"
+
+    stdin, stdout, stderr = ssh_client.exec_command(sed_cmd)
+    exit_code = stdout.channel.recv_exit_status()
+    if exit_code:
+        raise FilesystemError(
+            f'Command "{sed_cmd}" failed to {("disable", "enable")[enabled]} '
+            f'cron job {cron_file_path} on {hostname}: {stderr.read()}'
+        )
+
+    LOGGER.info(f'Successfully {("disabled", "enabled")[enabled]} cron job '
+                f'{cron_file_path} on {hostname}.')
 
 
 def find_rbd_device_mounts(ssh_client, hostname):
@@ -56,8 +97,7 @@ def find_rbd_device_mounts(ssh_client, hostname):
         FilesystemError: if there is a problem listing RBD devices or mount points
 
     Returns:
-        list of RBDDeviceMount: the list of mounted RBD devices with their path
-            and mount point
+        list of str: the list of mount points where RBD devices are mounted
     """
     ssh_client.connect(hostname)
 
@@ -91,7 +131,7 @@ def find_rbd_device_mounts(ssh_client, hostname):
             continue
 
         LOGGER.info(f'Found mount of RBD device {device_path} at {rbd_mount_point} on {hostname}')
-        mounted_rbd_devices.append(RBDDeviceMount(device_path, rbd_mount_point))
+        mounted_rbd_devices.append(rbd_mount_point)
 
     return mounted_rbd_devices
 
@@ -137,10 +177,6 @@ def prepare_umount(ssh_client, hostname, mount_points):
 
     Raises:
         FilesystemError: if there is a problem listing RBD devices or mount points
-
-    Returns:
-        list of RBDDeviceMount: the list of mounted RBD devices with their path
-            and mount point
     """
     ssh_client.connect(hostname)
 
@@ -177,3 +213,110 @@ def prepare_umount(ssh_client, hostname, mount_points):
         else:
             LOGGER.debug('No mount points to unmount.')
             break
+
+
+def unmount_filesystems(ssh_client, hostname, mount_points):
+    """Unmount filesystems mounted at given mount points.
+
+    All given mount points are assumed not to be currently in use by running
+    processes. Unmounting will fail if filesystems are currently in use.
+
+    Args:
+        ssh_client (paramiko.SSHClient): the SSH client to use to connect to the host
+        hostname (str): the hostname to connect to
+        mount_points (list of str): the list of mount points to be unmounted
+
+    Raises:
+        FilesystemError: if there is an error unmounting any filesystems
+    """
+    ssh_client.connect(hostname)
+
+    failed_umounts = []
+
+    for mount_point in mount_points:
+        LOGGER.info(f'Unmounting {mount_point}')
+        umount_cmd = f'umount {mount_point}'
+        stdin, stdout, stderr = ssh_client.exec_command(umount_cmd)
+        exit_code = stdout.channel.recv_exit_status()
+
+        if exit_code:
+            LOGGER.error(f'{umount_cmd} failed with exit code {exit_code}: {stderr.read()}')
+            failed_umounts.append(mount_point)
+            continue
+
+        LOGGER.info(f'Successfully unmounted {mount_point}')
+
+    if failed_umounts:
+        raise FilesystemError(f'Failed to unmount {len(failed_umounts)}/{len(mount_points)} filesystems.')
+
+
+def unmap_rbd_devices(ssh_client, hostname):
+    """Unmap all RBD devices on the given host.
+
+    Args:
+        ssh_client (paramiko.SSHClient): the SSH client to use to connect to the host
+        hostname (str): the hostname to connect to
+
+    Raises:
+        FilesystemError: if there is a failure to unmap RBD devices
+    """
+    # Unmap RBD on ncn-m001
+    try:
+        # Execute rbdmap unmap-all command on ncn-m001
+        command = 'rbdmap unmap-all'
+        ssh_client.connect(hostname)
+        stdin, stdout, stderr = ssh_client.exec_command(command)
+        exit_status = stdout.channel.recv_exit_status()
+        if exit_status != 0:
+            raise FilesystemError(
+                f'Failed to unmap all RBD devices on {hostname}. Command '
+                f'"{command}" exited with exit code {exit_status}: {stderr.read()}')
+    except (SSHException, socket.error) as err:
+        raise FilesystemError(f'Error occurred while connecting to {hostname} or executing command: {err}')
+
+
+def do_ceph_umounts(ssh_client, hostname):
+    """Find all filesystems provided by Ceph and unmount them on the given host.
+
+    Find all filesystems which are backed by Ceph storage (filesystems of type
+    ceph or fuse.s3fs or filesystems on RBD devices), check whether the mounts
+    are in use, and then unmount the filesystems when the admin has stopped any
+    processes using the mount points.
+
+    Args:
+        ssh_client (paramiko.SSHClient): the SSH client to use to connect to ncn-m001
+        hostname (str): the hostname to connect to
+
+    Raises:
+        FilesystemError: if there is an error finding and unmounting filesystems.
+    """
+    inflector = engine()
+
+    fs_descriptor = 'mounted RBD device'
+    LOGGER.info(f'Finding {inflector.plural(fs_descriptor)} on {hostname}')
+    rbd_device_mounts = find_rbd_device_mounts(ssh_client, hostname)
+    LOGGER.info(f'Found {inflector.no(fs_descriptor, len(rbd_device_mounts))} on {hostname}')
+
+    fs_descriptor = 'mounted ceph or fuse.s3fs filesystem'
+    LOGGER.info(f'Finding {inflector.plural(fs_descriptor)} on {hostname}')
+    ceph_s3fs_mounts = find_ceph_and_s3fs_mounts(ssh_client, hostname)
+    LOGGER.info(f'Found {inflector.no(fs_descriptor, len(ceph_s3fs_mounts))} on {hostname}')
+
+    if not(rbd_device_mounts or ceph_s3fs_mounts):
+        return
+
+    LOGGER.info(f'Checking whether mounts are in use on {hostname}')
+    mount_points = ceph_s3fs_mounts + [r.mount_point for r in rbd_device_mounts]
+    prepare_umount(ssh_client, hostname, mount_points)
+
+    LOGGER.info(f'Disabling cronjob that ensures Ceph and s3fs filesystems are mounted.')
+    modify_ensure_ceph_mounts_cron_job(ssh_client, hostname, enabled=False)
+
+    fs_descriptor = f'{inflector.no("filesystem", len(mount_points))} on {hostname}'
+    LOGGER.info(f'Unmounting {fs_descriptor}')
+    unmount_filesystems(ssh_client, hostname, mount_points)
+    LOGGER.info(f'Successfully unmounted {fs_descriptor}')
+
+    LOGGER.info(f'Unmapping and unmounting RBD devices on {hostname}')
+    unmap_rbd_devices(ssh_client, hostname)
+    LOGGER.info(f'All RBD devices unmapped successfully on {hostname}')

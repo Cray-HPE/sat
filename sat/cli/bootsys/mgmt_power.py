@@ -34,6 +34,7 @@ import sys
 import inflect
 from paramiko.ssh_exception import BadHostKeyException, AuthenticationException, SSHException
 
+from sat.cli.bootsys.hostkeys import FilteredHostKeys
 from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger, ConsoleLoggingError
 from sat.cli.bootsys.util import get_and_verify_ncn_groups, get_ssh_client, FatalBootsysError
 from sat.cli.bootsys.platform import do_ceph_freeze, do_ceph_unfreeze, FatalPlatformError
@@ -158,7 +159,8 @@ class SSHAvailableWaiter(GroupWaiter):
     """
 
     def __init__(self, members, timeout, poll_interval=1):
-        self.ssh_client = get_ssh_client()
+        host_keys = FilteredHostKeys(hostnames=members)
+        self.ssh_client = get_ssh_client(host_keys=host_keys)
 
         super().__init__(members, timeout, poll_interval=poll_interval)
 
@@ -257,11 +259,10 @@ def finish_shutdown(hosts, username, password, ncn_shutdown_timeout, ipmi_timeou
             sys.exit(0)
 
 
-def do_mgmt_shutdown_power(ssh_client, username, password, excluded_ncns, ncn_shutdown_timeout, ipmi_timeout):
+def do_mgmt_shutdown_power(username, password, excluded_ncns, ncn_shutdown_timeout, ipmi_timeout):
     """Power off NCNs.
 
     Args:
-        ssh_client (paramiko.SSHClient): a paramiko client object.
         username (str): IPMI username to use.
         password (str): IPMI password to use.
         excluded_ncns (set of str): The set of NCN hostnames to exclude.
@@ -273,6 +274,10 @@ def do_mgmt_shutdown_power(ssh_client, username, password, excluded_ncns, ncn_sh
     except FatalBootsysError as err:
         LOGGER.error(f'Not proceeding with NCN power off: {err}')
         raise SystemExit(1)
+
+    all_ncn_hostnames = itertools.chain(*other_ncns_by_role.values())
+    host_keys = FilteredHostKeys(hostnames=all_ncn_hostnames)
+    ssh_client = get_ssh_client(host_keys=host_keys)
 
     # Shutdown workers
     worker_ncns = other_ncns_by_role.get('workers', [])
@@ -364,10 +369,8 @@ def do_power_off_ncns(args):
         prompt_continue(action_msg)
     username, password = get_username_and_password_interactively(username_prompt='IPMI username',
                                                                  password_prompt='IPMI password')
-    ssh_client = get_ssh_client()
-
     with BeginEndLogger(action_msg):
-        do_mgmt_shutdown_power(ssh_client, username, password, args.excluded_ncns,
+        do_mgmt_shutdown_power(username, password, args.excluded_ncns,
                                get_config_value('bootsys.ncn_shutdown_timeout'),
                                get_config_value('bootsys.ipmi_timeout'))
     LOGGER.info('Succeeded with {}.'.format(action_msg))
@@ -432,7 +435,8 @@ def do_power_on_ncns(args):
 
                         # Mount Ceph and S3FS filesystems on ncn-m001
                         try:
-                            ssh_client = get_ssh_client()
+                            host_keys = FilteredHostKeys(hostnames=['ncn-m001'])
+                            ssh_client = get_ssh_client(host_keys=host_keys)
                             mount_filesystems_on_ncn(ssh_client, 'ncn-m001')
                         except MountError as err:
                             LOGGER.error(f'Failed to mount filesystems on ncn-m001: {err}')
