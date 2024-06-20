@@ -47,7 +47,7 @@ def convert_ssh_exception(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         try:
-            func(*args, **kwargs)
+            return func(*args, **kwargs)
         except SSHException as err:
             raise FilesystemError(
                 f'Error executing command via SSH during {func.__name__}: '
@@ -142,7 +142,7 @@ def find_rbd_device_mounts(ssh_client, hostname):
         stdin, stdout, stderr = ssh_client.exec_command(findmnt_cmd)
         exit_code = stdout.channel.recv_exit_status()
 
-        rbd_mount_point = stdout.read()
+        rbd_mount_point = stdout.read().decode().strip()
         if exit_code or not rbd_mount_point:
             LOGGER.info(f'No mount of RBD device {device_path} found on {hostname}')
             continue
@@ -216,7 +216,7 @@ def check_mount_activity(ssh_client, hostname, mount_points):
             # lsof exits with zero exit status when mount point is in use
             mount_points_in_use = True
             LOGGER.info(f'Mount point {mount_point} is in use by the following processes on {hostname}:')
-            LOGGER.info(f'{stdout.read()}')
+            LOGGER.info(f'{stdout.read().decode()}')
 
         if mount_points_in_use:
             prompt_continue(
