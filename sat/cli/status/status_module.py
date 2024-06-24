@@ -410,7 +410,11 @@ class SLSStatusModule(StatusModule):
         sls_client = SLSClient(self.session)
 
         try:
-            sls_response = sls_client.get('hardware').json()
+            # Per SLSStatusModule.component_types, this module only applies to the Node type in
+            # HSM, for which the corresponding SLS type is comptype_node. In the future, if other
+            # types may have aliases that should be presented by `sat status`, this may need to be
+            # extended.
+            sls_response = sls_client.get('search', 'hardware', params={'type': 'comptype_node'}).json()
         except APIError as err:
             raise StatusModuleException(f'Could not query SLS for component aliases: {err}') from err
         except ValueError as err:
