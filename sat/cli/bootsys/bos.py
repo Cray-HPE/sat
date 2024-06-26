@@ -256,11 +256,11 @@ class BOSV2SessionWaiter(Waiter):
                 self.pct_successful = float(self.session_status['percent_successful'])
                 self.pct_failed = float(self.session_status['percent_failed'])
                 LOGGER.info(
-                    'Session %s: %.0f%% components succeeded, %.0f%% components failed',
+                    'Session %s: %.4f%% components succeeded, %.4f%% components failed',
                     self.bos_session_thread.session_id, self.pct_successful, self.pct_failed
                 )
 
-            if self.session_status['status'] in self.target_states:
+            if self.session_status['status'] in self.target_states or self.pct_successful >= 99:
                 if not self.session_status.get('managed_components_count'):
                     LOGGER.info(
                         'Session %s did not manage any components.',
@@ -651,7 +651,7 @@ def do_parallel_bos_operations(session_templates, operation, timeout, limit=None
 
         if thread.bos_session_status:
             LOGGER.info(
-                'Session %s: %.0f%% components succeeded, %.0f%% components failed',
+                'Session %s: %.4f%% components succeeded, %.4f%% components failed',
                 thread.session_id,
                 thread.bos_session_status['percent_successful'],
                 thread.bos_session_status['percent_failed']
