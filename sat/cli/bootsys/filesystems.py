@@ -27,12 +27,12 @@ Manage the mounting and unmounting of filesystems during shutdown and boot.
 import functools
 import json
 import logging
-import socket
 
 from inflect import engine
 from paramiko.ssh_exception import SSHException
 
 from sat.util import prompt_continue
+from sat.cli.bootsys.cron import CronJobError, modify_cron_job
 
 LOGGER = logging.getLogger(__name__)
 
@@ -50,8 +50,8 @@ def convert_ssh_exception(func):
             return func(*args, **kwargs)
         except SSHException as err:
             raise FilesystemError(
-                f'Error executing command via SSH during {func.__name__}: '
-                f'{err}') from err
+                f'Error executing command via SSH during {func.__name__}: {err}'
+            ) from err
 
     return wrapper
 
@@ -76,31 +76,10 @@ def modify_ensure_ceph_mounts_cron_job(ssh_client, hostname, enabled=False):
         FilesystemError: if there is an error executing the command to disable
             the automatic filesystem mounting job
     """
-    action = ('disable', 'enable')[enabled]
-    cron_file_path = '/etc/cron.d/ensure-ceph-mounts'
-
-    stdin, stdout, stderr = ssh_client.exec_command(f'test -e {cron_file_path}')
-    exit_code = stdout.channel.recv_exit_status()
-    if exit_code:
-        LOGGER.info(f'Cron job {cron_file_path} does not exist on {hostname}, '
-                    f'so it does not need to be {action}d')
-        return
-
-    magic_string = 'COMMENTED_BY_SAT'
-    if enabled:
-        # Only uncomment lines containing magic_string, which indicates SAT commented them out
-        sed_cmd = fr"sed -i 's/^# {magic_string} //' {cron_file_path}"
-    else:
-        # Add magic_string to allow us to see which lines were commented out by SAT
-        sed_cmd = fr"sed -i 's/^\([^#]\)/# {magic_string} \1/' {cron_file_path}"
-
-    stdin, stdout, stderr = ssh_client.exec_command(sed_cmd)
-    exit_code = stdout.channel.recv_exit_status()
-    if exit_code:
-        raise FilesystemError(
-            f'Command "{sed_cmd}" failed to {action} cron job {cron_file_path}'
-            f'on {hostname}: {stderr.read()}'
-        )
+    try:
+        modify_cron_job(ssh_client, hostname, '/etc/cron.d/ensure-ceph-mounts', enabled=enabled)
+    except CronJobError as err:
+        raise FilesystemError(str(err)) from err
 
 
 @convert_ssh_exception
