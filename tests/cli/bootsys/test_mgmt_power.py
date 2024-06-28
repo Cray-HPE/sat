@@ -41,6 +41,7 @@ from sat.waiting import WaitingFailure
 class TestSSHAvailableWaiter(unittest.TestCase):
     """Tests for the sat.cli.bootsys.mgmt_power.SSHAvailableWaiter class"""
     def setUp(self):
+        self.mock_filtered_host_keys = patch('sat.cli.bootsys.mgmt_power.FilteredHostKeys').start()
         self.mock_get_ssh_client = patch('sat.cli.bootsys.mgmt_power.get_ssh_client').start()
         self.mock_ssh_client = self.mock_get_ssh_client.return_value
         self.members = ['ncn-w002', 'ncn-s001']
@@ -52,7 +53,9 @@ class TestSSHAvailableWaiter(unittest.TestCase):
     def test_pre_wait_action_loads_keys(self):
         """Test the SSH waiter loads system host keys through get_ssh_client."""
         SSHAvailableWaiter(self.members, self.timeout).pre_wait_action()
-        self.mock_get_ssh_client.assert_called_once_with()
+        self.mock_get_ssh_client.assert_called_once_with(
+            host_keys=self.mock_filtered_host_keys.return_value
+        )
 
     def test_ssh_available(self):
         """Test the SSH waiter detects available nodes"""
