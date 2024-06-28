@@ -30,7 +30,7 @@ import socket
 import time
 import urllib3.exceptions
 from collections import namedtuple
-from multiprocessing import Process
+from multiprocessing import Process, Queue
 
 from csm_api_client.k8s import load_kube_api
 from kubernetes.client import BatchV1Api
@@ -60,7 +60,7 @@ LOGGER = logging.getLogger(__name__)
 # adding up to 15 seconds if they all time out.
 CONTAINER_STOP_SCRIPT = (
     'crictl ps -q | '
-    'timeout -s 9 5m xargs -n 3 -P 50 '
+    'timeout -s 9 5m xargs -n 1 -P 50 '
     'timeout -s 9 --foreground 15s crictl stop --timeout 5'
 )
 # Default timeout in seconds for service start/stop actions
@@ -228,7 +228,7 @@ class RemoteServiceWaiter(Waiter):
 
 class ContainerStopProcess(Process):
     """A process that will stop containers on hosts."""
-    def __init__(self, host, host_keys=None):
+    def __init__(self, host, host_keys=None, result_queue=None):
         """Create a process to stop containers in containerd on the given host.
 
         Args:
@@ -239,7 +239,7 @@ class ContainerStopProcess(Process):
         super().__init__()
         self.host = host
         self.host_keys = host_keys
-        self.success = False
+        self.result_queue = result_queue
 
     @cached_property
     def ssh_client(self):
@@ -297,7 +297,7 @@ class ContainerStopProcess(Process):
             SystemExit(1): unconditionally
         """
         LOGGER.error(err_msg)
-        self.success = False
+        self.result_queue.put((self.host, False))
         raise SystemExit(1)
 
     def _success_exit(self, info_msg):
@@ -310,7 +310,7 @@ class ContainerStopProcess(Process):
             SystemExit(0): unconditionally
         """
         LOGGER.info(info_msg)
-        self.success = True
+        self.result_queue.put((self.host, True))
         raise SystemExit(0)
 
     def _get_running_containers(self):
@@ -347,45 +347,51 @@ class ContainerStopProcess(Process):
                 with code 1. If it's successful, raises a SystemExit with a code 0.
                 This is used to stop the process.
         """
-        exit_status, stdout, stderr = self._run_remote_command('systemctl is-active containerd',
-                                                               err_on_non_zero=False)
-        if exit_status:
-            if 'inactive' in stdout:
-                self._success_exit(f'containerd is not active on {self.host} so '
-                                   f'there are no containers to stop.')
-            else:
-                self._err_exit(f'Failed to query if containerd is active. '
-                               f'stdout: {stdout}, stderr: {stderr}')
+        try:
+            while True:
+                exit_status, stdout, stderr = self._run_remote_command('systemctl is-active containerd',
+                                                                       err_on_non_zero=False)
+                if exit_status:
+                    if 'inactive' in stdout:
+                        self._success_exit(f'containerd is not active on {self.host} so '
+                                           f'there are no containers to stop.')
+                    else:
+                        self._err_exit(f'Failed to query if containerd is active. '
+                                       f'stdout: {stdout}, stderr: {stderr}')
 
-        running_containers = self._get_running_containers()
+                running_containers = self._get_running_containers()
 
-        if not running_containers:
-            self._success_exit(f'No containers to stop on {self.host}.')
+                if not running_containers:
+                    self._success_exit(f'No containers to stop on {self.host}.')
 
-        LOGGER.debug('The following containers were running before the stop attempt '
-                     'on %s: %s', self.host, running_containers)
+                LOGGER.debug('The following containers were running before the stop attempt '
+                             'on %s: %s', self.host, running_containers)
 
-        exit_status, stdout, stderr = self._run_remote_command(CONTAINER_STOP_SCRIPT,
-                                                               err_on_non_zero=False)
+                exit_status, stdout, stderr = self._run_remote_command(CONTAINER_STOP_SCRIPT,
+                                                                       err_on_non_zero=False)
 
-        stopped_containers = stdout.splitlines()
-        LOGGER.debug('The following containers were stopped successfully on %s: %s',
-                     self.host, stopped_containers)
+                stopped_containers = stdout.splitlines()
+                LOGGER.debug('The following containers were stopped successfully on %s: %s',
+                             self.host, stopped_containers)
 
-        if exit_status:
-            # This is most likely a timeout but not necessarily an error if
-            # containers have been stopped.
-            LOGGER.warning(f'One or more "crictl stop" commands timed out on {self.host}')
+                if exit_status:
+                    # This is most likely a timeout but not necessarily an error if
+                    # containers have been stopped.
+                    LOGGER.debug(f'One or more "crictl stop" commands timed out on {self.host}')
 
-        # Check and see if they've all been stopped.
-        running_containers = self._get_running_containers()
-        self.ssh_client.close()
+                # Check and see if they've all been stopped.
+                running_containers = self._get_running_containers()
 
-        if running_containers:
-            self._err_exit(f'Failed to stop {len(running_containers)} container(s) on {self.host}. '
-                           f'Execute "crictl ps -q" on the host to view running containers.')
-        else:
-            self._success_exit(f'All containers stopped on {self.host}.')
+                if running_containers:
+                    LOGGER.warning(f'Some containers are still running after stop attempt on {self.host}: '
+                                   f'{running_containers}')
+                    LOGGER.info(f'Retrying container stop procedure on {self.host}')
+                    time.sleep(1)
+                else:
+                    self._success_exit(f'All containers stopped on {self.host}.')
+
+        finally:
+            self.ssh_client.close()
 
 
 def do_service_action_on_hosts(hosts, service, target_state,
@@ -430,15 +436,22 @@ def do_stop_containers(ncn_groups):
     """
     k8s_ncns = ncn_groups['kubernetes']
     host_keys = FilteredHostKeys(hostnames=k8s_ncns)
+    result_queue = Queue()
     # This currently stops all containers in parallel before stopping containerd
     # on each ncn in parallel.  It probably could be faster if it was all in parallel.
-    container_stop_processes = [ContainerStopProcess(ncn, host_keys=host_keys) for ncn in k8s_ncns]
+    container_stop_processes = [ContainerStopProcess(ncn, host_keys=host_keys, result_queue=result_queue)
+                                for ncn in k8s_ncns]
     for process in container_stop_processes:
         process.start()
     for process in container_stop_processes:
         process.join()
 
-    failed_ncns = [process.host for process in container_stop_processes if not process.success]
+    failed_ncns = []
+    while not result_queue.empty():
+        host, success = result_queue.get()
+        if not success:
+            failed_ncns.append(host)
+
     if failed_ncns:
         raise NonFatalPlatformError(f'Failed to stop containers on the following NCN(s): '
                                     f'{", ".join(failed_ncns)}')

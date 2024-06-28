@@ -31,6 +31,8 @@ import unittest
 from argparse import Namespace
 from contextlib import contextmanager
 from unittest import mock
+from multiprocessing import Process, Queue
+import queue
 
 from paramiko import SSHException
 
@@ -59,8 +61,10 @@ class TestContainerStopProcess(unittest.TestCase):
         self.host = 'ncn-w001'
         self.get_ssh_client = mock.patch('sat.cli.bootsys.platform.get_ssh_client').start()
         self.ssh_client = self.get_ssh_client.return_value
-
-        self.cst = ContainerStopProcess(self.host)
+        # Replace sleep with a Mock to decrease the execution time of tests
+        self.mock_sleep = mock.patch('time.sleep').start()
+        self.result_queue = Queue()
+        self.csp = ContainerStopProcess(self.host, result_queue=self.result_queue)
 
     def tearDown(self):
         mock.patch.stopall()
@@ -85,7 +89,16 @@ class TestContainerStopProcess(unittest.TestCase):
             with self.assertLogs(level=log_level) as logs_cm:
                 yield logs_cm
 
-        self.assertFalse(self.cst.success)
+        try:
+            # We have to use a blocking call with a small timeout. See https://bugs.python.org/issue20147
+            host, success = self.result_queue.get(timeout=0.01)
+        except queue.Empty:
+            self.fail('Expected a failure result from ContainerStopProcess '
+                      'but received no results.')
+
+        self.assertEqual(self.host, host)
+        self.assertFalse(success)
+
         err_log_records = [record for record in logs_cm.records
                            if record.levelno == logging.ERROR]
         self.assertEqual(1, len(err_log_records))
@@ -106,7 +119,16 @@ class TestContainerStopProcess(unittest.TestCase):
             with self.assertLogs(level=logging.INFO) as logs_cm:
                 yield logs_cm
 
-        self.assertTrue(self.cst.success)
+        try:
+            # We have to use a blocking call with a small timeout. See https://bugs.python.org/issue20147
+            host, success = self.result_queue.get(timeout=0.01)
+        except queue.Empty:
+            self.fail('Expected a successful result from ContainerStopProcess '
+                      'but received no results.')
+
+        self.assertEqual(self.host, host)
+        self.assertTrue(success)
+
         info_log_records = [record for record in logs_cm.records
                             if record.levelno == logging.INFO]
         self.assertEqual(1, len(info_log_records))
@@ -115,29 +137,31 @@ class TestContainerStopProcess(unittest.TestCase):
 
     def test_init(self):
         """Test the creation of a new ContainerStopProcess."""
-        self.assertEqual(self.host, self.cst.host)
-        self.assertFalse(self.cst.success)
+        self.assertEqual(self.host, self.csp.host)
+        # Result queue should be empty before run is called
+        with self.assertRaises(queue.Empty):
+            self.result_queue.get(block=False)
 
     def test_err_exit(self):
-        """Test the _err_exit method logs an error, raises SystemExit(1), and sets success to False."""
+        """Test the _err_exit method logs an error, raises SystemExit(1), and adds result to queue."""
         err_msg = 'error message'
         with self.assert_exits_with_err(err_msg):
-            self.cst._err_exit(err_msg)
+            self.csp._err_exit(err_msg)
 
     def test_success_exit(self):
-        """Test the _success_exit method logs info msg, raises SystemExit(0), and sets success to True"""
+        """Test the _success_exit method logs info msg, raises SystemExit(0), and adds result to queue"""
         info_msg = 'all done'
         with self.assert_exits_successfully(info_msg):
-            self.cst._success_exit(info_msg)
+            self.csp._success_exit(info_msg)
 
     def test_ssh_client_success(self):
         """Test the ssh_client property of ContainerStopProcess."""
-        ssh_client = self.cst.ssh_client
+        ssh_client = self.csp.ssh_client
         self.assertEqual(self.ssh_client, ssh_client)
         self.assert_ssh_connected()
         # Check that the property is cached by accessing it again and verifying
         # that the SSHClient and its methods are not called again.
-        _ = self.cst.ssh_client
+        _ = self.csp.ssh_client
         # The below assertion uses assert_called_once_with, which will fail if
         # methods are called multiple times.
         self.assert_ssh_connected()
@@ -147,7 +171,7 @@ class TestContainerStopProcess(unittest.TestCase):
         self.ssh_client.connect.side_effect = SSHException('ssh failed')
 
         with self.assert_exits_with_err(f'Failed to connect to host {self.host}: ssh failed'):
-            _ = self.cst.ssh_client
+            _ = self.csp.ssh_client
 
         self.assert_ssh_connected()
 
@@ -155,7 +179,7 @@ class TestContainerStopProcess(unittest.TestCase):
         """Test the ssh_client property when socket.error is raised by connect."""
         self.ssh_client.connect.side_effect = socket.error
         with self.assert_exits_with_err(f'Failed to connect to host {self.host}: '):
-            _ = self.cst.ssh_client
+            _ = self.csp.ssh_client
 
         self.assert_ssh_connected()
 
@@ -181,7 +205,7 @@ class TestContainerStopProcess(unittest.TestCase):
         self.set_up_mock_exec_command(0, b'containerid1\ncontainerid2\n', b'')
         command = 'crictl ps -q'
 
-        exit_status, stdout, stderr = self.cst._run_remote_command(command)
+        exit_status, stdout, stderr = self.csp._run_remote_command(command)
 
         self.ssh_client.exec_command.assert_called_once_with(command)
         self.assertEqual(0, exit_status)
@@ -194,7 +218,7 @@ class TestContainerStopProcess(unittest.TestCase):
         command = 'crictl ps -q'
 
         with self.assert_exits_with_err(f'Failed to execute {command} on {self.host}: ssh failure'):
-            self.cst._run_remote_command(command)
+            self.csp._run_remote_command(command)
 
         self.ssh_client.exec_command.assert_called_once_with(command)
 
@@ -206,7 +230,7 @@ class TestContainerStopProcess(unittest.TestCase):
                    f'stdout: , stderr: containerd down')
 
         with self.assert_exits_with_err(err_msg):
-            self.cst._run_remote_command(command)
+            self.csp._run_remote_command(command)
 
         self.ssh_client.exec_command.assert_called_once_with(command)
 
@@ -215,7 +239,7 @@ class TestContainerStopProcess(unittest.TestCase):
         self.set_up_mock_exec_command(1, b'okay', b'just a warning')
         command = 'failing_command'
 
-        exit_status, stdout, stderr = self.cst._run_remote_command(command, err_on_non_zero=False)
+        exit_status, stdout, stderr = self.csp._run_remote_command(command, err_on_non_zero=False)
 
         self.ssh_client.exec_command.assert_called_once_with(command)
         self.assertEqual(1, exit_status)
@@ -231,9 +255,9 @@ class TestContainerStopProcess(unittest.TestCase):
             'f3575f8e17f1455d183b5464fe67aa478ea1dfe8d4c358400c13f3e8c2653f91'
         ]
 
-        with mock.patch.object(self.cst, '_run_remote_command') as mock_run:
+        with mock.patch.object(self.csp, '_run_remote_command') as mock_run:
             mock_run.return_value = 0, '\n'.join(container_ids), ''
-            running_containers = self.cst._get_running_containers()
+            running_containers = self.csp._get_running_containers()
 
         self.assertEqual(container_ids, running_containers)
 
@@ -266,116 +290,138 @@ class TestContainerStopProcess(unittest.TestCase):
                 # Unknown command, fail
                 self.fail(f'_run_remote_command called with unexpected command "{command}"')
 
-        mock_run = mock.patch.object(self.cst, '_run_remote_command').start()
+        mock_run = mock.patch.object(self.csp, '_run_remote_command').start()
         mock_run.side_effect = fake_run_remote_command
 
     def test_run_success(self):
         """Test run method in the successful case."""
         self.set_up_mock_run_remote_command()
-        mock_get_containers = mock.patch.object(self.cst, '_get_running_containers').start()
+        mock_get_containers = mock.patch.object(self.csp, '_get_running_containers').start()
         # On first call, containers are running; on second call, there are none
         mock_get_containers.side_effect = [['a', 'b', 'c'], []]
 
         with self.assert_exits_successfully(f'All containers stopped on {self.host}.'):
-            self.cst.run()
+            self.csp.run()
 
         self.assertEqual(
             [mock.call('systemctl is-active containerd', err_on_non_zero=False),
              mock.call(CONTAINER_STOP_SCRIPT, err_on_non_zero=False)],
-            self.cst._run_remote_command.mock_calls
+            self.csp._run_remote_command.mock_calls
         )
         self.assertEqual([mock.call()] * 2, mock_get_containers.mock_calls)
 
     def test_run_containerd_inactive(self):
         """Test run method when containerd is inactive."""
-        self.set_up_mock_run_remote_command()
-        mock_get_containers = mock.patch.object(self.cst, '_get_running_containers').start()
+        mock_get_containers = mock.patch.object(self.csp, '_get_running_containers').start()
         self.set_up_mock_run_remote_command(containerd_active=False)
 
         with self.assert_exits_successfully(f'containerd is not active on {self.host} so '
                                             f'there are no containers to stop.'):
-            self.cst.run()
+            self.csp.run()
 
-        self.cst._run_remote_command.assert_called_once_with('systemctl is-active containerd',
+        self.csp._run_remote_command.assert_called_once_with('systemctl is-active containerd',
                                                              err_on_non_zero=False)
         mock_get_containers.assert_not_called()
 
     def test_run_systemctl_failure(self):
         """Test run method when containerd fails to query whether containerd is active."""
-        self.set_up_mock_run_remote_command()
-        mock_get_containers = mock.patch.object(self.cst, '_get_running_containers').start()
+        mock_get_containers = mock.patch.object(self.csp, '_get_running_containers').start()
         self.set_up_mock_run_remote_command(systemctl_fail=True)
 
         with self.assert_exits_with_err(f'Failed to query if containerd is active. '
                                         f'stdout: , stderr: error'):
-            self.cst.run()
+            self.csp.run()
 
         self.assertEqual(
             [mock.call('systemctl is-active containerd', err_on_non_zero=False)],
-            self.cst._run_remote_command.mock_calls
+            self.csp._run_remote_command.mock_calls
         )
         mock_get_containers.assert_not_called()
 
     def test_run_no_running_containers(self):
         """Test run method when there are no running containers."""
         self.set_up_mock_run_remote_command()
-        mock_get_containers = mock.patch.object(self.cst, '_get_running_containers').start()
+        mock_get_containers = mock.patch.object(self.csp, '_get_running_containers').start()
         # On first call, no containers are running
         mock_get_containers.return_value = []
 
         with self.assert_exits_successfully(f'No containers to stop on {self.host}.'):
-            self.cst.run()
+            self.csp.run()
 
         self.assertEqual(
             [mock.call('systemctl is-active containerd', err_on_non_zero=False)],
-            self.cst._run_remote_command.mock_calls
+            self.csp._run_remote_command.mock_calls
         )
         mock_get_containers.assert_called_once_with()
 
     def test_run_timeout_all_containers_stopped(self):
         """Test run method when the stop command times out, but no containers remain running."""
         self.set_up_mock_run_remote_command(stop_timeout=True)
-        mock_get_containers = mock.patch.object(self.cst, '_get_running_containers').start()
+        mock_get_containers = mock.patch.object(self.csp, '_get_running_containers').start()
         # On first call, containers are running; on second call, there are none
         mock_get_containers.side_effect = [['a', 'b', 'c'], []]
 
         with self.assert_exits_successfully(f'All containers stopped on {self.host}.') as logs_cm:
-            self.cst.run()
+            self.csp.run()
 
         self.assertEqual(
             [mock.call('systemctl is-active containerd', err_on_non_zero=False),
              mock.call(CONTAINER_STOP_SCRIPT, err_on_non_zero=False)],
-            self.cst._run_remote_command.mock_calls
+            self.csp._run_remote_command.mock_calls
         )
-        warnings = [record for record in logs_cm.records if record.levelno == logging.WARNING]
-        self.assertEqual(1, len(warnings))
-        self.assertEqual(f'One or more "crictl stop" commands timed out on {self.host}',
-                         warnings[0].message)
         self.assertEqual([mock.call()] * 2, mock_get_containers.mock_calls)
 
-    def test_run_timeout_running_containers_exist(self):
-        """Test run method when the stop command times out, and containers remain running."""
-        self.set_up_mock_run_remote_command(stop_timeout=True)
-        mock_get_containers = mock.patch.object(self.cst, '_get_running_containers').start()
-        # On first call, 3 containers are running; on second call, one remains
-        mock_get_containers.side_effect = [['a', 'b', 'c'], ['c']]
+    def test_run_retry_stops_remaining_containers(self):
+        """Test run method when some containers remain running initially and are stopped in subsequent retries."""
+        # Create a mock for _get_running_containers method
+        mock_get_containers = mock.patch.object(self.csp, '_get_running_containers').start()
 
-        err_msg = (f'Failed to stop 1 container(s) on {self.host}. Execute "crictl ps -q" '
-                   f'on the host to view running containers.')
+        # Define the side effects for _get_running_containers:
+        # - On the first call, 4 containers ('a', 'b', 'c', 'd') are running
+        # - On the second call, 2 containers ('c', 'd') remain running
+        # - On the third call, 2 containers ('c', 'd') remain running
+        # - On the fourth call, no containers are running
+        mock_get_containers.side_effect = [['a', 'b', 'c', 'd'], ['c', 'd'], ['c', 'd'], []]
 
-        with self.assert_exits_with_err(err_msg, log_level=logging.WARNING) as logs_cm:
-            self.cst.run()
+        # Mock the _run_remote_command method
+        mock_run_command = mock.patch.object(self.csp, '_run_remote_command').start()
 
+        # Set up the side effects for _run_remote_command:
+        mock_run_command.side_effect = [
+            (0, 'active\n', ''),
+            (1, 'a\nb', ''),
+            (0, 'active\n', ''),
+            (0, 'c\nd', '')
+        ]
+
+        # Run the container stop process
+        with self.assertRaises(SystemExit) as raises_cm:
+            with self.assertLogs(level=logging.INFO) as logs_cm:
+                self.csp.run()
+
+        self.assertEqual(0, raises_cm.exception.code)
+        info_logs = [record for record in logs_cm.records if record.levelno == logging.INFO]
+        warning_logs = [record for record in logs_cm.records if record.levelno == logging.WARNING]
+        self.assertEqual(f'Retrying container stop procedure on {self.host}',
+                         info_logs[0].message)
+        self.assertEqual(f'All containers stopped on {self.host}.',
+                         info_logs[1].message)
+        self.assertEqual(f"Some containers are still running after stop attempt on {self.host}: ['c', 'd']",
+                         warning_logs[0].message)
+
+        # The while loop in the run method executes twice, and in each iteration:
+        # - First call checks if containerd is active
+        # - Second call attempts to stop the containers
         self.assertEqual(
             [mock.call('systemctl is-active containerd', err_on_non_zero=False),
+             mock.call(CONTAINER_STOP_SCRIPT, err_on_non_zero=False),
+             mock.call('systemctl is-active containerd', err_on_non_zero=False),
              mock.call(CONTAINER_STOP_SCRIPT, err_on_non_zero=False)],
-            self.cst._run_remote_command.mock_calls
+            mock_run_command.mock_calls
         )
-        warnings = [record for record in logs_cm.records if record.levelno == logging.WARNING]
-        self.assertEqual(1, len(warnings))
-        self.assertEqual(f'One or more "crictl stop" commands timed out on {self.host}',
-                         warnings[0].message)
-        self.assertEqual([mock.call()] * 2, mock_get_containers.mock_calls)
+
+        # Verify that _get_running_containers was called four times
+        self.assertEqual([mock.call()] * 4, mock_get_containers.mock_calls)
 
 
 class TestRemoteServiceWaiter(unittest.TestCase):
@@ -730,18 +776,23 @@ class TestDoStopContainers(unittest.TestCase):
         self.k8s_ncns = ['ncn-w001', 'ncn-w002', 'ncn-w003', 'ncn-m001', 'ncn-m002']
         self.failed_ncns = failed_ncns = []
 
+        # Use Thread to avoid issues pickling the mocked class when using Process
+        # Their interfaces are similar enough that it works.
         class MockContainerStopProcess(threading.Thread):
             """Mock the ContainerStopProcess for these tests."""
 
-            def __init__(self, host, host_keys):
+            def __init__(self, host, host_keys, result_queue):
                 super().__init__()
                 self.host = host
                 self.success = False
+                self.result_queue = result_queue
 
             def run(self):
                 self.success = self.host not in failed_ncns
+                self.result_queue.put((self.host, self.success))
 
         self.ncn_groups = {'kubernetes': self.k8s_ncns}
+        self.result_queue = Queue()
         mock.patch('sat.cli.bootsys.platform.ContainerStopProcess', MockContainerStopProcess).start()
         self.mock_host_keys = mock.patch('sat.cli.bootsys.platform.FilteredHostKeys').start()
 
@@ -750,16 +801,23 @@ class TestDoStopContainers(unittest.TestCase):
 
     def test_do_stop_containers_threads_executed(self):
         """Test that do_stop_containers calls thread methods appropriately."""
-        mock_threads = [mock.Mock(host=ncn, success=True) for ncn in self.k8s_ncns]
+        mock_procs = [mock.Mock(host=ncn, success=True, result_queue=self.result_queue)
+                      for ncn in self.k8s_ncns]
 
-        with mock.patch('sat.cli.bootsys.platform.ContainerStopProcess') as mock_cst:
-            mock_cst.side_effect = mock_threads
-            do_stop_containers(self.ncn_groups)
+        with mock.patch('sat.cli.bootsys.platform.Queue') as mock_queue_cls:
+            # Replace the queue so we can assert the calls to create each ContainerStopProcess
+            mock_queue_cls.return_value = self.result_queue
+            with mock.patch('sat.cli.bootsys.platform.ContainerStopProcess') as mock_csp:
+                mock_csp.side_effect = mock_procs
+                do_stop_containers(self.ncn_groups)
 
-        self.assertEqual([mock.call(ncn, host_keys=self.mock_host_keys.return_value) for ncn in self.k8s_ncns],
-                         mock_cst.mock_calls)
-        for mock_thread in mock_threads:
-            self.assertEqual([mock.call.start(), mock.call.join()], mock_thread.mock_calls)
+        self.assertEqual(
+            [mock.call(ncn, host_keys=self.mock_host_keys.return_value, result_queue=self.result_queue)
+             for ncn in self.k8s_ncns],
+            mock_csp.mock_calls
+        )
+        for mock_proc in mock_procs:
+            self.assertEqual([mock.call.start(), mock.call.join()], mock_proc.mock_calls)
 
     def test_do_stop_containers_successful(self):
         """Test a do_stop_containers with all successful."""
