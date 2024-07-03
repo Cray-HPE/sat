@@ -189,12 +189,12 @@ class StatusModule(ABC):
         return True
 
     @classmethod
-    def get_relevant_modules(cls, component_type=None, limit_modules=None):
-        """Get a list of relevant modules for some component type.
+    def get_relevant_modules(cls, component_types, limit_modules=None):
+        """Get a list of relevant modules for some component type(s).
 
         Args:
-            component_type (None or str): if None, return all modules. If a str,
-                return modules relevant to the given component type.
+            component_types (list of str): return modules relevant to the
+                given list of component types.
             limit_modules (None or list): if None, return all modules relevant to the
                 given `component_type`. If a list, return a subset of the given
                 modules relevant to the given `component_type`.
@@ -204,15 +204,15 @@ class StatusModule(ABC):
         """
         modules = cls.modules() if limit_modules is None else limit_modules
 
-        if component_type is not None:
-            return [module for module in modules
-                    if module.can_use()[0] and
-                    (not module.component_types or component_type in module.component_types)]
-        return modules
+        return [module for module in modules
+                if module.can_use()[0] and
+                (not module.component_types or
+                 any(component_type in module.component_types
+                     for component_type in component_types))]
 
     @classmethod
     def get_all_headings(cls, primary_key, limit_modules=None, initial_headings=None, component_type=None):
-        """Get a list of headings applicable to the given modules and component types.
+        """Get a list of headings applicable to the given modules and component type.
 
         Headings from modules are filtered based on their `include_headings`
         method.
@@ -228,13 +228,14 @@ class StatusModule(ABC):
                 placed at the beginning of the list following the primary key.
                 Headings are not repeated.
             component_type (None or str): if None, return all headings from all
-                modules. If a list, return the subset of headings from modules
+                modules. If a str, return the subset of headings from modules
                 relevant to the given component type.
 
         Returns:
             [str]: the applicable headings
         """
-        modules = cls.get_relevant_modules(limit_modules=limit_modules, component_type=component_type)
+        modules = cls.get_relevant_modules(component_types=[component_type],
+                                           limit_modules=limit_modules)
         if not modules:
             return []
 
@@ -269,7 +270,8 @@ class StatusModule(ABC):
         return primaries.pop()
 
     @classmethod
-    def get_populated_rows(cls, *, primary_key, session, limit_modules=None, primary_key_type=str, **kwargs):
+    def get_populated_rows(cls, *, primary_key, session, component_types, limit_modules=None,
+                           primary_key_type=str, **kwargs):
         """Return a list of rows joining data from all defined modules.
 
         Additional keyword arguments are passed through to StatusModule
@@ -286,6 +288,7 @@ class StatusModule(ABC):
             primary_key_type (str -> Any): a callable (or type) which takes a string
                 and returns an object. The primary key of the populated rows
                 will have this type.
+            component_types (list of str): the list of component types to get data for
 
         Returns:
             [dict]: data from the status modules as described above,
@@ -294,13 +297,15 @@ class StatusModule(ABC):
         items_by_primary_key = defaultdict(dict)
         primary_module = cls.get_primary()
 
-        modules = cls.get_relevant_modules(limit_modules=limit_modules)
+        modules = cls.get_relevant_modules(component_types=component_types,
+                                           limit_modules=limit_modules)
         if primary_module not in modules:
             modules = [primary_module, *modules]
 
         for module in sorted(modules, key=cls._module_index):
             module_instance = module(session=session,
                                      primary_keys=items_by_primary_key.keys(),
+                                     component_types=component_types,
                                      **kwargs)
 
             try:
@@ -405,7 +410,11 @@ class SLSStatusModule(StatusModule):
         sls_client = SLSClient(self.session)
 
         try:
-            sls_response = sls_client.get('hardware').json()
+            # Per SLSStatusModule.component_types, this module only applies to the Node type in
+            # HSM, for which the corresponding SLS type is comptype_node. In the future, if other
+            # types may have aliases that should be presented by `sat status`, this may need to be
+            # extended.
+            sls_response = sls_client.get('search', 'hardware', params={'type': 'comptype_node'}).json()
         except APIError as err:
             raise StatusModuleException(f'Could not query SLS for component aliases: {err}') from err
         except ValueError as err:

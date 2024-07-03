@@ -25,6 +25,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.21.12] - 2024-07-03
+
+### Fixed
+- Fixed issue where `sat status` made unnecessary queries to BOS, CFS, and SLS
+  APIs when types other than `Node` were specified.
+- Fixed issue in `sat status` to limit SLS query to only node-type components,
+  which is the only component type where SLS data is used.
+
 ## [3.21.11] - 2024-06-11
 
 ### Fixed
