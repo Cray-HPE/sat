@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -255,10 +255,16 @@ class BOSV2SessionWaiter(Waiter):
                 # Only log progress update when components succeed or fail
                 self.pct_successful = float(self.session_status['percent_successful'])
                 self.pct_failed = float(self.session_status['percent_failed'])
-                LOGGER.info(
-                    'Session %s: %.0f%% components succeeded, %.0f%% components failed',
-                    self.bos_session_thread.session_id, self.pct_successful, self.pct_failed
-                )
+                if 99 < self.pct_successful < 100:
+                    LOGGER.info(
+                        'Session %s: %.6f%% components succeeded, %.2f%% components failed',
+                        self.bos_session_thread.session_id, self.pct_successful, self.pct_failed
+                    )
+                else:
+                    LOGGER.info(
+                        'Session %s: %.2f%% components succeeded, %.2f%% components failed',
+                        self.bos_session_thread.session_id, self.pct_successful, self.pct_failed
+                    )
 
             if self.session_status['status'] in self.target_states:
                 if not self.session_status.get('managed_components_count'):
@@ -651,7 +657,7 @@ def do_parallel_bos_operations(session_templates, operation, timeout, limit=None
 
         if thread.bos_session_status:
             LOGGER.info(
-                'Session %s: %.0f%% components succeeded, %.0f%% components failed',
+                'Session %s: %.2f%% components succeeded, %.2f%% components failed',
                 thread.session_id,
                 thread.bos_session_status['percent_successful'],
                 thread.bos_session_status['percent_failed']
