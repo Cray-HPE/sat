@@ -25,6 +25,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.28.10] - 2024-07-04
+
+### Security
+- Update the version of requests from 2.31.0 to 2.32.2 to address CVE-2024-35195
+- Update the version of urllib3 from 1.26.18 to 1.26.19 to address CVE-2024-37891
+
 ## [3.28.9] - 2024-07-04
 
 ### Security
