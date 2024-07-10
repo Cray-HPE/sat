@@ -25,6 +25,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.28.11] - 2024-07-09
+
+### Security
+- Update the version of certifi from 2023.7.22 to 2024.7.4 to address CVE-2024-39689
+
 ## [3.28.10] - 2024-07-04
 
 ### Security
