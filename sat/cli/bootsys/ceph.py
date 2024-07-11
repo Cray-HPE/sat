@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -151,7 +151,8 @@ def validate_ceph_warning_state(ceph_check_data, allow_osdmap_flags=True):
     Raises:
         CephHealthCheckError: if Ceph is not healthy.
     """
-    acceptable_checks = ['LARGE_OMAP_OBJECTS', 'TOO_FEW_PGS', 'POOL_NEAR_FULL', 'OSD_NEARFULL', 'OSDMAP_FLAGS']
+    acceptable_checks = ['LARGE_OMAP_OBJECTS', 'TOO_FEW_PGS', 'POOL_NEAR_FULL', 'OSD_NEARFULL', 'OSDMAP_FLAGS',
+                         'PG_NOT_DEEP_SCRUBBED']
     unacceptable_checks_found = [check for check in ceph_check_data if check not in acceptable_checks]
     if unacceptable_checks_found:
         raise CephHealthCheckError(
