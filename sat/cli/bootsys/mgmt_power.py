@@ -33,7 +33,7 @@ import subprocess
 import sys
 
 import inflect
-from paramiko.ssh_exception import BadHostKeyException, AuthenticationException, SSHException
+from paramiko.ssh_exception import SSHException
 
 from sat.cli.bootsys.filesystems import FilesystemError, do_ceph_unmounts, modify_ensure_ceph_mounts_cron_job
 from sat.cli.bootsys.hostkeys import FilteredHostKeys
@@ -161,7 +161,8 @@ class SSHAvailableWaiter(GroupWaiter):
     """
 
     def __init__(self, members, timeout, poll_interval=1):
-        self.ssh_client = get_ssh_client()
+        host_keys = FilteredHostKeys(hostnames=members)
+        self.ssh_client = get_ssh_client(host_keys=host_keys)
 
         super().__init__(members, timeout, poll_interval=poll_interval)
 
@@ -202,8 +203,7 @@ def start_shutdown(hosts, ssh_client):
         LOGGER.info('Executing command on host "%s": `%s`', host, REMOTE_CMD)
         try:
             ssh_client.connect(host)
-        except (BadHostKeyException, AuthenticationException,
-                SSHException, socket.error) as err:
+        except (SSHException, socket.error) as err:
             LOGGER.warning('Unable to connect to host "%s": %s', host, err)
             continue
 
@@ -428,7 +428,8 @@ def do_power_on_ncns(args):
 
                         # Mount Ceph and S3FS filesystems on ncn-m001
                         try:
-                            ssh_client = get_ssh_client()
+                            host_keys = FilteredHostKeys(hostnames=['ncn-m001'])
+                            ssh_client = get_ssh_client(host_keys=host_keys)
                             mount_filesystems_on_ncn(ssh_client, 'ncn-m001')
                         except MountError as err:
                             LOGGER.error(f'Failed to mount filesystems on ncn-m001: {err}')
