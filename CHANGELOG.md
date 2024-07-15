@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fixed a traceback that occurs during the `bos-operations` stage of `sat
   bootsys` if the BOS API fails to create a BOS session.
+- Fixed the prompt in the `bos-operations` stage of `sat bootsys shutdown` and
+  `sat bootsys reboot` to say "nodes" rather than "compute nodes and UANs",
+  which is not always accurate.
 
 ## [3.28.11] - 2024-07-09
 

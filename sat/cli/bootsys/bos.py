@@ -888,7 +888,7 @@ def do_bos_shutdowns(args):
     Returns: None
     """
     if not (args.disruptive or args.staged_session):
-        prompt_continue('shutdown of compute nodes and UANs using BOS')
+        prompt_continue('shutdown of nodes using BOS')
 
     try:
         do_bos_operations('shutdown', get_config_value('bootsys.bos_shutdown_timeout'),
@@ -925,7 +925,7 @@ def do_bos_reboots(args: Namespace):
     Returns: None
     """
     if not (args.disruptive or args.staged_session):
-        prompt_continue('reboot of compute nodes and UANs using BOS')
+        prompt_continue('reboot of nodes using BOS')
 
     try:
         do_bos_operations(
