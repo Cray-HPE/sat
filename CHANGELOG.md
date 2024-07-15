@@ -50,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the `platform-services` stage.
 - Adding PG_NOT_DEEP_SCRUBBED in allowable checks excluded during ceph health check as it is
   ignorable. 
+- Automate the procedure of setting next boot device to disk before the management nodes are
+  powered off as part of the full-system shutdown.
 
 ### Fixed
 - Updated `sat bootsys` to increase the default management NCN shutdown timeout

@@ -31,6 +31,7 @@ import shlex
 import socket
 import subprocess
 import sys
+import re
 
 import inflect
 from paramiko.ssh_exception import SSHException
@@ -260,6 +261,56 @@ def finish_shutdown(hosts, username, password, ncn_shutdown_timeout, ipmi_timeou
             sys.exit(0)
 
 
+def set_next_boot_device_to_disk(ssh_client, ncns):
+    """
+    Set the next boot device to a disk for a list of nodes via SSH.
+
+    This function connects to each node via SSH, retrieves the current boot order, identifies the first available disk,
+    and sets the next boot device to the specified disk.
+
+    Args:
+        ssh_client (paramiko.SSHClient): An active SSH client used to connect to the nodes.
+        ncns (list): A list of node names (NCNs) to configure.
+    """
+    command = 'efibootmgr'
+
+    for ncn in ncns:
+        try:
+            ssh_client.connect(ncn)
+        except (SSHException, socket.error) as err:
+            LOGGER.warning(f'Unable to connect to node {ncn}: {err}')
+            continue
+
+        try:
+            _, stdout, stderr = ssh_client.exec_command(command)
+            exit_code = stdout.channel.recv_exit_status()
+            if exit_code != 0:
+                LOGGER.warning(f'Unable to determine boot order of {ncn}, {command} exited with exit code {exit_code}')
+                continue
+
+            boot_order = stdout.read().decode()
+            match = re.search(r'^Boot([0-9A-Fa-f]{4})\*?\s.*UEFI OS', boot_order, re.MULTILINE)
+            if not match:
+                LOGGER.warning(f'No disk boot entries found for {ncn}')
+                continue
+
+            next_boot = match.group(1)
+
+            # Set the next boot device
+            next_boot_disk = f'efibootmgr -n {next_boot}'
+            _, stdout, stderr = ssh_client.exec_command(next_boot_disk)
+            exit_code = stdout.channel.recv_exit_status()
+            if exit_code != 0:
+                LOGGER.warning(f'Failed to set next boot device for {ncn}, {next_boot_disk} exited with exit code '
+                               f'{exit_code}')
+                continue
+
+            LOGGER.info(f'Successfully set next boot device to disk (Boot{next_boot}) for {ncn}')
+
+        finally:
+            ssh_client.close()
+
+
 def do_mgmt_shutdown_power(username, password, excluded_ncns, ncn_shutdown_timeout, ipmi_timeout):
     """Power off NCNs.
 
@@ -283,6 +334,7 @@ def do_mgmt_shutdown_power(username, password, excluded_ncns, ncn_shutdown_timeo
     # Shutdown workers
     worker_ncns = other_ncns_by_role.get('workers', [])
     if worker_ncns:
+        set_next_boot_device_to_disk(ssh_client, worker_ncns)
         try:
             with IPMIConsoleLogger(worker_ncns, username, password):
                 LOGGER.info(f'Shutting down worker NCNs: {", ".join(worker_ncns)}')
@@ -300,6 +352,8 @@ def do_mgmt_shutdown_power(username, password, excluded_ncns, ncn_shutdown_timeo
     # Shutdown managers (except ncn-m001)
     manager_ncns = other_ncns_by_role.get('managers', [])
     if manager_ncns:
+        set_next_boot_device_to_disk(ssh_client, ['ncn-m001'])
+        set_next_boot_device_to_disk(ssh_client, manager_ncns)
         try:
             with IPMIConsoleLogger(manager_ncns, username, password):
                 LOGGER.info(f'Shutting down manager NCNs: {", ".join(manager_ncns)}')
@@ -324,6 +378,8 @@ def do_mgmt_shutdown_power(username, password, excluded_ncns, ncn_shutdown_timeo
     # Freeze Ceph on storage nodes and then shutdown
     storage_ncns = other_ncns_by_role.get('storage', [])
     if storage_ncns:
+        set_next_boot_device_to_disk(ssh_client, storage_ncns)
+
         LOGGER.info(f'Freezing Ceph and shutting down storage NCNs: {", ".join(storage_ncns)}')
         try:
             do_ceph_freeze()
