@@ -31,8 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the step that freezes Ceph from the `platform-services` stage of `sat bootsys shutdown`
 - Modified the `ncn-power` stage of `sat bootsys shutdown` to shut down the NCNs
   one group at a time instead of all simultaneously. The new order of this stage
-  is to shut down workers, shut down masters (except ncn-m001), unmap and
-  unmount all rbd devices on `ncn-m001`, and then shut down storage nodes.
+  is to shut down workers, shut down masters (except ncn-m001), unmount all Ceph
+  and s3fs filesystems on `ncn-m001`, unmount and unmap all RBD devices on
+  `ncn-m001`, and then shut down storage nodes.
+- Added a step that disables the `ensure-ceph-mounts` systemd cron job on
+  `ncn-m001` during the `ncn-power` stage of `sat bootsys shutdown`.
+- Added a step that re-enables the `ensure-ceph-mounts` systemd cron job on
+  `ncn-m001` during the `ncn-power` stage of `sat bootsys boot`.
 - Modified the sat bootsys platform services stage to not perform unfreeze ceph
 - Updated the power on order of node groups in sat bootsys ncn-power stage to storage,
   unfreezing of ceph, managers and then the worker nodes.
