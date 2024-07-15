@@ -560,6 +560,10 @@ class BOSSessionThread(Thread):
         """
         self.create_session()
 
+        # Return without attempting to monitor status if session creation failed
+        if self.failed:
+            return
+
         if get_config_value('bos.api_version') == 'v2':
             self.monitor_status()
         else:
@@ -599,14 +603,15 @@ def do_parallel_bos_operations(session_templates, operation, timeout, limit=None
     bos_session_threads = [BOSSessionThread(session_template, operation, limit=limit, stage=stage)
                            for session_template in session_templates]
 
+    starting_verb = 'Staging' if stage else 'Starting'
+    LOGGER.info(f'{starting_verb} {operation} operation on BOS '
+                f'{template_plural}: {", ".join(session_templates)}.')
+
     start_time = monotonic()
     elapsed_time = 0
     for thread in bos_session_threads:
         thread.start()
 
-    started_verb = 'Staged' if stage else 'Started'
-    LOGGER.info(f'{started_verb} {operation} operation on BOS '
-                f'{template_plural}: {", ".join(session_templates)}.')
     completed_state = 'stage' if stage else 'complete'
     completed_state_past_tense = 'staged' if stage else 'completed'
     LOGGER.info(f'Waiting up to {timeout} seconds for {session_plural} to {completed_state}.')
