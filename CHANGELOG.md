@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ncn power stage
 - If containers fail to stop, automate the procedure of trying to stop them again
   in the `platform-services` stage.
+- Adding PG_NOT_DEEP_SCRUBBED in allowable checks excluded during ceph health check as it is
+  ignorable. 
 
 ### Fixed
 - Updated `sat bootsys` to increase the default management NCN shutdown timeout
