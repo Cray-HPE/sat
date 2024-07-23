@@ -24,7 +24,10 @@
 """
 Powers on and off liquid-cooled compute cabinets.
 """
+from datetime import datetime
 import logging
+
+from dateutil.tz import tzutc
 
 from sat.apiclient import APIError, HSMClient
 from sat.apiclient.pcs import PCSClient
@@ -188,6 +191,11 @@ def do_cabinets_power_on(args):
         None
     """
     LOGGER.info(f'Resuming {HMSDiscoveryCronJob.FULL_NAME}.')
+    # Save the time immediately before resuming hms-discovery CronJob, so we can
+    # look for any jobs scheduled after this time. Zero out microseconds because
+    # Kubernetes may immediately create a job for the cronjob, and it doesn't
+    # include microseconds in the job's creation_timestamp.
+    hms_discovery_resumed_time = datetime.now(tz=tzutc()).replace(microsecond=0)
     try:
         HMSDiscoveryCronJob().set_suspend_status(False)
     except HMSDiscoveryError as err:
@@ -196,7 +204,7 @@ def do_cabinets_power_on(args):
 
     LOGGER.info(f'Waiting for {HMSDiscoveryCronJob.FULL_NAME} to be scheduled.')
     try:
-        hms_discovery_waiter = HMSDiscoveryScheduledWaiter()
+        hms_discovery_waiter = HMSDiscoveryScheduledWaiter(start_time=hms_discovery_resumed_time)
     except HMSDiscoveryError as err:
         LOGGER.error(f'Failed to start waiting on HMS discovery job being '
                      f'rescheduled after resume: {err}')

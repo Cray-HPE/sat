@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -95,6 +95,19 @@ def recreate_cronjob(batch_api, cronjob):
 
 def recreate_namespaced_stuck_cronjobs(batch_api, namespace):
     """Find cronjobs that are not being scheduled and recreate them.
+
+    This should no longer be necessary since Kubernetes 1.21.0, which made
+    the new CronJobControllerV2 the default. We retain this function in case
+    it is still necessary to check for cronjobs that need to be re-created
+    due to unforeseen circumstances.
+
+    The CronJobControllerV2 handles CronJobs that have missed too many start
+    times differently than the CronJobController. When a CronJob missed too
+    many start times under the original CronJobController, it would issue a
+    "FailedNeedsStart" warning event and then not schedule a job for the
+    CronJob. On the other hand, the CronJobControllerV2 issues a
+    "TooManyMissedTimes" warning event and then does still schedule a Job for
+    the CronJob.
 
     Args:
         batch_api (kubernetes.client.BatchV1Api): the Kubernetes API client

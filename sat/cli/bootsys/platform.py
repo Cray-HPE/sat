@@ -612,7 +612,6 @@ STEPS_BY_ACTION = {
         PlatformServicesStep('Ensure etcd is running and enabled on all Kubernetes manager NCNs.',
                              do_etcd_start),
         PlatformServicesStep('Start and enable kubelet on all Kubernetes NCNs.', do_kubelet_start),
-        PlatformServicesStep('Recreate cron jobs that have become stuck', do_recreate_cronjobs),
     ],
     # The ordered steps to stop platform services
     'stop': [
