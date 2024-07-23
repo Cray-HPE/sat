@@ -69,7 +69,7 @@ def do_air_cooled_cabinets_power_off(args):
     node_xnames = list(set(river_nodes) - set(river_mgmt_nodes))
 
     if not node_xnames:
-        LOGGER.info(f'No non-management nodes in air-cooled cabinets to power off.')
+        LOGGER.info('No non-management nodes in air-cooled cabinets to power off.')
         return
 
     LOGGER.info(f'Powering off {len(node_xnames)} non-management nodes in air-cooled cabinets.')
