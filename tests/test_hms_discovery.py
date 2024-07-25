@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -35,7 +35,6 @@ from kubernetes.config import ConfigException
 from sat.hms_discovery import (HMSDiscoveryCronJob, HMSDiscoveryError,
                                HMSDiscoveryScheduledWaiter,
                                HMSDiscoverySuspendedWaiter)
-from sat.waiting import WaitingFailure
 
 
 class TestHMSDiscoveryCronJob(unittest.TestCase):
@@ -86,6 +85,21 @@ class TestHMSDiscoveryCronJob(unittest.TestCase):
 
         with self.assertRaisesRegex(HMSDiscoveryError, 'Failed to get data'):
             _ = self.hdcj.data
+
+    def test_schedule_interval(self):
+        """Test the schedule_interval property returns the correct intervals for various schedules"""
+        schedules_and_intervals = [
+            ('*/3 * * * *', 180),
+            ('*/15 * * * *', 900),
+            ('0 */3 * * *', 10800),
+            ('5 0 * * *', 86400),
+        ]
+
+        for schedule, interval in schedules_and_intervals:
+            mock_cron_job = Mock()
+            mock_cron_job.spec.schedule = schedule
+            self.mock_batch_api.read_namespaced_cron_job.return_value = mock_cron_job
+            self.assertEqual(interval, self.hdcj.schedule_interval)
 
     def test_get_last_schedule_time(self):
         """Test get last_schedule_time method."""
@@ -200,7 +214,7 @@ class TestHMSDiscoveryScheduledWaiter(unittest.TestCase):
 
         self.next_sched_time = datetime(2020, 10, 31, 8, 3, 0, tzinfo=tzutc())
         self.mock_hd_cron_job = patch('sat.hms_discovery.HMSDiscoveryCronJob').start().return_value
-        self.mock_hd_cron_job.get_latest_next_schedule_time.return_value = self.next_sched_time
+        self.mock_hd_cron_job.schedule_interval = 180
 
         self.hd_waiter = HMSDiscoveryScheduledWaiter(self.poll_interval, self.grace_period)
 
@@ -210,11 +224,17 @@ class TestHMSDiscoveryScheduledWaiter(unittest.TestCase):
 
     def test_init(self):
         """Test creation of an HMSDiscoveryScheduledWaiter."""
-        self.assertEqual((self.next_sched_time - self.start_time).seconds + self.grace_period,
+        self.assertEqual(self.mock_hd_cron_job.schedule_interval + self.grace_period,
                          self.hd_waiter.timeout)
         self.assertEqual(self.poll_interval, self.hd_waiter.poll_interval)
         self.assertEqual(self.start_time, self.hd_waiter.start_time)
         self.assertEqual(self.mock_hd_cron_job, self.hd_waiter.hd_cron_job)
+
+    def test_init_start_time(self):
+        """Test creation of an HMSDiscoveryScheduledWaiter with overridden start_time"""
+        start_time = datetime(2018, 6, 7, 8, 45, 0, tzinfo=tzutc())
+        hd_waiter = HMSDiscoveryScheduledWaiter(start_time=start_time)
+        self.assertEqual(start_time, hd_waiter.start_time)
 
     def test_condition_name(self):
         """Test the condition_name method of the HMSDiscoveryScheduledWaiter."""

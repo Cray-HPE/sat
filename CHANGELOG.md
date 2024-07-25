@@ -49,11 +49,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - If containers fail to stop, automate the procedure of trying to stop them again
   in the `platform-services` stage.
 - Adding PG_NOT_DEEP_SCRUBBED in allowable checks excluded during ceph health check as it is
-  ignorable. 
+  ignorable.
 - Automate the procedure of setting next boot device to disk before the management nodes are
   powered off as part of the full-system shutdown.
 - Adding a ceph health check bypass prompt to take input from user and act accordingly.
   unfreezing of ceph would be done, only the wait period will be skipped if user wishes to.
+- Improved logic in `cabinet-power` stage of `sat bootsys boot` to more reliably
+  determine when the a Job has been scheduled for the `hms-discovery` Kubernetes
+  CronJob after it has been resumed.
+- Remove unreliable step from the `platform-services` stage of `sat bootsys
+  boot` that checked for Kubernetes CronJobs that were not being scheduled due
+  to missing too many start times. The problem this attempted to solve should no
+  longer occur with the CronJobControllerV2 being the default starting in
+  Kubernetes 1.21.
 
 ### Fixed
 - Updated `sat bootsys` to increase the default management NCN shutdown timeout
