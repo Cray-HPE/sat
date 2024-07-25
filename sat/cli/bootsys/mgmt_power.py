@@ -496,6 +496,9 @@ def do_power_on_ncns(args):
                             host_keys = FilteredHostKeys(hostnames=['ncn-m001'])
                             ssh_client = get_ssh_client(host_keys=host_keys)
                             mount_filesystems_on_ncn(ssh_client, 'ncn-m001')
+
+                            # try-restart cray-sdu-rda service on ncn-m001
+                            restart_cray_sdu_rda(ssh_client, 'ncn-m001')
                         except MountError as err:
                             LOGGER.error(f'Failed to mount filesystems on ncn-m001: {err}')
                             sys.exit(1)
@@ -505,6 +508,21 @@ def do_power_on_ncns(args):
             raise SystemExit(1)
 
     LOGGER.info('Succeeded with {}.'.format(action_msg))
+
+
+def restart_cray_sdu_rda(ssh_client, ncn):
+    try:
+        ssh_client.connect(ncn)
+        cmd = 'systemctl try-restart cray-sdu-rda'
+        _, stdout, stderr = ssh_client.exec_command(cmd)
+        exit_status = stdout.channel.recv_exit_status()
+        if exit_status != 0:
+            LOGGER.error(f"Failed to restart 'cray-sdu-rda' service on {ncn}. Exit status: {exit_status}")
+
+        LOGGER.info(f"Successfully restarted 'cray-sdu-rda' service on {ncn}")
+
+    except SSHException as err:
+        LOGGER.warning(f'Failed to execute {cmd} on {ncn}: {err}')
 
 
 def mount_filesystems_on_ncn(ssh_client, ncn):

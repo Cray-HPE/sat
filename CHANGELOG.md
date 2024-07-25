@@ -64,6 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Kubernetes 1.21.
 - Changed the missing host key policy used with Paramiko in sat bootsys to the AutoAddPolicy to 
   reduce warning messages displayed to the user.
+- Automate the steps to recreate the /var/opt/cray/sdu/collection symbolic link to point at
+  the collection-mount location where the fuse.s3fs filesystem is mounted.
 
 ### Fixed
 - Updated `sat bootsys` to increase the default management NCN shutdown timeout
