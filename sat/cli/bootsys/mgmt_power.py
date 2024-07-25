@@ -477,10 +477,19 @@ def do_power_on_ncns(args):
                     if ncn_group == included_ncn_groups['storage']:
                         try:
                             do_ceph_unfreeze(included_ncn_groups)
+                            LOGGER.info('Ceph unfreeze completed successfully on storage NCNs.')
+
                         except FatalPlatformError as err:
                             LOGGER.error(f'Failed to unfreeze Ceph on storage NCNs: {err}')
-                            sys.exit(1)
-                        LOGGER.info('Ceph unfreeze completed successfully on storage NCNs.')
+                            # Use pester_choices to prompt the user
+                            user_choice = pester_choices('Ceph is not healthy. Do you want to continue anyway?',
+                                                         ['yes', 'no'])
+                            if user_choice == 'no':
+                                LOGGER.info('Exiting as per user\'s decision.')
+                                sys.exit(1)
+                            else:
+                                LOGGER.info('Continuing despite Ceph not being healthy as per user\'s input, '
+                                            'make sure to verify it later.')
 
                         # Mount Ceph and S3FS filesystems on ncn-m001
                         try:

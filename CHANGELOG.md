@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ignorable. 
 - Automate the procedure of setting next boot device to disk before the management nodes are
   powered off as part of the full-system shutdown.
+- Adding a ceph health check bypass prompt to take input from user and act accordingly.
+  unfreezing of ceph would be done, only the wait period will be skipped if user wishes to.
 
 ### Fixed
 - Updated `sat bootsys` to increase the default management NCN shutdown timeout
