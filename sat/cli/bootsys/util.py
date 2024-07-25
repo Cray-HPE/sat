@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021, 2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2021, 2023-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -30,7 +30,7 @@ import re
 from collections import defaultdict
 
 import yaml
-from paramiko import SSHClient, WarningPolicy
+from paramiko import SSHClient, AutoAddPolicy
 
 from sat.util import pester_choices
 
@@ -226,6 +226,6 @@ def get_ssh_client(host_keys=None):
     if host_keys is not None:
         ssh_client._system_host_keys = host_keys
     ssh_client.load_system_host_keys()
-    ssh_client.set_missing_host_key_policy(WarningPolicy)
+    ssh_client.set_missing_host_key_policy(AutoAddPolicy)
 
     return ssh_client
