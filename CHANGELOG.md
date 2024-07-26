@@ -62,6 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to missing too many start times. The problem this attempted to solve should no
   longer occur with the CronJobControllerV2 being the default starting in
   Kubernetes 1.21.
+- Changed the missing host key policy used with Paramiko in sat bootsys to the AutoAddPolicy to 
+  reduce warning messages displayed to the user.
 
 ### Fixed
 - Updated `sat bootsys` to increase the default management NCN shutdown timeout
