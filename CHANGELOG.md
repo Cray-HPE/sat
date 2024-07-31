@@ -25,6 +25,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.29.1] - 2024-08-02
+
+### Fixed
+- Fixed a logging issue with messages logged by the `waiting` module used in
+  `sat bootsys` and other commands, so that log messages emitted by this module
+  are correctly handled and formatted.
+
 ## [3.29.0] - 2024-08-01
 
 ### Changed
