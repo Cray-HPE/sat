@@ -75,6 +75,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - addressed the bug to import time to make the sleep time effective before retrying to create
   cronjobs
 
+## [3.28.12] - 2024-07-15
+
+### Fixed
+- Fixed a traceback that occurs during the `bos-operations` stage of `sat
+  bootsys` if the BOS API fails to create a BOS session.
+- Fixed the prompt in the `bos-operations` stage of `sat bootsys shutdown` and
+  `sat bootsys reboot` to say "nodes" rather than "compute nodes and UANs",
+  which is not always accurate.
+
+## [3.28.11] - 2024-07-09
+
+### Security
+- Update the version of certifi from 2023.7.22 to 2024.7.4 to address CVE-2024-39689
+
+## [3.28.10] - 2024-07-04
+
+### Security
+- Update the version of requests from 2.31.0 to 2.32.2 to address CVE-2024-35195
+- Update the version of urllib3 from 1.26.18 to 1.26.19 to address CVE-2024-37891
+
+## [3.28.9] - 2024-07-04
+
+### Security
+- Update the version of jinja2 from 3.1.3 to 3.1.4 to address CVE-2024-34064
+
+## [3.28.8] - 2024-07-03
+
+### Fixed
+- Fixed issue in `sat status` to limit SLS query to only node-type components,
+  which is the only component type where SLS data is used.
+
+## [3.28.7] - 2024-06-26
+
+### Fixed
+- Improve info messages logged by `sat bootsys` in the `bos-operations` stage to
+  use more precision when displaying percent successful values in order to avoid
+  prematurely reporting that a BOS session is 100% complete when the actual
+  percentage is between 99 and 100%.
+
+## [3.28.6] - 2024-06-10
+
+### Fixed
+- Fixed issue where `sat status` made unnecessary queries to BOS, CFS, and SLS
+  APIs when types other than `Node` were specified.
+
+## [3.28.5] - 2024-05-31
+
+### Added
+- Add new HSM types, namely `NodeBMC`, `RouterBMC`, `MgmtSwitch`, `CabinetPDU` and
+  `CabinetPDUPowerConnector` to `sat hwinv`. Also update the man page appropriately.
+
+## [3.28.4] - 2024-05-08
+
+### Fixed
+- Polling the snapshot in `sat firmware` resulted in HTTP errors in large clusters.
+  Hence, adding the retry option when it consecutively fails for up to 5 times.
+- Remove expiration time and add `--delete-snapshot` option to delete the snapshot
+  if it is no longer needed. By default, log a message referring the user how to
+  delete the snapshot.
+
+## [3.28.3] - 2024-05-03
+
+### Security
+- Update the version of idna from 3.3 to 3.7 to address CVE-2024-3651
+
+## [3.28.2] - 2024-04-25
+
+### Fixed
+- Fix the `kubernetes` Python client library version to match the Kubernetes
+  cluster version in CSM 1.5 and currently in CSM 1.6.
+
 ## [3.28.1] - 2024-04-10
 
 ### Added

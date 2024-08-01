@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -199,7 +199,15 @@ class BaseComponent:
     def fru_info(self):
         """ComponentDataDict: The FRU info stored in the raw data.
         """
-        fru_info_key = '{}FRUInfo'.format(self.type)
+        hw_type = self.type
+
+        if hw_type == "CabinetPDU":
+            hw_type = "PDU"
+
+        if hw_type == "CabinetPDUPowerConnector":
+            hw_type = "Outlet"
+
+        fru_info_key = '{}FRUInfo'.format(hw_type)
         return ComponentDataDict(self.raw_data['PopulatedFRU'][fru_info_key])
 
     @cached_property

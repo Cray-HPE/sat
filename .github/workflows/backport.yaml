@@ -1,5 +1,7 @@
-# Top-level requirements for sat package to function.
-# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP.
+#
+# MIT License
+#
+# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -13,30 +15,22 @@
 #
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
-argcomplete
-boto3
-botocore
-cray-product-catalog >= 1.6.0
-csm-api-client >= 1.2.4, <2.0
-croniter >= 0.3, < 1.0
-inflect >= 0.2.5, < 3.0
-Jinja2 >= 3.0, < 4.0
-json-schema-for-humans
-jsonschema >= 4.0, < 5.0
-kubernetes >= 22.0, < 23.0
-paramiko >= 2.11.0
-parsec == 3.5.0
-prettytable >= 0.7.2, < 1.0
-python-dateutil >= 2.7.3, < 3.0
-pyyaml >= 6.0.1, < 7.0
-requests < 3.0
-requests-oauthlib
-semver >= 2.13.0, < 3.0
-sseclient-py >= 1.7
-toml == 0.10.0
-urllib3 >= 1.26.5, < 2.0
+#
+name: backport
+ 
+on:
+  issue_comment:
+    types:
+      - created
+ 
+jobs:
+  backport:
+    runs-on: ubuntu-latest
+    if: github.event.issue.pull_request
+    steps:
+      - uses: Cray-HPE/backport-command-action@main

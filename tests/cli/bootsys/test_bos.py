@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -369,6 +369,50 @@ class TestBOSV2SessionWaiter(unittest.TestCase):
 
         with self.assertLogs(level='INFO'):
             self.assertTrue(staged_waiter.has_completed())
+
+    def test_percent_complete_above_99(self):
+        """Test that the waiter correctly handles percent_complete above 99 but below 100"""
+        self.mock_bos_client.get_session_status.return_value.update({
+            'status': 'running',
+            'phases': {
+                'percent_complete': 99.6898,
+                'percent_powering_on': 0.0,
+                'percent_powering_off': 0.0,
+                'percent_configuring': 0.0,
+            },
+            'percent_successful': 99.6898,
+            'percent_failed': 0.0,
+        })
+        with self.assertLogs(level='INFO') as logs_cm:
+            self.assertFalse(self.waiter.has_completed())
+        self.assertEqual(2, len(logs_cm.records))
+        self.assertEqual(
+            logs_cm.records[1].message,
+            f'Session {self.session_id}: 99.689800% components succeeded, '
+            f'0.00% components failed'
+        )
+
+    def test_percent_complete_below_99(self):
+        """Test that the waiter correctly handles percent_complete below 99"""
+        self.mock_bos_client.get_session_status.return_value.update({
+            'status': 'running',
+            'phases': {
+                'percent_complete': 78.5689,
+                'percent_powering_on': 0.0,
+                'percent_powering_off': 0.0,
+                'percent_configuring': 0.0,
+            },
+            'percent_successful': 78.5689,
+            'percent_failed': 0.0,
+        })
+        with self.assertLogs(level='INFO') as logs_cm:
+            self.assertFalse(self.waiter.has_completed())
+        self.assertEqual(2, len(logs_cm.records))
+        self.assertEqual(
+            logs_cm.records[1].message,
+            f'Session {self.session_id}: 78.57% components succeeded, '
+            f'0.00% components failed'
+        )
 
 
 class TestBOSSessionThread(unittest.TestCase):

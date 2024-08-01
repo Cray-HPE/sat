@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -125,6 +125,18 @@ class TestFirmware(ExtendedTestCase):
         """An APIError getting snapshot names logs an error and exits"""
         args = self.parser.parse_args(['firmware', '--snapshots'])
         self.firmware_client.get_all_snapshot_names.side_effect = APIError
+        self.assertExitsWithError(do_firmware, args)
+
+    def test_delete_snapshot(self):
+        """Deleting a snapshot using --delete-snapshot with correct snapshot name"""
+        args = self.parser.parse_args(['firmware', '--delete-snapshot', 'snap1'])
+        do_firmware(args)
+        self.firmware_client.delete_snapshot.assert_called_once_with('snap1')
+
+    def test_delete_snapshot_error(self):
+        """An APIError deleting incorrect snapshot name logs an error and exits"""
+        args = self.parser.parse_args(['firmware', '--delete-snapshot', 'foo'])
+        self.firmware_client.delete_snapshot.side_effect = APIError
         self.assertExitsWithError(do_firmware, args)
 
     def test_xname_and_snapshots_without_arguments(self):

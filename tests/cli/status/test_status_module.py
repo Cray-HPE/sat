@@ -85,26 +85,40 @@ class TestStatusModuleGettingModules(BaseStatusModuleTestCase):
             component_types = {'NodeBMC'}
         self.NodeBMCTestModule = NodeBMCTestModule
 
+        class RouterBMCTestModule(StatusModule, ABC):
+            component_types = {'RouterBMC'}
+        self.RouterBMCTestModule = RouterBMCTestModule
+
+        class MultiTypeTestModule(StatusModule, ABC):
+            component_types = {'Node', 'NodeBMC'}
+        self.MultiTypeTestModule = MultiTypeTestModule
+
         class PrimaryTestModule(StatusModule, ABC):
             primary = True
         self.PrimaryTestModule = PrimaryTestModule
 
     def test_getting_relevant_modules(self):
-        """Test that relevant modules are returned by get_relevant_modules()"""
-        self.assertIn(self.NodeTestModule, StatusModule.get_relevant_modules(component_type='Node'))
+        """Test that only relevant modules for a single type are returned by get_relevant_modules"""
+        relevant_modules = StatusModule.get_relevant_modules(component_types=['Node'])
+        self.assertEqual([self.NodeTestModule, self.MultiTypeTestModule, self.PrimaryTestModule],
+                         relevant_modules)
 
-    def test_irrelevant_modules_ignored(self):
-        """Test that irrelevant modules are ignored by get_relevant_modules()"""
-        self.assertNotIn(self.NodeBMCTestModule, StatusModule.get_relevant_modules(component_type='Node'))
+    def test_getting_relevant_modules_multiple_types(self):
+        """Test that only relevant modules for multiple types are returned by get_relevant_modules"""
+        relevant_modules = StatusModule.get_relevant_modules(component_types=['Node', 'NodeBMC', 'Chassis'])
+        self.assertEqual([self.NodeTestModule, self.NodeBMCTestModule,
+                          self.MultiTypeTestModule, self.PrimaryTestModule],
+                         relevant_modules)
 
-    def test_all_modules_returned_no_component_types(self):
-        """Test that all modules are returned if no component types specified"""
-        self.assertEqual(self.modules, StatusModule.get_relevant_modules())
+    def test_getting_relevant_modules_no_matching_types(self):
+        relevant_modules = StatusModule.get_relevant_modules(component_types=['Chassis', 'ChassisBMC'])
+        self.assertEqual([self.PrimaryTestModule], relevant_modules)
 
     def test_limit_subset_of_modules_returned(self):
         """Test that a limited subset of modules can be returned by get_relevant_modules()"""
         self.assertEqual([self.NodeTestModule],
-                         StatusModule.get_relevant_modules(limit_modules=[self.NodeTestModule]))
+                         StatusModule.get_relevant_modules(component_types=['Node'],
+                                                           limit_modules=[self.NodeTestModule]))
 
     def test_getting_primary_module(self):
         """Test getting the primary module"""
@@ -199,7 +213,8 @@ class TestGettingRows(BaseStatusModuleTestCase):
 
     def test_getting_populated_rows(self):
         """Test getting rows in the successful case"""
-        for row in StatusModule.get_populated_rows(primary_key='xname', session=MagicMock()):
+        for row in StatusModule.get_populated_rows(primary_key='xname', session=MagicMock(),
+                                                   component_types=['Node']):
             self.assertIn(row, self.all_rows)
 
     def test_getting_populated_rows_fails(self):
@@ -215,7 +230,8 @@ class TestGettingRows(BaseStatusModuleTestCase):
                 raise StatusModuleException('Information is irrelevant!')
 
         with self.assertLogs(level='WARNING'):
-            rows = StatusModule.get_populated_rows(primary_key='xname', session=MagicMock())
+            rows = StatusModule.get_populated_rows(primary_key='xname', session=MagicMock(),
+                                                   component_types=['Node'])
 
         for row in rows:
             for heading, value in row.items():
@@ -227,7 +243,8 @@ class TestGettingRows(BaseStatusModuleTestCase):
     def test_getting_populated_rows_subset_of_modules(self):
         """Test that rows can be retrieved with a subset of modules"""
         rows = StatusModule.get_populated_rows(primary_key='xname', session=MagicMock(),
-                                               limit_modules=[self.TestStatusModuleOne])
+                                               limit_modules=[self.TestStatusModuleOne],
+                                               component_types=['Node'])
         for populated_row, original_row in zip(rows, self.all_rows):
             for heading in self.TestStatusModuleOne.headings:
                 self.assertEqual(populated_row[heading], original_row[heading])
@@ -243,7 +260,8 @@ class TestGettingRows(BaseStatusModuleTestCase):
             }
         )
         rows = StatusModule.get_populated_rows(primary_key='xname', session=MagicMock(),
-                                               limit_modules=[self.TestStatusModuleOne])
+                                               limit_modules=[self.TestStatusModuleOne],
+                                               component_types=['Node'])
 
         row_had_missing_state = False
         for row in rows:
@@ -259,7 +277,8 @@ class TestGettingRows(BaseStatusModuleTestCase):
         missing_module_two_xname = 'x3000c0s1b0n1'
         self.test_module_two_rows.remove(missing_module_two_xname)
 
-        rows = StatusModule.get_populated_rows(primary_key='xname', session=MagicMock())
+        rows = StatusModule.get_populated_rows(primary_key='xname', session=MagicMock(),
+                                               component_types=['Node'])
         row_had_missing_config = False
         for row in rows:
             if row['xname'] == missing_module_two_xname:

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2020, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -178,6 +178,7 @@ def add_hwinv_subparser(subparsers):
     list_component_names = ['node', 'chassis', 'hsn-board', 'compute-module',
                             'router-module', 'node-enclosure', 'node-enclosure-power-supply',
                             'proc', 'node-accel', 'node-accel-riser', 'node-hsn-nic',
-                            'mem', 'drive', 'cmm-rectifier']
+                            'mem', 'drive', 'cmm-rectifier', 'node-bmc', 'router-bmc',
+                            'mgmt-switch', 'cabinet-pdu', 'cabinet-pdu-power-connector']
     for component in list_component_names:
         _add_list_option(list_group, component)
