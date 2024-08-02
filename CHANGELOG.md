@@ -25,6 +25,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.29.0] - 2024-08-01
+
+### Changed
+- Removed the step that freezes Ceph from the `platform-services` stage of `sat bootsys shutdown`
+- Modified the `ncn-power` stage of `sat bootsys shutdown` to shut down the NCNs
+  one group at a time instead of all simultaneously. The new order of this stage
+  is to shut down workers, shut down masters (except ncn-m001), unmount all Ceph
+  and s3fs filesystems on `ncn-m001`, unmount and unmap all RBD devices on
+  `ncn-m001`, and then shut down storage nodes.
+- Disable the `ensure-ceph-mounts` systemd cron job on `ncn-m001` during the `ncn-power` stage
+  of `sat bootsys shutdown`. Then, re-enable it during the `ncn-power` stage of
+  `sat bootsys boot`.
+- Modified the `sat bootsys platform services` stage to not perform unfreeze ceph
+- Updated the power on order of node groups in `sat bootsys ncn-power` stage to storage,
+  unfreezing of ceph, managers and then the worker nodes.
+- Added a wait on the Kubernetes API being reachable between the step that starts
+  kubelet and the step that re-creates Kubernetes cronjobs in the
+  `platform-services` stage of `sat bootsys boot`.
+- Added a function to mount `fuse.s3fs` and `ceph` post ceph health status check on `ncn-m001` in
+  `ncn-power` stage of `sat bootsys boot`.
+- Automate the procedure to stop containers until all containers are stopped in the
+  `platform-services` stage of `sat bootsys shutdown`.
+- Adding PG_NOT_DEEP_SCRUBBED in allowable checks excluded during ceph health check as it is
+  ignorable.
+- Automate the procedure of setting next boot device to disk before the management nodes are
+  powered off as part of the full-system shutdown.
+- Adding a ceph health check bypass prompt to take input from user and act accordingly.
+  unfreezing of ceph would be done, only the wait period will be skipped if user wishes to.
+- Improved logic in `cabinet-power` stage of `sat bootsys boot` to more reliably
+  determine when a Job has been scheduled for the `hms-discovery` Kubernetes
+  CronJob after it has been resumed.
+- Remove unreliable step from the `platform-services` stage of `sat bootsys
+  boot` that checked for Kubernetes CronJobs that were not being scheduled due
+  to missing too many start times. The problem this attempted to solve should no
+  longer occur with the CronJobControllerV2 being the default starting in
+  Kubernetes 1.21.
+- Changed the missing host key policy used with Paramiko in sat bootsys to the AutoAddPolicy to
+  reduce warning messages displayed to the user.
+- Automate the steps to recreate the /var/opt/cray/sdu/collection symbolic link to point at
+  the `collection-mount` location where the `fuse.s3fs` filesystem is mounted.
+
+### Fixed
+- Updated `sat bootsys` to increase the default management NCN shutdown timeout
+  to 900 seconds.
+- Updated `sat bootsys` to include a prompt for input before proceeding with
+  hard power off of management NCNs after timeout.
+- addressed the bug to import time to make the sleep time effective before retrying to create
+  cronjobs
+
 ## [3.28.12] - 2024-07-15
 
 ### Fixed

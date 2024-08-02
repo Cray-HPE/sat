@@ -57,13 +57,15 @@ to reach the power "Off" state.
 
 In the ``platform-services`` stage, it stops all management services on the
 non-compute nodes (NCNs). This includes backing up and stopping the etcd
-cluster, stopping the kubelet service on each node, freezing ceph, and stopping
-all containers running in containerd.
+cluster, stopping the kubelet service on each node, stopping all containers
+running in containerd, and stopping containerd.
 
-In the ``ncn-power`` stage, it shuts down Linux on all management NCNs
-simultaneously, powers them off, and creates screen sessions to monitor console
-logs using ``ipmitool``. Once this has completed, and it is safe to shutdown
-and power off ncn-m001 where this command was run.
+In the ``ncn-power`` stage, it shuts down worker NCNs, shuts down master NCNs
+except ncn-m001, unmaps and unmounts rbd devices on ncn-m001, freezes Ceph,
+and shuts down storage nodes. While each group of management NCNs is being shut
+down, it sets up screen sessions to monitor console logs using ``ipmitool``.
+Once this has completed, it is safe to shutdown and power off ncn-m001 where
+this command was run.
 
 BOOT ACTION
 -----------
@@ -247,7 +249,7 @@ These options set the timeouts of various parts of the stages of the
 **--ncn-shutdown-timeout** *NCN_SHUTDOWN_TIMEOUT*
         Timeout, in seconds, to wait until management NCNs
         have completed a graceful shutdown and have reached the
-        powered off state according to IPMI. Defaults to 300.
+        powered off state according to IPMI. Defaults to 900.
         Overrides the option bootsys.ncn_shutdown_timeout in
         the config file.
 

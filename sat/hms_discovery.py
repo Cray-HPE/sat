@@ -83,6 +83,13 @@ class HMSDiscoveryCronJob:
                                     f'{self.FULL_NAME}: {err}') from err
 
     @property
+    def schedule_interval(self):
+        """int: the number of seconds between scheduled runs of the cronjob"""
+        ci = croniter(self.data.spec.schedule, start_time=datetime.now(tz=tzutc()))
+        next_time = ci.get_next()
+        return int(ci.get_next() - next_time)
+
+    @property
     def job_label_selector(self):
         """str: the label selector for querying jobs created by this cronjob"""
         label_selector = 'cronjob-name'
@@ -201,7 +208,8 @@ class HMSDiscoveryCronJob:
 class HMSDiscoveryScheduledWaiter(Waiter):
     """Waiter for HMS discovery cronjob to be scheduled by k8s."""
 
-    def __init__(self, poll_interval=5, grace_period=180, retries=1):
+    def __init__(self, poll_interval=5, grace_period=180, retries=1,
+                 start_time=None):
         """Create a new HMSDiscoveryScheduledWaiter.
 
         Timeout is computed automatically based on the latest possible time
@@ -211,6 +219,9 @@ class HMSDiscoveryScheduledWaiter(Waiter):
             poll_interval (int): see `Waiter.__init__`
             grace_period (int): the number of seconds after the expected next
                 scheduled time to wait for the job to be scheduled.
+            retries (int): see `Waiter.__init__`
+            start_time (datetime or None): the starting UTC time after which we
+                should look for jobs to be scheduled.
 
         Raises:
             HMSDiscoveryError: if there is an error querying the k8s API for the
@@ -218,10 +229,13 @@ class HMSDiscoveryScheduledWaiter(Waiter):
         """
         self.hd_cron_job = HMSDiscoveryCronJob()
 
-        # This call can raise HMSDiscoveryError
-        next_time = self.hd_cron_job.get_latest_next_schedule_time()
-        self.start_time = datetime.now(tz=tzutc())
-        timeout = (next_time - self.start_time).seconds + grace_period
+        if start_time:
+            self.start_time = start_time
+        else:
+            self.start_time = datetime.now(tz=tzutc())
+
+        # Wait for one schedule interval plus the grace period
+        timeout = self.hd_cron_job.schedule_interval + grace_period
 
         super().__init__(timeout, poll_interval, retries)
 
@@ -242,7 +256,7 @@ class HMSDiscoveryScheduledWaiter(Waiter):
         try:
             jobs = self.hd_cron_job.get_jobs()
             return any(
-                job.metadata.creation_timestamp > self.start_time
+                job.metadata.creation_timestamp >= self.start_time
                 for job in jobs
             )
         except ApiException as err:

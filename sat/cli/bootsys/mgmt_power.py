@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2021, 2023-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -25,20 +25,25 @@
 Management cluster boot, shutdown, and IPMI power support.
 """
 from collections import defaultdict
+import itertools
 import logging
 import shlex
 import socket
 import subprocess
 import sys
+import re
 
 import inflect
-from paramiko.ssh_exception import BadHostKeyException, AuthenticationException, SSHException
+from paramiko.ssh_exception import SSHException
 
+from sat.cli.bootsys.filesystems import FilesystemError, do_ceph_unmounts, modify_ensure_ceph_mounts_cron_job
+from sat.cli.bootsys.hostkeys import FilteredHostKeys
 from sat.cli.bootsys.ipmi_console import IPMIConsoleLogger, ConsoleLoggingError
 from sat.cli.bootsys.util import get_and_verify_ncn_groups, get_ssh_client, FatalBootsysError
+from sat.cli.bootsys.platform import do_ceph_freeze, do_ceph_unfreeze, FatalPlatformError
 from sat.waiting import GroupWaiter, WaitingFailure
 from sat.config import get_config_value
-from sat.util import BeginEndLogger, get_username_and_password_interactively, prompt_continue
+from sat.util import BeginEndLogger, get_username_and_password_interactively, pester_choices, prompt_continue
 
 LOGGER = logging.getLogger(__name__)
 INF = inflect.engine()
@@ -157,7 +162,8 @@ class SSHAvailableWaiter(GroupWaiter):
     """
 
     def __init__(self, members, timeout, poll_interval=1):
-        self.ssh_client = get_ssh_client()
+        host_keys = FilteredHostKeys(hostnames=members)
+        self.ssh_client = get_ssh_client(host_keys=host_keys)
 
         super().__init__(members, timeout, poll_interval=poll_interval)
 
@@ -198,8 +204,7 @@ def start_shutdown(hosts, ssh_client):
         LOGGER.info('Executing command on host "%s": `%s`', host, REMOTE_CMD)
         try:
             ssh_client.connect(host)
-        except (BadHostKeyException, AuthenticationException,
-                SSHException, socket.error) as err:
+        except (SSHException, socket.error) as err:
             LOGGER.warning('Unable to connect to host "%s": %s', host, err)
             continue
 
@@ -217,8 +222,8 @@ def finish_shutdown(hosts, username, password, ncn_shutdown_timeout, ipmi_timeou
 
     After start_shutdown is called, this checks that all the hosts
     have reached an IPMI "off" power state. If the shutdown has timed
-    out on a given host, an IPMI power off command is sent to hard
-    power off the host.
+    out on a given host, a prompt is shown to the user to decide whether
+    to proceed with hard power off.
 
     Args:
         hosts ([str]): a list of hostnames to power off.
@@ -236,56 +241,169 @@ def finish_shutdown(hosts, username, password, ncn_shutdown_timeout, ipmi_timeou
     pending_hosts = ipmi_waiter.wait_for_completion()
 
     if pending_hosts:
-        LOGGER.warning('Forcibly powering off nodes: %s', ', '.join(pending_hosts))
+        LOGGER.warning('The following nodes did not complete a graceful '
+                       'shutdown within the timeout: %s', ', '.join(pending_hosts))
 
         # Confirm all nodes have actually turned off.
-        failed_hosts = IPMIPowerStateWaiter(pending_hosts, 'off', ipmi_timeout, username, password,
-                                            send_command=True).wait_for_completion()
+        prompt_message = 'Do you want to forcibly power off the nodes that timedout?'
+        if pester_choices(prompt_message, ('yes', 'no')) == 'yes':
+            LOGGER.info('Proceeding with hard power off.')
 
-        if failed_hosts:
-            LOGGER.error('The following nodes failed to reach powered '
-                         'off state: %s', ', '.join(failed_hosts))
-            sys.exit(1)
+            failed_hosts = IPMIPowerStateWaiter(pending_hosts, 'off', ipmi_timeout, username, password,
+                                                send_command=True).wait_for_completion()
+
+            if failed_hosts:
+                LOGGER.error('The following nodes failed to reach powered '
+                             'off state: %s', ', '.join(failed_hosts))
+                sys.exit(1)
+        else:
+            LOGGER.info('User opted not to proceed with hard power off. Exiting.')
+            sys.exit(0)
 
 
-def do_mgmt_shutdown_power(ssh_client, username, password, excluded_ncns, ncn_shutdown_timeout, ipmi_timeout):
+def set_next_boot_device_to_disk(ssh_client, ncns):
+    """
+    Set the next boot device to a disk for a list of nodes via SSH.
+
+    This function connects to each node via SSH, retrieves the current boot order, identifies the first available disk,
+    and sets the next boot device to the specified disk.
+
+    Args:
+        ssh_client (paramiko.SSHClient): An active SSH client used to connect to the nodes.
+        ncns (list): A list of node names (NCNs) to configure.
+    """
+    command = 'efibootmgr'
+
+    for ncn in ncns:
+        try:
+            ssh_client.connect(ncn)
+        except (SSHException, socket.error) as err:
+            LOGGER.warning(f'Unable to connect to node {ncn}: {err}')
+            continue
+
+        try:
+            _, stdout, stderr = ssh_client.exec_command(command)
+            exit_code = stdout.channel.recv_exit_status()
+            if exit_code != 0:
+                LOGGER.warning(f'Unable to determine boot order of {ncn}, {command} exited with exit code {exit_code}')
+                continue
+
+            boot_order = stdout.read().decode()
+            match = re.search(r'^Boot([0-9A-Fa-f]{4})\*?\s.*UEFI OS', boot_order, re.MULTILINE)
+            if not match:
+                LOGGER.warning(f'No disk boot entries found for {ncn}')
+                continue
+
+            next_boot = match.group(1)
+
+            # Set the next boot device
+            next_boot_disk = f'efibootmgr -n {next_boot}'
+            _, stdout, stderr = ssh_client.exec_command(next_boot_disk)
+            exit_code = stdout.channel.recv_exit_status()
+            if exit_code != 0:
+                LOGGER.warning(f'Failed to set next boot device for {ncn}, {next_boot_disk} exited with exit code '
+                               f'{exit_code}')
+                continue
+
+            LOGGER.info(f'Successfully set next boot device to disk (Boot{next_boot}) for {ncn}')
+
+        finally:
+            ssh_client.close()
+
+
+def do_mgmt_shutdown_power(username, password, excluded_ncns, ncn_shutdown_timeout, ipmi_timeout):
     """Power off NCNs.
 
     Args:
-        ssh_client (paramiko.SSHClient): a paramiko client object.
         username (str): IPMI username to use.
         password (str): IPMI password to use.
-        excluded_ncns (set of str): The set of ncn hostnames to exclude, in
-            addition to ncn-m001, which is always excluded.
-        ncn_shutdown_timeout (int): timeout, in seconds, after which to hard
-            power off.
-        ipmi_timeout (int): timeout, in seconds, for nodes to reach desired
-            power state after IPMI power off.
+        excluded_ncns (set of str): The set of NCN hostnames to exclude.
+        ncn_shutdown_timeout (int): Timeout, in seconds, after which to hard power off.
+        ipmi_timeout (int): Timeout, in seconds, for nodes to reach desired power state after IPMI power off.
     """
-    # Ensure we do not shut down the first master node yet, as it is the node
-    # where "sat bootsys" commands are being run.
-    # TODO: Is there a better way to get the hostname of the first master node?
     try:
         other_ncns_by_role = get_and_verify_ncn_groups(excluded_ncns.union({'ncn-m001'}))
     except FatalBootsysError as err:
         LOGGER.error(f'Not proceeding with NCN power off: {err}')
         raise SystemExit(1)
 
-    other_ncns = list({ncn for role in ('managers', 'storage', 'workers')
-                       for ncn in other_ncns_by_role[role]})
+    all_ncn_hostnames = list(itertools.chain(*other_ncns_by_role.values()))
+    host_keys = FilteredHostKeys(hostnames=all_ncn_hostnames)
+    ssh_client = get_ssh_client(host_keys=host_keys)
+
+    # Shutdown workers
+    worker_ncns = other_ncns_by_role.get('workers', [])
+    if worker_ncns:
+        set_next_boot_device_to_disk(ssh_client, worker_ncns)
+        try:
+            with IPMIConsoleLogger(worker_ncns, username, password):
+                LOGGER.info(f'Shutting down worker NCNs: {", ".join(worker_ncns)}')
+                start_shutdown(worker_ncns, ssh_client)
+                LOGGER.info(f'Waiting up to {ncn_shutdown_timeout} seconds for worker NCNs to shut down...')
+                finish_shutdown(worker_ncns, username, password, ncn_shutdown_timeout, ipmi_timeout)
+        except ConsoleLoggingError as err:
+            LOGGER.error(f'Aborting shutdown of worker NCNs due to failure to '
+                         f'set up NCN console logging: {err}')
+            ssh_client.close()
+            raise SystemExit(1)
+    else:
+        LOGGER.info('No worker NCNs to shutdown.')
+
+    # Shutdown managers (except ncn-m001)
+    manager_ncns = other_ncns_by_role.get('managers', [])
+    if manager_ncns:
+        set_next_boot_device_to_disk(ssh_client, ['ncn-m001'])
+        set_next_boot_device_to_disk(ssh_client, manager_ncns)
+        try:
+            with IPMIConsoleLogger(manager_ncns, username, password):
+                LOGGER.info(f'Shutting down manager NCNs: {", ".join(manager_ncns)}')
+                start_shutdown(manager_ncns, ssh_client)
+                LOGGER.info(f'Waiting up to {ncn_shutdown_timeout} seconds for manager NCNs to shut down...')
+                finish_shutdown(manager_ncns, username, password, ncn_shutdown_timeout, ipmi_timeout)
+        except ConsoleLoggingError as err:
+            LOGGER.error(f'Aborting shutdown of manager NCNs due to failure to '
+                         f'set up NCN console logging: {err}')
+            ssh_client.close()
+            raise SystemExit(1)
+    else:
+        LOGGER.info('No Manager NCNs to shutdown.')
 
     try:
-        with IPMIConsoleLogger(other_ncns, username, password):
-            LOGGER.info(f'Sending shutdown command to other NCNs: {", ".join(other_ncns)}')
-            start_shutdown(other_ncns, ssh_client)
-            LOGGER.info(f'Waiting up to {ncn_shutdown_timeout} seconds for other NCNs to '
-                        f'reach powered off state according to ipmitool: {", ".join(other_ncns)}.')
-            finish_shutdown(other_ncns, username, password,
-                            ncn_shutdown_timeout, ipmi_timeout)
-            LOGGER.info('Shutdown and power off of all other NCNs complete.')
-    except ConsoleLoggingError as err:
-        LOGGER.error(f'Aborting shutdown of NCNs due failure to set up NCN console logging: {err}')
+        do_ceph_unmounts(ssh_client, 'ncn-m001')
+    except FilesystemError as err:
+        LOGGER.error(f'Failed to unmount Ceph filesystems on ncn-m001: {err}')
+        ssh_client.close()
         raise SystemExit(1)
+
+    # Freeze Ceph on storage nodes and then shutdown
+    storage_ncns = other_ncns_by_role.get('storage', [])
+    if storage_ncns:
+        set_next_boot_device_to_disk(ssh_client, storage_ncns)
+
+        LOGGER.info(f'Freezing Ceph and shutting down storage NCNs: {", ".join(storage_ncns)}')
+        try:
+            do_ceph_freeze()
+        except FatalPlatformError as err:
+            LOGGER.error(f'Failed to freeze Ceph on storage NCNs: {err}')
+            ssh_client.close()
+            raise SystemExit(1)
+        LOGGER.info('Ceph freeze completed successfully on storage NCNs.')
+        try:
+            with IPMIConsoleLogger(storage_ncns, username, password):
+                start_shutdown(storage_ncns, ssh_client)
+                LOGGER.info(f'Waiting up to {ncn_shutdown_timeout} seconds for storage NCNs to shut down...')
+                finish_shutdown(storage_ncns, username, password, ncn_shutdown_timeout, ipmi_timeout)
+                LOGGER.info(f'Shutdown and power off of storage NCNs: {", ".join(storage_ncns)}')
+        except ConsoleLoggingError as err:
+            LOGGER.error(f'Aborting shutdown of storage NCNs due to failure to '
+                         f'set up NCN console logging: {err}')
+            ssh_client.close()
+            raise SystemExit(1)
+    else:
+        LOGGER.info('No storage NCNs to shutdown.')
+
+    ssh_client.close()
+    LOGGER.info('Shutdown and power off of all management NCNs complete.')
 
 
 def do_power_off_ncns(args):
@@ -295,16 +413,13 @@ def do_power_off_ncns(args):
         args: The argparse.Namespace object containing the parsed arguments
             passed to this stage.
     """
-
     action_msg = 'shutdown of other management NCNs'
     if not args.disruptive:
         prompt_continue(action_msg)
     username, password = get_username_and_password_interactively(username_prompt='IPMI username',
                                                                  password_prompt='IPMI password')
-    ssh_client = get_ssh_client()
-
     with BeginEndLogger(action_msg):
-        do_mgmt_shutdown_power(ssh_client, username, password, args.excluded_ncns,
+        do_mgmt_shutdown_power(username, password, args.excluded_ncns,
                                get_config_value('bootsys.ncn_shutdown_timeout'),
                                get_config_value('bootsys.ipmi_timeout'))
     LOGGER.info('Succeeded with {}.'.format(action_msg))
@@ -329,7 +444,7 @@ def do_power_on_ncns(args):
         LOGGER.error(f'Not proceeding with NCN power on: {err}')
         raise SystemExit(1)
 
-    ordered_boot_groups = [included_ncn_groups[role] for role in ('managers', 'storage', 'workers')]
+    ordered_boot_groups = [included_ncn_groups[role] for role in ('storage', 'managers', 'workers')]
     # flatten lists of ncn groups
     affected_ncns = list({ncn for sublist in ordered_boot_groups for ncn in sublist})
 
@@ -358,8 +473,110 @@ def do_power_on_ncns(args):
                         raise SystemExit(1)
                     else:
                         LOGGER.info(f'Powered on NCNs: {", ".join(ncn_group)}')
+                    # Unfreeze Ceph and wait for Ceph health after powering on the storage nodes
+                    if ncn_group == included_ncn_groups['storage']:
+                        try:
+                            do_ceph_unfreeze(included_ncn_groups)
+                            LOGGER.info('Ceph unfreeze completed successfully on storage NCNs.')
+
+                        except FatalPlatformError as err:
+                            LOGGER.error(f'Failed to unfreeze Ceph on storage NCNs: {err}')
+                            # Use pester_choices to prompt the user
+                            user_choice = pester_choices('Ceph is not healthy. Do you want to continue anyway?',
+                                                         ['yes', 'no'])
+                            if user_choice == 'no':
+                                LOGGER.info('Exiting as per user\'s decision.')
+                                sys.exit(1)
+                            else:
+                                LOGGER.info('Continuing despite Ceph not being healthy as per user\'s input, '
+                                            'make sure to verify it later.')
+
+                        # Mount Ceph and S3FS filesystems on ncn-m001
+                        try:
+                            host_keys = FilteredHostKeys(hostnames=['ncn-m001'])
+                            ssh_client = get_ssh_client(host_keys=host_keys)
+                            mount_filesystems_on_ncn(ssh_client, 'ncn-m001')
+
+                            # try-restart cray-sdu-rda service on ncn-m001
+                            restart_cray_sdu_rda(ssh_client, 'ncn-m001')
+                        except MountError as err:
+                            LOGGER.error(f'Failed to mount filesystems on ncn-m001: {err}')
+                            sys.exit(1)
+
         except ConsoleLoggingError as err:
             LOGGER.error(f'Aborting boot of NCNs due failure to set up NCN console logging: {err}')
             raise SystemExit(1)
 
     LOGGER.info('Succeeded with {}.'.format(action_msg))
+
+
+def restart_cray_sdu_rda(ssh_client, ncn):
+    try:
+        ssh_client.connect(ncn)
+        cmd = 'systemctl try-restart cray-sdu-rda'
+        _, stdout, stderr = ssh_client.exec_command(cmd)
+        exit_status = stdout.channel.recv_exit_status()
+        if exit_status != 0:
+            LOGGER.error(f"Failed to restart 'cray-sdu-rda' service on {ncn}. Exit status: {exit_status}")
+
+        LOGGER.info(f"Successfully restarted 'cray-sdu-rda' service on {ncn}")
+
+    except SSHException as err:
+        LOGGER.warning(f'Failed to execute {cmd} on {ncn}: {err}')
+
+
+def mount_filesystems_on_ncn(ssh_client, ncn):
+    """Mount Ceph and S3FS filesystems on a given NCN via SSH.
+
+    Args:
+        ssh_client (paramiko.SSHClient): a paramiko client object.
+        ncn: The hostname of the NCN where the filesystems will be mounted.
+
+    Raises:
+        MountError: If mounting any filesystem fails.
+    """
+    filesystems = {
+        "ceph": "awk '{ if ($3 == \"ceph\") { print $2; }}' /etc/fstab",
+        "fuse.s3fs": "awk '{ if ($3 == \"fuse.s3fs\") { print $2; }}' /etc/fstab"
+    }
+
+    try:
+        # Establish SSH connection
+        ssh_client.connect(ncn)
+
+        for fs_type, awk_command in filesystems.items():
+            # Execute awk command to get mount points
+            stdin, stdout, stderr = ssh_client.exec_command(awk_command)
+            mount_points = stdout.read().decode().splitlines()
+
+            for mount_point in mount_points:
+                LOGGER.info(f'Checking whether {fs_type} filesystem is mounted on {mount_point}.')
+
+                # Check if the mount point is already mounted
+                stdin, stdout, stderr = ssh_client.exec_command(f"mountpoint {mount_point}")
+                if stdout.channel.recv_exit_status() != 0:  # If not a mountpoint, try to mount it
+                    LOGGER.info(f'Mounting {fs_type} filesystem on {mount_point}.')
+                    stdin, stdout, stderr = ssh_client.exec_command(f"mount {mount_point}")
+                    if stdout.channel.recv_exit_status() != 0:
+                        error_msg = stderr.read().decode()
+                        raise MountError(f"Failed to mount {fs_type} filesystem on {ncn}: {error_msg}")
+                    LOGGER.info(f'Successfully mounted {fs_type} filesystem on {mount_point}.')
+                else:
+                    LOGGER.info(f'{fs_type} filesystem is already mounted on {mount_point}.')
+
+        try:
+            modify_ensure_ceph_mounts_cron_job(ssh_client, ncn, enabled=True)
+        except FilesystemError as err:
+            raise MountError(str(err)) from err
+
+    except SSHException as e:
+        raise MountError(f"SSH connection failed: {str(e)}")
+
+    # Ensure the ssh_client is closed
+    finally:
+        ssh_client.close()
+
+
+class MountError(Exception):
+    """Custom exception for mount errors."""
+    pass

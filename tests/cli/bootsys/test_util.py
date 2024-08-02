@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -356,10 +356,10 @@ class TestGetSSHClient(unittest.TestCase):
     """Tests for get_ssh_client function."""
 
     def setUp(self):
-        """Set up mocks of paramiko SSHClient and WarningPolicy."""
+        """Set up mocks of paramiko SSHClient and AutoAddPolicy."""
         self.mock_ssh_client_cls = patch('sat.cli.bootsys.util.SSHClient').start()
         self.mock_ssh_client = self.mock_ssh_client_cls.return_value
-        self.mock_warning_policy = patch('sat.cli.bootsys.util.WarningPolicy').start()
+        self.mock_auto_add_policy = patch('sat.cli.bootsys.util.AutoAddPolicy').start()
 
     def tearDown(self):
         patch.stopall()
@@ -371,5 +371,5 @@ class TestGetSSHClient(unittest.TestCase):
         self.mock_ssh_client_cls.assert_called_once_with()
         self.mock_ssh_client.load_system_host_keys.assert_called_once_with()
         self.mock_ssh_client.set_missing_host_key_policy.assert_called_once_with(
-            self.mock_warning_policy
+            self.mock_auto_add_policy
         )

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -193,7 +193,8 @@ class TestCheckCephHealth(ExtendedTestCase):
                 'status': 'HEALTH_WARN',
                 'checks': {
                     'LARGE_OMAP_OBJECTS': {},
-                    'TOO_FEW_PGS': {}
+                    'TOO_FEW_PGS': {},
+                    'PG_NOT_DEEP_SCRUBBED': {}
                 }
             }
         })
@@ -302,7 +303,8 @@ class TestCheckCephHealth(ExtendedTestCase):
         with self.assertLogs(level=logging.WARNING) as logs:
             check_ceph_health()
         self.ceph_health_command.assert_called_once_with(['ceph', '-s', '--format=json'])
-        self.assert_in_element('Ceph is healthy with warnings: LARGE_OMAP_OBJECTS,TOO_FEW_PGS', logs.output)
+        self.assert_in_element('Ceph is healthy with warnings: LARGE_OMAP_OBJECTS,TOO_FEW_PGS,'
+                               'PG_NOT_DEEP_SCRUBBED', logs.output)
 
     def test_ceph_warn_unhealthy(self):
         """Test check_ceph_health raises CephHealthCheckError when ceph is in an 'unacceptable' warning state."""

@@ -55,7 +55,7 @@ TIMEOUT_SPECS = [
                 'compute and application nodes have completed their BOS shutdown.'),
     TimeoutSpec('bos-boot', ['boot', 'reboot'], 900,
                 'compute and application nodes have completed their BOS boot.'),
-    TimeoutSpec('ncn-shutdown', ['shutdown'], 300,
+    TimeoutSpec('ncn-shutdown', ['shutdown'], 900,
                 'management NCNs have completed a graceful shutdown and have reached '
                 'the powered off state according to IPMI.'),
 ]
