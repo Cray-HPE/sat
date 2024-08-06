@@ -444,7 +444,7 @@ def do_power_on_ncns(args):
         LOGGER.error(f'Not proceeding with NCN power on: {err}')
         raise SystemExit(1)
 
-    ordered_boot_groups = [included_ncn_groups[role] for role in ('storage', 'managers', 'workers')]
+    ordered_boot_groups = [included_ncn_groups['storage'], included_ncn_groups['kubernetes']]
     # flatten lists of ncn groups
     affected_ncns = list({ncn for sublist in ordered_boot_groups for ncn in sublist})
 
