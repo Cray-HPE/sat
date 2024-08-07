@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -32,6 +32,7 @@ import sys
 
 import argcomplete
 
+from oauthlib.oauth2 import InvalidGrantError
 from sat.config import ConfigFileExistsError, DEFAULT_CONFIG_PATH, generate_default_config, load_config
 from sat.warnings import configure_insecure_request_warnings
 from sat.logging import bootstrap_logging, configure_logging
@@ -119,7 +120,11 @@ def main():
                          args.command, args.command)
             sys.exit(1)
 
-        subcommand(args)
+        try:
+            subcommand(args)
+        except InvalidGrantError:
+            LOGGER.error("The token is not active or is invalid. "
+                         "Please re-authenticate using 'sat auth' to obtain a new token")
 
     except KeyboardInterrupt:
         LOGGER.info("Received keyboard interrupt; quitting.", exc_info=True)
