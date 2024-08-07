@@ -25,6 +25,7 @@
 Entry point for the status subcommand.
 """
 import logging
+from oauthlib.oauth2 import TokenExpiredError, InvalidGrantError
 
 from csm_api_client.service.gateway import APIError
 from csm_api_client.service.hsm import HSMClient
@@ -203,13 +204,27 @@ def do_status(args):
     multiple_reports = len(types) != 1
     report_strings = []
 
-    components = StatusModule.get_populated_rows(
-        primary_key='xname',
-        session=session,
-        component_types=types,
-        limit_modules=modules,
-        primary_key_type=XName,
-    )
+    try:
+        components = StatusModule.get_populated_rows(
+            primary_key='xname',
+            session=session,
+            component_types=types,
+            limit_modules=modules,
+            primary_key_type=XName,
+        )
+    except TokenExpiredError:
+        print(
+            "Error: Your authentication token has expired. "
+            "Please re-authenticate using 'sat auth' to obtain a new token.")
+        return
+    except InvalidGrantError:
+        print(
+            "Error: Invalid grant. The token is not active. "
+            "Please re-authenticate using 'sat auth' to obtain a new token.")
+        return
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return
 
     for component_type, components_by_type in group_dicts_by('Type', components).items():
         title = f'{component_type} Status' if multiple_reports else None
