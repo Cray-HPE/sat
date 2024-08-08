@@ -277,7 +277,8 @@ class BOSV2SessionWaiter(Waiter):
             return False
 
         except APIError as err:
-            LOGGER.warning('Failed to query session status: %s', err)
+            LOGGER.error('Failed to query session status: %s', err)
+            sys.exit(1)
         except KeyError as err:
             LOGGER.warning('BOS session status query response missing key %s', err)
 
