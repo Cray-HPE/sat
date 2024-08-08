@@ -14,7 +14,7 @@ coverage==6.3.2
 cray-product-catalog==1.6.0
 croniter==0.3.37
 cryptography==42.0.4
-csm-api-client==1.2.4
+csm-api-client==2.0.0
 dataclasses-json==0.5.6
 docutils==0.17.1
 google-auth==2.6.0
@@ -54,7 +54,7 @@ requests==2.32.2
 requests-oauthlib==1.3.1
 rsa==4.8
 s3transfer==0.5.2
-semver==2.13.0
+semver==3.0.2
 six==1.16.0
 snowballstemmer==2.2.0
 Sphinx==2.4.5
