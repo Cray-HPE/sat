@@ -45,7 +45,7 @@ from sat.cli.bootsys.defaults import PARALLEL_CHECK_INTERVAL
 from sat.config import get_config_value
 from sat.session import SATSession
 from sat.util import pester, prompt_continue
-from sat.waiting import Waiter
+from sat.waiting import Waiter, WaitingFailure
 from sat.xname import XName
 
 LOGGER = logging.getLogger(__name__)
@@ -246,9 +246,23 @@ class BOSV2SessionWaiter(Waiter):
                 self.bos_session_thread.session_template
             )
 
-            self.session_status = self.bos_client.get_session_status(
-                self.bos_session_thread.session_id
-            )
+            response = self.bos_client.get(self.bos_client.session_path, self.bos_session_thread.session_id, 'status',
+                                           raise_not_ok=False)
+
+            if not response.ok:
+                if response.status_code == 404:
+                    raise WaitingFailure(
+                        f'Failed to query session status: Session {self.bos_session_thread.session_id} does not exist.')
+                else:
+                    LOGGER.warning(
+                        f'Failed to query status of BOS session {self.bos_session_thread.session_id}: '
+                        f'{response.status_code} {response.reason}.')
+                    return False
+
+            try:
+                self.session_status = response.json()
+            except ValueError as err:
+                LOGGER.warning(f'Failed to parse session status JSON: {err}')
 
             if (self.session_status['percent_successful'] != self.pct_successful
                     or self.session_status['percent_failed'] != self.pct_failed):
@@ -276,8 +290,6 @@ class BOSV2SessionWaiter(Waiter):
 
             return False
 
-        except APIError as err:
-            LOGGER.warning('Failed to query session status: %s', err)
         except KeyError as err:
             LOGGER.warning('BOS session status query response missing key %s', err)
 

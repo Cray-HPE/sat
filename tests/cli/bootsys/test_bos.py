@@ -40,6 +40,7 @@ from sat.cli.bootsys.bos import (BOSFailure, BOSLimitString, BOSSessionThread,
                                  do_bos_reboots, do_bos_shutdowns,
                                  get_session_templates)
 from tests.common import ExtendedTestCase
+from sat.waiting import WaitingFailure
 
 
 class TestBOAJobSuccessful(ExtendedTestCase):
@@ -233,7 +234,7 @@ class TestBOSV2SessionWaiter(unittest.TestCase):
         self.session_id = 'abcdef-012345-678901-fdecba'
 
         self.mock_bos_client = MagicMock()
-        self.mock_bos_client.get_session_status.return_value = {
+        self.mock_bos_client.get.return_value = MagicMock(ok=True, status_code=200, json=MagicMock(return_value={
             'status': 'complete',
             'managed_components_count': 10,
             'phases': {
@@ -251,7 +252,8 @@ class TestBOSV2SessionWaiter(unittest.TestCase):
                 'end_time': '2022-01-01T00:00:00',
                 'start_time': '2022-01-01T00:01:00',
             },
-        }
+        }))
+
         patch('sat.cli.bootsys.bos.BOSClientCommon.get_bos_client', return_value=self.mock_bos_client).start()
 
         self.mock_session_thread = MagicMock(session_id=self.session_id)
@@ -268,7 +270,7 @@ class TestBOSV2SessionWaiter(unittest.TestCase):
 
     def test_session_not_completed(self):
         """Test that the waiter detects a session that has not completed yet"""
-        self.mock_bos_client.get_session_status.return_value.update({
+        self.mock_bos_client.get.return_value.json.return_value.update({
             'status': 'running',
             'phases': {
                 'percent_complete': 50.0,
@@ -282,7 +284,7 @@ class TestBOSV2SessionWaiter(unittest.TestCase):
 
     def test_session_failed(self):
         """Test that the waiter detects when a session has failed"""
-        self.mock_bos_client.get_session_status.return_value.update({
+        self.mock_bos_client.get.return_value.json.return_value.update({
             'status': 'running',
             'phases': {
                 'percent_complete': 50.0,
@@ -297,7 +299,7 @@ class TestBOSV2SessionWaiter(unittest.TestCase):
 
     def test_session_superseded(self):
         """Test when the waiter's session has its managed components taken by another session"""
-        self.mock_bos_client.get_session_status.return_value.update({
+        self.mock_bos_client.get.return_value.json.return_value.update({
             'status': 'complete',
             'managed_components_count': 0,
             'phases': {
@@ -314,7 +316,7 @@ class TestBOSV2SessionWaiter(unittest.TestCase):
 
     def test_staged_session_not_complete(self):
         """Test that a staged session still in pending state is not complete"""
-        self.mock_bos_client.get_session_status.return_value.update({
+        self.mock_bos_client.get.return_value.json.return_value.update({
             'status': 'pending',
             'managed_components_count': 0,
             'phases': {
@@ -333,7 +335,7 @@ class TestBOSV2SessionWaiter(unittest.TestCase):
 
     def test_staged_session_running_complete(self):
         """Test that a staged session that has reached running state is complete."""
-        self.mock_bos_client.get_session_status.return_value.update({
+        self.mock_bos_client.get.return_value.json.return_value.update({
             'status': 'running',
             'managed_components_count': 10,
             'phases': {
@@ -352,7 +354,7 @@ class TestBOSV2SessionWaiter(unittest.TestCase):
 
     def test_staged_session_empty_complete(self):
         """Test that a staged session with empty components in complete state is complete."""
-        self.mock_bos_client.get_session_status.return_value.update({
+        self.mock_bos_client.get.return_value.json.return_value.update({
             'status': 'complete',
             'managed_components_count': 0,
             'phases': {
@@ -372,7 +374,7 @@ class TestBOSV2SessionWaiter(unittest.TestCase):
 
     def test_percent_complete_above_99(self):
         """Test that the waiter correctly handles percent_complete above 99 but below 100"""
-        self.mock_bos_client.get_session_status.return_value.update({
+        self.mock_bos_client.get.return_value.json.return_value.update({
             'status': 'running',
             'phases': {
                 'percent_complete': 99.6898,
@@ -394,7 +396,7 @@ class TestBOSV2SessionWaiter(unittest.TestCase):
 
     def test_percent_complete_below_99(self):
         """Test that the waiter correctly handles percent_complete below 99"""
-        self.mock_bos_client.get_session_status.return_value.update({
+        self.mock_bos_client.get.return_value.json.return_value.update({
             'status': 'running',
             'phases': {
                 'percent_complete': 78.5689,
@@ -412,6 +414,49 @@ class TestBOSV2SessionWaiter(unittest.TestCase):
             logs_cm.records[1].message,
             f'Session {self.session_id}: 78.57% components succeeded, '
             f'0.00% components failed'
+        )
+
+    def test_session_status_404_error(self):
+        """Test that the waiter raises WaitingFailure on a 404 error."""
+        self.mock_bos_client.get.return_value.ok = False
+        self.mock_bos_client.get.return_value.status_code = 404
+
+        with self.assertRaises(WaitingFailure) as context:
+            self.waiter.has_completed()
+
+        self.assertEqual(
+            str(context.exception),
+            f'Failed to query session status: Session {self.session_id} does not exist.'
+        )
+
+    def test_session_status_503_error(self):
+        """Test that the waiter logs a warning and continues on a 503 error."""
+        self.mock_bos_client.get.side_effect = [
+            MagicMock(ok=False, status_code=503, json=MagicMock(return_value={})),
+            MagicMock(ok=True, status_code=200, json=MagicMock(return_value={
+                'status': 'running',
+                'managed_components_count': 10,
+                'phases': {
+                    'percent_complete': 75.0,
+                    'percent_powering_on': 25.0,
+                    'percent_powering_off': 0.0,
+                    'percent_configuring': 50.0,
+                },
+                'percent_successful': 75.0,
+                'percent_failed': 0.0,
+            }))
+        ]
+
+        with self.assertLogs(level='WARNING') as logs_cm:
+            result = self.waiter.has_completed()
+
+        self.assertFalse(result)
+        self.assertEqual(1, len(logs_cm.records))
+        self.assertIn('Failed to query status of BOS session', logs_cm.records[0].message)
+
+        # Ensuring it made the second call
+        self.mock_bos_client.get.assert_called_with(
+            self.mock_bos_client.session_path, self.session_id, 'status', raise_not_ok=False
         )
 
 
