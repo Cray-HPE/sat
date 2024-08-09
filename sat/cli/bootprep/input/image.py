@@ -447,13 +447,21 @@ class BaseInputImage(DependencyGroupMember, ABC):
         if not configured_image_id:
             raise ImageCreateError('Failed to determine ID of configured image.')
 
-        LOGGER.info(f'Renaming configured image with ID {configured_image_id} to {self.name}')
+        if self.cfs_client.supports_customized_image_name:
+            LOGGER.debug(f'No rename necessary since CFS supports naming the configured '
+                         f'image {self.name}')
+            self.final_image_id = configured_image_id
+            return
+
+        rename_description = f'configured image with ID {configured_image_id} to {self.name}'
+        LOGGER.info(f'Renaming {rename_description}')
 
         try:
             self.final_image_id = self.ims_client.rename_image(configured_image_id, self.name)
         except APIError as err:
-            raise ImageCreateError(f'Failed to rename configured image with ID {configured_image_id} '
-                                   f'from {self.created_image_name} to {self.name}: {err}')
+            raise ImageCreateError(f'Failed to rename {rename_description}: {err}')
+
+        LOGGER.info(f'Renamed {rename_description}')
 
     def delete_overwritten_images(self):
         """Delete the images which were marked to be overwritten
