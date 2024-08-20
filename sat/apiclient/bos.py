@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -144,29 +144,6 @@ class BOSClientCommon(APIGatewayClient):
             # TODO (CRAYSAT-898): update default hostname for authoritative DNS changes
             'rootfs_provider_passthrough': 'dvs:api-gw-service-nmn.local:300:nmn0'
         }
-
-    def get_session_status(self, session_id):
-        """Get the status of a BOS session.
-
-        Args:
-            session_id (str): the ID of the session
-
-        Returns:
-            dict: the session status information from BOS
-
-        Raises:
-            APIError: if there is a problem retrieving session status BOS, or if
-                the returned JSON is invalid.
-        """
-        try:
-            return self.get(self.session_path, session_id, 'status').json()
-        except APIError as err:
-            raise APIError(f'Failed to get BOS session status for session {session_id}: '
-                           f'{err}')
-        except ValueError as err:
-            raise APIError(f'Failed to parse JSON in response from BOS when '
-                           f'getting session status for session {session_id}: '
-                           f'{err}')
 
     def get_session(self, session_id):
         """Get information about a given session.
