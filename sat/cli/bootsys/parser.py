@@ -51,9 +51,9 @@ TIMEOUT_SPECS = [
                 'BGP routes report that they are established on management switches.'),
     TimeoutSpec('hsn', ['boot'], 300,
                 'the high-speed network (HSN) has returned to its pre-shutdown state.'),
-    TimeoutSpec('bos-shutdown', ['shutdown', 'reboot'], 600,
+    TimeoutSpec('bos-shutdown', ['shutdown', 'reboot'], -1,
                 'compute and application nodes have completed their BOS shutdown.'),
-    TimeoutSpec('bos-boot', ['boot', 'reboot'], 900,
+    TimeoutSpec('bos-boot', ['boot', 'reboot'], -1,
                 'compute and application nodes have completed their BOS boot.'),
     TimeoutSpec('ncn-shutdown', ['shutdown'], 900,
                 'management NCNs have completed a graceful shutdown and have reached '

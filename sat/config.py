@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -30,6 +30,7 @@ import getpass
 import logging
 import os
 from textwrap import dedent, indent
+import math
 
 import toml
 
@@ -342,13 +343,18 @@ def get_config_value(query_string):
     if len(parts) != EXPECTED_LEVELS:
         raise ValueError("Wrong number of levels in query string passed to get_config_value(). "
                          "(Should be {}, was {}.)".format(EXPECTED_LEVELS, len(parts)))
-    else:
-        section, option = parts
-        if not section or not option:
-            raise ValueError("Improperly formatted query string supplied to get_config_value(). "
-                             "(Got '{}'.)".format(query_string))
-        else:
-            return CONFIG.get(section, option)
+
+    section, option = parts
+    if not section or not option:
+        raise ValueError("Improperly formatted query string supplied to get_config_value(). "
+                         "(Got '{}'.)".format(query_string))
+
+    value = CONFIG.get(section, option)
+
+    if option.lower() == 'timeout' and value == '-1':
+        return math.inf
+
+    return value
 
 
 def read_config_value_file(query_string):
