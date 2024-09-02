@@ -626,13 +626,16 @@ def do_parallel_bos_operations(session_templates, operation, timeout, limit=None
 
     completed_state = 'stage' if stage else 'complete'
     completed_state_past_tense = 'staged' if stage else 'completed'
-    LOGGER.info(f'Waiting up to {timeout} seconds for {session_plural} to {completed_state}.')
+    if timeout == -1:
+        LOGGER.info(f'Waiting for {session_plural} to {completed_state}.')
+    else:
+        LOGGER.info(f'Waiting up to {timeout} seconds for {session_plural} to {completed_state}.')
 
     active_threads = {t.session_template: t for t in bos_session_threads}
     failed_session_templates = []
     just_finished = []
 
-    while active_threads and elapsed_time < timeout:
+    while active_threads and (timeout == -1 or elapsed_time < timeout):
         if just_finished:
             LOGGER.info(f'Still waiting on session(s) for template(s): '
                         f'{", ".join(active_threads.keys())}')
@@ -940,10 +943,14 @@ def do_bos_reboots(args: Namespace):
         prompt_continue('reboot of nodes using BOS')
 
     try:
+        boot_timeout = get_config_value("bootsys.bos_boot_timeout")
+        shutdown_timeout = get_config_value("bootsys.bos_shutdown_timeout")
+        total_timeout = boot_timeout + shutdown_timeout
+        if total_timeout < -1:
+            total_timeout = -1
         do_bos_operations(
             "reboot",
-            get_config_value("bootsys.bos_boot_timeout") +
-            get_config_value("bootsys.bos_shutdown_timeout"),
+            total_timeout,
             limit=args.bos_limit,
             recursive=args.recursive,
             stage=args.staged_session

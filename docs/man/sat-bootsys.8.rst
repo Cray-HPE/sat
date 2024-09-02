@@ -7,7 +7,7 @@ Perform boot, shutdown, or reboot actions on the system
 -------------------------------------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2020-2023 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2020-2024 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -243,7 +243,7 @@ These options set the timeouts of various parts of the stages of the
 **--bos-shutdown-timeout** *BOS_SHUTDOWN_TIMEOUT*
         Timeout, in seconds, to wait until compute and
         application nodes have completed their BOS shutdown.
-        Defaults to 600. Overrides the option
+        No default timeout is set. It is infinite. Overrides the option
         bootsys.bos_shutdown_timeout in the config file.
 
 **--ncn-shutdown-timeout** *NCN_SHUTDOWN_TIMEOUT*
@@ -297,7 +297,7 @@ These options set the timeouts of various parts of the stages of the
 **--bos-boot-timeout** *BOS_BOOT_TIMEOUT*
         Timeout, in seconds, to wait until compute and
         application nodes have completed their BOS boot.
-        Defaults to 900. Overrides the option
+        No default timeout is set. It is infinite. Overrides the option
         bootsys.bos_boot_timeout in the config file.
 
 REBOOT TIMEOUT OPTIONS
@@ -309,7 +309,7 @@ These options set the timeouts of various parts of the stages of the
 **--bos-shutdown-timeout** *BOS_SHUTDOWN_TIMEOUT*
         Timeout, in seconds, to wait until compute and
         application nodes have completed their BOS shutdown.
-        Defaults to 600. Overrides the option
+        No default timeout is set. It is infinite. Overrides the option
         bootsys.bos_shutdown_timeout in the config file.
 
         For a reboot, the --bos-shutdown-timeout and
@@ -318,7 +318,7 @@ These options set the timeouts of various parts of the stages of the
 **--bos-boot-timeout** *BOS_BOOT_TIMEOUT*
         Timeout, in seconds, to wait until compute and
         application nodes have completed their BOS boot.
-        Defaults to 900. Overrides the option
+        No default timeout is set. It is infinite. Overrides the option
         bootsys.bos_boot_timeout in the config file.
 
         For a reboot, the --bos-shutdown-timeout and
