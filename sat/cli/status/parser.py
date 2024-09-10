@@ -97,3 +97,9 @@ def add_status_subparser(subparsers):
         choices=['v1', 'v2'],
         help='The version of the BOS API to use for BOS operations',
     )
+
+    status_parser.add_argument(
+        '--cfs-version',
+        choices=['v2', 'v3'],
+        help='The version of the CFS API to use for CFS operations',
+    )
