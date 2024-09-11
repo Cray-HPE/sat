@@ -30,7 +30,7 @@ from collections import defaultdict
 import logging
 from urllib.parse import urlparse
 
-from csm_api_client.service.cfs import CFSClient
+from csm_api_client.service.cfs import CFSClientBase
 from csm_api_client.service.gateway import APIError
 from csm_api_client.service.hsm import HSMClient
 
@@ -448,9 +448,13 @@ class CFSStatusModule(StatusModule):
 
     @property
     def rows(self):
-        cfs_client = CFSClient(self.session)
+        cfs_version = get_config_value('cfs.api_version')
+        cfs_client = CFSClientBase.get_cfs_client(self.session, cfs_version)
         try:
-            cfs_response = cfs_client.get('components').json()
+            cfs_response = cfs_client.get_components()
+            for response in cfs_response:
+                yield response
+
         except APIError as err:
             raise StatusModuleException(f'Failed to query CFS for component information: {err}') from err
         except ValueError as err:

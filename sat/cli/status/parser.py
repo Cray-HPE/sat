@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -96,4 +96,10 @@ def add_status_subparser(subparsers):
         '--bos-version',
         choices=['v1', 'v2'],
         help='The version of the BOS API to use for BOS operations',
+    )
+
+    status_parser.add_argument(
+        '--cfs-version',
+        choices=['v2', 'v3'],
+        help='The version of the CFS API to use for CFS operations',
     )

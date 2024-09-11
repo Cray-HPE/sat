@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -45,6 +45,7 @@ from sat.config import (
     load_config,
     read_config_value_file,
     validate_bos_api_version,
+    validate_cfs_api_version,
     validate_log_level
 )
 from tests.common import ExtendedTestCase
@@ -84,6 +85,21 @@ class TestValidateBosApiVersion(unittest.TestCase):
             with self.subTest(version=version):
                 with self.assertRaises(ConfigValidationError):
                     validate_bos_api_version(version)
+
+
+class TestValidateCfsApiVersion(unittest.TestCase):
+    """Tests for validate_cfs_api_version function"""
+
+    def test_validate_cfs_api_version_v2(self):
+        """Test that "v2" is a valid CFS API version"""
+        validate_cfs_api_version('v2')
+
+    def test_validate_invalid_cfs_api_version(self):
+        """Test that invalid CFS versions are not allowed"""
+        for version in ['v5', 'foo', '', '1', '2']:
+            with self.subTest(version=version):
+                with self.assertRaises(ConfigValidationError):
+                    validate_cfs_api_version(version)
 
 
 class TestOptionValue(unittest.TestCase):
