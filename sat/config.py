@@ -95,6 +95,23 @@ def validate_bos_api_version(version):
         )
 
 
+def validate_cfs_api_version(version):
+    """Validates the given CFS API version string
+    Args:
+        version (str): the CFS API version string to validate
+    Returns:
+        None
+    Raises:
+        ConfigValidationError: if `version` is not a valid CFS API version string
+    """
+    valid_cfs_api_versions = {'v2', 'v3'}
+    if not version.lower() in valid_cfs_api_versions:
+        raise ConfigValidationError(
+            f'CFS API Version "{version}" is not one of the valid '
+            f'CFS API versions: {", ".join(valid_cfs_api_versions)}'
+        )
+
+
 SAT_CONFIG_SPEC = {
     'api_gateway': {
         'host': OptionSpec(str, 'api-gw-service-nmn.local', None, None),
@@ -106,6 +123,9 @@ SAT_CONFIG_SPEC = {
     },
     'bos': {
         'api_version': OptionSpec(str, 'v2', validate_bos_api_version, 'bos_version')
+    },
+    'cfs': {
+        'api_version': OptionSpec(str, 'v3', validate_cfs_api_version, 'cfs_version')
     },
     'bootsys': {
         'max_hsn_states': OptionSpec(int, 10, None, None),
