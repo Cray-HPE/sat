@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -38,7 +38,7 @@ from paramiko.ssh_exception import SSHException
 
 from sat.apiclient import (
     APIError,
-    CFSClient,
+    CFSClientBase,
     NMDClient
 )
 from sat.apiclient.bos import BOSClientCommon
@@ -383,7 +383,7 @@ class CFSActivityChecker(ServiceActivityChecker):
         Raises:
             ServiceCheckError: if unable to get the active CFS sessions.
         """
-        cfs_client = CFSClient(SATSession())
+        cfs_client = CFSClientBase.get_cfs_client(SATSession(), 'v2')
         try:
             sessions = cfs_client.get('sessions').json()
         except (APIError, ValueError) as err:

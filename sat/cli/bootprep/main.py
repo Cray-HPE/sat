@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -32,7 +32,7 @@ import inflect
 from jinja2.sandbox import SandboxedEnvironment
 import yaml
 
-from sat.apiclient import CFSClient, IMSClient
+from sat.apiclient import CFSClientBase, IMSClient
 from sat.apiclient.bos import BOSClientCommon
 from sat.cli.bootprep.errors import (
     BootPrepDocsError,
@@ -210,7 +210,7 @@ def do_bootprep_run(schema_validator, args):
     LOGGER.info('Input file successfully validated against schema')
 
     session = SATSession()
-    cfs_client = CFSClient(session)
+    cfs_client = CFSClientBase.get_cfs_client(session, 'v2')
     ims_client = IMSClient(session)
     # CASMTRIAGE-4288: IMS can be extremely slow to return DELETE requests for
     # large images, so this IMSClient will not use a timeout on HTTP requests

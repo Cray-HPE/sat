@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -330,7 +330,7 @@ def validate_image_configurations(input_images, cfs_client, input_config_names, 
     Args:
         input_images (list of sat.cli.bootprep.input.image.InputImage): the
             IMSImages which should have their configurations validated.
-        cfs_client (csm_api_client.service.cfs.CFSClient): the CFS client to query to
+        cfs_client (csm_api_client.service.cfs.CFSClientBase): the CFS client to query to
             determine whether the configuration for the image exists.
         input_config_names (list of str): the list of configuration names that
             are defined in the input file
@@ -423,7 +423,7 @@ def validate_images(instance, args, cfs_client):
             against the schema.
         args: The argparse.Namespace object containing the parsed arguments
             passed to the bootprep subcommand.
-        cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client to make
+        cfs_client (csm_api_client.service.cfs.CFSClientBase): the CFS API client to make
             requests to the CFS API
 
     Returns: None

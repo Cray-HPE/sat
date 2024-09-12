@@ -508,7 +508,7 @@ class TestCFSActivityChecker(unittest.TestCase):
 
         patch('sat.cli.bootsys.service_activity.SATSession').start()
         self.mock_cfs_client = patch(
-            'sat.cli.bootsys.service_activity.CFSClient').start()
+            'sat.cli.bootsys.service_activity.CFSClientBase.get_cfs_client').start()
         self.mock_cfs_client.return_value.get = mock_cfs_get
 
     def tearDown(self):
