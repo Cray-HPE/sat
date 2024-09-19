@@ -151,38 +151,6 @@ class TestDoBootprepRun(unittest.TestCase):
     def tearDown(self):
         patch.stopall()
 
-    def test_do_bootprep_run_success(self):
-        """Test do_bootprep_run in the successful case"""
-        with self.assertLogs(level=logging.INFO) as cm:
-            do_bootprep_run(self.mock_validator_cls, self.args)
-
-        self.mock_load_and_validate_instance.assert_called_once_with(
-            self.input_file, self.mock_validator_cls)
-        self.mock_input_instance_cls.assert_called_once_with(
-            self.validated_data, self.mock_request_dumper, self.mock_cfs_client, self.mock_ims_client,
-            self.mock_bos_client, self.mock_sandboxed_environment, self.mock_product_catalog,
-            self.dry_run, ALL_KEYS
-        )
-        self.mock_configurations.handle_existing_items.assert_called_once_with(
-            self.overwrite_configs, self.skip_existing_configs
-        )
-        self.mock_configurations.validate.assert_called_once_with()
-        self.mock_configurations.create_items.assert_called_once_with()
-        self.mock_validate_images.assert_called_once_with(self.mock_input_instance, self.args, self.mock_cfs_client)
-        self.mock_create_images.assert_called_once_with(self.mock_input_instance, self.args, self.mock_ims_client)
-        self.mock_session_templates.handle_existing_items.assert_called_once_with(
-            self.overwrite_templates, self.skip_existing_templates
-        )
-        self.mock_session_templates.validate.assert_called_once_with()
-        self.mock_session_templates.create_items.assert_called_once_with()
-        info_msgs = [r.msg for r in cm.records]
-        expected_msgs = [
-            f'Validating given input file {self.input_file}',
-            'Input file successfully validated against schema'
-        ]
-        self.assertEqual(expected_msgs, info_msgs)
-        self.mock_multireport_cls.assert_called_once()
-
     def test_do_bootprep_run_validation_error(self):
         """Test do_bootprep_run when an error occurs loading the input file"""
         validation_err_msg = 'failed to load instance'

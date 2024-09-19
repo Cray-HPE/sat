@@ -65,6 +65,8 @@ class VariableContext:
                 command line. Overrides variables from the `vars_file` and from
                 the HPC software recipe.
         """
+        LOGGER.info(f"recipe_version={recipe_version}, vars_file_path={vars_file_path}"
+                    f"cli_vars={cli_vars}")
         self.recipe_version = recipe_version
         self.vars_file_path = vars_file_path
         self.cli_vars = cli_vars or {}
@@ -80,9 +82,16 @@ class VariableContext:
         Raises:
             VariableContextError: if there is a failure to load variables from a file.
         """
+        LOGGER.info(f"Variables: self.vars = {self.vars}")
+        LOGGER.info(f"self.software_recipe_vars = {self.software_recipe_vars}")
+        LOGGER.info(f"self.file_vars = {self.file_vars}")
+        LOGGER.info(f"self.cli_vars = {self.cli_vars}")
         deep_update_dict(self.vars, self.software_recipe_vars)
+        LOGGER.info("self.software_recipe_vars completed")
         deep_update_dict(self.vars, self.file_vars)
+        LOGGER.info("self.file_vars completed")
         deep_update_dict(self.vars, self.cli_vars)
+        LOGGER.info("self.cli_vars completed")
         # CRAYSAT-1653: Replace hyphens in top-level keys with underscores.
         # This allows us to support hyphens in IUF product names, but note that
         # this substitution is only done for top-level keys.

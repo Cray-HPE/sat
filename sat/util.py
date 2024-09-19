@@ -542,6 +542,7 @@ def deep_update_dict(original_dict, new_dict):
         raise TypeError(f'Expected two dict instances. Got {type(original_dict)} and {type(new_dict)}')
 
     for key, value in new_dict.items():
+        LOGGER.info(f"key= {key}, value= {value}")
         if key in original_dict and isinstance(original_dict[key], dict) and isinstance(value, dict):
             deep_update_dict(original_dict[key], value)
         else:

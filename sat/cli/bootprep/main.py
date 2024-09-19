@@ -97,8 +97,11 @@ def load_vars_or_exit(recipe_version, vars_file_path, additional_vars):
         SystemExit: if the variables cannot be loaded.
     """
     try:
+        LOGGER.info(f"inside load_vars_or_exit")
         var_context = VariableContext(recipe_version, vars_file_path, additional_vars)
+        LOGGER.info(f"var_context = {var_context} ")
         var_context.load_vars()
+        LOGGER.info(f"Returned var_context = {var_context}")
         return var_context
     except VariableContextError as err:
         LOGGER.error(str(err))
@@ -210,16 +213,24 @@ def do_bootprep_run(schema_validator, args):
     LOGGER.info('Input file successfully validated against schema')
 
     session = SATSession()
+    LOGGER.info(f"SAT session created {session}")
     cfs_client = CFSClientBase.get_cfs_client(session, 'v2')
+    LOGGER.info(f"CFS Session completed")
     ims_client = IMSClient(session)
+    LOGGER.info(f"IMS Session started")
     # CASMTRIAGE-4288: IMS can be extremely slow to return DELETE requests for
     # large images, so this IMSClient will not use a timeout on HTTP requests
     ims_client.set_timeout(None)
+    LOGGER.info(f"IMS Session completed")
     bos_client = BOSClientCommon.get_bos_client(session)
+    LOGGER.info(f"BOS Session completed")
+    LOGGER.info(f"args.save_files= {args.save_files}, args.output_dir= {args.output_dir}")
     request_dumper = RequestDumper(args.save_files, args.output_dir)
+    LOGGER.info(f"request_dumper = {request_dumper}")
 
     try:
         product_catalog = ProductCatalog()
+        LOGGER.info(f"product_catalog= {product_catalog}")
     except ProductCatalogError as err:
         LOGGER.warning(f'Failed to load product catalog data. Creation of any input items '
                        f'that require data from the product catalog will fail. ({err})')
@@ -227,17 +238,26 @@ def do_bootprep_run(schema_validator, args):
         # data will fail. Otherwise, this is not a problem.
         product_catalog = None
 
+    LOGGER.info(f"Starting var context")
+
     var_context = load_vars_or_exit(
         args.recipe_version,
         args.vars_file,
         args.vars
     )
+    LOGGER.info(f"var_context= {var_context}")
 
     jinja_env = SandboxedEnvironment()
     jinja_env.globals = var_context.vars
 
+    LOGGER.info(f"jinja_env.globals = {jinja_env.globals}")
+    LOGGER.info(f"instance_data= {instance_data}, request_dumper= {request_dumper}, cfs_client={cfs_client}"
+                f"ims_client={ims_client}, bos_client={bos_client}, jinja_env= {jinja_env}, product_catalog="
+                f"{product_catalog}, args.dry_run={args.dry_run}, args.limit= {args.limit}")
+
     instance = InputInstance(instance_data, request_dumper, cfs_client, ims_client, bos_client,
                              jinja_env, product_catalog, args.dry_run, args.limit)
+    LOGGER.info(f"instance = {instance}")
 
     # This is kind of an odd way to pass this through, but it works
     InputConfigurationLayerBase.resolve_branches = args.resolve_branches
@@ -245,7 +265,8 @@ def do_bootprep_run(schema_validator, args):
     # the input instance are used when validating images and session templates,
     # and validation ensures the names render.
     try:
-        instance.input_configurations.validate()
+        out = instance.input_configurations.validate()
+        LOGGER.info(f"out= {out}")
     except InputItemValidateError as err:
         LOGGER.error(str(err))
         raise SystemExit(1)
@@ -254,6 +275,7 @@ def do_bootprep_run(schema_validator, args):
         try:
             instance.input_configurations.handle_existing_items(args.overwrite_configs,
                                                                 args.skip_existing_configs)
+            LOGGER.info(f"instance.input_configurations.handle_existing_items completed")
         except UserAbortException:
             LOGGER.error('Aborted')
             raise SystemExit(1)
@@ -263,6 +285,7 @@ def do_bootprep_run(schema_validator, args):
 
         try:
             instance.input_configurations.create_items()
+            LOGGER.info(f"instance.input_configurations.create_items completed")
         except InputItemCreateError as err:
             LOGGER.error(str(err))
             raise SystemExit(1)
@@ -270,6 +293,7 @@ def do_bootprep_run(schema_validator, args):
         LOGGER.info('Skipping creation of CFS configurations based on value of --limit option.')
 
     # TODO (CRAYSAT-1277): Refactor images to use BaseInputItemCollection
+    LOGGER.info('cfs configuration completed')
 
     # If images or session templates are being created we must validate images,
     # so session templates that use IMS images from the input instance can find
