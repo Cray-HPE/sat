@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2023-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -92,10 +92,12 @@ class TestInputSessionTemplateV2(unittest.TestCase):
         bos_payload_bootsets = {}
         for boot_set_name, boot_set_arch in arch_by_bootset.items():
             input_bootsets[boot_set_name] = {
-                'node_roles_groups': ['Compute']
+                'node_roles_groups': ['Compute'],
+                'rootfs_provider_passthrough': "dvs:api-gw-service-nmn.local:300:hsn0,nmn0:0"
             }
             bos_payload_bootsets[boot_set_name] = {
                 'node_roles_groups': ['Compute'],
+                'rootfs_provider_passthrough': "dvs:api-gw-service-nmn.local:300:hsn0,nmn0:0",
                 'path': self.mock_path,
                 'etag': self.mock_etag,
                 'type': self.mock_image_type
