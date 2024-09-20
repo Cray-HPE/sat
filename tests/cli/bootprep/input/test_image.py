@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2023-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from cray_product_catalog.query import InstalledProductVersion, ProductCatalog
-from csm_api_client.service.cfs import CFSClient
+from csm_api_client.service.cfs import CFSClientBase
 from jinja2 import Environment
 
 from sat.apiclient.ims import IMSClient
@@ -64,7 +64,7 @@ class TestProductInputImage(unittest.TestCase):
 
         self.jinja_env = Environment()
         self.jinja_env.globals = {self.product_name: {'version': self.product_version}}
-        self.mock_cfs_client = Mock(spec=CFSClient)
+        self.mock_cfs_client = Mock(spec=CFSClientBase)
         self.mock_ims_client = Mock(spec=IMSClient)
 
         # The IMS resources should have the same info as in the product catalog entries

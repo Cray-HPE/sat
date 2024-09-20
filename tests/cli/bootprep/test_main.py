@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -131,7 +131,7 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_input_instance_cls = patch('sat.cli.bootprep.main.InputInstance').start()
         self.mock_input_instance = self.mock_input_instance_cls.return_value
         self.mock_sat_session = patch('sat.cli.bootprep.main.SATSession').start()
-        self.mock_cfs_client = patch('sat.cli.bootprep.main.CFSClient').start().return_value
+        self.mock_cfs_client = patch('sat.cli.bootprep.main.CFSClientBase.get_cfs_client').start().return_value
         self.mock_ims_client = patch('sat.cli.bootprep.main.IMSClient').start().return_value
         self.mock_bos_client = patch('sat.cli.bootprep.main.BOSClientCommon.get_bos_client').start().return_value
         self.mock_configurations = self.mock_input_instance.input_configurations

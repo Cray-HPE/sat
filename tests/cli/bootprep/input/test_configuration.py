@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -34,7 +34,7 @@ from cray_product_catalog.query import ProductCatalogError
 from csm_api_client.service.vcs import VCSError
 from jinja2.sandbox import SandboxedEnvironment
 
-from csm_api_client.service.cfs import CFSClient
+from csm_api_client.service.cfs import CFSClientBase
 from sat.cli.bootprep.errors import InputItemCreateError
 from sat.cli.bootprep.input.configuration import (
     AdditionalInventory,
@@ -617,7 +617,7 @@ class TestInputConfiguration(unittest.TestCase):
         self.mock_instance = Mock(spec=InputInstance)
         # Fake index of configuration data in an input file
         self.index = 0
-        self.mock_cfs_client = Mock(spep=CFSClient)
+        self.mock_cfs_client = Mock(spep=CFSClientBase)
 
     def tearDown(self):
         patch.stopall()

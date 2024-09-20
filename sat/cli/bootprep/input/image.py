@@ -55,7 +55,7 @@ class BaseInputImage(DependencyGroupMember, ABC):
         image_data (dict): the data for an image from the bootprep input file
         ims_client (sat.apiclient.IMSClient): the IMSClient to make requests to
             the IMS API
-        cfs_client (csm_api_client.service.cfs.CFSClient): the CFSClient to make requests to
+        cfs_client (csm_api_client.service.cfs.CFSClientBase): the CFSClient to make requests to
             the CFS API
         public_key_id (str): the id of the public key in IMS to use when
             building the image
@@ -94,7 +94,7 @@ class BaseInputImage(DependencyGroupMember, ABC):
                 the product catalog object
             ims_client (sat.apiclient.IMSClient): the IMS API client to make
                 requests to the IMS API
-            cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client to make
+            cfs_client (csm_api_client.service.cfs.CFSClientBase): the CFS API client to make
                 requests to the CFS API
         """
         super().__init__()

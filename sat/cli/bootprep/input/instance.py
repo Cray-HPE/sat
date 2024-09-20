@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -45,7 +45,7 @@ class InputInstance:
                 the instance has already been validated against the schema.
             request_dumper (sat.cli.bootprep.output.RequestDumper): the dumper
                 for dumping request data to files.
-            cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client to make
+            cfs_client (csm_api_client.service.cfs.CFSClientBase): the CFS API client to make
                 requests to the CFS API
             ims_client (sat.apiclient.IMSClient): the IMS API client to make
                 requests to the IMS API

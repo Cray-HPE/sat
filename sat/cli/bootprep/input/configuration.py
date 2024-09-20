@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -371,7 +371,7 @@ class InputConfiguration(BaseInputItem):
             index (int): the index of the item in the collection in the instance
             jinja_env (jinja2.Environment): the Jinja2 environment in which
                 fields supporting Jinja2 templating should be rendered.
-            cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client
+            cfs_client (csm_api_client.service.cfs.CFSClientBase): the CFS API client
             product_catalog (cray_product_catalog.query.ProductCatalog):
                 the product catalog object
             **kwargs: additional keyword arguments
@@ -466,7 +466,7 @@ class InputConfigurationCollection(BaseInputItemCollection):
                 fields supporting Jinja2 templating should be rendered.
             request_dumper (sat.cli.bootprep.output.RequestDumper): the dumper
                 for dumping request data to files.
-            cfs_client (csm_api_client.service.cfs.CFSClient): the CFS API client
+            cfs_client (csm_api_client.service.cfs.CFSClientBase): the CFS API client
             **kwargs: additional keyword arguments
         """
         super().__init__(items_data, instance, jinja_env, request_dumper,

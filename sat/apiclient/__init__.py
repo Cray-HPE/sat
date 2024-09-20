@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@ Client for querying the API gateway.
 """
 # Import these names so that they can still be imported from the apiclient package directly
 
-from csm_api_client.service.cfs import CFSClient
+from csm_api_client.service.cfs import CFSClientBase
 from csm_api_client.service.gateway import APIError, APIGatewayClient, ReadTimeout
 from csm_api_client.service.hsm import HSMClient
 
