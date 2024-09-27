@@ -25,6 +25,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.32.3] - 2024-09-27
+
+### Added
+- Update man-page of `sat status`, `sat bootprep`, `sat bootsys` after introduction of
+  CFS V2-V3.
+
+### Security
+- Update the version of cryptography from 42.0.4 to 43.0.1 to resolve
+  CVE-2024-6119
+
 ## [3.32.2] - 2024-09-27
 
 ### Fixed

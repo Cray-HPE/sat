@@ -36,7 +36,7 @@ file.
 
 In the ``session-checks`` stage, it checks for any active sessions across
 multiple different services in the system, including the Boot Orchestration
-Service (BOS), the Configuration Framework Service (CFS), the Compute Rolling
+Service (BOS), the Configuration Framework Service (CFS)(currently supported only cfs/v2), the Compute Rolling
 Upgrade Service (CRUS), the Firmware Action Service (FAS), the Node Memory Dump
 (NMD) service, and the System Dump Utility (SDU). If any active sessions are
 found, it will print information about those sessions and exit with exit code 1.
