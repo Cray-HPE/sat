@@ -7,7 +7,7 @@ Prepare to boot nodes with images and configurations
 ----------------------------------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2021-2023 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2021-2024 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -18,7 +18,7 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-The bootprep command creates CFS configurations, builds IMS images, customizes
+The bootprep command creates CFS configurations(currently supported only cfs/v2), builds IMS images, customizes
 IMS images with CFS configurations, and creates BOS session templates which can
 then be used to boot nodes in the system, such as compute and application nodes.
 

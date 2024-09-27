@@ -7,7 +7,7 @@ Show node status
 ----------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2019-2022, 2024 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -81,6 +81,10 @@ These options must be specified after the subcommand.
 **--bos-version BOS_VERSION**
         The version of the BOS API to use when looking up BOS template boot
         sets or querying BOS boot status.
+
+**--cfs-version CFS_VERSION**
+        The version of the CFS API to use when querying CFS configuration status
+        and desired configuration for all the components in the system.
 
 .. include:: _sat-format-opts.rst
 .. include:: _sat-filter-opts.rst

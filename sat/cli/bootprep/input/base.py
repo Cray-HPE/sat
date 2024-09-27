@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -241,6 +241,11 @@ class BaseInputItem(Validatable, ABC):
         # The 'name' property is required by the schema for all types of input
         # items that inherit from BaseInputItem.
         return self.data['name']
+
+    @property
+    def boot_set(self):
+        """Return the full boot_sets dictionary."""
+        return self.data.get('bos_parameters', {}).get('boot_sets', {})
 
     def __str__(self):
         # Since the name can be rendered, and when unrendered, it does not need
