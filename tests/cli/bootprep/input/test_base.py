@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@ Tests for functionality in the BaseInputItem classes
 """
 
 import unittest
+from jinja2 import Template
 
 from sat.cli.bootprep.input.base import BaseInputItem
 from sat.constants import MISSING_VALUE
@@ -57,6 +58,12 @@ def create_input_item_cls(cls_report_attrs):
 
         def create(self, payload):
             return
+
+        def render_jinja_template(self, template_str):
+            """Render a Jinja template with provided data."""
+            template = Template(template_str)
+            return template.render(**self.data)
+
     return SomeTestItem
 
 
@@ -84,3 +91,14 @@ class TestBaseInputItem(unittest.TestCase):
         report_row = item_cls(data).report_row()
         self.assertEqual(len(report_row), len(row_headings))
         self.assertEqual(report_row[-1], MISSING_VALUE)
+
+    def test_jinja_template_rendering(self):
+        """Test Jinja template rendering with data from the input item."""
+        item_cls = create_input_item_cls(['name', 'type'])
+        data = {'name': 'foo', 'type': 'configuration'}
+        item = item_cls(data)
+
+        template_str = "name: {{name}} and type: {{type}}"
+        rendered_output = item.render_jinja_template(template_str)
+        expected_output = "name: foo and type: configuration"
+        self.assertEqual(rendered_output, expected_output)

@@ -98,6 +98,7 @@ class InputSessionTemplate(BaseInputItem):
         return self.data['configuration']
 
     @property
+    @jinja_rendered
     def boot_sets(self):
         """dict: the boot sets specified for the session template"""
         # the 'bos_parameters' property is required, and 'boot_sets' is required within that
@@ -186,12 +187,6 @@ class InputSessionTemplate(BaseInputItem):
             boot_set_api_data.update(boot_set_data)
             api_data['boot_sets'][boot_set_name] = boot_set_api_data
 
-            # Fetch full boot sets
-            boot_sets = self.boot_set
-            # Render the rootfs_provider_passthrough using Jinja2
-            rendered_rootfs = self.jinja_env.from_string(
-                        boot_sets[boot_set_name]['rootfs_provider_passthrough']).render(self.data)
-            api_data['boot_sets'][boot_set_name]['rootfs_provider_passthrough'] = rendered_rootfs
         return api_data
 
     def get_image_record_by_id(self, ims_image_id):
