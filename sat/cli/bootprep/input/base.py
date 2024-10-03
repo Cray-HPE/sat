@@ -108,14 +108,25 @@ def jinja_rendered(func):
         # Default to no additional context if not set
         context = getattr(self, 'jinja_context', {})
 
-        try:
-            return self.jinja_env.from_string(unrendered_result).render(context)
-        except SecurityError as err:
-            raise error_cls(f'Jinja2 template {unrendered_result} for value '
-                            f'{func.__name__} tried to access unsafe attributes.') from err
-        except TemplateError as err:
-            raise error_cls(f'Failed to render Jinja2 template {unrendered_result} '
-                            f'for value {func.__name__}: {err}') from err
+        def render_object(obj):
+            """Render an object with the given context."""
+            if isinstance(obj, str):
+                try:
+                    return self.jinja_env.from_string(obj).render(context)
+                except SecurityError as err:
+                    raise error_cls(f'Jinja2 template {obj} for value '
+                                    f'{func.__name__} tried to access unsafe attributes.') from err
+                except TemplateError as err:
+                    raise error_cls(f'Failed to render Jinja2 template {obj} '
+                                    f'for value {func.__name__}: {err}') from err
+            elif isinstance(obj, dict):
+                return {key: render_object(value) for key, value in obj.items()}
+            elif isinstance(obj, list):
+                return [render_object(item) for item in obj]
+            else:
+                return obj
+
+        return render_object(unrendered_result)
 
     return wrapper
 
@@ -241,11 +252,6 @@ class BaseInputItem(Validatable, ABC):
         # The 'name' property is required by the schema for all types of input
         # items that inherit from BaseInputItem.
         return self.data['name']
-
-    @property
-    def boot_set(self):
-        """Return the full boot_sets dictionary."""
-        return self.data.get('bos_parameters', {}).get('boot_sets', {})
 
     def __str__(self):
         # Since the name can be rendered, and when unrendered, it does not need
