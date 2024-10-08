@@ -2,7 +2,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -27,10 +27,10 @@ LOGDIR=/var/log/cray/sat
 
 SATMANDIR=/usr/share/man/man8
 
-METAL_PROVISION_REPO="https://github.com/Cray-HPE/metal-provision.git"
-METAL_PROVISION_DIR="metal-provision"
-METAL_PROVISION_BASE_PACKAGES_PATH="group_vars/all.yml"
-METAL_PROVISION_BRANCH="lts/csm-1.5"
+METAL_PROVISION_REPO="https://github.com/Cray-HPE/node-images.git"
+METAL_PROVISION_DIR="node-images"
+METAL_PROVISION_BASE_PACKAGES_PATH="metal-provision/group_vars/all.yml"
+METAL_PROVISION_BRANCH="main"
 
 # create logging directory
 if [ ! -d "$LOGDIR" ]; then
