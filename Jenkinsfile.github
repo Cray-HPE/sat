@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * (C) Copyright 2022-2023 Hewlett Packard Enterprise Development LP
+ * (C) Copyright 2022-2024 Hewlett Packard Enterprise Development LP
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -45,6 +45,16 @@ pipeline {
     }
 
     stages {
+        stage('Checkout node-images repo for Kubernetes version') {
+            steps {
+                dir("node-images") {
+                    git(
+                        url: "https://github.com/Cray-HPE/node-images", branch: "main",
+                        credentialsId: "jenkins-algol60-cray-hpe-github-integration"
+                    )
+                }
+            }
+	}
         stage('Run Unit Tests') {
             steps {
                 sh 'make unittest'
