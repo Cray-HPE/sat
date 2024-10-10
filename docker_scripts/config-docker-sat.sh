@@ -2,7 +2,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -27,10 +27,8 @@ LOGDIR=/var/log/cray/sat
 
 SATMANDIR=/usr/share/man/man8
 
-METAL_PROVISION_REPO="https://github.com/Cray-HPE/metal-provision.git"
-METAL_PROVISION_DIR="metal-provision"
-METAL_PROVISION_BASE_PACKAGES_PATH="group_vars/all.yml"
-METAL_PROVISION_BRANCH="lts/csm-1.5"
+NODE_IMAGES_DIR="/tmp/node-images"
+NODE_IMAGES_BASE_PACKAGES_PATH="metal-provision/group_vars/all.yml"
 
 # create logging directory
 if [ ! -d "$LOGDIR" ]; then
@@ -61,18 +59,13 @@ register-python-argcomplete sat > /usr/share/bash-completion/completions/sat
 echo "export PATH=$VIRTUAL_ENV/bin:\$PATH" > /etc/profile.d/sat_path.sh
 
 # install kubectl using same version used in ncn image
-cd /sat
-git clone $METAL_PROVISION_REPO $METAL_PROVISION_DIR
-cd $METAL_PROVISION_DIR
-git checkout $METAL_PROVISION_BRANCH
-
 KUBERNETES_PULL_VERSION=$(python3 <<EOF
 import sys
 
 import yaml
 
 
-with open("${METAL_PROVISION_BASE_PACKAGES_PATH}") as pkgs:
+with open("${NODE_IMAGES_DIR}/${NODE_IMAGES_BASE_PACKAGES_PATH}") as pkgs:
     pkgs = yaml.safe_load(pkgs)
     version = pkgs.get("kubernetes_release")
     if version:
@@ -84,7 +77,7 @@ EOF
 )
 
 if [ -z "$KUBERNETES_PULL_VERSION" ]; then
-    echo >&2 "Unable to determine version of kubectl to use from ${METAL_PROVISION_REPO}"
+    echo >&2 "Unable to determine version of kubectl to use from node-images repo"
     exit 1
 fi
 

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -34,13 +34,19 @@ endif
 
 all : unittest codestyle image
 
-unittest:
+# The node-images repo must be cloned to get the Kubernetes version, so we can
+# install the matching version of kubectl in the cray-sat image. In the Jenkins
+# pipeline, this is handled prior to running make
+node-images:
+		git clone --branch main git@github.com:Cray-HPE/node-images.git node-images
+
+unittest: node-images
 		$(DOCKER_BUILD) --target testing --tag $(TEST_TAG)
 		docker run $(TEST_TAG)
 
-codestyle:
+codestyle: node-images
 		$(DOCKER_BUILD) --target codestyle --tag $(CODESTYLE_TAG)
 		docker run $(CODESTYLE_TAG)
 
-image:
+image: node-images
 		$(DOCKER_BUILD) --tag $(DEFAULT_TAG)
