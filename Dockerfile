@@ -69,6 +69,7 @@ COPY docs/man docs/man
 COPY tools tools
 
 RUN --mount=type=secret,id=netrc,target=/root/.netrc \
+    --mount=type=bind,source=node-images,target=/tmp/node-images \
     pip3 install --no-cache-dir pip && \
     pip3 install --no-cache-dir --timeout=300 . && \
     ./config-docker-sat.sh
