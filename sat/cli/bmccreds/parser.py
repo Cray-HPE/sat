@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@ The parser for the bmccreds subcommand.
 
 from argparse import HelpFormatter
 
+from sat.cli.bmccreds.constants import RANDOM_PASSWORD_LENGTH, VALID_CHAR_SETS
 from sat.constants import BMC_TYPES
 from sat.parsergroups import create_format_options, create_xname_options
 
@@ -63,6 +64,25 @@ class BMCCredsFormatter(HelpFormatter):
         return super()._split_lines(text, width)
 
 
+def selected_chars(selected):
+    """Convert a string of comma-separated character sets into a character set string.
+
+    Args:
+        selected (str): the comma-separated character sets. Each element must be
+            a key from VALID_CHAR_SETS.
+
+    Returns:
+        str: the full set of characters as a single string
+    """
+    char_sets = []
+    for char_set in selected.split(','):
+        if char_set not in VALID_CHAR_SETS:
+            raise ValueError(f'Unrecognized char set {char_set}')
+        else:
+            char_sets.append(VALID_CHAR_SETS[char_set])
+    return ''.join(char_sets)
+
+
 def add_bmccreds_subparser(subparsers):
     """Add the bmccreds subparser to the parent parser.
 
@@ -85,6 +105,7 @@ def add_bmccreds_subparser(subparsers):
     )
 
     password_options = bmccreds_subparser.add_mutually_exclusive_group()
+    password_characters = bmccreds_subparser.add_mutually_exclusive_group()
 
     password_options.add_argument(
         '--password',
@@ -100,6 +121,29 @@ def add_bmccreds_subparser(subparsers):
              'not specified and --password is not given, then the user will be '
              'prompted to enter a password. This option is not valid with '
              '--password.'
+    )
+
+    bmccreds_subparser.add_argument(
+        '--password-length', type=int,
+        help='The desired length of the random BMC password. Only valid with '
+             '--random-password. '
+    )
+
+    password_characters.add_argument(
+        '--password-char-sets', type=selected_chars,
+        help=f'A comma-separated list of allowed character sets to be used in '
+             f'a randomly generated password. Only valid with --random-password. '
+             f'Character sets are as follows: "alpha" includes all uppercase and '
+             f'lowercase ASCII letters, "numeric" includes digits 0-9, and "symbols" '
+             f'includes the symbols "{VALID_CHAR_SETS["symbols"].replace("%", "%%")}". '
+             f'For example: sat bmccreds --password-char-sets alpha,numeric,symbols ',
+    )
+
+    password_characters.add_argument(
+        '--password-chars',
+        help=f'Specify explicit list of characters to generate random passwords. '
+             f'Only valid with --random-password. '
+             f'For example: sat bmccreds --password-chars "abcdefghijklmnopqrstuvwxyz!$%%_". '
     )
 
     # Even though the default is 'system', do not set it as default, so we
