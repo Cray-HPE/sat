@@ -371,9 +371,6 @@ def get_config_value(query_string):
 
     value = CONFIG.get(section, option)
 
-    if option.lower() == 'timeout' and value == '-1':
-        return math.inf
-
     return value
 
 
