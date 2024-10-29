@@ -437,24 +437,30 @@ class CFSStatusModule(StatusModule):
     source_name = 'CFS'
     component_types = {'Node'}
 
-    @staticmethod
-    def map_heading(heading):
-        return {
-            'id': 'xname',
-            'desiredConfig': 'Desired Config',
-            'configurationStatus': 'Configuration Status',
-            'errorCount': 'Error Count'
-        }.get(heading, heading)
+    def __init__(self, *, session, **_):
+        super().__init__(session=session)
+        self.cfs_version = get_config_value('cfs.api_version')
+        self.cfs_client = CFSClientBase.get_cfs_client(self.session, self.cfs_version)
+
+        # CFS v2 and v3 components have different property names in components,
+        # so generate a mapping from those field names to the row headings. It
+        # should be generated here rather than in `map_heading` because that method
+        # is called for every row.
+        self.heading_mapping = {
+            self.cfs_client.join_words(*heading.split()): heading
+            for heading in self.headings if heading != 'xname'
+        }
+        # This property name is the same between CFS v2 and v3
+        self.heading_mapping['id'] = 'xname'
+
+    def map_heading(self, heading):
+        return self.heading_mapping.get(heading, heading)
 
     @property
     def rows(self):
-        cfs_version = get_config_value('cfs.api_version')
-        cfs_client = CFSClientBase.get_cfs_client(self.session, cfs_version)
         try:
-            cfs_response = cfs_client.get_components()
-            for response in cfs_response:
-                yield response
-
+            cfs_response = self.cfs_client.get_components()
+            yield from cfs_response
         except APIError as err:
             raise StatusModuleException(f'Failed to query CFS for component information: {err}') from err
         except ValueError as err:
