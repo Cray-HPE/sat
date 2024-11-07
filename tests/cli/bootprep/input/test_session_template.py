@@ -161,6 +161,98 @@ class TestInputSessionTemplateV2(unittest.TestCase):
         self.assertEqual(expected_bos_data,
                          input_session_template.get_create_item_data())
 
+    def test_validate_rootfs_provider_good(self):
+        """Test that validate_rootfs_provider passes with good data"""
+        input_data, _ = self.get_input_and_expected_bos_data()
+        input_session_template = self.simplified_session_template_v2(
+            input_data, self.input_instance, 0, self.jinja_env,
+            self.bos_client, self.cfs_client, self.ims_client
+        )
+        input_session_template.validate_rootfs_provider_has_value()
+
+    def test_validate_rootfs_provider_bad(self):
+        """Test that validate_rootfs_provider fails with bad data"""
+        input_data, _ = self.get_input_and_expected_bos_data()
+        input_data['bos_parameters']['boot_sets']['compute']['rootfs_provider'] = ''
+        input_session_template = self.simplified_session_template_v2(
+            input_data, self.input_instance, 0, self.jinja_env,
+            self.bos_client, self.cfs_client, self.ims_client
+        )
+        err_regex = 'The value of rootfs_provider for boot set compute cannot be an empty string'
+        with self.assertRaisesRegex(InputItemValidateError, err_regex):
+            input_session_template.validate_rootfs_provider_has_value()
+
+    def test_validate_rootfs_provider_multiple_good(self):
+        """Test that validate_rootfs_provider passes with good data in multiple boot sets"""
+        input_data, _ = self.get_input_and_expected_bos_data()
+        compute_boot_set = input_data['bos_parameters']['boot_sets']['compute']
+        input_data['bos_parameters']['boot_sets']['compute_two'] = compute_boot_set
+        input_session_template = self.simplified_session_template_v2(
+            input_data, self.input_instance, 0, self.jinja_env,
+            self.bos_client, self.cfs_client, self.ims_client
+        )
+        input_session_template.validate_rootfs_provider_has_value()
+
+    def test_validate_rootfs_provider_multiple_bad(self):
+        """Test that validate_rootfs_provider fails with bad data in multiple boot sets"""
+        input_data, _ = self.get_input_and_expected_bos_data()
+        input_data['bos_parameters']['boot_sets']['compute']['rootfs_provider'] = ''
+        compute_boot_set = input_data['bos_parameters']['boot_sets']['compute']
+        input_data['bos_parameters']['boot_sets']['compute_two'] = compute_boot_set
+        input_session_template = self.simplified_session_template_v2(
+            input_data, self.input_instance, 0, self.jinja_env,
+            self.bos_client, self.cfs_client, self.ims_client
+        )
+        err_regex = 'The value of rootfs_provider for boot set compute cannot be an empty string'
+        with self.assertRaisesRegex(InputItemValidateError, err_regex):
+            input_session_template.validate_rootfs_provider_has_value()
+
+    def test_validate_rootfs_provider_passthrough_good(self):
+        """Test that validate_rootfs_provider_passthrough passes with good data"""
+        input_data, _ = self.get_input_and_expected_bos_data()
+        input_session_template = self.simplified_session_template_v2(
+            input_data, self.input_instance, 0, self.jinja_env,
+            self.bos_client, self.cfs_client, self.ims_client
+        )
+        input_session_template.validate_rootfs_provider_passthrough_has_value()
+
+    def test_validate_rootfs_provider_passthrough_bad(self):
+        """Test that validate_rootfs_provider_passthrough fails with bad data"""
+        input_data, _ = self.get_input_and_expected_bos_data()
+        input_data['bos_parameters']['boot_sets']['compute']['rootfs_provider_passthrough'] = ''
+        input_session_template = self.simplified_session_template_v2(
+            input_data, self.input_instance, 0, self.jinja_env,
+            self.bos_client, self.cfs_client, self.ims_client
+        )
+        err_regex = 'The value of rootfs_provider_passthrough for boot set compute cannot be an empty string'
+        with self.assertRaisesRegex(InputItemValidateError, err_regex):
+            input_session_template.validate_rootfs_provider_passthrough_has_value()
+
+    def test_validate_rootfs_provider_passthrough_multiple_good(self):
+        """Test that validate_rootfs_provider_passthrough passes with good data in multiple boot sets"""
+        input_data, _ = self.get_input_and_expected_bos_data()
+        compute_boot_set = input_data['bos_parameters']['boot_sets']['compute']
+        input_data['bos_parameters']['boot_sets']['compute_two'] = compute_boot_set
+        input_session_template = self.simplified_session_template_v2(
+            input_data, self.input_instance, 0, self.jinja_env,
+            self.bos_client, self.cfs_client, self.ims_client
+        )
+        input_session_template.validate_rootfs_provider_passthrough_has_value()
+
+    def test_validate_rootfs_provider_passthrough_multiple_bad(self):
+        """Test that validate_rootfs_provider_passthrough fails with bad data in multiple boot sets"""
+        input_data, _ = self.get_input_and_expected_bos_data()
+        input_data['bos_parameters']['boot_sets']['compute']['rootfs_provider_passthrough'] = ''
+        compute_boot_set = input_data['bos_parameters']['boot_sets']['compute']
+        input_data['bos_parameters']['boot_sets']['compute_two'] = compute_boot_set
+        input_session_template = self.simplified_session_template_v2(
+            input_data, self.input_instance, 0, self.jinja_env,
+            self.bos_client, self.cfs_client, self.ims_client
+        )
+        err_regex = 'The value of rootfs_provider_passthrough for boot set compute cannot be an empty string'
+        with self.assertRaisesRegex(InputItemValidateError, err_regex):
+            input_session_template.validate_rootfs_provider_passthrough_has_value()
+
 
 if __name__ == '__main__':
     unittest.main()
