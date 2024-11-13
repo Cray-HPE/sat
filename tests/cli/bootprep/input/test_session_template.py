@@ -38,6 +38,12 @@ class TestInputSessionTemplateV2(unittest.TestCase):
         self.input_instance = Mock()
         self.index = 0
         self.jinja_env = SandboxedEnvironment()
+        self.jinja_env.globals = {
+            'default': {
+                'system_name': 'drax',
+                'site_domain': 'example.com',
+            }
+        }
         self.bos_client = Mock()
         self.mock_base_boot_set_data = {
             'rootfs_provider': 'cpss3'
@@ -93,16 +99,20 @@ class TestInputSessionTemplateV2(unittest.TestCase):
         for boot_set_name, boot_set_arch in arch_by_bootset.items():
             input_bootsets[boot_set_name] = {
                 'node_roles_groups': ['Compute'],
-                'rootfs_provider_passthrough': "dvs:api-gw-service-nmn.local:300:hsn0,nmn0:0"
+                'rootfs_provider': 'sbps',
+                'rootfs_provider_passthrough': ('sbps:v1:iqn.2023-06.csm.iscsi:_sbps-hsn._tcp.'
+                                                '{{default.system_name}}.{{default.site_domain}}:300')
             }
-            bos_payload_bootsets[boot_set_name] = {
+            bos_payload_bootsets[boot_set_name] = self.mock_base_boot_set_data.copy()
+            bos_payload_bootsets[boot_set_name].update({
                 'node_roles_groups': ['Compute'],
-                'rootfs_provider_passthrough': "dvs:api-gw-service-nmn.local:300:hsn0,nmn0:0",
+                'rootfs_provider': 'sbps',
+                'rootfs_provider_passthrough': ('sbps:v1:iqn.2023-06.csm.iscsi:_sbps-hsn._tcp.'
+                                                'drax.example.com:300'),
                 'path': self.mock_path,
                 'etag': self.mock_etag,
                 'type': self.mock_image_type
-            }
-            bos_payload_bootsets[boot_set_name].update(self.mock_base_boot_set_data)
+            })
             if boot_set_arch:
                 input_bootsets[boot_set_name]['arch'] = boot_set_arch
                 bos_payload_bootsets[boot_set_name]['arch'] = boot_set_arch
