@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -37,6 +37,7 @@ import os.path
 import re
 import time
 
+
 # Logic borrowed from imps to get the most efficient YAML available
 try:
     from yaml import CSafeDumper as SafeDumper
@@ -49,6 +50,7 @@ import boto3
 from prettytable import PrettyTable
 
 from sat.xname import XName
+from sat.loose_version import LooseVersion
 from sat.config import get_config_value, read_config_value_file
 
 
@@ -348,8 +350,15 @@ def _xname_representer(dumper, xname):
     )
 
 
+def _looseversion_representer(dumper, looseversion):
+    return dumper.represent_scalar(
+        BaseResolver.DEFAULT_SCALAR_TAG, looseversion.version_str
+    )
+
+
 SATDumper.add_representer(OrderedDict, _ordered_dict_representer)
 SATDumper.add_representer(XName, _xname_representer)
+SATDumper.add_representer(LooseVersion, _looseversion_representer)
 
 
 # A function to dump YAML to be used by all SAT code.
@@ -369,6 +378,8 @@ class SATEncoder(JSONEncoder):
         """
         if isinstance(o, XName):
             return str(o)
+        if isinstance(o, LooseVersion):
+            return o.version_str
         return JSONEncoder.default(self, o)
 
 

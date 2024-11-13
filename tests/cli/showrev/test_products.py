@@ -33,6 +33,7 @@ from unittest.mock import patch, Mock
 from cray_product_catalog.query import InstalledProductVersion, ProductCatalogError
 
 from sat.cli.showrev.products import get_product_versions
+from sat.loose_version import LooseVersion
 from tests.test_util import ExtendedTestCase
 
 SAMPLES_DIR = os.path.join(os.path.dirname(__file__), 'samples')
@@ -90,9 +91,9 @@ class TestGetProducts(ExtendedTestCase):
     def test_get_product_versions(self):
         """Test a basic invocation of get_product_versions."""
         expected_fields = [
-            ['cos', '1.4.0', COS_IMAGE_NAME, COS_RECIPE_NAME],
-            ['uan', '2.0.0', UAN_IMAGE_NAME, UAN_RECIPE_NAME],
-            ['pbs', '0.1.0', '-', '-']
+            ['cos', LooseVersion('1.4.0'), COS_IMAGE_NAME, COS_RECIPE_NAME],
+            ['uan', LooseVersion('2.0.0'), UAN_IMAGE_NAME, UAN_RECIPE_NAME],
+            ['pbs', LooseVersion('0.1.0'), '-', '-']
         ]
         actual_headers, actual_fields = get_product_versions()
         self.mock_product_catalog_cls.assert_called_once_with()
@@ -108,10 +109,10 @@ class TestGetProducts(ExtendedTestCase):
         self.mock_product_catalog.products.insert(2, new_uan_product)
 
         expected_fields = [
-            ['cos', '1.4.0', COS_IMAGE_NAME, COS_RECIPE_NAME],
-            ['uan', '2.0.0', UAN_IMAGE_NAME, UAN_RECIPE_NAME],
-            ['uan', '2.0.1', new_uan_image_name, new_uan_recipe_name],
-            ['pbs', '0.1.0', '-', '-']
+            ['cos', LooseVersion('1.4.0'), COS_IMAGE_NAME, COS_RECIPE_NAME],
+            ['uan', LooseVersion('2.0.0'), UAN_IMAGE_NAME, UAN_RECIPE_NAME],
+            ['uan', LooseVersion('2.0.1'), new_uan_image_name, new_uan_recipe_name],
+            ['pbs', LooseVersion('0.1.0'), '-', '-']
         ]
         actual_headers, actual_fields = get_product_versions()
         self.mock_product_catalog_cls.assert_called_once_with()
@@ -125,9 +126,10 @@ class TestGetProducts(ExtendedTestCase):
         self.mock_uan_product.recipes.append(get_fake_ims_data(other_uan_recipe))
 
         expected_fields = [
-            ['cos', '1.4.0', COS_IMAGE_NAME, COS_RECIPE_NAME],
-            ['uan', '2.0.0', f'{other_uan_image}\n{UAN_IMAGE_NAME}', f'{other_uan_recipe}\n{UAN_RECIPE_NAME}'],
-            ['pbs', '0.1.0', '-', '-']
+            ['cos', LooseVersion('1.4.0'), COS_IMAGE_NAME, COS_RECIPE_NAME],
+            ['uan', LooseVersion('2.0.0'), f'{other_uan_image}\n{UAN_IMAGE_NAME}',
+             f'{other_uan_recipe}\n{UAN_RECIPE_NAME}'],
+            ['pbs', LooseVersion('0.1.0'), '-', '-']
         ]
         actual_headers, actual_fields = get_product_versions()
         self.mock_product_catalog_cls.assert_called_once_with()
@@ -150,9 +152,9 @@ class TestGetProducts(ExtendedTestCase):
         self.mock_uan_product.supports_active = True
         self.mock_uan_product.active = False
         expected_fields = [
-            ['cos', '1.4.0', COS_IMAGE_NAME, COS_RECIPE_NAME],
-            ['uan', '2.0.0', UAN_IMAGE_NAME, UAN_RECIPE_NAME],
-            ['pbs', '0.1.0', '-', '-']
+            ['cos', LooseVersion('1.4.0'), COS_IMAGE_NAME, COS_RECIPE_NAME],
+            ['uan', LooseVersion('2.0.0'), UAN_IMAGE_NAME, UAN_RECIPE_NAME],
+            ['pbs', LooseVersion('0.1.0'), '-', '-']
         ]
         actual_headers, actual_fields = get_product_versions()
         self.mock_product_catalog_cls.assert_called_once_with()
