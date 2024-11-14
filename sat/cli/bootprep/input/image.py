@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -403,7 +403,7 @@ class BaseInputImage(DependencyGroupMember, ABC):
 
         try:
             self.image_configure_session = self.cfs_client.create_image_customization_session(
-                self.configuration, self.image_id_to_configure, self.configuration_group_names, self.name)
+                session_name, self.configuration, self.image_id_to_configure, self.configuration_group_names, self.name)
         except APIError as err:
             raise ImageCreateError(f'Failed to launch image customization CFS session: {err}')
 
