@@ -407,7 +407,6 @@ class InputConfiguration(BaseInputItem):
             payload (dict): the payload to pass to the CFS API to create the
                 CFS configuration
         """
-        # TODO: Consider using a method of the CFSConfiguration class from csm_api_client
         try:
             # request_body guaranteed to have 'name' key, so no need to catch ValueError
             self.cfs_client.put_configuration(self.name, payload)
@@ -445,14 +444,9 @@ class InputConfigurationCollection(BaseInputItemCollection):
         See parent class for full docstring.
         """
         try:
-            # TODO: Add a get_configurations method to cfs_client?
-            configurations = self.cfs_client.get('configurations').json()
+            configurations = self.cfs_client.get_configurations()
         except APIError as err:
-            # TODO: Consider whether we need subclasses of InputItemCreateError
             raise InputItemCreateError(f'Unable to get existing CFS configurations: {err}')
-        except ValueError as err:
-            raise InputItemCreateError(f'Unable to parse response when getting existing CFS '
-                                       f'configurations: {err}')
 
         # CFS configurations have unique names, so this is safe
         return {
