@@ -251,10 +251,13 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
         """
         layer_cls = self.cfs_client.configuration_cls.cfs_config_layer_cls
 
+        # If the version is 'latest', we want to pass None to from_product_catalog
+        version = self.product_version if self.product_version != LATEST_VERSION_VALUE else None
+
         try:
             layer = layer_cls.from_product_catalog(
                 product_name=self.product_name, api_gw_host=get_config_value('api_gateway.host'),
-                product_version=self.product_version, commit=self.commit, branch=self.branch,
+                product_version=version, commit=self.commit, branch=self.branch,
                 name=self.name, playbook=self.playbook, ims_require_dkms=self.ims_require_dkms,
                 product_catalog=self.product_catalog
             )
