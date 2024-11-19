@@ -110,6 +110,30 @@ class InputSessionTemplate(BaseInputItem):
         """dict: the image record from IMS for this session template"""
 
     @Validatable.validation_method()
+    def validate_rootfs_provider_has_value(self, **_):
+        """Validate that the rootfs_provider is not an empty string
+
+        Raises:
+            InputItemValidateError: if the rootfs_provider is an empty string
+        """
+        for boot_set_name, boot_set_data in self.boot_sets.items():
+            if not boot_set_data['rootfs_provider']:
+                raise InputItemValidateError(f'The value of rootfs_provider for boot set '
+                                             f'{boot_set_name} cannot be an empty string')
+
+    @Validatable.validation_method()
+    def validate_rootfs_provider_passthrough_has_value(self, **_):
+        """Validate that the rootfs_provider_passthrough is not an empty string
+
+        Raises:
+            InputItemValidateError: if the rootfs_provider_passthrough is an empty string
+        """
+        for boot_set_name, boot_set_data in self.boot_sets.items():
+            if not boot_set_data['rootfs_provider_passthrough']:
+                raise InputItemValidateError(f'The value of rootfs_provider_passthrough for boot set '
+                                             f'{boot_set_name} cannot be an empty string')
+
+    @Validatable.validation_method()
     def validate_configuration_exists(self, **_):
         """Validate that the configuration specified for this session template exists.
 
