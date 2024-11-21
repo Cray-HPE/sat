@@ -17,3 +17,4 @@ venv
 
 nosetests.xml
 .vscode/
+.idea

@@ -27,6 +27,7 @@ Module for obtaining product version information.
 import logging
 
 from cray_product_catalog.query import ProductCatalog, ProductCatalogError
+from sat.loose_version import LooseVersion
 
 
 LOGGER = logging.getLogger(__name__)
@@ -66,6 +67,6 @@ def get_product_versions():
     for product in product_catalog.products:
         images = '\n'.join(sorted(image['name'] for image in product.images)) or '-'
         recipes = '\n'.join(sorted(recipe['name'] for recipe in product.recipes)) or '-'
-        products.append([product.name, product.version, images, recipes])
+        products.append([product.name, LooseVersion(product.version), images, recipes])
 
     return headers, products

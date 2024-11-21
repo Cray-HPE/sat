@@ -25,6 +25,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.32.12] - 2024-11-21
+
+### Fixed
+- Fix sorting by product version in `sat showrev --products` to sort by semantic
+  version rather than a simple lexicographic order.
+
 ## [3.32.11] - 2024-11-12
 
 ### Fixed
@@ -65,7 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.32.4] - 2024-09-27
 
 ### Added
-- Add jinja rendering of rootfs_provider_passthrough value for the boot_set to create session 
+- Add jinja rendering of rootfs_provider_passthrough value for the boot_set to create session
   template with iSCSI values.
 
 ## [3.32.3] - 2024-09-27
@@ -101,7 +107,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.31.0] - 2024-08-21
 
-### Fixed 
+### Fixed
 - Updating the cray-product-catalog & python-csm-api-client to latest versions.
 
 ## [3.30.2] - 2024-08-14
@@ -326,7 +332,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.27.11] - 2024-02-28
 
 ### Fixed
-- Fixed for `sat showrev` to stop supporting `--release-files` option 
+- Fixed for `sat showrev` to stop supporting `--release-files` option
   and log a warning message indicating that this option is no longer supported.
 
 ## [3.27.10] - 2024-02-26
@@ -357,7 +363,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.27.6] - 2024-02-16
 
 ### Fixed
-- Remove unnecessary queries to BOS to get the name of the session template for 
+- Remove unnecessary queries to BOS to get the name of the session template for
   every single node component in the output of `sat status`.
 
 ## [3.27.5] - 2024-02-07
@@ -371,7 +377,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Update the version of jinja2 from 3.0.3 to 3.1.3 to address
   CVE-2024-22195
-  
+
 ## [3.27.3] - 2024-01-31
 
 ### Fixed
