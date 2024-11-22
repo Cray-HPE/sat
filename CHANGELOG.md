@@ -33,9 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `cfs.api_version` config-file option.
 
 ### Changed
-- Modified the `sat bootprep` input file schema to require the `playbook` field
-  be specified for each layer of a CFS configuration. The CFS v3 API requires a
-  playbook for each layer.
+- The `sat bootprep` command defaults to using the v3 CFS API instead of v2.
+- When using the CFS v3 API, CFS configuration layers defined in `sat bootprep`
+  input files are required to specify the `playbook` field as this is required
+  by the CFS v3 API.
 
 ## [3.32.13] - 2024-11-25
 
