@@ -45,7 +45,7 @@ from sat.util import get_val_by_path
 LOGGER = logging.getLogger(__name__)
 
 
-class InputConfigurationLayerBase(ABC):
+class InputConfigurationLayerBase(ABC, Validatable):
     """An object representing data in common between layers and additional inventory"""
 
     # CRAYSAT-1174: Specifying a 'branch' in a CFS configuration layer is not
@@ -106,6 +106,24 @@ class InputConfigurationLayerBase(ABC):
 class InputConfigurationLayer(InputConfigurationLayerBase, ABC):
     """A CFS configuration layer as defined in the bootprep input file"""
 
+    def __init__(self, layer_data, index, jinja_env, cfs_client):
+        """Create a new InputConfigurationLayer.
+
+        Args:
+            layer_data (dict): the layer data from the input instance
+            index (int): the index of the layer in the configuration
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
+            cfs_client (csm_api_client.service.cfs.CFSClientBase): the CFS API
+                client to use when creating the layer in CFS
+        """
+        super().__init__(layer_data, jinja_env, cfs_client)
+        self.index = index
+
+    def __str__(self):
+        """str: a string representation of the layer"""
+        return f'CFS configuration layer at index {self.index}'
+
     @property
     @jinja_rendered
     def playbook(self):
@@ -135,12 +153,13 @@ class InputConfigurationLayer(InputConfigurationLayerBase, ABC):
                                          'CFS v3 API to create configurations.')
 
     @staticmethod
-    def get_configuration_layer(layer_data, jinja_env, cfs_client, product_catalog):
+    def get_configuration_layer(layer_data, index, jinja_env, cfs_client, product_catalog):
         """Get and return a new InputConfigurationLayer for the given layer data.
 
         Args:
             layer_data (dict): The data for a layer, already validated against
                 the bootprep input file schema.
+            index (int): the index of the layer in the configuration
             jinja_env (jinja2.Environment): the Jinja2 environment in which
                 fields supporting Jinja2 templating should be rendered.
             cfs_client (csm_api_client.service.cfs.CFSClientBase): the CFS API
@@ -154,9 +173,9 @@ class InputConfigurationLayer(InputConfigurationLayerBase, ABC):
                 properly validated against the schema.
         """
         if 'git' in layer_data:
-            return GitInputConfigurationLayer(layer_data, jinja_env, cfs_client)
+            return GitInputConfigurationLayer(layer_data, index, jinja_env, cfs_client)
         elif 'product' in layer_data:
-            return ProductInputConfigurationLayer(layer_data, jinja_env, cfs_client, product_catalog)
+            return ProductInputConfigurationLayer(layer_data, index, jinja_env, cfs_client, product_catalog)
         else:
             raise ValueError('Unrecognized type of configuration layer')
 
@@ -216,11 +235,12 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
     A configuration layer that is defined with the name of a product
     and the version or branch.
     """
-    def __init__(self, layer_data, jinja_env, cfs_client, product_catalog):
+    def __init__(self, layer_data, index, jinja_env, cfs_client, product_catalog):
         """Create a new ProductInputConfigurationLayer.
 
         Args:
             layer_data (dict): the layer data from the input instance
+            index (int): the index of the layer in the configuration
             jinja_env (jinja2.Environment): the Jinja2 environment in which
                 fields supporting Jinja2 templating should be rendered.
             cfs_client (csm_api_client.service.cfs.CFSClientBase): the CFS API
@@ -228,7 +248,7 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
             product_catalog (cray_product_catalog.query.ProductCatalog or None):
                 the product catalog object
         """
-        super().__init__(layer_data, jinja_env, cfs_client)
+        super().__init__(layer_data, index, jinja_env, cfs_client)
         self.product_catalog = product_catalog
 
     @property
@@ -367,14 +387,37 @@ class InputConfiguration(BaseInputItem):
         self.jinja_context = {}
 
         # The 'layers' property is required and must be a list, but it can be empty
-        self.layers = [InputConfigurationLayer.get_configuration_layer(layer_data, jinja_env,
+        self.layers = [InputConfigurationLayer.get_configuration_layer(layer_data, index, jinja_env,
                                                                        cfs_client, product_catalog)
-                       for layer_data in self.data['layers']]
+                       for index, layer_data in enumerate(self.data['layers'])]
 
         self.additional_inventory = None
         if 'additional_inventory' in self.data:
             self.additional_inventory = AdditionalInventory(self.data['additional_inventory'], jinja_env,
                                                             cfs_client)
+
+    @Validatable.validation_method()
+    def validate_layers(self, **kwargs):
+        """Validate all layers within this configuration.
+
+        If a layer's `validate` method raises an `InputItemValidateError`, an
+        error will be logged, and once all layers are validated, this will raise
+        a new `InputItemValidateError`.
+
+        Raises:
+            InputItemValidateError: if any layer is invalid
+        """
+        valid = True
+
+        for layer in self.layers:
+            try:
+                layer.validate(**kwargs)
+            except InputItemValidateError as err:
+                LOGGER.error(str(err))
+                valid = False
+
+        if not valid:
+            raise InputItemValidateError(f'One or more layers is not valid in {self}')
 
     def get_create_item_data(self):
         """Get the data to pass to the CFS API to create this configuration.
