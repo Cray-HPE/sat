@@ -28,15 +28,16 @@ from abc import ABC, abstractmethod
 import logging
 
 from csm_api_client.service.gateway import APIError
-from csm_api_client.service.cfs import CFSConfigurationError
+from csm_api_client.service.cfs import CFSV3Client, CFSConfigurationError
 
 from sat.cached_property import cached_property
 from sat.cli.bootprep.constants import LATEST_VERSION_VALUE
-from sat.cli.bootprep.errors import InputItemCreateError
+from sat.cli.bootprep.errors import InputItemCreateError, InputItemValidateError
 from sat.cli.bootprep.input.base import (
     BaseInputItem,
     BaseInputItemCollection,
-    jinja_rendered,
+    Validatable,
+    jinja_rendered
 )
 from sat.config import get_config_value
 from sat.util import get_val_by_path
@@ -108,14 +109,30 @@ class InputConfigurationLayer(InputConfigurationLayerBase, ABC):
     @property
     @jinja_rendered
     def playbook(self):
-        """str: the playbook specified in the layer"""
-        # playbook is now required by the schema
-        return self.layer_data['playbook']
+        """str or None: the playbook specified in the layer"""
+        # Note that CFS v3 requires a playbook but CFS v2 does not, so the
+        # schema does not require a playbook, but it is validated in the
+        # validate_playbook_specified_with_cfs_v3 method below.
+        return self.layer_data.get('playbook')
 
     @property
     def ims_require_dkms(self):
         """str or None: whether to enable DKMS when this layer customizes an IMS image"""
         return get_val_by_path(self.layer_data, 'special_parameters.ims_require_dkms')
+
+    @Validatable.validation_method()
+    def validate_playbook_specified_with_cfs_v3(self, **_):
+        """Validate that a playbook is specified when using CFS v3.
+
+        The CFS v3 API will respond with a clear error, but validating here
+        allows this issue to be caught in --dry-run mode.
+
+        Raises:
+            InputItemValidateError: if a playbook is not specified when using CFS v3
+        """
+        if isinstance(self.cfs_client, CFSV3Client) and not self.playbook:
+            raise InputItemValidateError('A playbook is required when using the '
+                                         'CFS v3 API to create configurations.')
 
     @staticmethod
     def get_configuration_layer(layer_data, jinja_env, cfs_client, product_catalog):

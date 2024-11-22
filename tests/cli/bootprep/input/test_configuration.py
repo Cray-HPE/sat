@@ -24,16 +24,14 @@
 """
 Tests for sat.cli.bootprep.input.configuration
 """
-from copy import deepcopy
 import logging
 import unittest
 from unittest.mock import Mock, patch
 
-from csm_api_client.service.vcs import VCSError
 from jinja2.sandbox import SandboxedEnvironment
 
-from csm_api_client.service.cfs import CFSClientBase, CFSConfigurationError
-from sat.cli.bootprep.errors import InputItemCreateError
+from csm_api_client.service.cfs import CFSClientBase, CFSConfigurationError, CFSV2Client, CFSV3Client
+from sat.cli.bootprep.errors import InputItemCreateError, InputItemValidateError
 from sat.cli.bootprep.input.configuration import (
     AdditionalInventory,
     InputConfigurationLayer,
@@ -156,10 +154,17 @@ class TestGitInputConfigurationLayer(TestInputConfigurationLayerBase):
         patch.stopall()
 
     def test_playbook_property_present(self):
-        """Test the playbook property"""
+        """Test the playbook property when a playbook is in the layer data"""
         layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env,
                                            self.mock_cfs_client)
         self.assertEqual(self.playbook, layer.playbook)
+
+    def test_playbook_property_not_present(self):
+        """Test the playbook property when a playbook is not in the layer data"""
+        del self.branch_layer_data['playbook']
+        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env,
+                                           self.mock_cfs_client)
+        self.assertIsNone(layer.playbook)
 
     def test_playbook_property_jinja_template(self):
         """Test the playbook property when the playbook uses Jinja2 templating"""
@@ -224,6 +229,38 @@ class TestGitInputConfigurationLayer(TestInputConfigurationLayerBase):
         layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env,
                                            self.mock_cfs_client)
         self.assertIsNone(layer.commit)
+
+    def test_validate_playbook_cfs_v3(self):
+        """Test the validate_playbook_specified_with_cfs_v3 method with a CFSV3Client and present playbook"""
+        mock_cfs_v3_client = Mock(spec=CFSV3Client)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env,
+                                           mock_cfs_v3_client)
+        layer.validate_playbook_specified_with_cfs_v3()
+
+    def test_validate_playbook_missing_cfs_v3(self):
+        """Test the validate_playbook_specified_with_cfs_v3 method with a CFSV3Client and missing playbook"""
+        mock_cfs_v3_client = Mock(spec=CFSV3Client)
+        del self.branch_layer_data['playbook']
+        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env,
+                                           mock_cfs_v3_client)
+        err_regex = 'A playbook is required when using the CFS v3 API'
+        with self.assertRaisesRegex(InputItemValidateError, err_regex):
+            layer.validate_playbook_specified_with_cfs_v3()
+
+    def test_validate_playbook_cfs_v2(self):
+        """Test the validate_playbook_specified_with_cfs_v3 method with a CFSV2Client and present playbook"""
+        mock_cfs_v2_client = Mock(spec=CFSV2Client)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env,
+                                           mock_cfs_v2_client)
+        layer.validate_playbook_specified_with_cfs_v3()
+
+    def test_validate_playbook_missing_cfs_v2(self):
+        """Test the validate_playbook_specified_with_cfs_v3 method with a CFSV2Client and missing playbook"""
+        mock_cfs_v2_client = Mock(spec=CFSV2Client)
+        del self.branch_layer_data['playbook']
+        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env,
+                                           mock_cfs_v2_client)
+        layer.validate_playbook_specified_with_cfs_v3()
 
     def test_get_cfs_api_data_no_resolve_branches(self):
         """Test get_cfs_api_data method without branch resolution"""
