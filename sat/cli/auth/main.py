@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -53,7 +53,7 @@ def do_auth(args):
         None
     """
 
-    session = SATSession(no_unauth_warn=True)
+    session = SATSession(no_unauth_err=True)
     if session.token and not pester(
                     f'Token already exists for "{session.username}" on "{session.host}". '
                     f'Overwrite?'):
