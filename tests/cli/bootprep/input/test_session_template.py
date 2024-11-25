@@ -207,6 +207,16 @@ class TestInputSessionTemplateV2(unittest.TestCase):
         with self.assertRaisesRegex(InputItemValidateError, err_regex):
             input_session_template.validate_rootfs_provider_has_value()
 
+    def test_validate_no_rootfs_provider(self):
+        """Test that validate_rootfs_provider passes with good data"""
+        input_data, _ = self.get_input_and_expected_bos_data()
+        del input_data['bos_parameters']['boot_sets']['compute']['rootfs_provider']
+        input_session_template = self.simplified_session_template_v2(
+            input_data, self.input_instance, 0, self.jinja_env,
+            self.bos_client, self.cfs_client, self.ims_client
+        )
+        input_session_template.validate_rootfs_provider_has_value()
+
     def test_validate_rootfs_provider_passthrough_good(self):
         """Test that validate_rootfs_provider_passthrough passes with good data"""
         input_data, _ = self.get_input_and_expected_bos_data()
@@ -253,6 +263,15 @@ class TestInputSessionTemplateV2(unittest.TestCase):
         with self.assertRaisesRegex(InputItemValidateError, err_regex):
             input_session_template.validate_rootfs_provider_passthrough_has_value()
 
+    def test_validate_no_rootfs_provider_passthrough(self):
+        """Test that validate_rootfs_provider_passthrough passes with good data"""
+        input_data, _ = self.get_input_and_expected_bos_data()
+        del input_data['bos_parameters']['boot_sets']['compute']['rootfs_provider_passthrough']
+        input_session_template = self.simplified_session_template_v2(
+            input_data, self.input_instance, 0, self.jinja_env,
+            self.bos_client, self.cfs_client, self.ims_client
+        )
+        input_session_template.validate_rootfs_provider_passthrough_has_value()
 
 if __name__ == '__main__':
     unittest.main()
