@@ -273,5 +273,6 @@ class TestInputSessionTemplateV2(unittest.TestCase):
         )
         input_session_template.validate_rootfs_provider_passthrough_has_value()
 
+
 if __name__ == '__main__':
     unittest.main()
