@@ -186,6 +186,7 @@ class GitInputConfigurationLayer(InputConfigurationLayer):
     and a branch or a commit hash.
     """
     @property
+    @jinja_rendered
     def clone_url(self):
         # The 'url' property is required by the schema
         return self.layer_data['git']['url']
@@ -197,6 +198,7 @@ class GitInputConfigurationLayer(InputConfigurationLayer):
         return self.layer_data['git'].get('branch')
 
     @property
+    @jinja_rendered
     def commit(self):
         # The 'commit' property is optional
         return self.layer_data['git'].get('commit')
@@ -271,6 +273,7 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
         return self.layer_data['product'].get('branch')
 
     @cached_property
+    @jinja_rendered
     def commit(self):
         # The 'commit' property is optional
         return self.layer_data['product'].get('commit')

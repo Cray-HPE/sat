@@ -200,6 +200,18 @@ class TestGitInputConfigurationLayer(TestInputConfigurationLayerBase):
                                            self.mock_cfs_client)
         self.assertEqual(self.branch_layer_data['git']['url'], layer.clone_url)
 
+    def test_clone_url_property_jinja_template(self):
+        """Test the clone_url property when the clone URL uses Jinja2 templating"""
+        repo_name = 'foo-config-management'
+        self.jinja_env.globals['test'] = {
+            'repo_name': repo_name
+        }
+
+        self.branch_layer_data['git']['url'] = 'https://api-gw-service-nmn.local/vcs/cray/{{test.repo_name}}.git'
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
+        self.assertEqual(f'https://api-gw-service-nmn.local/vcs/cray/{repo_name}.git', layer.clone_url)
+
     def test_branch_property_present(self):
         """Test the branch property when the branch is in the layer data"""
         layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
@@ -230,6 +242,20 @@ class TestGitInputConfigurationLayer(TestInputConfigurationLayerBase):
         layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
                                            self.mock_cfs_client)
         self.assertIsNone(layer.commit)
+
+    def test_commit_property_jinja_template(self):
+        """Test the commit property when the commit uses Jinja2 templating"""
+        commit_hash = 'abc1234'
+        self.jinja_env.globals['test'] = {
+            'commit_hash': commit_hash
+        }
+
+        self.commit_layer_data['git']['commit'] = '{{test.commit_hash}}'
+
+        layer = GitInputConfigurationLayer(self.commit_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
+
+        self.assertEqual(commit_hash, layer.commit)
 
     def test_validate_playbook_cfs_v3(self):
         """Test the validate_playbook_specified_with_cfs_v3 method with a CFSV3Client and present playbook"""
@@ -423,7 +449,7 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
 
     def test_branch_property_jinja_template(self):
         """Test the branch property when the branch uses Jinja2 templating"""
-        # Have to double the literal brackets that make up the Jinja2 variable reference
+        # Use non f-string to include the literal brackets that make up the Jinja2 variable reference
         self.branch_layer_data['product']['branch'] = 'integration-{{' + f'{self.product_name}.version' + '}}'
 
         layer = ProductInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
@@ -438,6 +464,21 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
     def test_commit_property_not_present(self):
         """Test the commit property when a branch is in the layer data"""
         self.assertIsNone(self.branch_layer.commit)
+
+    def test_commit_property_jinja_template(self):
+        """Test the commit property when the commit uses Jinja2 templating"""
+        commit_hash = 'abc1234'
+        self.jinja_env.globals['test'] = {
+            'commit_hash': commit_hash
+        }
+
+        # Use non f-string to include the literal brackets that make up the Jinja2 variable reference
+        self.commit_layer_data['product']['commit'] = '{{test.commit_hash}}'
+
+        layer = ProductInputConfigurationLayer(self.commit_layer_data, 0, self.jinja_env,
+                                               self.mock_cfs_client, self.mock_product_catalog)
+
+        self.assertEqual(commit_hash, layer.commit)
 
     def test_commit_property_resolve_branches(self):
         """Test the commit property when resolving branches and commit specified in the input file"""

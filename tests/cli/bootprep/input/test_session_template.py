@@ -134,6 +134,66 @@ class TestInputSessionTemplateV2(unittest.TestCase):
 
         return input_data, bos_payload
 
+    def test_ims_image_name(self):
+        """Test the ims_image_name property"""
+        image_name = 'my-example-image'
+        input_data, _ = self.get_input_and_expected_bos_data(image_name=image_name)
+        input_session_template = self.simplified_session_template_v2(
+            input_data, self.input_instance, 0, self.jinja_env,
+            self.bos_client, self.cfs_client, self.ims_client
+        )
+        self.assertEqual(image_name, input_session_template.ims_image_name)
+
+    def test_ims_image_name_jinja_rendered(self):
+        """Test the ims_image_name property with Jinja rendering"""
+        image_name = 'some-image'
+        self.jinja_env.globals['test'] = {
+            'image_name': image_name
+        }
+        image_property = '{{test.image_name}}'
+        input_data, _ = self.get_input_and_expected_bos_data(image_name=image_property)
+        input_session_template = self.simplified_session_template_v2(
+            input_data, self.input_instance, 0, self.jinja_env,
+            self.bos_client, self.cfs_client, self.ims_client
+        )
+        self.assertEqual(image_name, input_session_template.ims_image_name)
+
+    def test_ims_image_id(self):
+        """Test the ims_image_id property"""
+        image_id = 'abcdef12345'
+        input_data = {
+            'name': 'my-session-template',
+            'image': {'ims': {'id': image_id}},
+            'configuration': 'my-configuration',
+            'bos_parameters': {}
+        }
+
+        input_session_template = self.simplified_session_template_v2(
+            input_data, self.input_instance, 0, self.jinja_env,
+            self.bos_client, self.cfs_client, self.ims_client
+        )
+        self.assertEqual(image_id, input_session_template.ims_image_id)
+
+    def test_ims_image_id_jinja_rendered(self):
+        """Test the ims_image_id property with Jinja rendering"""
+        image_id = 'abcdef12345'
+        self.jinja_env.globals['test'] = {
+            'image_id': image_id
+        }
+        id_property = '{{test.image_id}}'
+        input_data = {
+            'name': 'my-session-template',
+            'image': {'ims': {'id': id_property}},
+            'configuration': 'my-configuration',
+            'bos_parameters': {}
+        }
+
+        input_session_template = self.simplified_session_template_v2(
+            input_data, self.input_instance, 0, self.jinja_env,
+            self.bos_client, self.cfs_client, self.ims_client
+        )
+        self.assertEqual(image_id, input_session_template.ims_image_id)
+
     def test_get_create_item_data_no_arch(self):
         """Test get_create_item_data method with no architecture specified"""
         input_data, expected_bos_data = self.get_input_and_expected_bos_data()
