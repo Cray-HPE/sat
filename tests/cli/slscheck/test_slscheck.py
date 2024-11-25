@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -204,7 +204,7 @@ class TestDoSlscheck(unittest.TestCase):
         self.mock_hsm_client.get_all_components.return_value = self.all_hsm_components
         self.mock_hsm_client.get_bmcs_by_type.return_value = self.all_hsm_redfish_endpoints
 
-        self.mock_sat_session = mock.patch('sat.cli.nid2xname.main.SATSession').start()
+        self.mock_sat_session = mock.patch('sat.cli.slscheck.main.SATSession').start()
         self.mock_print = mock.patch('builtins.print', autospec=True).start()
 
         self.fake_args = Namespace()
