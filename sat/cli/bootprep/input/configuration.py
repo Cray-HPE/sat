@@ -313,21 +313,25 @@ class AdditionalInventory(InputConfigurationLayerBase):
     """Additional inventory data for a CFS configuration"""
 
     @property
+    @jinja_rendered
     def clone_url(self):
         """str: the clone URL for the additional inventory"""
         return self.layer_data['url']
 
     @property
+    @jinja_rendered
     def commit(self):
         """str or None: the commit hash or None if branch was specified instead"""
         return self.layer_data.get('commit')
 
     @property
+    @jinja_rendered
     def branch(self):
         """str or None: the branch or None if commit was specified instead"""
         return self.layer_data.get('branch')
 
     @property
+    @jinja_rendered
     def name(self):
         """str or None: the optional name of the additional inventory"""
         return self.layer_data.get('name')

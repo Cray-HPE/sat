@@ -560,6 +560,19 @@ class TestAdditionalInventory(TestInputConfigurationLayerBase):
                                                    self.mock_cfs_client)
         self.assertEqual(self.repo_url, additional_inventory.clone_url)
 
+    def test_clone_url_jinja_rendered(self):
+        """Test the clone_url property when it uses Jinja2 templating"""
+        repo_name = 'foo-inventory'
+        self.jinja_env.globals['test'] = {
+            'repo_name': repo_name
+        }
+
+        self.data_with_commit['url'] = 'https://api-gw-service.nmn.local/vcs/cray/{{test.repo_name}}.git'
+        additional_inventory = AdditionalInventory(self.data_with_commit, self.jinja_env,
+                                                   self.mock_cfs_client)
+        self.assertEqual(f'https://api-gw-service.nmn.local/vcs/cray/{repo_name}.git',
+                         additional_inventory.clone_url)
+
     def test_commit_property_specified(self):
         """Test the commit property when specified"""
         additional_inventory = AdditionalInventory(self.data_with_commit, self.jinja_env,
@@ -571,6 +584,18 @@ class TestAdditionalInventory(TestInputConfigurationLayerBase):
         additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env,
                                                    self.mock_cfs_client)
         self.assertIsNone(additional_inventory.commit)
+
+    def test_commit_property_jinja_rendered(self):
+        """Test the commit property when it uses Jinja2 templating"""
+        commit_hash = 'abc1234'
+        self.jinja_env.globals['test'] = {
+            'commit_hash': commit_hash
+        }
+
+        self.data_with_commit['commit'] = '{{test.commit_hash}}'
+        additional_inventory = AdditionalInventory(self.data_with_commit, self.jinja_env,
+                                                   self.mock_cfs_client)
+        self.assertEqual(commit_hash, additional_inventory.commit)
 
     def test_branch_property_specified(self):
         """"Test the branch property when specified"""
@@ -584,6 +609,18 @@ class TestAdditionalInventory(TestInputConfigurationLayerBase):
                                                    self.mock_cfs_client)
         self.assertIsNone(additional_inventory.branch)
 
+    def test_branch_property_jinja_rendered(self):
+        """Test the branch property when it uses Jinja2 templating"""
+        branch_name = 'integration'
+        self.jinja_env.globals['test'] = {
+            'branch_name': branch_name
+        }
+
+        self.data_with_branch['branch'] = '{{test.branch_name}}'
+        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env,
+                                                   self.mock_cfs_client)
+        self.assertEqual(branch_name, additional_inventory.branch)
+
     def test_name_property_specified(self):
         """Test the name property when specified"""
         additional_inventory = AdditionalInventory(self.data_with_name, self.jinja_env,
@@ -595,6 +632,18 @@ class TestAdditionalInventory(TestInputConfigurationLayerBase):
         additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env,
                                                    self.mock_cfs_client)
         self.assertIsNone(additional_inventory.name)
+
+    def test_name_property_jinja_rendered(self):
+        """Test the name property when it uses Jinja2 templating"""
+        name = 'inventory'
+        self.jinja_env.globals['test'] = {
+            'name': name
+        }
+
+        self.data_with_name['name'] = '{{test.name}}'
+        additional_inventory = AdditionalInventory(self.data_with_name, self.jinja_env,
+                                                   self.mock_cfs_client)
+        self.assertEqual(name, additional_inventory.name)
 
     def test_get_cfs_api_data_no_resolve_branches(self):
         """Test get_cfs_api_data method without branch resolution"""
