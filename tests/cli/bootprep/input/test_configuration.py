@@ -24,25 +24,21 @@
 """
 Tests for sat.cli.bootprep.input.configuration
 """
-from copy import deepcopy
 import logging
 import unittest
 from unittest.mock import Mock, patch
-from urllib.parse import urlparse
 
-from cray_product_catalog.query import ProductCatalogError
-from csm_api_client.service.vcs import VCSError
 from jinja2.sandbox import SandboxedEnvironment
 
-from csm_api_client.service.cfs import CFSClientBase
-from sat.cli.bootprep.errors import InputItemCreateError
+from cray_product_catalog.query import ProductCatalog
+from csm_api_client.service.cfs import CFSClientBase, CFSConfigurationError, CFSV2Client, CFSV3Client
+from sat.cli.bootprep.errors import InputItemCreateError, InputItemValidateError
 from sat.cli.bootprep.input.configuration import (
     AdditionalInventory,
     InputConfigurationLayer,
     GitInputConfigurationLayer,
     ProductInputConfigurationLayer,
     InputConfiguration,
-    LATEST_VERSION_VALUE
 )
 from sat.cli.bootprep.input.instance import InputInstance
 
@@ -59,6 +55,7 @@ class TestInputConfigurationLayer(unittest.TestCase):
         """Mock the constructors for the child classes"""
         self.mock_git_layer = patch_configuration('GitInputConfigurationLayer').start()
         self.mock_product_layer = patch_configuration('ProductInputConfigurationLayer').start()
+        self.mock_cfs_client = Mock()
         self.mock_product_catalog = Mock()
         self.mock_jinja_env = Mock()
 
@@ -69,16 +66,22 @@ class TestInputConfigurationLayer(unittest.TestCase):
         """Test the get_configuration_layer static method with a git layer"""
         # Just needs a 'git' key; we're mocking the GitInputConfigurationLayer class
         layer_data = {'git': {}}
-        layer = InputConfigurationLayer.get_configuration_layer(layer_data, self.mock_jinja_env,
+        layer = InputConfigurationLayer.get_configuration_layer(layer_data, 0, self.mock_jinja_env,
+                                                                self.mock_cfs_client,
                                                                 self.mock_product_catalog)
         self.assertEqual(self.mock_git_layer.return_value, layer)
+        self.mock_git_layer.assert_called_once_with(layer_data, 0, self.mock_jinja_env,
+                                                    self.mock_cfs_client)
 
     def test_get_configuration_layer_product(self):
         """Test the get_configuration_layer static method with a product layer"""
         layer_data = {'product': {}}
-        layer = InputConfigurationLayer.get_configuration_layer(layer_data, self.mock_jinja_env,
+        layer = InputConfigurationLayer.get_configuration_layer(layer_data, 0, self.mock_jinja_env,
+                                                                self.mock_cfs_client,
                                                                 self.mock_product_catalog)
         self.assertEqual(self.mock_product_layer.return_value, layer)
+        self.mock_product_layer.assert_called_once_with(layer_data, 0, self.mock_jinja_env,
+                                                        self.mock_cfs_client, self.mock_product_catalog)
 
     def test_get_configuration_layer_unknown(self):
         """Test the get_configuration_layer static method with bad layer data"""
@@ -88,7 +91,8 @@ class TestInputConfigurationLayer(unittest.TestCase):
         layer_data = {'unknown': {}}
         expected_err = 'Unrecognized type of configuration layer'
         with self.assertRaisesRegex(ValueError, expected_err):
-            InputConfigurationLayer.get_configuration_layer(layer_data, self.mock_jinja_env,
+            InputConfigurationLayer.get_configuration_layer(layer_data, 0, self.mock_jinja_env,
+                                                            self.mock_cfs_client,
                                                             self.mock_product_catalog)
 
 
@@ -97,8 +101,13 @@ class TestInputConfigurationLayerBase(unittest.TestCase):
     module_path = 'sat.cli.bootprep.input.configuration'
 
     def setUp(self):
-        """Patch the resolve_branches class attribute on InputConfigurationLayer"""
+        """Mock needed functionality for both types of InputConfigurationLayer"""
         self.patch_resolve_branches(False).start()
+
+        self.mock_cfs_client = Mock()
+        self.mock_cfs_configuration_cls = self.mock_cfs_client.configuration_cls
+        self.mock_cfs_layer_cls = self.mock_cfs_configuration_cls.cfs_config_layer_cls
+        self.mock_add_inv_cls = self.mock_cfs_configuration_cls.cfs_additional_inventory_cls
 
     def tearDown(self):
         patch.stopall()
@@ -133,8 +142,6 @@ class TestGitInputConfigurationLayer(TestInputConfigurationLayerBase):
         }
 
         self.branch_head_commit = 'e6bfdb28d44669c4317d6dc021c22a75cebb3bfb'
-        self.mock_vcs_repo = patch(f'{self.module_path}.VCSRepo').start()
-        self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = self.branch_head_commit
 
         self.mock_sat_version = '2.3.6'
         self.mock_network_type = 'cassini'
@@ -149,123 +156,189 @@ class TestGitInputConfigurationLayer(TestInputConfigurationLayerBase):
 
     def test_playbook_property_present(self):
         """Test the playbook property when a playbook is in the layer data"""
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
         self.assertEqual(self.playbook, layer.playbook)
 
     def test_playbook_property_not_present(self):
         """Test the playbook property when a playbook is not in the layer data"""
         del self.branch_layer_data['playbook']
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
         self.assertIsNone(layer.playbook)
 
     def test_playbook_property_jinja_template(self):
         """Test the playbook property when the playbook uses Jinja2 templating"""
         self.branch_layer_data['playbook'] = 'shs_{{shs.network_type}}_install.yaml'
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
         self.assertEqual(f'shs_{self.mock_network_type}_install.yaml', layer.playbook)
 
     def test_name_property_present(self):
         """Test the name property when the name is in the layer data"""
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
         self.assertEqual(self.branch_layer_data['name'], layer.name)
 
     def test_name_property_not_present(self):
         """Test the name property when the name is not in the layer data"""
         del self.branch_layer_data['name']
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
         self.assertIsNone(layer.name)
 
     def test_name_property_jinja_template(self):
         """Test the name property when the name uses Jinja2 templating"""
         self.branch_layer_data['name'] = 'sat-ncn-{{sat.version}}'
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
         self.assertEqual(f'sat-ncn-{self.mock_sat_version}', layer.name)
 
     def test_clone_url_property(self):
         """Test the clone_url property."""
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
         self.assertEqual(self.branch_layer_data['git']['url'], layer.clone_url)
+
+    def test_clone_url_property_jinja_template(self):
+        """Test the clone_url property when the clone URL uses Jinja2 templating"""
+        repo_name = 'foo-config-management'
+        self.jinja_env.globals['test'] = {
+            'repo_name': repo_name
+        }
+
+        self.branch_layer_data['git']['url'] = 'https://api-gw-service-nmn.local/vcs/cray/{{test.repo_name}}.git'
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
+        self.assertEqual(f'https://api-gw-service-nmn.local/vcs/cray/{repo_name}.git', layer.clone_url)
 
     def test_branch_property_present(self):
         """Test the branch property when the branch is in the layer data"""
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
         self.assertEqual(self.branch_layer_data['git']['branch'], layer.branch)
 
     def test_branch_property_not_present(self):
         """Test the branch property when the branch is not in the layer data"""
-        layer = GitInputConfigurationLayer(self.commit_layer_data, self.jinja_env)
+        layer = GitInputConfigurationLayer(self.commit_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
         self.assertIsNone(layer.branch)
 
     def test_branch_property_jinja_template(self):
         """Test the branch property when the branch uses Jinja2 templating"""
         self.branch_layer_data['git']['branch'] = 'integration-{{sat.version}}'
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
         self.assertEqual(f'integration-{self.mock_sat_version}', layer.branch)
 
     def test_commit_property_present(self):
         """Test the commit property when the commit is in the layer data"""
-        layer = GitInputConfigurationLayer(self.commit_layer_data, self.jinja_env)
+        layer = GitInputConfigurationLayer(self.commit_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
         self.assertEqual(self.commit_layer_data['git']['commit'], layer.commit)
 
     def test_commit_property_not_present(self):
         """Test the commit property when the commit is not in the layer data"""
-        layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
         self.assertIsNone(layer.commit)
 
-    def test_get_cfs_api_data_optional_properties(self):
-        """Test get_create_item_data method with optional name and playbook properties present."""
-        branch_layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
-        commit_layer = GitInputConfigurationLayer(self.commit_layer_data, self.jinja_env)
-        subtests = (('branch', branch_layer), ('commit', commit_layer))
-        for present_property, layer in subtests:
-            with self.subTest(present_property=present_property):
-                expected = deepcopy(getattr(self, f'{present_property}_layer_data'))
-                expected['cloneUrl'] = expected['git']['url']
-                del expected['git']['url']
-                # Move branch or commit to the top level
-                for key, value in expected['git'].items():
-                    expected[key] = value
-                del expected['git']
-                self.assertEqual(expected, layer.get_cfs_api_data())
+    def test_commit_property_jinja_template(self):
+        """Test the commit property when the commit uses Jinja2 templating"""
+        commit_hash = 'abc1234'
+        self.jinja_env.globals['test'] = {
+            'commit_hash': commit_hash
+        }
 
-    def test_get_cfs_api_data_special_parameters(self):
-        """Test get_create_item_data method with special_parameters present."""
-        layer_data = deepcopy(self.branch_layer_data)
-        require_dkms = True
-        layer_data['special_parameters'] = {'ims_require_dkms': require_dkms}
-        layer = GitInputConfigurationLayer(layer_data, self.jinja_env)
+        self.commit_layer_data['git']['commit'] = '{{test.commit_hash}}'
 
-        expected_api_data = deepcopy(layer_data)
-        # Move these values to where CFS expects them
-        expected_api_data['cloneUrl'] = expected_api_data['git']['url']
-        expected_api_data['branch'] = expected_api_data['git']['branch']
-        del expected_api_data['git']
-        expected_api_data['specialParameters'] = {'imsRequireDkms': require_dkms}
-        del expected_api_data['special_parameters']
+        layer = GitInputConfigurationLayer(self.commit_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
 
-        self.assertEqual(expected_api_data, layer.get_cfs_api_data())
+        self.assertEqual(commit_hash, layer.commit)
 
-    def test_commit_property_branch_commit_lookup(self):
-        """Test looking up commit hash from branch in VCS when branch not supported in CSM"""
+    def test_validate_playbook_cfs_v3(self):
+        """Test the validate_playbook_specified_with_cfs_v3 method with a CFSV3Client and present playbook"""
+        mock_cfs_v3_client = Mock(spec=CFSV3Client)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           mock_cfs_v3_client)
+        layer.validate_playbook_specified_with_cfs_v3()
+
+    def test_validate_playbook_missing_cfs_v3(self):
+        """Test the validate_playbook_specified_with_cfs_v3 method with a CFSV3Client and missing playbook"""
+        mock_cfs_v3_client = Mock(spec=CFSV3Client)
+        del self.branch_layer_data['playbook']
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           mock_cfs_v3_client)
+        err_regex = 'A playbook is required when using the CFS v3 API'
+        with self.assertRaisesRegex(InputItemValidateError, err_regex):
+            layer.validate_playbook_specified_with_cfs_v3()
+
+    def test_validate_playbook_cfs_v2(self):
+        """Test the validate_playbook_specified_with_cfs_v3 method with a CFSV2Client and present playbook"""
+        mock_cfs_v2_client = Mock(spec=CFSV2Client)
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           mock_cfs_v2_client)
+        layer.validate_playbook_specified_with_cfs_v3()
+
+    def test_validate_playbook_missing_cfs_v2(self):
+        """Test the validate_playbook_specified_with_cfs_v3 method with a CFSV2Client and missing playbook"""
+        mock_cfs_v2_client = Mock(spec=CFSV2Client)
+        del self.branch_layer_data['playbook']
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           mock_cfs_v2_client)
+        layer.validate_playbook_specified_with_cfs_v3()
+
+    def test_get_cfs_api_data_no_resolve_branches(self):
+        """Test get_cfs_api_data method without branch resolution"""
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
+
+        cfs_api_data = layer.get_cfs_api_data()
+
+        # All the work of getting CFS API request data is delegated to csm_api_client
+        self.mock_cfs_layer_cls.from_clone_url.assert_called_once_with(
+            clone_url=layer.clone_url, branch=layer.branch, commit=layer.commit,
+            name=layer.name, playbook=layer.playbook, ims_require_dkms=layer.ims_require_dkms
+        )
+        cfs_layer_instance = self.mock_cfs_layer_cls.from_clone_url.return_value
+        self.assertEqual(cfs_layer_instance.req_payload, cfs_api_data)
+        cfs_layer_instance.resolve_branch_to_commit_hash.assert_not_called()
+
+    def test_get_cfs_api_data_resolve_branches(self):
+        """Test get_cfs_api_data method with branch resolution"""
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
+
         with self.patch_resolve_branches(True):
-            layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
-            self.assertEqual(layer.commit, self.branch_head_commit)
+            cfs_api_data = layer.get_cfs_api_data()
 
-    def test_commit_property_branch_commit_vcs_query_fails(self):
-        """Test looking up commit hash raises InputItemCreateError when VCS is inaccessible"""
-        with self.patch_resolve_branches(True):
-            layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
-            self.mock_vcs_repo.return_value.get_commit_hash_for_branch.side_effect = VCSError
-            with self.assertRaises(InputItemCreateError):
-                _ = layer.commit
+        # All the work of getting CFS API request data is delegated to csm_api_client
+        self.mock_cfs_layer_cls.from_clone_url.assert_called_once_with(
+            clone_url=layer.clone_url, branch=layer.branch, commit=layer.commit,
+            name=layer.name, playbook=layer.playbook, ims_require_dkms=layer.ims_require_dkms
+        )
+        cfs_layer_instance = self.mock_cfs_layer_cls.from_clone_url.return_value
+        self.assertEqual(cfs_layer_instance.req_payload, cfs_api_data)
+        cfs_layer_instance.resolve_branch_to_commit_hash.assert_called_once_with()
 
-    def test_commit_property_branch_commit_lookup_fails(self):
-        """Test looking up commit hash for nonexistent branch when branch not supported in CSM"""
+    def test_get_cfs_api_data_value_error(self):
+        """Test get_cfs_api_data method when from_clone_url raises ValueError"""
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
+        self.mock_cfs_layer_cls.from_clone_url.side_effect = ValueError('error')
+        with self.assertRaisesRegex(InputItemCreateError, 'error'):
+            _ = layer.get_cfs_api_data()
+
+    def test_get_cfs_api_data_resolve_branch_error(self):
+        """Test get_cfs_api_data method when branch resolution fails"""
+        layer = GitInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                           self.mock_cfs_client)
         with self.patch_resolve_branches(True):
-            layer = GitInputConfigurationLayer(self.branch_layer_data, self.jinja_env)
-            self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = None
-            with self.assertRaises(InputItemCreateError):
-                _ = layer.commit
+            cfs_layer_instance = self.mock_cfs_layer_cls.from_clone_url.return_value
+            cfs_layer_instance.resolve_branch_to_commit_hash.side_effect = CFSConfigurationError('error')
+            with self.assertRaisesRegex(InputItemCreateError, 'error'):
+                _ = layer.get_cfs_api_data()
 
 
 class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
@@ -275,32 +348,12 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
         """Mock K8s API to return fake product catalog data and set up layers"""
         super().setUp()
 
-        # Minimal set of product catalog data needed for these tests
-        self.old_url = 'https://vcs.local/vcs/cray/cos-config-management.git'
-        self.old_commit = '82537e59c24dd5607d5f5d6f92cdff971bd9c615'
-        self.new_url = 'https://vcs.local/vcs/cray/newcos-config-management.git'
-        self.new_commit = '6b0d9d55d399c92abae08002e75b9a1ce002f917'
-        self.product_name = 'cos'
-        self.product_version = '2.1.50'
-
-        self.old_cos = Mock(clone_url=self.old_url, commit=self.old_commit)
-        self.new_cos = Mock(clone_url=self.new_url, commit=self.new_commit)
-
-        def mock_get_product(product_name, product_version=None):
-            if product_name != self.product_name:
-                raise ProductCatalogError('Unknown product')
-            elif product_version == self.product_version:
-                return self.old_cos
-            elif not product_version:
-                return self.new_cos
-            else:
-                raise ProductCatalogError('Unknown version')
-
         self.mock_product_catalog = Mock()
-        self.mock_product_catalog.get_product.side_effect = mock_get_product
 
         # Used to test variable substitution in Jinja2-templated fields
         self.jinja_env = SandboxedEnvironment()
+        self.product_name = 'cos'
+        self.product_version = '2.1.50'
         self.mock_network_type = 'cassini'
         self.jinja_env.globals = {
             self.product_name: {'version': self.product_version},
@@ -316,8 +369,9 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
                 'version': self.product_version
             }
         }
-        self.version_layer = ProductInputConfigurationLayer(self.version_layer_data,
+        self.version_layer = ProductInputConfigurationLayer(self.version_layer_data, 0,
                                                             self.jinja_env,
+                                                            self.mock_cfs_client,
                                                             self.mock_product_catalog)
         self.branch = 'integration'
         self.branch_layer_data = {
@@ -328,8 +382,9 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
                 'branch': self.branch
             }
         }
-        self.branch_layer = ProductInputConfigurationLayer(self.branch_layer_data,
+        self.branch_layer = ProductInputConfigurationLayer(self.branch_layer_data, 0,
                                                            self.jinja_env,
+                                                           self.mock_cfs_client,
                                                            self.mock_product_catalog)
 
         self.commit = 'c07f317c4127d8667a4bd6c08d48e716b1d47da1'
@@ -341,16 +396,14 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
                 'commit': self.commit
             }
         }
-        self.commit_layer = ProductInputConfigurationLayer(self.commit_layer_data,
+        self.commit_layer = ProductInputConfigurationLayer(self.commit_layer_data, 0,
                                                            self.jinja_env,
+                                                           self.mock_cfs_client,
                                                            self.mock_product_catalog)
 
-        self.branch_head_commit = 'e6bfdb28d44669c4317d6dc021c22a75cebb3bfb'
-        self.mock_vcs_repo = patch(f'{self.module_path}.VCSRepo').start()
-        self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = self.branch_head_commit
-
+        self.mock_api_gw = 'api_gateway.nmn'
         self.mock_sat_config = {
-            'api_gateway.host': 'api_gateway.nmn'
+            'api_gateway.host': self.mock_api_gw
         }
         patch_configuration('get_config_value', side_effect=self.mock_sat_config.get).start()
 
@@ -360,8 +413,8 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
     def test_playbook_property_jinja_template(self):
         """Test the playbook property when the playbook uses Jinja2 templating"""
         self.branch_layer_data['playbook'] = 'shs_{{shs.network_type}}_install.yaml'
-        layer = ProductInputConfigurationLayer(self.branch_layer_data, self.jinja_env,
-                                               self.mock_product_catalog)
+        layer = ProductInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                               self.mock_cfs_client, self.mock_product_catalog)
         self.assertEqual(f'shs_{self.mock_network_type}_install.yaml', layer.playbook)
 
     def test_product_name_property(self):
@@ -374,67 +427,17 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
 
     def test_product_version_property_not_present(self):
         """Test the product_version property when version is not in the layer data"""
-        self.assertEqual(LATEST_VERSION_VALUE, self.branch_layer.product_version)
+        self.assertIsNone(self.branch_layer.product_version)
 
     def test_product_version_jinja_template(self):
         """Test the product_version property when it uses Jinja2 templating"""
         # Have to double the literal brackets that make up the Jinja2 variable reference
         self.version_layer_data['product']['version'] = '{{' + f'{self.product_name}.version' + '}}'
 
-        layer = ProductInputConfigurationLayer(self.version_layer_data, self.jinja_env,
-                                               self.mock_product_catalog)
+        layer = ProductInputConfigurationLayer(self.version_layer_data, 0, self.jinja_env,
+                                               self.mock_cfs_client, self.mock_product_catalog)
 
         self.assertEqual(self.product_version, layer.product_version)
-
-    def test_matching_product_explicit_version(self):
-        """Test getting the matching InstalledProductVersion for an explict version."""
-        self.assertEqual(self.old_cos, self.version_layer.matching_product)
-
-    def test_matching_product_no_version(self):
-        """Test getting the matching InstalledProductVersion for an assumed latest version."""
-        self.assertEqual(self.new_cos, self.branch_layer.matching_product)
-
-    def test_matching_product_latest_version(self):
-        """Test getting the matching InstalledProductVersion for an explict latest version."""
-        latest_layer_data = deepcopy(self.branch_layer_data)
-        latest_layer_data['product']['version'] = LATEST_VERSION_VALUE
-        latest_layer = ProductInputConfigurationLayer(latest_layer_data, self.jinja_env,
-                                                      self.mock_product_catalog)
-        self.assertEqual(self.new_cos, latest_layer.matching_product)
-
-    def test_matching_product_no_product_catalog(self):
-        """Test getting the matching InstalledProductVersion when the product catalog is missing."""
-        layer = ProductInputConfigurationLayer(self.version_layer_data, self.jinja_env, None)
-        err_regex = 'Product catalog data is not available'
-        with self.assertRaisesRegex(InputItemCreateError, err_regex):
-            _ = layer.matching_product
-
-    def test_matching_product_software_inventory_error(self):
-        """Test getting the matching InstalledProductVersion when there is software inventory failure."""
-        sw_inv_err_msg = 'unable find configmap'
-        self.mock_product_catalog.get_product.side_effect = ProductCatalogError(sw_inv_err_msg)
-        err_regex = f'Unable to get product data from product catalog: {sw_inv_err_msg}'
-        with self.assertRaisesRegex(InputItemCreateError, err_regex):
-            _ = self.version_layer.matching_product
-
-    def test_clone_url_present(self):
-        """Test clone_url when present in product catalog data"""
-        old_url_parsed = urlparse(self.old_url)
-        new_url_parsed = urlparse(self.version_layer.clone_url)
-        # All parts of the URL should be unchanged, except for the 'netloc' which should
-        # be replaced with what is in the configuration.
-        for attr in ('scheme', 'path', 'params', 'query', 'fragment'):
-            self.assertEqual(getattr(old_url_parsed, attr), getattr(new_url_parsed, attr))
-        self.assertEqual(new_url_parsed.netloc, self.mock_sat_config['api_gateway.host'])
-
-    def test_clone_url_missing(self):
-        """Test clone_url when missing from product catalog data"""
-        self.old_cos.clone_url = None
-        err_regex = (f"No clone URL present for version {self.product_version} of "
-                     f"product {self.product_name}")
-
-        with self.assertRaisesRegex(InputItemCreateError, err_regex):
-            _ = self.version_layer.clone_url
 
     def test_branch_property_present(self):
         """Test the branch property when branch is in the layer data"""
@@ -446,49 +449,94 @@ class TestProductInputConfigurationLayer(TestInputConfigurationLayerBase):
 
     def test_branch_property_jinja_template(self):
         """Test the branch property when the branch uses Jinja2 templating"""
-        # Have to double the literal brackets that make up the Jinja2 variable reference
+        # Use non f-string to include the literal brackets that make up the Jinja2 variable reference
         self.branch_layer_data['product']['branch'] = 'integration-{{' + f'{self.product_name}.version' + '}}'
 
-        layer = ProductInputConfigurationLayer(self.branch_layer_data, self.jinja_env,
-                                               self.mock_product_catalog)
+        layer = ProductInputConfigurationLayer(self.branch_layer_data, 0, self.jinja_env,
+                                               self.mock_cfs_client, self.mock_product_catalog)
 
         self.assertEqual(f'integration-{self.product_version}', layer.branch)
 
-    def test_commit_property_branch_present(self):
+    def test_commit_property_present(self):
+        """Test the commit property when commit is in the layer data"""
+        self.assertEqual(self.commit, self.commit_layer.commit)
+
+    def test_commit_property_not_present(self):
         """Test the commit property when a branch is in the layer data"""
         self.assertIsNone(self.branch_layer.commit)
 
-    def test_commit_property_branch_not_present(self):
-        """Test the commit property when a branch is not in the layer data"""
-        self.assertEqual(self.old_commit, self.version_layer.commit)
+    def test_commit_property_jinja_template(self):
+        """Test the commit property when the commit uses Jinja2 templating"""
+        commit_hash = 'abc1234'
+        self.jinja_env.globals['test'] = {
+            'commit_hash': commit_hash
+        }
 
-    def test_commit_property_branch_commit_lookup(self):
-        """Test looking up commit hash from branch in VCS when branch not supported in CSM"""
-        with self.patch_resolve_branches(True):
-            self.assertEqual(self.branch_layer.commit, self.branch_head_commit)
+        # Use non f-string to include the literal brackets that make up the Jinja2 variable reference
+        self.commit_layer_data['product']['commit'] = '{{test.commit_hash}}'
 
-    def test_commit_property_branch_commit_vcs_query_fails(self):
-        """Test looking up commit hash raises InputItemCreateError when VCS is inaccessible"""
-        self.mock_vcs_repo.return_value.get_commit_hash_for_branch.side_effect = VCSError
-        with self.patch_resolve_branches(True):
-            with self.assertRaises(InputItemCreateError):
-                _ = self.branch_layer.commit
+        layer = ProductInputConfigurationLayer(self.commit_layer_data, 0, self.jinja_env,
+                                               self.mock_cfs_client, self.mock_product_catalog)
 
-    def test_commit_property_branch_commit_lookup_fails(self):
-        """Test looking up commit hash for nonexistent branch when branch not supported in CSM"""
-        self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = None
-        with self.patch_resolve_branches(True):
-            with self.assertRaises(InputItemCreateError):
-                _ = self.branch_layer.commit
-
-    def test_commit_property_when_commit_specified_in_input(self):
-        """Test the commit property when commit specified in the input file"""
-        self.assertEqual(self.commit_layer.commit, self.commit)
+        self.assertEqual(commit_hash, layer.commit)
 
     def test_commit_property_resolve_branches(self):
         """Test the commit property when resolving branches and commit specified in the input file"""
         with self.patch_resolve_branches(True):
             self.assertEqual(self.commit_layer.commit, self.commit)
+
+    def test_get_cfs_api_data_no_resolve_branches(self):
+        """Test get_cfs_api_data method without branch resolution"""
+        cfs_api_data = self.version_layer.get_cfs_api_data()
+
+        # All the work of getting CFS API request data is delegated to csm_api_client
+        self.mock_cfs_layer_cls.from_product_catalog.assert_called_once_with(
+            product_name=self.product_name, api_gw_host=self.mock_api_gw,
+            product_version=self.product_version, commit=None,
+            branch=None, name=self.version_layer.name,
+            playbook=self.playbook, ims_require_dkms=None,
+            product_catalog=self.mock_product_catalog
+        )
+        cfs_layer_instance = self.mock_cfs_layer_cls.from_product_catalog.return_value
+        self.assertEqual(cfs_layer_instance.req_payload, cfs_api_data)
+        cfs_layer_instance.resolve_branch_to_commit_hash.assert_not_called()
+
+    def test_get_cfs_api_data_resolve_branches(self):
+        """Test get_cfs_api_data method with branch resolution"""
+        with self.patch_resolve_branches(True):
+            cfs_api_data = self.version_layer.get_cfs_api_data()
+
+        # All the work of getting CFS API request data is delegated to csm_api_client
+        self.mock_cfs_layer_cls.from_product_catalog.assert_called_once_with(
+            product_name=self.product_name, api_gw_host=self.mock_api_gw,
+            product_version=self.product_version, commit=None,
+            branch=None, name=self.version_layer.name,
+            playbook=self.playbook, ims_require_dkms=None,
+            product_catalog=self.mock_product_catalog
+        )
+        cfs_layer_instance = self.mock_cfs_layer_cls.from_product_catalog.return_value
+        self.assertEqual(cfs_layer_instance.req_payload, cfs_api_data)
+        cfs_layer_instance.resolve_branch_to_commit_hash.assert_called_once_with()
+
+    def test_get_cfs_api_data_value_error(self):
+        """Test get_cfs_api_data method when from_product_catalog raises ValueError"""
+        self.mock_cfs_layer_cls.from_product_catalog.side_effect = ValueError('error')
+        with self.assertRaisesRegex(InputItemCreateError, 'error'):
+            _ = self.version_layer.get_cfs_api_data()
+
+    def test_get_cfs_api_data_cfs_configuration_error(self):
+        """Test get_cfs_api_data method when from_product_catalog raises CFSConfigurationError"""
+        self.mock_cfs_layer_cls.from_product_catalog.side_effect = CFSConfigurationError('error')
+        with self.assertRaisesRegex(InputItemCreateError, 'error'):
+            _ = self.version_layer.get_cfs_api_data()
+
+    def test_get_cfs_api_data_resolve_branch_error(self):
+        """Test get_cfs_api_data method when branch resolution raises CFSConfigurationError"""
+        with self.patch_resolve_branches(True):
+            cfs_layer_instance = self.mock_cfs_layer_cls.from_product_catalog.return_value
+            cfs_layer_instance.resolve_branch_to_commit_hash.side_effect = CFSConfigurationError('error')
+            with self.assertRaisesRegex(InputItemCreateError, 'error'):
+                _ = self.version_layer.get_cfs_api_data()
 
 
 class TestAdditionalInventory(TestInputConfigurationLayerBase):
@@ -505,90 +553,146 @@ class TestAdditionalInventory(TestInputConfigurationLayerBase):
         self.data_with_branch = {'url': self.repo_url, 'branch': self.branch}
         self.data_with_name = {'url': self.repo_url, 'branch': self.branch, 'name': self.name}
         self.jinja_env = SandboxedEnvironment()
-        self.branch_head_commit = 'e64ef6c370166285e6a674724b74e912a3f4a21e'
-        self.mock_vcs_repo = patch(f'{self.module_path}.VCSRepo').start()
-        self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = self.branch_head_commit
 
     def test_clone_url_property(self):
         """Test the clone_url property of AdditionalInventory"""
-        additional_inventory = AdditionalInventory(self.data_with_commit, self.jinja_env)
+        additional_inventory = AdditionalInventory(self.data_with_commit, self.jinja_env,
+                                                   self.mock_cfs_client)
         self.assertEqual(self.repo_url, additional_inventory.clone_url)
+
+    def test_clone_url_jinja_rendered(self):
+        """Test the clone_url property when it uses Jinja2 templating"""
+        repo_name = 'foo-inventory'
+        self.jinja_env.globals['test'] = {
+            'repo_name': repo_name
+        }
+
+        self.data_with_commit['url'] = 'https://api-gw-service.nmn.local/vcs/cray/{{test.repo_name}}.git'
+        additional_inventory = AdditionalInventory(self.data_with_commit, self.jinja_env,
+                                                   self.mock_cfs_client)
+        self.assertEqual(f'https://api-gw-service.nmn.local/vcs/cray/{repo_name}.git',
+                         additional_inventory.clone_url)
 
     def test_commit_property_specified(self):
         """Test the commit property when specified"""
-        additional_inventory = AdditionalInventory(self.data_with_commit, self.jinja_env)
+        additional_inventory = AdditionalInventory(self.data_with_commit, self.jinja_env,
+                                                   self.mock_cfs_client)
         self.assertEqual(self.commit_hash, additional_inventory.commit)
 
     def test_commit_property_unspecified(self):
         """Test the commit property when not specified"""
-        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env)
+        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env,
+                                                   self.mock_cfs_client)
         self.assertIsNone(additional_inventory.commit)
 
-    def test_commit_property_branch_commit_lookup(self):
-        """Test looking up commit hash from branch in VCS when branch not supported in CSM"""
-        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env)
-        with self.patch_resolve_branches(True):
-            self.assertEqual(additional_inventory.commit, self.branch_head_commit)
+    def test_commit_property_jinja_rendered(self):
+        """Test the commit property when it uses Jinja2 templating"""
+        commit_hash = 'abc1234'
+        self.jinja_env.globals['test'] = {
+            'commit_hash': commit_hash
+        }
 
-    def test_commit_property_no_resolve_branches(self):
-        """Test that commit is None when branch is specified with no_resolve_branches"""
-        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env)
-        self.assertIsNone(additional_inventory.commit)
-
-    def test_commit_property_vcs_query_fails(self):
-        """Test looking up commit hash raises InputItemCreateError when VCS is inaccessible"""
-        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env)
-        self.mock_vcs_repo.return_value.get_commit_hash_for_branch.side_effect = VCSError
-        with self.patch_resolve_branches(True):
-            with self.assertRaises(InputItemCreateError):
-                _ = additional_inventory.commit
-
-    def test_commit_property_branch_lookup_fails(self):
-        """Test looking up commit hash for nonexistent branch"""
-        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env)
-        self.mock_vcs_repo.return_value.get_commit_hash_for_branch.return_value = None
-        with self.patch_resolve_branches(True):
-            with self.assertRaises(InputItemCreateError):
-                _ = additional_inventory.commit
+        self.data_with_commit['commit'] = '{{test.commit_hash}}'
+        additional_inventory = AdditionalInventory(self.data_with_commit, self.jinja_env,
+                                                   self.mock_cfs_client)
+        self.assertEqual(commit_hash, additional_inventory.commit)
 
     def test_branch_property_specified(self):
         """"Test the branch property when specified"""
-        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env)
+        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env,
+                                                   self.mock_cfs_client)
         self.assertEqual(self.branch, additional_inventory.branch)
 
     def test_branch_property_not_specified(self):
         """"Test the branch property when not specified"""
-        additional_inventory = AdditionalInventory(self.data_with_commit, self.jinja_env)
+        additional_inventory = AdditionalInventory(self.data_with_commit, self.jinja_env,
+                                                   self.mock_cfs_client)
         self.assertIsNone(additional_inventory.branch)
+
+    def test_branch_property_jinja_rendered(self):
+        """Test the branch property when it uses Jinja2 templating"""
+        branch_name = 'integration'
+        self.jinja_env.globals['test'] = {
+            'branch_name': branch_name
+        }
+
+        self.data_with_branch['branch'] = '{{test.branch_name}}'
+        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env,
+                                                   self.mock_cfs_client)
+        self.assertEqual(branch_name, additional_inventory.branch)
 
     def test_name_property_specified(self):
         """Test the name property when specified"""
-        additional_inventory = AdditionalInventory(self.data_with_name, self.jinja_env)
+        additional_inventory = AdditionalInventory(self.data_with_name, self.jinja_env,
+                                                   self.mock_cfs_client)
         self.assertEqual(self.name, additional_inventory.name)
 
     def test_name_property_not_specified(self):
         """Test the name property when not specified"""
-        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env)
+        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env,
+                                                   self.mock_cfs_client)
         self.assertIsNone(additional_inventory.name)
 
-    def test_get_cfs_api_data_branch_no_resolve_branches(self):
-        """Test the get_cfs_api_data method with branch and name specified and no_resolve_branches"""
-        additional_inventory = AdditionalInventory(self.data_with_name, self.jinja_env)
-        expected = {'name': self.name, 'branch': self.branch, 'cloneUrl': self.repo_url}
-        self.assertEqual(expected, additional_inventory.get_cfs_api_data())
+    def test_name_property_jinja_rendered(self):
+        """Test the name property when it uses Jinja2 templating"""
+        name = 'inventory'
+        self.jinja_env.globals['test'] = {
+            'name': name
+        }
 
-    def test_get_cfs_api_data_branch_resolved(self):
-        """Test the get_cfs_api_data method with branch resolved to a commit hash"""
-        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env)
-        expected = {'commit': self.branch_head_commit, 'cloneUrl': self.repo_url}
+        self.data_with_name['name'] = '{{test.name}}'
+        additional_inventory = AdditionalInventory(self.data_with_name, self.jinja_env,
+                                                   self.mock_cfs_client)
+        self.assertEqual(name, additional_inventory.name)
+
+    def test_get_cfs_api_data_no_resolve_branches(self):
+        """Test get_cfs_api_data method without branch resolution"""
+        additional_inventory = AdditionalInventory(self.data_with_name, self.jinja_env,
+                                                   self.mock_cfs_client)
+        cfs_api_data = additional_inventory.get_cfs_api_data()
+
+        # All the work of getting CFS API request data is delegated to csm_api_client
+        self.mock_add_inv_cls.from_clone_url.assert_called_once_with(
+            clone_url=self.repo_url, name=self.name,
+            branch=self.branch, commit=None
+        )
+        add_inv_instance = self.mock_add_inv_cls.from_clone_url.return_value
+        self.assertEqual(add_inv_instance.req_payload, cfs_api_data)
+        add_inv_instance.resolve_branch_to_commit_hash.assert_not_called()
+
+    def test_get_cfs_api_data_resolve_branches(self):
+        """Test get_cfs_api_data method with branch resolution"""
+        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env,
+                                                   self.mock_cfs_client)
         with self.patch_resolve_branches(True):
-            self.assertEqual(expected, additional_inventory.get_cfs_api_data())
+            cfs_api_data = additional_inventory.get_cfs_api_data()
 
-    def test_get_cfs_api_data_commit(self):
-        """Test the get_cfs_api_data method with commit specified"""
-        additional_inventory = AdditionalInventory(self.data_with_commit, self.jinja_env)
-        expected = {'commit': self.commit_hash, 'cloneUrl': self.repo_url}
-        self.assertEqual(expected, additional_inventory.get_cfs_api_data())
+        # All the work of getting CFS API request data is delegated to csm_api_client
+        self.mock_add_inv_cls.from_clone_url.assert_called_once_with(
+            clone_url=self.repo_url, name=None,
+            branch=self.branch, commit=None
+        )
+        add_inv_instance = self.mock_add_inv_cls.from_clone_url.return_value
+        self.assertEqual(add_inv_instance.req_payload, cfs_api_data)
+        add_inv_instance.resolve_branch_to_commit_hash.assert_called_once_with()
+
+    def test_get_cfs_api_data_value_error(self):
+        """Test get_cfs_api_data method when from_clone_url raises ValueError"""
+        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env,
+                                                   self.mock_cfs_client)
+        self.mock_add_inv_cls.from_clone_url.side_effect = ValueError('error')
+        with self.assertRaisesRegex(InputItemCreateError, 'error'):
+            _ = additional_inventory.get_cfs_api_data()
+
+    def test_get_cfs_api_data_resolve_branch_error(self):
+        """Test get_cfs_api_data method when branch resolution raises CFSConfigurationError"""
+        additional_inventory = AdditionalInventory(self.data_with_branch, self.jinja_env,
+                                                   self.mock_cfs_client)
+        with self.patch_resolve_branches(True):
+            add_inv_instance = self.mock_add_inv_cls.from_clone_url.return_value
+            add_inv_instance.resolve_branch_to_commit_hash.side_effect = CFSConfigurationError('error')
+            with self.assertRaisesRegex(InputItemCreateError, 'error'):
+                _ = additional_inventory.get_cfs_api_data()
 
 
 class TestInputConfiguration(unittest.TestCase):
@@ -617,7 +721,7 @@ class TestInputConfiguration(unittest.TestCase):
         self.mock_instance = Mock(spec=InputInstance)
         # Fake index of configuration data in an input file
         self.index = 0
-        self.mock_cfs_client = Mock(spep=CFSClientBase)
+        self.mock_cfs_client = Mock(spec=CFSClientBase)
 
     def tearDown(self):
         patch.stopall()
@@ -635,7 +739,8 @@ class TestInputConfiguration(unittest.TestCase):
         self.config_data['additional_inventory'] = additional_inventory_data
         config = InputConfiguration(self.config_data, self.mock_instance, self.index,
                                     self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
-        self.mock_additional_inventory_cls.assert_called_once_with(additional_inventory_data, self.jinja_env)
+        self.mock_additional_inventory_cls.assert_called_once_with(additional_inventory_data, self.jinja_env,
+                                                                   self.mock_cfs_client)
         self.assertEqual(self.mock_additional_inventory, config.additional_inventory)
 
     def test_name_property(self):
@@ -673,7 +778,7 @@ class TestInputConfiguration(unittest.TestCase):
         config = InputConfiguration(self.config_data, self.mock_instance, self.index,
                                     self.jinja_env, self.mock_cfs_client, self.mock_product_catalog)
         self.mock_additional_inventory_cls.assert_called_once_with(additional_inventory_data,
-                                                                   self.jinja_env)
+                                                                   self.jinja_env, self.mock_cfs_client)
         self.assertEqual(expected, config.get_create_item_data())
 
     def test_get_create_item_data_one_layer_failure(self):
@@ -762,6 +867,82 @@ class TestInputConfiguration(unittest.TestCase):
             self.assertEqual(f'Failed to create layers[{idx}] of configuration '
                              f'{self.config_name}: {layer_fail_msg}',
                              logs_cm.records[idx + 1].message)
+
+
+class TestInputConfigurationValidation(unittest.TestCase):
+    """Tests for the validate method of the InputConfiguration class"""
+
+    def setUp(self):
+        self.config_name = 'compute-config'
+        self.config_data = {
+            'name': self.config_name,
+            'layers': [
+                {
+                    'name': 'branch_layer',
+                    'git': {
+                        'url': 'https://api-gw-service-nmn.local/vcs/cray/cos-config-management.git',
+                        'branch': 'integration'
+                    },
+                    'playbook': 'site.yaml'
+                },
+                {
+                    'name': 'version_layer',
+                    'product': {
+                        'name': 'csm',
+                        'version': '1.6.0'
+                    },
+                    'playbook': 'site.yaml'
+                }
+            ]
+        }
+        self.jinja_env = SandboxedEnvironment()
+        self.mock_product_catalog = Mock(spec=ProductCatalog)
+        self.mock_instance = Mock(spec=InputInstance)
+        # Fake index of configuration data in an input file
+        self.index = 0
+
+    def test_validate_layers_missing_playbook_cfs_v3(self):
+        """Test validate function when layers are missing playbooks and we are using the CFS v3 API"""
+        self.config_data['layers'][0].pop('playbook')
+        self.config_data['layers'][1].pop('playbook')
+        mock_cfs_v3_client = Mock(spec=CFSV3Client)
+        config = InputConfiguration(self.config_data, self.mock_instance, self.index,
+                                    self.jinja_env, mock_cfs_v3_client, self.mock_product_catalog)
+        err_regex = f'The CFS configuration at index {self.index} is not valid'
+        with self.assertLogs(level=logging.ERROR) as logs_cm:
+            with self.assertRaisesRegex(InputItemValidateError, err_regex):
+                config.validate()
+
+        self.assertEqual(5, len(logs_cm.records))
+        self.assertRegex(logs_cm.records[0].message, 'A playbook is required when using the CFS v3 API')
+        self.assertRegex(logs_cm.records[1].message, 'The CFS configuration layer at index 0 is not valid')
+        self.assertRegex(logs_cm.records[2].message, 'A playbook is required when using the CFS v3 API')
+        self.assertRegex(logs_cm.records[3].message, 'The CFS configuration layer at index 1 is not valid')
+        self.assertRegex(logs_cm.records[4].message,
+                         f'One or more layers is not valid in CFS configuration at index {self.index}')
+
+    def test_validate_layers_playbook_present_cfs_v3(self):
+        """Test validate function when layers have playbooks and we are using the CFS v3 API"""
+        mock_cfs_v3_client = Mock(spec=CFSV3Client)
+        config = InputConfiguration(self.config_data, self.mock_instance, self.index,
+                                    self.jinja_env, mock_cfs_v3_client, self.mock_product_catalog)
+        config.validate()
+
+    def test_validate_layers_missing_playbook_cfs_v2(self):
+        """Test validate function when layers are missing playbooks and we are using the CFS v2 API"""
+        mock_cfs_v2_client = Mock(spec=CFSV2Client)
+        self.config_data['layers'][0].pop('playbook')
+        self.config_data['layers'][1].pop('playbook')
+        config = InputConfiguration(self.config_data, self.mock_instance, self.index,
+                                    self.jinja_env, mock_cfs_v2_client, self.mock_product_catalog)
+        config.validate()
+
+    def test_validate_layers_playbook_present_cfs_v2(self):
+        """Test validate function when layers have playbooks and we are using the CFS v2 API"""
+        mock_cfs_v2_client = Mock(spec=CFSV2Client)
+        config = InputConfiguration(self.config_data, self.mock_instance, self.index,
+                                    self.jinja_env, mock_cfs_v2_client, self.mock_product_catalog)
+        config.validate()
 
 
 if __name__ == '__main__':

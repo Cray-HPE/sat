@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -258,6 +258,11 @@ def _add_bootprep_run_subparser(subparsers):
         '--bos-version',
         choices=['v1', 'v2'],
         help='The version of the BOS API to use for BOS operations',
+    )
+    run_subparser.add_argument(
+        '--cfs-version',
+        choices=['v2', 'v3'],
+        help='The version of the CFS API to use for CFS operations',
     )
 
     add_vars_options(run_subparser)

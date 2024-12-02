@@ -137,6 +137,10 @@ These options only apply to the ``run`` action.
 **--bos-version BOS_VERSION**
         The version of the BOS API to use when creating BOS session templates.
 
+**--cfs-version CFS_VERSION**
+        The version of the CFS API to use when creating or checking for the
+        existence of CFS configurations.
+
 **--recipe-version RECIPE_VERSION**
         The HPC CSM Software Recipe version, e.g. 22.03. This is used to obtain the
         product versions which can be substituted for variables specified in

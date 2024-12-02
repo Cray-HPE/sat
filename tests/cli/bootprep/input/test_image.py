@@ -31,8 +31,58 @@ from jinja2 import Environment
 
 from sat.apiclient.ims import IMSClient
 from sat.cli.bootprep.errors import ImageCreateError
-from sat.cli.bootprep.input.image import ProductInputImage
+from sat.cli.bootprep.input.image import IMSInputImageV2, ProductInputImage
 from sat.cli.bootprep.input.instance import InputInstance
+
+
+class TestIMSInputImageV2(unittest.TestCase):
+    """Tests for IMSInputImageV2"""
+    def setUp(self):
+        self.mock_input_instance = Mock(spec=InputInstance)
+        self.mock_product_catalog = Mock(spec=ProductCatalog)
+        self.mock_cfs_client = Mock(spec=CFSClientBase)
+        self.mock_ims_client = Mock(spec=IMSClient)
+        self.jinja_env = Environment()
+
+    def test_ims_data(self):
+        """Test the ims_data property of IMSInputImageV2"""
+        base_type = 'image'
+        image_id = 'abcdef12'
+        input_data = {
+            'name': 'my-image',
+            'base': {
+                'ims': {
+                    'type': base_type,
+                    'id': image_id
+                }
+            }
+        }
+        ims_input_image = IMSInputImageV2(input_data, 0, self.mock_input_instance, self.jinja_env,
+                                          self.mock_product_catalog, self.mock_ims_client,
+                                          self.mock_cfs_client)
+        self.assertEqual({'type': base_type, 'id': image_id}, ims_input_image.ims_data)
+
+    def test_ims_data_jinja_rendered(self):
+        """Test the ims_data property of IMSInputImageV2 when it uses variable substitution"""
+        image_id = '1234abcd'
+        base_type = 'recipe'
+        self.jinja_env.globals['test'] = {
+            'id': image_id,
+            'type': base_type
+        }
+        input_data = {
+            'name': 'my-image',
+            'base': {
+                'ims': {
+                    'type': '{{test.type}}',
+                    'id': '{{test.id}}'
+                }
+            }
+        }
+        ims_input_image = IMSInputImageV2(input_data, 0, self.mock_input_instance, self.jinja_env,
+                                          self.mock_product_catalog, self.mock_ims_client,
+                                          self.mock_cfs_client)
+        self.assertEqual({'type': base_type, 'id': image_id}, ims_input_image.ims_data)
 
 
 class TestProductInputImage(unittest.TestCase):

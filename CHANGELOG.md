@@ -25,6 +25,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.33.0] - 2024-11-25
+
+### Added
+- Added support for using either the CFS v2 or v3 API in `sat bootprep`,
+  depending on the value of the `--cfs-version` command-line option or the
+  `cfs.api_version` config-file option.
+
+### Changed
+- The `sat bootprep` command defaults to using the v3 CFS API instead of v2.
+- When using the CFS v3 API, CFS configuration layers defined in `sat bootprep`
+  input files are required to specify the `playbook` field as this is required
+  by the CFS v3 API.
+
 ## [3.32.13] - 2024-11-25
 
 ### Fixed

@@ -26,39 +26,27 @@ Defines classes for configurations defined in the input file.
 """
 from abc import ABC, abstractmethod
 import logging
-from urllib.parse import urlparse, urlunparse
 
-from cray_product_catalog.query import ProductCatalogError
 from csm_api_client.service.gateway import APIError
-from csm_api_client.service.vcs import VCSError, VCSRepo
+from csm_api_client.service.cfs import CFSV3Client, CFSConfigurationError
 
 from sat.cached_property import cached_property
 from sat.cli.bootprep.constants import LATEST_VERSION_VALUE
-from sat.cli.bootprep.errors import InputItemCreateError
+from sat.cli.bootprep.errors import InputItemCreateError, InputItemValidateError
 from sat.cli.bootprep.input.base import (
     BaseInputItem,
     BaseInputItemCollection,
-    jinja_rendered,
+    Validatable,
+    jinja_rendered
 )
 from sat.config import get_config_value
-from sat.util import get_val_by_path, set_val_by_path
+from sat.util import get_val_by_path
 
 LOGGER = logging.getLogger(__name__)
 
 
-class InputConfigurationLayerBase(ABC):
+class InputConfigurationLayerBase(ABC, Validatable):
     """An object representing data in common between layers and additional inventory"""
-    REQUIRED_CFS_PROPERTIES = {
-        'cloneUrl': 'clone_url'
-    }
-    # Mapping from CFS property name to class property name for optional properties
-    # If the property value is None, the property will be omitted from the CFS layer
-    # Nested CFS properties are specified by separating each property name with '.'
-    OPTIONAL_CFS_PROPERTIES = {
-        'branch': 'branch',
-        'commit': 'commit',
-        'name': 'name'
-    }
 
     # CRAYSAT-1174: Specifying a 'branch' in a CFS configuration layer is not
     # supported until CSM 1.2. Toggling this variable will change the behavior
@@ -68,28 +56,25 @@ class InputConfigurationLayerBase(ABC):
     # The jinja_rendered properties here are only rendered at item creation time
     template_render_err = InputItemCreateError
 
-    def __init__(self, layer_data, jinja_env):
+    def __init__(self, layer_data, jinja_env, cfs_client):
         """Create a new configuration layer.
 
         Args:
             layer_data (dict): the layer data from the input instance
             jinja_env (jinja2.Environment): the Jinja2 environment in which
                 fields supporting Jinja2 templating should be rendered.
+            cfs_client (csm_api_client.service.cfs.CFSClientBase): the CFS API
+                client to use when creating the layer in CFS
         """
         self.layer_data = layer_data
         self.jinja_env = jinja_env
+        self.cfs_client = cfs_client
 
     @property
     @jinja_rendered
     def name(self):
         """str or None: the name specified for the layer"""
         return self.layer_data.get('name')
-
-    @property
-    @abstractmethod
-    def clone_url(self):
-        """str: the git clone URL for this layer"""
-        pass
 
     @property
     @abstractmethod
@@ -103,6 +88,7 @@ class InputConfigurationLayerBase(ABC):
         """str or None: the commit for this layer"""
         pass
 
+    @abstractmethod
     def get_cfs_api_data(self):
         """Get the data to pass to the CFS API to create this layer.
 
@@ -114,59 +100,37 @@ class InputConfigurationLayerBase(ABC):
             InputItemCreateError: if there was a failure to obtain the data
                 needed to create the layer in CFS.
         """
-        cfs_layer_data = {cfs_property: getattr(self, self_property)
-                          for cfs_property, self_property in self.REQUIRED_CFS_PROPERTIES.items()}
-        for cfs_property, self_property in self.OPTIONAL_CFS_PROPERTIES.items():
-            # CRAYSAT-1174: Ignore branch property if not supported by CFS
-            if self.resolve_branches and cfs_property == 'branch':
-                continue
-
-            property_value = getattr(self, self_property)
-            if property_value is not None:
-                set_val_by_path(cfs_layer_data, cfs_property, property_value)
-
-        return cfs_layer_data
-
-    def resolve_commit_hash(self, branch):
-        """Query VCS to determine the commit hash at the head of the branch.
-
-        Args:
-            branch (str): the name of the branch to look up
-
-        Returns:
-            str: the commit hash corresponding to the HEAD commit of the branch.
-
-        Raises:
-            InputItemCreateError: if there is no such branch on the remote
-                repository.
-        """
-        try:
-            commit_hash = VCSRepo(self.clone_url).get_commit_hash_for_branch(branch)
-        except VCSError as err:
-            raise InputItemCreateError(f'Could not query VCS to resolve branch name "{branch}": '
-                                       f'{err}')
-
-        if commit_hash is None:
-            raise InputItemCreateError(f'Could not retrieve HEAD commit for branch "{branch}"; '
-                                       'no matching branch was found on remote VCS repo.')
-        return commit_hash
+        pass
 
 
 class InputConfigurationLayer(InputConfigurationLayerBase, ABC):
     """A CFS configuration layer as defined in the bootprep input file"""
 
-    OPTIONAL_CFS_PROPERTIES = {
-        'branch': 'branch',
-        'commit': 'commit',
-        'name': 'name',
-        'playbook': 'playbook',
-        'specialParameters.imsRequireDkms': 'ims_require_dkms'
-    }
+    def __init__(self, layer_data, index, jinja_env, cfs_client):
+        """Create a new InputConfigurationLayer.
+
+        Args:
+            layer_data (dict): the layer data from the input instance
+            index (int): the index of the layer in the configuration
+            jinja_env (jinja2.Environment): the Jinja2 environment in which
+                fields supporting Jinja2 templating should be rendered.
+            cfs_client (csm_api_client.service.cfs.CFSClientBase): the CFS API
+                client to use when creating the layer in CFS
+        """
+        super().__init__(layer_data, jinja_env, cfs_client)
+        self.index = index
+
+    def __str__(self):
+        """str: a string representation of the layer"""
+        return f'CFS configuration layer at index {self.index}'
 
     @property
     @jinja_rendered
     def playbook(self):
         """str or None: the playbook specified in the layer"""
+        # Note that CFS v3 requires a playbook but CFS v2 does not, so the
+        # schema does not require a playbook, but it is validated in the
+        # validate_playbook_specified_with_cfs_v3 method below.
         return self.layer_data.get('playbook')
 
     @property
@@ -174,15 +138,32 @@ class InputConfigurationLayer(InputConfigurationLayerBase, ABC):
         """str or None: whether to enable DKMS when this layer customizes an IMS image"""
         return get_val_by_path(self.layer_data, 'special_parameters.ims_require_dkms')
 
+    @Validatable.validation_method()
+    def validate_playbook_specified_with_cfs_v3(self, **_):
+        """Validate that a playbook is specified when using CFS v3.
+
+        The CFS v3 API will respond with a clear error, but validating here
+        allows this issue to be caught in --dry-run mode.
+
+        Raises:
+            InputItemValidateError: if a playbook is not specified when using CFS v3
+        """
+        if isinstance(self.cfs_client, CFSV3Client) and not self.playbook:
+            raise InputItemValidateError('A playbook is required when using the '
+                                         'CFS v3 API to create configurations.')
+
     @staticmethod
-    def get_configuration_layer(layer_data, jinja_env, product_catalog):
+    def get_configuration_layer(layer_data, index, jinja_env, cfs_client, product_catalog):
         """Get and return a new InputConfigurationLayer for the given layer data.
 
         Args:
             layer_data (dict): The data for a layer, already validated against
                 the bootprep input file schema.
+            index (int): the index of the layer in the configuration
             jinja_env (jinja2.Environment): the Jinja2 environment in which
                 fields supporting Jinja2 templating should be rendered.
+            cfs_client (csm_api_client.service.cfs.CFSClientBase): the CFS API
+                client to use when creating the layer in CFS
             product_catalog (cray_product_catalog.query.ProductCatalog):
                 the product catalog object
 
@@ -192,9 +173,9 @@ class InputConfigurationLayer(InputConfigurationLayerBase, ABC):
                 properly validated against the schema.
         """
         if 'git' in layer_data:
-            return GitInputConfigurationLayer(layer_data, jinja_env)
+            return GitInputConfigurationLayer(layer_data, index, jinja_env, cfs_client)
         elif 'product' in layer_data:
-            return ProductInputConfigurationLayer(layer_data, jinja_env, product_catalog)
+            return ProductInputConfigurationLayer(layer_data, index, jinja_env, cfs_client, product_catalog)
         else:
             raise ValueError('Unrecognized type of configuration layer')
 
@@ -205,6 +186,7 @@ class GitInputConfigurationLayer(InputConfigurationLayer):
     and a branch or a commit hash.
     """
     @property
+    @jinja_rendered
     def clone_url(self):
         # The 'url' property is required by the schema
         return self.layer_data['git']['url']
@@ -216,12 +198,38 @@ class GitInputConfigurationLayer(InputConfigurationLayer):
         return self.layer_data['git'].get('branch')
 
     @property
+    @jinja_rendered
     def commit(self):
         # The 'commit' property is optional
-        if self.resolve_branches and self.branch is not None:
-            # If given a branch, we can look up the commit dynamically.
-            return self.resolve_commit_hash(self.branch)
         return self.layer_data['git'].get('commit')
+
+    def get_cfs_api_data(self):
+        """Get the data to pass to the CFS API to create this layer.
+
+        Returns:
+            dict: The dictionary of data to pass to the CFS API to create the
+                layer.
+
+        Raises:
+            InputItemCreateError: if there was a failure to obtain the data
+                needed to create the layer in CFS.
+        """
+        layer_cls = self.cfs_client.configuration_cls.cfs_config_layer_cls
+        try:
+            layer = layer_cls.from_clone_url(
+                clone_url=self.clone_url, branch=self.branch, commit=self.commit,
+                name=self.name, playbook=self.playbook, ims_require_dkms=self.ims_require_dkms
+            )
+        except ValueError as err:
+            raise InputItemCreateError(str(err))
+
+        if self.resolve_branches:
+            try:
+                layer.resolve_branch_to_commit_hash()
+            except CFSConfigurationError as err:
+                raise InputItemCreateError(str(err))
+
+        return layer.req_payload
 
 
 class ProductInputConfigurationLayer(InputConfigurationLayer):
@@ -229,17 +237,20 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
     A configuration layer that is defined with the name of a product
     and the version or branch.
     """
-    def __init__(self, layer_data, jinja_env, product_catalog):
+    def __init__(self, layer_data, index, jinja_env, cfs_client, product_catalog):
         """Create a new ProductInputConfigurationLayer.
 
         Args:
             layer_data (dict): the layer data from the input instance
+            index (int): the index of the layer in the configuration
             jinja_env (jinja2.Environment): the Jinja2 environment in which
                 fields supporting Jinja2 templating should be rendered.
+            cfs_client (csm_api_client.service.cfs.CFSClientBase): the CFS API
+                client to use when creating the layer in CFS
             product_catalog (cray_product_catalog.query.ProductCatalog or None):
                 the product catalog object
         """
-        super().__init__(layer_data, jinja_env)
+        super().__init__(layer_data, index, jinja_env, cfs_client)
         self.product_catalog = product_catalog
 
     @property
@@ -252,42 +263,8 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
     @jinja_rendered
     def product_version(self):
         """str: the version specified for the product"""
-        # The 'version' property is optional. If not specified, assume latest
-        return self.layer_data['product'].get('version', LATEST_VERSION_VALUE)
-
-    @cached_property
-    def matching_product(self):
-        """sat.software_inventory.products.InstalledProductVersion: the matching installed product"""
-        if self.product_catalog is None:
-            raise InputItemCreateError(f'Product catalog data is not available.')
-
-        try:
-            if self.product_version == LATEST_VERSION_VALUE:
-                return self.product_catalog.get_product(self.product_name)
-            return self.product_catalog.get_product(self.product_name, self.product_version)
-        except ProductCatalogError as err:
-            raise InputItemCreateError(f'Unable to get product data from product catalog: {err}')
-
-    @staticmethod
-    def substitute_url_hostname(url):
-        """Substitute the hostname in a URL with the configured API gateway hostname.
-
-        Args:
-            url (str): The URL to substitute.
-
-        Returns:
-            str: The URL with the hostname portion replaced.
-        """
-        return urlunparse(urlparse(url)._replace(
-            netloc=get_config_value('api_gateway.host')
-        ))
-
-    @cached_property
-    def clone_url(self):
-        if self.matching_product.clone_url is None:
-            raise InputItemCreateError(f'No clone URL present for version {self.product_version} '
-                                       f'of product {self.product_name}')
-        return self.substitute_url_hostname(self.matching_product.clone_url)
+        # The 'version' property is optional
+        return self.layer_data['product'].get('version')
 
     @cached_property
     @jinja_rendered
@@ -296,61 +273,94 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
         return self.layer_data['product'].get('branch')
 
     @cached_property
+    @jinja_rendered
     def commit(self):
-        # There are a few ways to determine the proper commit hash for a
-        # layer, if necessary. Their precedence is as follows.
-        #   1. If the commit for the product was specified explicitly in the
-        #      input file, that should be returned.
-        #   2. If a branch for the product was specified in the input file, the
-        #      branch needs to be resolved to a commit hash, and that commit hash
-        #      should be returned. If branch resolving is disabled (i.e. with
-        #      --no-resolve-branches), then presumably CFS supports branch names,
-        #      and so this property should be None in order for a branch name to
-        #      be passed to CFS.
-        #   3. If neither a commit nor a branch was specified, then consult the
-        #      product catalog for the an associated commit hash and return
-        #      that.
+        # The 'commit' property is optional
+        return self.layer_data['product'].get('commit')
 
-        input_commit = self.layer_data['product'].get('commit')
-        if input_commit:
-            return input_commit
+    def get_cfs_api_data(self):
+        """Get the data to pass to the CFS API to create this layer.
 
-        if self.branch is not None:
+        Returns:
+            dict: The dictionary of data to pass to the CFS API to create the
+                layer.
+
+        Raises:
+            InputItemCreateError: if there was a failure to obtain the data
+                needed to create the layer in CFS.
+        """
+        layer_cls = self.cfs_client.configuration_cls.cfs_config_layer_cls
+
+        # If the version is 'latest', we want to pass None to from_product_catalog
+        version = self.product_version if self.product_version != LATEST_VERSION_VALUE else None
+
+        try:
+            layer = layer_cls.from_product_catalog(
+                product_name=self.product_name, api_gw_host=get_config_value('api_gateway.host'),
+                product_version=version, commit=self.commit, branch=self.branch,
+                name=self.name, playbook=self.playbook, ims_require_dkms=self.ims_require_dkms,
+                product_catalog=self.product_catalog
+            )
             if self.resolve_branches:
-                return self.resolve_commit_hash(self.branch)
-            return None
+                layer.resolve_branch_to_commit_hash()
+        except (ValueError, CFSConfigurationError) as err:
+            raise InputItemCreateError(str(err))
 
-        if self.matching_product.commit is None:
-            raise InputItemCreateError(f'No commit present for version {self.product_version} '
-                                       f'of product {self.product_name}')
-        return self.matching_product.commit
+        return layer.req_payload
 
 
 class AdditionalInventory(InputConfigurationLayerBase):
     """Additional inventory data for a CFS configuration"""
 
     @property
+    @jinja_rendered
     def clone_url(self):
         """str: the clone URL for the additional inventory"""
         return self.layer_data['url']
 
     @property
+    @jinja_rendered
     def commit(self):
         """str or None: the commit hash or None if branch was specified instead"""
-        if self.resolve_branches and self.branch is not None:
-            # If given a branch, we can look up the commit dynamically.
-            return self.resolve_commit_hash(self.branch)
         return self.layer_data.get('commit')
 
     @property
+    @jinja_rendered
     def branch(self):
         """str or None: the branch or None if commit was specified instead"""
         return self.layer_data.get('branch')
 
     @property
+    @jinja_rendered
     def name(self):
         """str or None: the optional name of the additional inventory"""
         return self.layer_data.get('name')
+
+    def get_cfs_api_data(self):
+        """Get the data to pass to the CFS API to create this layer.
+
+        Returns:
+            dict: The dictionary of data to pass to the CFS API to create the
+                layer.
+
+        Raises:
+            InputItemCreateError: if there was a failure to obtain the data
+                needed to create the layer in CFS.
+        """
+        layer_cls = self.cfs_client.configuration_cls.cfs_additional_inventory_cls
+
+        try:
+            layer = layer_cls.from_clone_url(clone_url=self.clone_url, name=self.name,
+                                             branch=self.branch, commit=self.commit)
+        except ValueError as err:
+            raise InputItemCreateError(str(err))
+        try:
+            if self.resolve_branches:
+                layer.resolve_branch_to_commit_hash()
+        except CFSConfigurationError as err:
+            raise InputItemCreateError(str(err))
+
+        return layer.req_payload
 
 
 class InputConfiguration(BaseInputItem):
@@ -384,12 +394,37 @@ class InputConfiguration(BaseInputItem):
         self.jinja_context = {}
 
         # The 'layers' property is required and must be a list, but it can be empty
-        self.layers = [InputConfigurationLayer.get_configuration_layer(layer_data, jinja_env, product_catalog)
-                       for layer_data in self.data['layers']]
+        self.layers = [InputConfigurationLayer.get_configuration_layer(layer_data, index, jinja_env,
+                                                                       cfs_client, product_catalog)
+                       for index, layer_data in enumerate(self.data['layers'])]
 
         self.additional_inventory = None
         if 'additional_inventory' in self.data:
-            self.additional_inventory = AdditionalInventory(self.data['additional_inventory'], jinja_env)
+            self.additional_inventory = AdditionalInventory(self.data['additional_inventory'], jinja_env,
+                                                            cfs_client)
+
+    @Validatable.validation_method()
+    def validate_layers(self, **kwargs):
+        """Validate all layers within this configuration.
+
+        If a layer's `validate` method raises an `InputItemValidateError`, an
+        error will be logged, and once all layers are validated, this will raise
+        a new `InputItemValidateError`.
+
+        Raises:
+            InputItemValidateError: if any layer is invalid
+        """
+        valid = True
+
+        for layer in self.layers:
+            try:
+                layer.validate(**kwargs)
+            except InputItemValidateError as err:
+                LOGGER.error(str(err))
+                valid = False
+
+        if not valid:
+            raise InputItemValidateError(f'One or more layers is not valid in {self}')
 
     def get_create_item_data(self):
         """Get the data to pass to the CFS API to create this configuration.
@@ -479,14 +514,9 @@ class InputConfigurationCollection(BaseInputItemCollection):
         See parent class for full docstring.
         """
         try:
-            # TODO: Add a get_configurations method to cfs_client?
-            configurations = self.cfs_client.get('configurations').json()
+            configurations = self.cfs_client.get_configurations()
         except APIError as err:
-            # TODO: Consider whether we need subclasses of InputItemCreateError
             raise InputItemCreateError(f'Unable to get existing CFS configurations: {err}')
-        except ValueError as err:
-            raise InputItemCreateError(f'Unable to parse response when getting existing CFS '
-                                       f'configurations: {err}')
 
         # CFS configurations have unique names, so this is safe
         return {

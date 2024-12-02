@@ -609,6 +609,7 @@ class IMSInputImageV1(IMSInputImage):
 class IMSInputImageV2(IMSInputImage):
     """An input image that specifies a base IMS image/recipe under the 'ims' property under the 'base' property."""
     @property
+    @jinja_rendered
     def ims_data(self):
         """dict: the data that defines the base IMS image or recipe"""
         return self.image_data['base']['ims']

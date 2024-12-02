@@ -210,7 +210,7 @@ def do_bootprep_run(schema_validator, args):
     LOGGER.info('Input file successfully validated against schema')
 
     session = SATSession()
-    cfs_client = CFSClientBase.get_cfs_client(session, 'v2')
+    cfs_client = CFSClientBase.get_cfs_client(session, get_config_value('cfs.api_version'))
     ims_client = IMSClient(session)
     # CASMTRIAGE-4288: IMS can be extremely slow to return DELETE requests for
     # large images, so this IMSClient will not use a timeout on HTTP requests
@@ -218,6 +218,7 @@ def do_bootprep_run(schema_validator, args):
     bos_client = BOSClientCommon.get_bos_client(session)
     request_dumper = RequestDumper(args.save_files, args.output_dir)
 
+    LOGGER.debug("Loading product catalog data")
     try:
         product_catalog = ProductCatalog()
     except ProductCatalogError as err:
@@ -226,6 +227,7 @@ def do_bootprep_run(schema_validator, args):
         # Any item from the InputInstance that needs to access product catalog
         # data will fail. Otherwise, this is not a problem.
         product_catalog = None
+    LOGGER.debug("Loaded product catalog data")
 
     var_context = load_vars_or_exit(
         args.recipe_version,

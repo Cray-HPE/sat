@@ -357,6 +357,7 @@ class InputSessionTemplateV2(InputSessionTemplate):
         return get_val_by_path(self.data, 'image.ims.name')
 
     @property
+    @jinja_rendered
     def ims_image_id(self):
         """str or None: the id specified for the IMS image, or None if not specified"""
         return get_val_by_path(self.data, 'image.ims.id')
