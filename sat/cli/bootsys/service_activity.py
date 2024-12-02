@@ -383,7 +383,7 @@ class CFSActivityChecker(ServiceActivityChecker):
         Raises:
             ServiceCheckError: if unable to get the active CFS sessions.
         """
-        cfs_client = CFSClientBase.get_cfs_client(SATSession(), 'v2')
+        cfs_client = CFSClientBase.get_cfs_client(SATSession(), get_config_value('cfs.api_version'))
         try:
             sessions = cfs_client.get('sessions').json()
         except (APIError, ValueError) as err:
