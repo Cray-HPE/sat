@@ -17,6 +17,8 @@ These options govern the format of the output.
 **--sort-by HEADING**
         Sort by the selected heading. Can also accept a 0-based column index.
 
+        TODO: Add explanation of multiple sort-fields specified as a comma-separated list.
+
 **--show-empty**
         Show values for columns even if every value is ``EMPTY``. By default,
         such columns will be hidden.

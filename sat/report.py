@@ -93,6 +93,7 @@ class Report:
         Args:
             headings: Headings for the table's columns.
             title: Title for the table
+            # TODO: Change the docstring to say that this is now a list of columns to sort by
             sort_by: Sort the output by the desired column when printing
                 in tabular format. Can be the name of a heading, or a 0-based
                 index.
@@ -159,6 +160,10 @@ class Report:
 
         # find the heading to sort on
         if sort_by is not None:
+            # TODO: Handle sort_by being a list of str, which may each be any of:
+            #  - a heading name
+            #  - a 0-based index
+            #  - a subsequence of a heading name
             warn_str = "Element '%s' is not in %s. Output will be unsorted."
             try:
                 self.sort_by = int(self.sort_by)
@@ -290,6 +295,7 @@ class Report:
         If `self.sort_by` is None, no sorting is done.
         """
         if self.sort_by is not None:
+            # TODO: handle sort_by being a list of dictionary keys by which the data should be sorted
             try:
                 self.data.sort(key=lambda d: d[self.sort_by], reverse=self.reverse)
             except TypeError:

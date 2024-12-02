@@ -39,7 +39,7 @@ def add_showrev_subparser(subparsers):
         None
     """
 
-    format_options = sat.parsergroups.create_format_options()
+    format_options = sat.parsergroups.create_format_options(sort_by_default=None)
     filter_options = sat.parsergroups.create_filter_options()
 
     showrev_parser = subparsers.add_parser(
