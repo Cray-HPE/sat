@@ -159,6 +159,9 @@ These options apply to both the ``shutdown`` and ``boot`` actions.
 **--bos-version BOS_VERSION**
         The version of the BOS API to use when launching BOS sessions.
 
+**--cfs-version CFS_VERSION**
+        The version of the CFS API to use when launching CFS sessions.
+
 **--cle-bos-template** *CLE_BOS_TEMPLATE*
         The name of the BOS session template for shutdown or boot of
         COS (formerly known as CLE) compute nodes. If not specified, no
