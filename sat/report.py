@@ -165,18 +165,19 @@ class Report:
             #  - a 0-based index
             #  - a subsequence of a heading name
             warn_str = "Element '%s' is not in %s. Output will be unsorted."
-            try:
-                self.sort_by = int(self.sort_by)
-                self.sort_by = self.headings[self.sort_by]
-            except IndexError:
-                # sort_by is out of range.
-                LOGGER.warning(warn_str, sort_by, self.headings)
-                self.sort_by = None
-            except ValueError:
-                # sort_by is not an int.
-                self.sort_by = match_query_key(self.sort_by, headings)
-                if not self.sort_by:
+            for i in range(len(self.sort_by)):
+                try:
+                    self.sort_by[i] = int(self.sort_by[i])
+                    self.sort_by[i] = self.headings[self.sort_by[i]]
+                except IndexError:
+                    # sort_by is out of range.
                     LOGGER.warning(warn_str, sort_by, self.headings)
+                    self.sort_by[i] = None
+                except ValueError:
+                    # sort_by is not an int.
+                    self.sort_by[i] = match_query_key(self.sort_by[i], headings)
+                    if not self.sort_by[i]:
+                        LOGGER.warning(warn_str, sort_by, self.headings)
 
         if display_headings is not None:
             self.display_headings = []
@@ -295,13 +296,14 @@ class Report:
         If `self.sort_by` is None, no sorting is done.
         """
         if self.sort_by is not None:
-            # TODO: handle sort_by being a list of dictionary keys by which the data should be sorted
-            try:
-                self.data.sort(key=lambda d: d[self.sort_by], reverse=self.reverse)
-            except TypeError:
-                LOGGER.info("Converting all values of '%s' field to str "
-                            "to allow sorting.", self.sort_by)
-                self.data.sort(key=lambda d: str(d[self.sort_by]), reverse=self.reverse)
+            # TODO: handle sort_by being a list of dictionary keys by which the data should be sorted %
+            for element in reversed(self.sort_by):
+                try:
+                    self.data.sort(key=lambda d: d[element], reverse=self.reverse)
+                except TypeError:
+                    LOGGER.info("Converting all values of '%s' field to str "
+                                "to allow sorting.", self.sort_by)
+                    self.data.sort(key=lambda d: str(d[element]), reverse=self.reverse)
 
     def remove_empty_and_missing(self, data_rows):
         """Removes columns which have only EMPTY_VALUE or MISSING_VALUE.
