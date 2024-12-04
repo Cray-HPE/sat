@@ -160,10 +160,8 @@ class Report:
 
         # find the heading to sort on
         if sort_by is not None:
-            # TODO: Handle sort_by being a list of str, which may each be any of:
-            #  - a heading name
-            #  - a 0-based index
-            #  - a subsequence of a heading name
+            if not isinstance(self.sort_by, list):
+                self.sort_by = [self.sort_by]
             warn_str = "Element '%s' is not in %s. Output will be unsorted."
             for i in range(len(self.sort_by)):
                 try:
@@ -172,12 +170,13 @@ class Report:
                 except IndexError:
                     # sort_by is out of range.
                     LOGGER.warning(warn_str, sort_by, self.headings)
-                    self.sort_by[i] = None
+                    self.sort_by = None
                 except ValueError:
                     # sort_by is not an int.
                     self.sort_by[i] = match_query_key(self.sort_by[i], headings)
                     if not self.sort_by[i]:
                         LOGGER.warning(warn_str, sort_by, self.headings)
+                        self.sort_by = None
 
         if display_headings is not None:
             self.display_headings = []
@@ -296,7 +295,6 @@ class Report:
         If `self.sort_by` is None, no sorting is done.
         """
         if self.sort_by is not None:
-            # TODO: handle sort_by being a list of dictionary keys by which the data should be sorted %
             for element in reversed(self.sort_by):
                 try:
                     self.data.sort(key=lambda d: d[element], reverse=self.reverse)

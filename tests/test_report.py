@@ -485,7 +485,7 @@ class TestReportFormatting(unittest.TestCase):
         """
         report = Report(self.headings, sort_by='pl')
 
-        self.assertEqual('place', report.sort_by)
+        self.assertEqual(['place'], report.sort_by)
 
         report.add_rows(self.out_of_order)
         pt_s = get_report_printed_list(report)
@@ -497,7 +497,7 @@ class TestReportFormatting(unittest.TestCase):
         """The report should sort on a unique subsequence.
         """
         report = Report(self.headings, sort_by='clr')
-        self.assertEqual('color', report.sort_by)
+        self.assertEqual(['color'], report.sort_by)
 
         report.add_rows(self.out_of_order)
         pt_s = get_report_printed_list(report)
@@ -509,7 +509,7 @@ class TestReportFormatting(unittest.TestCase):
         """The report should sort on the first match.
         """
         report = Report(self.headings, sort_by='ae')
-        self.assertEqual('name', report.sort_by)
+        self.assertEqual(['name'], report.sort_by)
 
         report.add_rows(self.out_of_order)
         pt_s = get_report_printed_list(report)
