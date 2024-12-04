@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -69,7 +69,7 @@ def create_format_options(sort_by_default='0'):
         help=('Select which column to sort by. If multiple columns are '
               'provided, output will be sorted in the order provided '
               'eg. --sort-by product_name,product_version will sort '
-              'results by name and then by version. Can accept a column '
+              'results by product name and then by product version. Can accept a column '
               'name or a 0-based index. Enclose the column name in '
               'double quotes if it contains a space.'))
 

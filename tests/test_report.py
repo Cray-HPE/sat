@@ -391,7 +391,7 @@ class TestReportFormatting(unittest.TestCase):
             self.assertEqual(expected, actual)
 
     def test_sorted_list_print(self):
-        """The internal PT should be sorted on the first column.
+        """The internal PT should be sorted on the first column and then the second column
         """
         report = Report(self.headings, sort_by=[0, 1])
 
@@ -401,6 +401,21 @@ class TestReportFormatting(unittest.TestCase):
         for expected, actual in zip(self.entries, pt_s):
             self.assertEqual(expected, actual)
 
+    def test_sorted_list_with_matches_print(self):
+        """Test sort on first and second column when elements are equal in first column
+        """
+        e1 = ['alice', 'mars', 'red']
+        e2 = ['bob', 'venus', 'blue']
+        e3 = ['charlie', 'earth', 'purple']
+        e4 = ['alice', 'earth', 'green']
+        out_of_order = [e1, e3, e2, e4]
+        expected_order = [e4, e1, e2, e3]
+        report = Report(self.headings, sort_by=[0, 1])
+        report.add_rows(out_of_order)
+        
+        pt_s = get_report_printed_list(report)
+
+        self.assertEqual(expected_order, pt_s)
     def test_sorted_yaml(self):
         """The YAML output list should be sorted as well.
         """

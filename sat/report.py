@@ -94,7 +94,7 @@ class Report:
             headings: Headings for the table's columns.
             title: Title for the table
             sort_by: List of columns to sort by when printing in tabular format.
-            Each column can be the name of a heading, or a 0-based index.
+                Each column can be the name of a heading, or a 0-based index.
             reverse: If True, then reverse the sorting order.
             no_headings: If True, then omit the title block and column
                 headings from the display.
@@ -156,8 +156,8 @@ class Report:
             LOGGER.warning("See the man page for this subcommand for further details on filter syntax.")
             sys.exit(1)
 
-        # find the heading to sort on
-        if sort_by is not None:
+        # find the heading(s) to sort on
+        if self.sort_by is not None:
             if not isinstance(self.sort_by, list):
                 self.sort_by = [self.sort_by]
             warn_str = "Element '%s' is not in %s. Output will be unsorted."

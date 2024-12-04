@@ -15,8 +15,8 @@ These options govern the format of the output.
         Reverses the sorting order.
 
 **--sort-by HEADING**
-        Sort by the selected heading or comma seperated list of headings.
-        Can also accept a 0-based column index or comma seperated list
+        Sort by the selected heading or comma-separated list of headings.
+        Can also accept a 0-based column index or comma-separated list
         of 0-based column indexes.
 
 **--show-empty**
