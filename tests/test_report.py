@@ -390,6 +390,17 @@ class TestReportFormatting(unittest.TestCase):
         for expected, actual in zip(self.entries, pt_s):
             self.assertEqual(expected, actual)
 
+    def test_sorted_list_print(self):
+        """The internal PT should be sorted on the first column.
+        """
+        report = Report(self.headings, sort_by=[0, 1])
+
+        report.add_rows(self.out_of_order)
+        pt_s = get_report_printed_list(report)
+
+        for expected, actual in zip(self.entries, pt_s):
+            self.assertEqual(expected, actual)
+
     def test_sorted_yaml(self):
         """The YAML output list should be sorted as well.
         """
