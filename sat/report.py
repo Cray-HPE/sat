@@ -93,10 +93,8 @@ class Report:
         Args:
             headings: Headings for the table's columns.
             title: Title for the table
-            # TODO: Change the docstring to say that this is now a list of columns to sort by
-            sort_by: Sort the output by the desired column when printing
-                in tabular format. Can be the name of a heading, or a 0-based
-                index.
+            sort_by: List of columns to sort by when printing in tabular format.
+            Each column can be the name of a heading, or a 0-based index.
             reverse: If True, then reverse the sorting order.
             no_headings: If True, then omit the title block and column
                 headings from the display.

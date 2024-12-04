@@ -63,15 +63,15 @@ def create_format_options(sort_by_default='0'):
         help='Sort the output in reverse order. Only applies for "pretty".',
         default=False, action='store_true')
 
-    # TODO: Modify the help text to describe how multiple sort-by fields are handled.
-    # For example, if I specify '--sort-by product_name,product_version', does it sort
-    # by product name first and then by product version?
     group.add_argument(
         '--sort-by', default=sort_by_default,
         type=lambda v: v.split(','),
-        help=('Select which column to sort by. Can accept a column name '
-              'or a 0-based index. Enclose the column name in double quotes '
-              'if it contains a space.'))
+        help=('Select which column to sort by. If multiple columns are '
+              'provided, output will be sorted in the order provided '
+              'eg. --sort-by product_name,product_version will sort '
+              'results by name and then by version. Can accept a column '
+              'name or a 0-based index. Enclose the column name in '
+              'double quotes if it contains a space.'))
 
     group.add_argument(
         '--show-empty',
