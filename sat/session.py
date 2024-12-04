@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@ OAuth2 authentication support.
 """
 
 import logging
+import os
+import sys
 
 from csm_api_client.session import UserSession
 
@@ -68,3 +70,6 @@ class SATSession(UserSession):
                            'Username is "{}". '.format(username) +
                            'Obtain a token with "auth" ' +
                            'subcommand, or use --token-file on the command line.')
+            if not os.path.exists(self.token_filename):
+                LOGGER.error('No token file could be found at {}'.format(self.token_filename))
+                sys.exit(1)
