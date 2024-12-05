@@ -53,7 +53,7 @@ def do_auth(args):
         None
     """
 
-    session = SATSession(no_unauth_warn=True)
+    session = SATSession(no_unauth_err=True)
     if session.token and not pester(
                     f'Token already exists for "{session.username}" on "{session.host}". '
                     f'Overwrite?'):

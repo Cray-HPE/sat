@@ -42,11 +42,11 @@ LOGGER = logging.getLogger(__name__)
 class SATSession(UserSession):
     """Subclass of the csm-api-client UserSession which follows the config file"""
 
-    def __init__(self, no_unauth_warn=False):
+    def __init__(self, no_unauth_err=False):
         """Initialize a SATSession.
 
         Args:
-            no_unauth_warn (bool): Suppress session-is-not-authorized warning.
+            no_unauth_err (bool): Suppress session-is-not-authorized warning.
                 used when fetching a new token with "sat auth".
         """
 
@@ -65,11 +65,11 @@ class SATSession(UserSession):
         if tenant_name:
             self.session.headers[TENANT_HEADER_NAME] = tenant_name
 
-        if not (self.token or no_unauth_warn):
-            LOGGER.warning('Session is not authenticated. ' +
+        if not (self.token or no_unauth_err):
+            if not os.path.exists(self.token_filename):
+                LOGGER.error('No token file could be found at {}'.format(self.token_filename))
+            LOGGER.error('Session is not authenticated. ' +
                            'Username is "{}". '.format(username) +
                            'Obtain a token with "auth" ' +
                            'subcommand, or use --token-file on the command line.')
-            if not os.path.exists(self.token_filename):
-                LOGGER.error('No token file could be found at {}'.format(self.token_filename))
-                sys.exit(1)
+            sys.exit(1)
