@@ -412,10 +412,11 @@ class TestReportFormatting(unittest.TestCase):
         expected_order = [e4, e1, e2, e3]
         report = Report(self.headings, sort_by=[0, 1])
         report.add_rows(out_of_order)
-        
+
         pt_s = get_report_printed_list(report)
 
         self.assertEqual(expected_order, pt_s)
+
     def test_sorted_yaml(self):
         """The YAML output list should be sorted as well.
         """

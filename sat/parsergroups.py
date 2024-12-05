@@ -37,6 +37,15 @@ LOGGER = logging.getLogger(__name__)
 
 
 def create_format_options(sort_by_default='0'):
+    """Creates a parser containing options for formatting.
+
+    sort_by_default: allows for the value of --sort_by to be set
+        when calling the method. It is set to 0 or the
+        first column of data being sorted.
+
+    Returns: an ArgumentParser object configured with options and help
+        text for formatting.
+    """
     parser = ArgumentParser(add_help=False)
 
     group = parser.add_argument_group(
@@ -66,9 +75,10 @@ def create_format_options(sort_by_default='0'):
     group.add_argument(
         '--sort-by', default=sort_by_default,
         type=lambda v: v.split(','),
-        help=('Select which column to sort by. If multiple columns are '
-              'provided, output will be sorted in the order provided '
-              'eg. --sort-by product_name,product_version will sort '
+        help=('Sort by the selected heading or comma-separated list of '
+              'headings. Can also accept a 0-based column index or '
+              'comma-separated list of 0-based column indexes.'
+              'E.g. "--sort-by product_name,product_version" will sort '
               'results by product name and then by product version. Can accept a column '
               'name or a 0-based index. Enclose the column name in '
               'double quotes if it contains a space.'))
