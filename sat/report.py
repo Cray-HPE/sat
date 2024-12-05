@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -93,9 +93,8 @@ class Report:
         Args:
             headings: Headings for the table's columns.
             title: Title for the table
-            sort_by: Sort the output by the desired column when printing
-                in tabular format. Can be the name of a heading, or a 0-based
-                index.
+            sort_by: List of columns to sort by when printing in tabular format.
+                Each column can be the name of a heading, or a 0-based index.
             reverse: If True, then reverse the sorting order.
             no_headings: If True, then omit the title block and column
                 headings from the display.
@@ -157,21 +156,28 @@ class Report:
             LOGGER.warning("See the man page for this subcommand for further details on filter syntax.")
             sys.exit(1)
 
-        # find the heading to sort on
-        if sort_by is not None:
-            warn_str = "Element '%s' is not in %s. Output will be unsorted."
-            try:
-                self.sort_by = int(self.sort_by)
-                self.sort_by = self.headings[self.sort_by]
-            except IndexError:
-                # sort_by is out of range.
-                LOGGER.warning(warn_str, sort_by, self.headings)
-                self.sort_by = None
-            except ValueError:
-                # sort_by is not an int.
-                self.sort_by = match_query_key(self.sort_by, headings)
-                if not self.sort_by:
+        # find the heading(s) to sort on
+        if self.sort_by is not None:
+            if not isinstance(self.sort_by, list):
+                self.sort_by = [self.sort_by]
+            warn_str = "Element '%s' is not in %s. Output will be unsorted on that element."
+            for i in range(len(self.sort_by)):
+                try:
+                    self.sort_by[i] = int(self.sort_by[i])
+                    self.sort_by[i] = self.headings[self.sort_by[i]]
+                except IndexError:
+                    # sort_by is out of range.
                     LOGGER.warning(warn_str, sort_by, self.headings)
+                    self.sort_by.remove(self.sort_by[i])
+                except ValueError:
+                    # sort_by is not an int.
+                    self.sort_by[i] = match_query_key(self.sort_by[i], headings)
+                    if not self.sort_by[i]:
+                        LOGGER.warning(warn_str, sort_by, self.headings)
+                        self.sort_by = None
+
+            if self.sort_by == []:
+                self.sort_by = None
 
         if display_headings is not None:
             self.display_headings = []
@@ -290,12 +296,13 @@ class Report:
         If `self.sort_by` is None, no sorting is done.
         """
         if self.sort_by is not None:
-            try:
-                self.data.sort(key=lambda d: d[self.sort_by], reverse=self.reverse)
-            except TypeError:
-                LOGGER.info("Converting all values of '%s' field to str "
-                            "to allow sorting.", self.sort_by)
-                self.data.sort(key=lambda d: str(d[self.sort_by]), reverse=self.reverse)
+            for element in reversed(self.sort_by):
+                try:
+                    self.data.sort(key=lambda d: d[element], reverse=self.reverse)
+                except TypeError:
+                    LOGGER.info("Converting all values of '%s' field to str "
+                                "to allow sorting.", self.sort_by)
+                    self.data.sort(key=lambda d: str(d[element]), reverse=self.reverse)
 
     def remove_empty_and_missing(self, data_rows):
         """Removes columns which have only EMPTY_VALUE or MISSING_VALUE.
