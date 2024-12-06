@@ -64,6 +64,9 @@ class TestFirmware(ExtendedTestCase):
         # Fake print
         self.mock_print = mock.patch('sat.cli.firmware.main.print').start()
 
+        # Fake SatSession
+        self.mock_sat_session = mock.patch('sat.cli.swap.ports.SATSession').start()
+
         # Fake get_config_value
         self.fake_config = {
             'format.no_headings': False,
@@ -134,7 +137,7 @@ class TestFirmware(ExtendedTestCase):
         self.firmware_client.delete_snapshot.assert_called_once_with('snap1')
 
     def test_delete_snapshot_error(self):
-        """An APIError deleting incorrect snapshot name logs an error and exits"""
+
         args = self.parser.parse_args(['firmware', '--delete-snapshot', 'foo'])
         self.firmware_client.delete_snapshot.side_effect = APIError
         self.assertExitsWithError(do_firmware, args)

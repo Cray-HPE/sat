@@ -401,6 +401,7 @@ class TestBOSV2ActivityChecker(unittest.TestCase):
 
     def setUp(self):
         self.mock_bos_client = MagicMock()
+        self.mock_sat_session = patch('sat.cli.bootsys.service_activity.SATSession').start()
         patch('sat.cli.bootsys.service_activity.BOSClientCommon.get_bos_client',
               return_value=self.mock_bos_client).start()
 
@@ -604,6 +605,7 @@ class TestFirmwareActivityChecker(ExtendedTestCase):
                 return self.fas_actions
 
         self.fw_client = patch('sat.cli.bootsys.service_activity.FASClient').start().return_value
+        self.mock_sat_session = patch('sat.cli.bootsys.service_activity.SATSession').start()
         self.fw_client.get_active_actions.side_effect = mock_get_active_updates
 
     def tearDown(self):
