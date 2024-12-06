@@ -69,7 +69,7 @@ class SATSession(UserSession):
             if not os.path.exists(self.token_filename):
                 LOGGER.error('No token file could be found at {}'.format(self.token_filename))
             LOGGER.error('Session is not authenticated. ' +
-                           'Username is "{}". '.format(username) +
-                           'Obtain a token with "auth" ' +
-                           'subcommand, or use --token-file on the command line.')
+                         'Username is "{}". '.format(username) +
+                         'Obtain a token with "auth" ' +
+                         'subcommand, or use --token-file on the command line.')
             sys.exit(1)
