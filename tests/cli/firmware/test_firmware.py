@@ -65,7 +65,7 @@ class TestFirmware(ExtendedTestCase):
         self.mock_print = mock.patch('sat.cli.firmware.main.print').start()
 
         # Fake SatSession
-        self.mock_sat_session = mock.patch('sat.cli.swap.ports.SATSession').start()
+        self.mock_sat_session = mock.patch('sat.cli.firmware.main.SATSession').start()
 
         # Fake get_config_value
         self.fake_config = {
