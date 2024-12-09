@@ -160,7 +160,7 @@ These options apply to both the ``shutdown`` and ``boot`` actions.
         The version of the BOS API to use when launching BOS sessions.
 
 **--cfs-version CFS_VERSION**
-        The version of the CFS API to use when launching CFS sessions.
+        The version of the CFS API to use when querying CFS sessions.
 
 **--cle-bos-template** *CLE_BOS_TEMPLATE*
         The name of the BOS session template for shutdown or boot of
