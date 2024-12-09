@@ -494,6 +494,19 @@ class TestReportFormatting(unittest.TestCase):
         for expected, actual in zip(self.out_of_order, pt_s):
             self.assertEqual(expected, actual)
 
+    def test_sort_heading_invalid_multiple(self):
+        """The PT should default to not sorting if the heading is not present.
+        """
+        report = Report(self.headings, sort_by=['does-not-exist', 'does-not-exist-two'])
+
+        self.assertEqual(None, report.sort_by)
+
+        report.add_rows(self.out_of_order)
+        pt_s = get_report_printed_list(report)
+
+        for expected, actual in zip(self.out_of_order, pt_s):
+            self.assertEqual(expected, actual)
+
     def test_sort_heading_idx_invalid(self):
         """The PT should not sort if the idx is out-of-range.
         """

@@ -161,20 +161,22 @@ class Report:
             if not isinstance(self.sort_by, list):
                 self.sort_by = [self.sort_by]
             warn_str = "Element '%s' is not in %s. Output will be unsorted on that element."
+            valid_sort_by = []
             for i in range(len(self.sort_by)):
                 try:
-                    self.sort_by[i] = int(self.sort_by[i])
-                    self.sort_by[i] = self.headings[self.sort_by[i]]
+                    index = int(self.sort_by[i])
+                    valid_sort_by.append(self.headings[index])
                 except IndexError:
                     # sort_by is out of range.
-                    LOGGER.warning(warn_str, sort_by, self.headings)
-                    self.sort_by.remove(self.sort_by[i])
+                    LOGGER.warning(warn_str, self.sort_by[i], self.headings)
                 except ValueError:
                     # sort_by is not an int.
-                    self.sort_by[i] = match_query_key(self.sort_by[i], headings)
-                    if not self.sort_by[i]:
-                        LOGGER.warning(warn_str, sort_by, self.headings)
-                        self.sort_by = None
+                    if match_query_key(sort_by[i], self.headings):
+                        valid_sort_by.append(match_query_key(self.sort_by[i], headings))
+                    else:
+                        LOGGER.warning(warn_str, self.sort_by[i], self.headings)
+
+            self.sort_by = valid_sort_by
 
             if self.sort_by == []:
                 self.sort_by = None
