@@ -313,7 +313,7 @@ class TestReport(unittest.TestCase):
 
         data = json.loads(json_s)
         for expected, actual in zip(self.entries, data):
-            self.assertEquals(expected, list(actual.values()))
+            self.assertEqual(expected, list(actual.values()))
 
     def test_get_formatted_report_json_with_xnames(self):
         """Json dumps should encode XName datatypes as strings.
@@ -326,7 +326,7 @@ class TestReport(unittest.TestCase):
 
         json_s = report.get_formatted_report('json')
         data = json.loads(json_s)
-        self.assertEquals(xname_s, data[0][header_s])
+        self.assertEqual(xname_s, data[0][header_s])
 
     def test_print_report(self):
         """str(report) should depend on the format instance variable.
