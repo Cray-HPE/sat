@@ -127,6 +127,7 @@ class TestGetSwitchPortDataList(unittest.TestCase):
         }
         self.mock_get_switch = mock.patch('sat.cli.swap.ports.PortManager.get_switch',
                                           autospec=True).start()
+        self.mock_sat_session = mock.patch('sat.cli.swap.ports.SATSession').start()
         self.mock_get_switch.side_effect = lambda _, switch_xname: self.mock_switches.get(switch_xname)
         self.pm = PortManager()
 
