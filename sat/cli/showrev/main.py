@@ -64,8 +64,13 @@ def do_showrev(args):
     """
     reports = []
 
+    # The `showrev` command sets the default of `--sort-by` to None, so we can use that to
+    # determine if the user explicitly set the value, and use a special default if not.
+    if args.sort_by is None:
+        sort_by = ['product_name', 'product_version']
+    else:
+        sort_by = args.sort_by
     # report formatting
-    sort_by = args.sort_by
     reverse = args.reverse
     no_headings = get_config_value('format.no_headings')
     no_borders = get_config_value('format.no_borders')
