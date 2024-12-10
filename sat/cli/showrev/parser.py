@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2020, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -39,7 +39,7 @@ def add_showrev_subparser(subparsers):
         None
     """
 
-    format_options = sat.parsergroups.create_format_options()
+    format_options = sat.parsergroups.create_format_options(sort_by_default=None)
     filter_options = sat.parsergroups.create_filter_options()
 
     showrev_parser = subparsers.add_parser(
