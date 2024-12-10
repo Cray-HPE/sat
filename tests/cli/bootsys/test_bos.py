@@ -177,6 +177,7 @@ class TestBOSLimitString(unittest.TestCase):
         self.blade_xname = 'x3000c0s0'
         self.nodes_on_blade_xnames = [f'{self.blade_xname}b0n{node}' for node in range(4)]
         self.mock_hsm_client = patch('sat.cli.bootsys.bos.HSMClient').start()
+        self.mock_sat_session = patch('sat.cli.bootsys.bos.SATSession').start()
         self.mock_get_node_components = self.mock_hsm_client.return_value.get_node_components
         self.mock_get_node_components.return_value = [
             {'ID': xname} for xname in self.nodes_on_blade_xnames
@@ -234,6 +235,7 @@ class TestBOSV2SessionWaiter(unittest.TestCase):
         self.session_id = 'abcdef-012345-678901-fdecba'
 
         self.mock_bos_client = MagicMock()
+        self.mock_sat_session = patch('sat.cli.bootsys.bos.SATSession').start()
         self.mock_bos_client.get.return_value = MagicMock(ok=True, status_code=200, json=MagicMock(return_value={
             'status': 'complete',
             'managed_components_count': 10,

@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2023-2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -40,11 +40,11 @@ class TestSessionTenantHandling(unittest.TestCase):
         """Test that the Cray-Tenant-Name header is set from the config"""
         tenant_name = 'some_tenant_name'
         with config({'api_gateway': {'tenant_name': tenant_name}}):
-            s = SATSession()
+            s = SATSession(no_unauth_err=True)
             self.assertEqual(s.session.headers[TENANT_HEADER_NAME], tenant_name)
 
     def test_cray_tenant_name_not_set(self):
         """Test that the Cray-Tenant-Name header is not set when not configured"""
         with config({'api_gateway': {'tenant_name': ''}}):
-            s = SATSession()
+            s = SATSession(no_unauth_err=True)
             self.assertIsNone(s.session.headers.get(TENANT_HEADER_NAME))
