@@ -495,26 +495,15 @@ class TestCFSActivityChecker(unittest.TestCase):
 
         # If not None, causes CFSClient().get() to raise this
         self.cfs_err = None
-        # If not None, causes CFSClient().get().json() to raise this
-        self.json_err = None
 
-        def mock_cfs_get(*args):
-            if self.cfs_err:
-                raise self.cfs_err
-
-            def json():
-                if len(args) != 1 or args[0] != 'sessions':
-                    self.fail('Unexpected get to CFSClient with args: {}'.format(args))
-                elif self.json_err:
-                    raise self.json_err
-                else:
-                    return self.cfs_sessions
-            return Mock(json=json)
+        def mock_get_sessions(*args, **kwargs):
+            for session in self.cfs_sessions:
+                yield session
 
         patch('sat.cli.bootsys.service_activity.SATSession').start()
         self.mock_cfs_client = patch(
             'sat.cli.bootsys.service_activity.CFSClientBase.get_cfs_client').start()
-        self.mock_cfs_client.return_value.get = mock_cfs_get
+        self.mock_cfs_client.return_value.get_sessions = mock_get_sessions
 
     def tearDown(self):
         """Stop mocks at the end of each unit test."""
@@ -553,17 +542,12 @@ class TestCFSActivityChecker(unittest.TestCase):
 
     def test_get_active_sessions_api_err(self):
         """Test get_active_sessions with an API error."""
+        self.mock_cfs_client.return_value.get_sessions = Mock(
+            side_effect=APIError('service unavailable')
+        )
         api_err_msg = 'service unavailable'
         self.cfs_err = APIError(api_err_msg)
         err_regex = '^Unable to get active CFS sessions: {}'.format(api_err_msg)
-        with self.assertRaisesRegex(ServiceCheckError, err_regex):
-            self.cfs_checker.get_active_sessions()
-
-    def test_get_active_sessions_value_err(self):
-        """Test get_active_sessions"""
-        val_err_msg = 'invalid json'
-        self.json_err = ValueError(val_err_msg)
-        err_regex = '^Unable to get active CFS sessions: {}'.format(val_err_msg)
         with self.assertRaisesRegex(ServiceCheckError, err_regex):
             self.cfs_checker.get_active_sessions()
 
