@@ -285,6 +285,12 @@ def add_bootsys_subparser(subparsers):
         help='The version of the BOS API to use for BOS operations',
     )
 
+    bootsys_parser.add_argument(
+        '--cfs-version',
+        choices=['v2', 'v3'],
+        help='The version of the CFS API to use for CFS operations',
+    )
+
     actions_subparsers = bootsys_parser.add_subparsers(
         metavar='action', dest='action', help='The action to perform.'
     )

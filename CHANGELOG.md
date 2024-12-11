@@ -25,12 +25,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.33.3] - 2024-11-26
+## [3.33.4] - 2024-12-11
+
+### Added
+- Added support for using either the CFS v2 or v3 API in `sat bootsys`,
+  depending on the value of the `--cfs-version` command-line option or the
+  `cfs.api_version` config-file option.
+
+## [3.33.3] - 2024-12-10
 
 ### Added
 -  Added the ability to sort reports by multiple fields
 
-## [3.33.2] - 2024-11-26
+## [3.33.2] - 2024-12-10
 
 ### Fixed
 -  Added error message and system exit when token file is not found.
