@@ -67,15 +67,17 @@ def do_showrev(args):
     # The `showrev` command sets the default of `--sort-by` to None, so we can use that to
     # determine if the user explicitly set the value, and use a special default if not.
     if args.sort_by is None:
-        sort_by = ['product_name', 'product_version']
+        product_sort_by = ['product_name', 'product_version']
+        other_sort_by = 0
     else:
-        sort_by = args.sort_by
+        product_sort_by = args.sort_by
+        other_sort_by = args.sort_by
     # report formatting
     reverse = args.reverse
     no_headings = get_config_value('format.no_headings')
     no_borders = get_config_value('format.no_borders')
 
-    def append_report(title, headings, data):
+    def append_report(title, headings, data, sort_by):
         """Create a new Report and add it to the list of reports.
 
         Args:
@@ -84,6 +86,7 @@ def do_showrev(args):
                 of the Report
             data: A list of tuples where each element is a row to add to
                 the new Report
+            sort_by: an item or list of items to sort the report by
 
         Returns:
             None.  Modifies reports in place.
@@ -103,7 +106,8 @@ def do_showrev(args):
         append_report(
             'System Revision Information',
             ['component', 'data'],
-            system.get_system_version(args.sitefile)
+            system.get_system_version(args.sitefile),
+            other_sort_by
         )
 
     if args.release_files:
@@ -115,14 +119,16 @@ def do_showrev(args):
         append_report(
             'Product Revision Information',
             product_headings,
-            product_data
+            product_data,
+            product_sort_by
         )
 
     if args.local:
         append_report(
             'Local Host Operating System',
             ['component', 'version'],
-            local.get_local_os_information()
+            local.get_local_os_information(),
+            other_sort_by
         )
 
     if not reports:
