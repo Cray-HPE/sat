@@ -32,7 +32,8 @@ These options must be specified after the subcommand.
         The types that may be specified are...
 
             all, Chassis, ChassisBMC, ComputeModule, HSNBoard, Node, NodeBMC,
-            NodeEnclosure, RouterBMC, RouterModule
+            NodeEnclosure, RouterBMC, RouterModule, CabinetPDU, CabinetPDUController,
+            CabinetPDUPowerConnector, MgmtSwitch
 
         If "all" is specified, then all types will be queried.
 
@@ -196,7 +197,8 @@ The following fields are displayed in the output of **sat status**
 |
 |   The Type of the component in HSM. Possible values are as follows:
 |
-|   Chassis, ChassisBMC, ComputeModule, HSNBoard, Node, NodeBMC, NodeEnclosure, RouterBMC, RouterModule
+|   Chassis, ChassisBMC, ComputeModule, HSNBoard, Node, NodeBMC, NodeEnclosure, RouterBMC, RouterModule,
+|   CabinetPDU, CabinetPDUController, CabinetPDUPowerConnector, MgmtSwitch
 |
 | *NID*
 |
