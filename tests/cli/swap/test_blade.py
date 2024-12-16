@@ -39,6 +39,7 @@ from kubernetes.client.exceptions import ApiException
 from sat.apiclient.pcs import PCSClient
 from sat.cli.swap.blade import (
     blade_swap_stage,
+    BladeClass,
     BladeSwapError,
     BladeSwapProcedure,
     RedfishEndpointDiscoveryWaiter,
@@ -182,7 +183,8 @@ class BaseBladeSwapProcedureTest(unittest.TestCase):
 
         self.mock_cron = patch('sat.cli.swap.blade.HMSDiscoveryCronJob').start()
 
-        self.mock_blade_class_patcher = patch('sat.cli.swap.blade.BladeSwapProcedure.blade_class', 'mountain')
+        self.mock_blade_class_patcher = patch('sat.cli.swap.blade.BladeSwapProcedure.blade_class',
+                                              BladeClass.LIQUID)
         self.mock_blade_class_patcher.start()
 
     def tearDown(self):
@@ -245,14 +247,46 @@ class TestDetermineBladeClass(BaseBladeSwapProcedureTest):
 
     def test_detecting_mountain_blade(self):
         """Test detecting a Mountain blade"""
-        self.assertEqual(self.swap_out.blade_class, 'mountain')
+        self.assertEqual(BladeClass.LIQUID, self.swap_out.blade_class)
+
+    def test_detecting_hill_blade(self):
+        """Test detecting a Hill blade"""
+        for node in self.nodes:
+            node['Class'] = 'Hill'
+
+        self.assertEqual(BladeClass.LIQUID, self.swap_out.blade_class)
+
+    def test_detecting_mixed_hill_mountain_blade(self):
+        """Test detecting a blade with both Hill and Mountain nodes"""
+        self.nodes[0]['Class'] = 'Hill'
+
+        with self.assertLogs(level='WARNING') as logs_cm:
+            self.assertEqual(BladeClass.LIQUID, self.swap_out.blade_class)
+
+        self.assertEqual(len(logs_cm.output), 1)
+        self.assertIn('Multiple node classes detected on blade', logs_cm.records[0].message)
 
     def test_detecting_river_blade(self):
         """Test detecting a River blade"""
         for node in self.nodes:
             node['Class'] = 'River'
 
-        self.assertEqual(self.swap_out.blade_class, 'river')
+        self.assertEqual(BladeClass.AIR, self.swap_out.blade_class)
+
+    def test_detecting_unrecognized_blade(self):
+        """Test detecting an unrecognized blade"""
+        for node in self.nodes:
+            node['Class'] = 'Unrecognized'
+
+        with self.assertRaisesRegex(BladeSwapError, 'unsupported blade class "Unrecognized"'):
+            _ = self.swap_out.blade_class
+
+    def test_incompatible_blade_class(self):
+        """Test that BladeSwapError is raised if the blade class is incompatible"""
+        self.nodes[0]['Class'] = 'River'
+
+        with self.assertRaisesRegex(BladeSwapError, 'incompatible node classes'):
+            _ = self.swap_out.blade_class
 
 
 class TestDisablingRedfishEndpoints(BaseBladeSwapProcedureTest):
@@ -367,7 +401,7 @@ class TestPowerOffSlot(BaseBladeSwapProcedureTest):
     """Tests for the powering off slot stage"""
 
     def test_slot_power_off_command_sent_mountain_blades(self):
-        """Test that the slot power off command is sent properly for Mountain blades"""
+        """Test that the slot power off command is sent properly for liquid-cooled blades"""
         self.swap_out.power_off_slot()
         self.mock_pcs_client.set_xnames_power_state.assert_called_once_with(
             [self.blade_xname],
@@ -377,9 +411,9 @@ class TestPowerOffSlot(BaseBladeSwapProcedureTest):
         )
 
     def test_slot_power_off_command_sent_river_blades(self):
-        """Test that the slot power off command is sent properly for River blades"""
+        """Test that the slot power off command is sent properly for air-cooled blades"""
         self.mock_blade_class_patcher.stop()
-        patch('sat.cli.swap.blade.BladeSwapProcedure.blade_class', 'river').start()
+        patch('sat.cli.swap.blade.BladeSwapProcedure.blade_class', BladeClass.AIR).start()
 
         node_xnames = [n['ID'] for n in self.nodes]
         self.mock_pcs_client.get_xnames_power_state.return_value = {'on': node_xnames}
@@ -590,7 +624,7 @@ class TestBeginningSlotDiscovery(BaseBladeSwapProcedureTest):
         self.mock_hsm_client.query_components.return_value = []
 
         self.mock_blade_class_patcher.stop()
-        patch('sat.cli.swap.blade.BladeSwapProcedure.blade_class', 'river').start()
+        patch('sat.cli.swap.blade.BladeSwapProcedure.blade_class', BladeClass.AIR).start()
 
         with self.assertLogs(level='WARNING') as cm:
             self.swap_in.begin_slot_discovery()
@@ -815,14 +849,14 @@ class TestSwapInProcedure(unittest.TestCase):
         self.mock_swapinprocedure_obj = MagicMock()
 
     def test_swap_in_mountain(self):
-        """Test swapping in a mountain blade discovers and waits for ChassisBMCs"""
-        self.mock_swapinprocedure_obj.blade_class = 'mountain'
+        """Test swapping in a liquid-cooled blade discovers and waits for ChassisBMCs"""
+        self.mock_swapinprocedure_obj.blade_class = BladeClass.LIQUID
         SwapInProcedure.procedure(self.mock_swapinprocedure_obj)
         self.mock_swapinprocedure_obj.wait_for_chassisbmc_endpoints.assert_called()
 
     def test_swap_in_river(self):
-        """Test swapping in a river blade does not wait for ChassisBMCs"""
-        self.mock_swapinprocedure_obj.blade_class = 'river'
+        """Test swapping in an air-cooled blade does not wait for ChassisBMCs"""
+        self.mock_swapinprocedure_obj.blade_class = BladeClass.AIR
         SwapInProcedure.procedure(self.mock_swapinprocedure_obj)
         self.mock_swapinprocedure_obj.wait_for_chassisbmc_endpoints.assert_not_called()
 
