@@ -188,7 +188,7 @@ class InputSessionTemplate(BaseInputItem):
 
         for boot_set_name, boot_set_data in self.boot_sets.items():
             # Must deepcopy to avoid every boot set sharing the same dict
-            boot_set_api_data = deepcopy(self.bos_client.get_base_boot_set_data())
+            boot_set_api_data = {}
             try:
                 image_record = self.image_record
             except InputItemValidateError as err:
