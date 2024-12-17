@@ -386,23 +386,24 @@ class CFSActivityChecker(ServiceActivityChecker):
         cfs_client = CFSClientBase.get_cfs_client(SATSession(), get_config_value('cfs.api_version'))
         try:
             sessions = cfs_client.get_sessions()
-        except (APIError, ValueError) as err:
+
+            cfs_session_fields = [
+                self.id_field_name,
+                'status.session.status',
+                'status.session.startTime',
+                'status.session.succeeded',
+                'status.session.job'
+            ]
+
+            return [
+                get_new_ordered_dict(session, cfs_session_fields, MISSING_VALUE)
+                for session in sessions
+                # Possible values are 'pending', 'running', or 'complete'
+                if get_val_by_path(session, 'status.session.status') != 'complete'
+            ]
+
+        except APIError as err:
             raise self.get_err(str(err))
-
-        cfs_session_fields = [
-            self.id_field_name,
-            'status.session.status',
-            'status.session.startTime',
-            'status.session.succeeded',
-            'status.session.job'
-        ]
-
-        return [
-            get_new_ordered_dict(session, cfs_session_fields, MISSING_VALUE)
-            for session in sessions
-            # Possible values are 'pending', 'running', or 'complete'
-            if get_val_by_path(session, 'status.session.status') != 'complete'
-        ]
 
 
 class FirmwareActivityChecker(ServiceActivityChecker):
