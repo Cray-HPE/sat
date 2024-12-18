@@ -28,6 +28,7 @@ Procedure for swapping a blade.
 """
 
 import abc
+import enum
 from functools import wraps
 import json
 import logging
@@ -53,6 +54,11 @@ from sat.xname import XName
 
 LOGGER = logging.getLogger(__name__)
 inf = inflect.engine()
+
+
+class BladeClass(enum.Enum):
+    LIQUID = 'liquid-cooled'
+    AIR = 'air-cooled'
 
 
 def get_available_file(prefix, extension):
@@ -173,28 +179,44 @@ class BladeSwapProcedure(abc.ABC):
 
     @cached_property
     def blade_class(self):
-        """str: the class of the blade ("mountain" or "river")
+        """BladeClass: the class of the blade (BladeClass.LIQUID or BladeClass.AIR)
+
+        "Mountain" and "Hill" blades are liquid-cooled, while "River" blades are
+        air-cooled.
 
         Raises:
             BladeSwapError: if there is a problem determining the slot class
         """
-        try:
-            node_classes = set()
-            for node in self.blade_nodes:
+        err_prefix = f'Could not determine blade class for {self.xname}'
+        node_classes = set()
+        for node in self.blade_nodes:
+            try:
                 node_classes.add(node['Class'])
+            except KeyError as err:
+                raise BladeSwapError(f'{err_prefix}: node {node["ID"]} is '
+                                     f'missing {err} field in HSM')
 
-            # These error cases shouldn't happen, but be defensive anyway.
-            if len(node_classes) > 1:
-                reason = f'multiple node classes on blade {self.xname}: {", ".join(node_classes)}'
-                raise BladeSwapError(f'Could not determine slot class: {reason}')
-            elif not node_classes:
-                reason = f'no nodes on blade {self.xname}'
-                raise BladeSwapError(f'Could not determine slot class: {reason}')
+        if len(node_classes) > 1:
+            if set(node_class.lower() for node_class in node_classes) == {'mountain', 'hill'}:
+                # This mismatch has been observed, and it doesn't change the procedure,
+                # so we'll just log it and continue.
+                LOGGER.warning('Multiple node classes detected on blade %s: %s',
+                               self.xname, ', '.join(node_classes))
+                return BladeClass.LIQUID
             else:
-                return node_classes.pop().lower()
+                reason = f'incompatible node classes: {", ".join(node_classes)}'
+                raise BladeSwapError(f'{err_prefix}: {reason}')
+        elif not node_classes:
+            raise BladeSwapError(f'{err_prefix}: no nodes on blade')
 
-        except KeyError as err:
-            raise BladeSwapError(f'Node {node["ID"]} is missing {err} field in HSM')
+        # In this case, there is just one node class on the blade
+        hsm_class = node_classes.pop()
+        if hsm_class.lower() in ('mountain', 'hill'):
+            return BladeClass.LIQUID
+        elif hsm_class.lower() == 'river':
+            return BladeClass.AIR
+        else:
+            raise BladeSwapError(f'{err_prefix}: unsupported blade class "{hsm_class}"')
 
     @abc.abstractmethod
     def procedure(self):
@@ -215,9 +237,11 @@ class BladeSwapProcedure(abc.ABC):
         Raises:
             SystemExit: if a BladeSwapError is raised during execution of the blade swap procedure
         """
-        if self.blade_class not in {'mountain', 'hill', 'river'}:
-            LOGGER.error('Unsupported blade class "%s" for blade %s; aborting.',
-                         self.blade_class.title(), self.xname)
+        try:
+            # This property can raise a BladeSwapError
+            _ = self.blade_class
+        except BladeSwapError as err:
+            LOGGER.error(str(err))
             raise SystemExit(1)
 
         try:
@@ -314,7 +338,7 @@ class SwapOutProcedure(BladeSwapProcedure):
         Raises:
             BladeSwapError: if there is a problem powering off the slot with PCS
         """
-        if self.blade_class == 'river':
+        if self.blade_class == BladeClass.AIR:
             # Power off nodes on the blade individually on River blades
             xnames_on = self.pcs_client.get_xnames_power_state(
                 [node['ID'] for node in self.blade_nodes]
@@ -416,7 +440,7 @@ class SwapOutProcedure(BladeSwapProcedure):
         # CRAYSAT-1373: Do this automatically with SCSD once CASMHMS-5447 is
         # completed.
 
-        if self.blade_class in ('mountain', 'hill'):
+        if self.blade_class == BladeClass.LIQUID:
             commands = []
             for node_bmc in self.blade_node_bmcs:
                 commands.append(
@@ -456,7 +480,7 @@ class SwapOutProcedure(BladeSwapProcedure):
         # well. Mountain blades should *only* have the node ethernet interfaces
         # deleted.
 
-        if self.blade_class == 'river':
+        if self.blade_class == BladeClass.AIR:
             interface_ids_to_delete |= set(
                 iface['ID']
                 for node in self.blade_node_bmcs
@@ -494,7 +518,7 @@ class SwapOutProcedure(BladeSwapProcedure):
 
         self.suspend_hms_discovery_cron_job()
 
-        if self.blade_class in ('mountain', 'hill'):
+        if self.blade_class == BladeClass.LIQUID:
             self.mountain_procedure()
         else:
             self.river_procedure()
@@ -571,7 +595,7 @@ class SwapInProcedure(BladeSwapProcedure):
             BladeSwapError: if the slot cannot be powered on
         """
         params = {'recursive': True}
-        if self.blade_class == 'river':
+        if self.blade_class == BladeClass.AIR:
             params['force'] = True
         self.pcs_client.set_xnames_power_state([self.xname], 'on', **params)
 
@@ -599,7 +623,7 @@ class SwapInProcedure(BladeSwapProcedure):
         try:
             chassis_bmc = self.hsm_client.query_components(chassis_xname, type='ChassisBMC')[0]
         except (APIError, IndexError):
-            if self.blade_class in ('mountain', 'hill'):
+            if self.blade_class == BladeClass.LIQUID:
                 LOGGER.warning('Could not locate ChassisBMC for chassis %s; waiting '
                                'for hms-discovery to discover slot',
                                chassis_xname)
@@ -736,14 +760,14 @@ class SwapInProcedure(BladeSwapProcedure):
         if self.src_mapping and self.dst_mapping:
             self.map_ip_mac_addresses()
 
-        if self.blade_class in ('mountain', 'hill'):
+        if self.blade_class == BladeClass.LIQUID:
             self.enable_slot()
             self.power_on_slot()
 
         self.resume_hms_discovery_cron_job()
         self.begin_slot_discovery()
 
-        if self.blade_class in ('mountain', 'hill'):
+        if self.blade_class == BladeClass.LIQUID:
             self.wait_for_chassisbmc_endpoints()
 
         self.wait_for_nodebmc_endpoints()
