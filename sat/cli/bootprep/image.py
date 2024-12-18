@@ -179,6 +179,9 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
 
     verb = ('will be', 'would be')[dry_run]
 
+    # TODO(CRAYSAT-1619): Prompt for each image individually
+    # TODO(CRAYSAT-1949): Look at the value of `if_exists` property to decide whether to skip/overwrite/abort
+
     existing_input_names = [image.name for image in existing_input_images]
     if not overwrite and not skip:
         answer = pester_choices(f'One or more images already exist in IMS with the following '
