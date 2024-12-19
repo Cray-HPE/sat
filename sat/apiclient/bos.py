@@ -132,19 +132,6 @@ class BOSClientCommon(APIGatewayClient):
 
         return bos_client_cls(session, **kwargs)
 
-    @staticmethod
-    def get_base_boot_set_data():
-        """Get the base boot set data to use as a starting point.
-
-        Returns:
-            dict: the base data to use as a starting point for a boot set
-        """
-        return {
-            'rootfs_provider': 'cpss3',
-            # TODO (CRAYSAT-898): update default hostname for authoritative DNS changes
-            'rootfs_provider_passthrough': 'dvs:api-gw-service-nmn.local:300:nmn0'
-        }
-
     def get_session(self, session_id):
         """Get information about a given session.
 
