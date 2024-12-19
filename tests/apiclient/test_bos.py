@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2022, 2024 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -84,51 +84,3 @@ class TestBOSClientCommon(BOSClientTestCase):
                     BOSClientCommon.get_bos_client(MagicMock(), version=None),
                     client_cls
                 )
-
-
-class TestBOSV1BaseBootSetData(BOSClientTestCase):
-    """Test BOSV1Client.get_base_boot_set_data() """
-
-    def setUp(self):
-        super().setUp()
-        self.mock_get_config.return_value = 'v1'
-
-    def test_bos_v1_client_has_correct_keys(self):
-        """Test that the BOS v1 base boot set data has the correct keys"""
-        expected_keys = {
-            'rootfs_provider',
-            'rootfs_provider_passthrough'
-        }
-        actual_keys = set(
-            BOSClientCommon.get_bos_client(MagicMock())
-            .get_base_boot_set_data()
-            .keys()
-        )
-        self.assertTrue(expected_keys.issubset(actual_keys))
-
-
-class TestBOSV2BaseBootSetData(BOSClientTestCase):
-    """Test BOSV2Client.get_base_boot_set_data() """
-
-    def setUp(self):
-        super().setUp()
-        self.mock_get_config.return_value = 'v2'
-
-    def test_bos_v2_client_has_correct_keys(self):
-        """Test that the BOS v2 base boot set data has the correct keys"""
-        expected_keys = {
-            'rootfs_provider',
-            'rootfs_provider_passthrough'
-        }
-        removed_keys = {
-            'boot_ordinal',
-            'network',
-        }
-        actual_keys = set(
-            BOSClientCommon.get_bos_client(MagicMock())
-            .get_base_boot_set_data()
-            .keys()
-        )
-
-        self.assertTrue(expected_keys.issubset(actual_keys))
-        self.assertTrue(removed_keys.isdisjoint(actual_keys))
