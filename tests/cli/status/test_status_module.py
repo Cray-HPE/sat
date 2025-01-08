@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022, 2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022, 2024-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -34,9 +34,11 @@ from csm_api_client.service.gateway import APIError
 import sat.cli.status.status_module as status_module_module
 from sat.cli.status.status_module import (
     BOSStatusModule,
+    HSMStatusModule,
     StatusModule,
     StatusModuleException,
 )
+from sat.cli.status.constants import COMPONENT_TYPES, DEFAULT_TYPE
 from sat.constants import MISSING_VALUE
 
 
@@ -451,3 +453,32 @@ class TestBOSStatusModule(BaseStatusModuleTestCase):
             'Most Recent BOS Session': self.bos_session,
             'Most Recent Image': self.img_id,
         })
+
+
+class TestHSMStatusModule(BaseStatusModuleTestCase):
+    """Tests for the HSMStatusModule class"""
+
+    def test_include_heading_node_type(self):
+        """Test that include_heading returns true for any heading for the Node type"""
+        for heading in HSMStatusModule.headings:
+            with self.subTest(heading=heading):
+                self.assertTrue(HSMStatusModule.include_heading(heading, component_type='Node'))
+
+    def test_include_heading_other_types(self):
+        """Test that include_heading for non-Node component types."""
+        for component_type in COMPONENT_TYPES:
+            if component_type == 'Node':
+                continue
+            else:
+                for heading in HSMStatusModule.headings:
+                    with self.subTest(component_type=component_type, heading=heading):
+                        if heading in ['NID', 'Role', 'SubRole', 'Arch']:
+                            self.assertFalse(HSMStatusModule.include_heading(heading, component_type=component_type))
+                        else:
+                            self.assertTrue(HSMStatusModule.include_heading(heading, component_type=component_type))
+
+    def test_include_heading_default_type(self):
+        """Test that include_heading returns true for any heading when using default type"""
+        for heading in HSMStatusModule.headings:
+            with self.subTest(heading=heading):
+                self.assertTrue(HSMStatusModule.include_heading(heading, component_type=DEFAULT_TYPE))

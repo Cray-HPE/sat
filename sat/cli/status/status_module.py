@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2022, 2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2022, 2024-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -370,7 +370,7 @@ class HSMStatusModule(StatusModule):
 
     @staticmethod
     def include_heading(heading, *, component_type, **_):
-        return component_type == 'Node' or heading not in ['NID', 'Role', 'SubRole']
+        return component_type == 'Node' or heading not in ['NID', 'Role', 'SubRole', 'Arch']
 
     @property
     def rows(self):
