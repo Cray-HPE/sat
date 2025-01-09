@@ -25,6 +25,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.33.10] - 2025-01-09
+
+### Fixed
+- Update the version of jinja2 from 3.1.4 to 3.1.5 to resolve
+  CVE-2024-56201, and CVE-2024-56326
+
 ## [3.33.9] - 2024-12-11
 
 ### Removed
