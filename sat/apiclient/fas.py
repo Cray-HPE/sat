@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -365,6 +365,8 @@ class FASClient(APIGatewayClient):
                 ready = response['ready']
             except KeyError:
                 raise APIError('Payload returned from GET to snapshots/name did not have "ready" field.')
+
+        LOGGER.info(f'Snapshot {name} created successfully.')
 
         return response
 
