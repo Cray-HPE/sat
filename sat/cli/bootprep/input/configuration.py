@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -389,6 +389,7 @@ class InputConfiguration(BaseInputItem):
         super().__init__(data, instance, index, jinja_env, **kwargs)
         self.cfs_client = cfs_client
         self.product_catalog = product_catalog
+        self.resolve_branches = InputConfigurationLayerBase.resolve_branches
 
         # Additional context to be used when rendering Jinja2 templated properties
         self.jinja_context = {}
@@ -478,8 +479,12 @@ class InputConfiguration(BaseInputItem):
                 CFS configuration
         """
         try:
-            # request_body guaranteed to have 'name' key, so no need to catch ValueError
-            self.cfs_client.put_configuration(self.name, payload)
+            if isinstance(self.cfs_client, CFSV3Client):
+                drop_branches = self.resolve_branches
+                self.cfs_client.put_configuration(self.name, payload, drop_branches=drop_branches)
+            else:
+                self.cfs_client.put_configuration(self.name, payload)
+
         except APIError as err:
             raise InputItemCreateError(f'Failed to create configuration: {err}')
 
