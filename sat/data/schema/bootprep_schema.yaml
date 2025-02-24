@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023, 2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -654,26 +654,12 @@ $defs:
     description: >
       The source to use for the CFS layer.
     type: object
-    required: ['clone_url', 'credentials']
+    required: ['source_name']
     properties:
-      clone_url:
+      source_name:
         description: >
-          The URL to the git repository which contains the source.
+          The name of the source as defined in CFS.
         type: string
-      credentials:
-        description: >
-          The credentials to use for accessing the source.
-        type: object
-        required: ['authentication_method', 'secret_name']
-        properties:
-          authentication_method:
-            description: >
-              The method of authentication to use.
-            type: string
-          secret_name:
-            description: >
-              The name of the secret containing the credentials.
-            type: string
   ImageName:
     description: >
       The name of the image that will be created in IMS. The image name
