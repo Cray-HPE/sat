@@ -210,7 +210,11 @@ properties:
                 special_parameters:
                   $ref: '#/$defs/CFSLayerSpecialParameters'
                 source:
-                  $ref: '#/$defs/CFSLayerSource'
+                  description: >
+                    The name of the source as defined in CFS.
+                  type: string
+                branch:
+                  $ref: '#/$defs/CFSLayerBranch'
 
         additional_inventory:
           oneOf:
