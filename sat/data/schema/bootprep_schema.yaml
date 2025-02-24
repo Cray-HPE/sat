@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023, 2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -196,6 +196,26 @@ properties:
                       commit:
                         description: The commit hash in the product's git repository.
                         type: string
+
+            - description: >
+                A layer of the CFS configuration defined using a source.
+              type: object
+              required: ['source']
+              additionalProperties: false
+              properties:
+                name:
+                  $ref: '#/$defs/CFSLayerName'
+                playbook:
+                  $ref: '#/$defs/CFSLayerPlaybook'
+                special_parameters:
+                  $ref: '#/$defs/CFSLayerSpecialParameters'
+                source:
+                  description: >
+                    The name of the source as defined in CFS.
+                  type: string
+                branch:
+                  $ref: '#/$defs/CFSLayerBranch'
+
         additional_inventory:
           oneOf:
           - description: Additional inventory to include in the CFS configuration
@@ -634,6 +654,16 @@ $defs:
     type: string
     description: >
       The URL to the git repository which contains the additional Ansible inventory.
+  CFSLayerSource:
+    description: >
+      The source to use for the CFS layer.
+    type: object
+    required: ['source_name']
+    properties:
+      source_name:
+        description: >
+          The name of the source as defined in CFS.
+        type: string
   ImageName:
     description: >
       The name of the image that will be created in IMS. The image name
