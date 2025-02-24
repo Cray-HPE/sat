@@ -317,9 +317,19 @@ class SourceInputConfigurationLayer(InputConfigurationLayer):
     """
     @property
     @jinja_rendered
-    def source(self):
-        # The 'source' property is required
+    def source_name(self):
+        # The 'source' property is required and directly contains the source name
         return self.layer_data['source']
+
+    @property
+    def branch(self):
+        """str or None: the branch for this layer"""
+        return self.layer_data.get('branch')
+
+    @property
+    def commit(self):
+        """str or None: the commit for this layer"""
+        return self.layer_data.get('commit')
 
     def get_cfs_api_data(self):
         """Get the data to pass to the CFS API to create this layer.
@@ -332,10 +342,15 @@ class SourceInputConfigurationLayer(InputConfigurationLayer):
             InputItemCreateError: if there was a failure to obtain the data
                 needed to create the layer in CFS.
         """
+        # Retrieve the source details using the source name
+        source_details = self.cfs_client.get_source_details(self.source_name)
+        credentials = source_details['credentials']
+
         layer_cls = self.cfs_client.configuration_cls.cfs_config_layer_cls
         try:
             layer = layer_cls.from_source(
-                source=self.source, name=self.name, playbook=self.playbook, ims_require_dkms=self.ims_require_dkms
+                source=self.source_name, name=self.name, playbook=self.playbook, ims_require_dkms=self.ims_require_dkms,
+                credentials=credentials, branch=self.branch, commit=self.commit
             )
         except ValueError as err:
             raise InputItemCreateError(str(err))
