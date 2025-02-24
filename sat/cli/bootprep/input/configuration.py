@@ -168,7 +168,7 @@ class InputConfigurationLayer(InputConfigurationLayerBase, ABC):
                 the product catalog object
 
         Raises:
-            ValueError: if neither 'git' nor 'product' keys are present in the
+            ValueError: if neither 'git', 'product', nor 'source' keys are present in the
                 input `layer_data`. This will not happen if the input is
                 properly validated against the schema.
         """
@@ -176,6 +176,8 @@ class InputConfigurationLayer(InputConfigurationLayerBase, ABC):
             return GitInputConfigurationLayer(layer_data, index, jinja_env, cfs_client)
         elif 'product' in layer_data:
             return ProductInputConfigurationLayer(layer_data, index, jinja_env, cfs_client, product_catalog)
+        elif 'source' in layer_data:
+            return SourceInputConfigurationLayer(layer_data, index, jinja_env, cfs_client)
         else:
             raise ValueError('Unrecognized type of configuration layer')
 
@@ -304,6 +306,38 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
             if self.resolve_branches:
                 layer.resolve_branch_to_commit_hash()
         except (ValueError, CFSConfigurationError) as err:
+            raise InputItemCreateError(str(err))
+
+        return layer.req_payload
+
+
+class SourceInputConfigurationLayer(InputConfigurationLayer):
+    """
+    A configuration layer that is defined with a source.
+    """
+    @property
+    @jinja_rendered
+    def source(self):
+        # The 'source' property is required
+        return self.layer_data['source']
+
+    def get_cfs_api_data(self):
+        """Get the data to pass to the CFS API to create this layer.
+
+        Returns:
+            dict: The dictionary of data to pass to the CFS API to create the
+                layer.
+
+        Raises:
+            InputItemCreateError: if there was a failure to obtain the data
+                needed to create the layer in CFS.
+        """
+        layer_cls = self.cfs_client.configuration_cls.cfs_config_layer_cls
+        try:
+            layer = layer_cls.from_source(
+                source=self.source, name=self.name, playbook=self.playbook, ims_require_dkms=self.ims_require_dkms
+            )
+        except ValueError as err:
             raise InputItemCreateError(str(err))
 
         return layer.req_payload
