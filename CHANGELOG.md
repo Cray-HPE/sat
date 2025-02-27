@@ -28,8 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.34.4] - 2025-02-25
 
 ### Security
-- Update the version of cryptography from 43.0.1 to 44.0.1 to address
-  a low-severity dependabot alert.
+- Update the version of cryptography from 43.0.1 to 44.0.1 to resolve
+  CVE-2024-12797, a low-severity dependabot alert.
 
 ## [3.34.3] - 2025-02-13
 
