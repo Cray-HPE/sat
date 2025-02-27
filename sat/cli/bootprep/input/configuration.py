@@ -342,18 +342,23 @@ class SourceInputConfigurationLayer(InputConfigurationLayer):
             InputItemCreateError: if there was a failure to obtain the data
                 needed to create the layer in CFS.
         """
-        # Retrieve the source details using the source name
-        source_details = self.cfs_client.get_source_details(self.source_name)
-        credentials = source_details['credentials']
+        # Check if the CFS client supports the get_source_details method
+        if hasattr(self.cfs_client, 'get_source_details'):
+            # Retrieve the source details using the source name
+            source_details = self.cfs_client.get_source_details(self.source_name)
+            credentials = source_details['credentials']
 
-        layer_cls = self.cfs_client.configuration_cls.cfs_config_layer_cls
-        try:
-            layer = layer_cls.from_source(
-                source=self.source_name, name=self.name, playbook=self.playbook, ims_require_dkms=self.ims_require_dkms,
-                credentials=credentials, branch=self.branch, commit=self.commit
-            )
-        except ValueError as err:
-            raise InputItemCreateError(str(err))
+            layer_cls = self.cfs_client.configuration_cls.cfs_config_layer_cls
+            try:
+                layer = layer_cls.from_source(
+                    source=self.source_name, name=self.name, playbook=self.playbook,
+                    ims_require_dkms=self.ims_require_dkms, credentials=credentials,
+                    branch=self.branch, commit=self.commit
+                )
+            except ValueError as err:
+                raise InputItemCreateError(str(err))
+        else:
+            raise InputItemCreateError('The source property is not supported in CFS v2.')
 
         return layer.req_payload
 
