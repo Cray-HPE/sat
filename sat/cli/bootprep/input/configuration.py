@@ -168,7 +168,7 @@ class InputConfigurationLayer(InputConfigurationLayerBase, ABC):
                 the product catalog object
 
         Raises:
-            ValueError: if neither 'git' nor 'product' keys are present in the
+            ValueError: if neither 'git', 'product', nor 'source' keys are present in the
                 input `layer_data`. This will not happen if the input is
                 properly validated against the schema.
         """
@@ -176,6 +176,8 @@ class InputConfigurationLayer(InputConfigurationLayerBase, ABC):
             return GitInputConfigurationLayer(layer_data, index, jinja_env, cfs_client)
         elif 'product' in layer_data:
             return ProductInputConfigurationLayer(layer_data, index, jinja_env, cfs_client, product_catalog)
+        elif 'source' in layer_data:
+            return SourceInputConfigurationLayer(layer_data, index, jinja_env, cfs_client)
         else:
             raise ValueError('Unrecognized type of configuration layer')
 
@@ -305,6 +307,58 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
                 layer.resolve_branch_to_commit_hash()
         except (ValueError, CFSConfigurationError) as err:
             raise InputItemCreateError(str(err))
+
+        return layer.req_payload
+
+
+class SourceInputConfigurationLayer(InputConfigurationLayer):
+    """
+    A configuration layer that is defined with a source.
+    """
+    @property
+    @jinja_rendered
+    def source_name(self):
+        # The 'source' property is required and directly contains the source name
+        return self.layer_data['source']
+
+    @property
+    def branch(self):
+        """str or None: the branch for this layer"""
+        return self.layer_data.get('branch')
+
+    @property
+    def commit(self):
+        """str or None: the commit for this layer"""
+        return self.layer_data.get('commit')
+
+    def get_cfs_api_data(self):
+        """Get the data to pass to the CFS API to create this layer.
+
+        Returns:
+            dict: The dictionary of data to pass to the CFS API to create the
+                layer.
+
+        Raises:
+            InputItemCreateError: if there was a failure to obtain the data
+                needed to create the layer in CFS.
+        """
+        # Check if the CFS client supports the get_source_details method
+        if hasattr(self.cfs_client, 'get_source_details'):
+            # Retrieve the source details using the source name
+            source_details = self.cfs_client.get_source_details(self.source_name)
+            credentials = source_details['credentials']
+
+            layer_cls = self.cfs_client.configuration_cls.cfs_config_layer_cls
+            try:
+                layer = layer_cls.from_source(
+                    source=self.source_name, name=self.name, playbook=self.playbook,
+                    ims_require_dkms=self.ims_require_dkms, credentials=credentials,
+                    branch=self.branch, commit=self.commit
+                )
+            except ValueError as err:
+                raise InputItemCreateError(str(err))
+        else:
+            raise InputItemCreateError('The source property is not supported in CFS v2.')
 
         return layer.req_payload
 
