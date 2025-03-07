@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -174,27 +174,44 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
     existing_input_images = [input_image for input_image in input_images
                              if input_image.name in ims_images_by_name]
 
+    # CRAYSAT-1949: add ability to skip overwrite and abort in the bootprep file
+    overwrite_all = overwrite
+    skip_all = skip
+
     if not existing_input_images:
         return input_images
 
     verb = ('will be', 'would be')[dry_run]
 
-    existing_input_names = [image.name for image in existing_input_images]
-    if not overwrite and not skip:
-        answer = pester_choices(f'One or more images already exist in IMS with the following '
-                                f'names: {", ".join(existing_input_names)}. Would you like to skip, '
-                                f'overwrite, or abort?', ('skip', 'overwrite', 'abort'))
-        if answer == 'abort':
-            raise ImageCreateError('User chose to abort')
-        skip = answer == 'skip'
-        overwrite = answer == 'overwrite'
+    existing_images_to_overwrite = []
+    existing_images_to_skip = []
+    if skip_all:
+        existing_images_to_skip = existing_input_images
+    elif overwrite_all:
+        existing_images_to_overwrite = existing_input_images
+    else:
+        for existing_input_image in existing_input_images:
+            answer = pester_choices(f'An image already exists in IMS with the following '
+                                    f'name: {existing_input_image.name}. Would you like to skip, '
+                                    f'overwrite, or abort?', ('skip', 'overwrite', 'abort'))
+            if answer == 'abort':
+                raise ImageCreateError('User chose to abort')
+            if answer == 'skip':
+                skip = True
+                # append to skip list
+                existing_images_to_skip.append(existing_input_image)
+            if answer == 'overwrite':
+                overwrite = True
+                # append to overwrite list
+                existing_images_to_overwrite.append(existing_input_image)
 
-    msg_template = (f'Images with the following names already exist in IMS and '
-                    f'{verb} %(action)s: {", ".join(existing_input_names)}')
     if overwrite:
+        names_to_overwrite = [image.name for image in existing_images_to_overwrite]
+        msg_template = (f'Images with the following names already exist in IMS and '
+                        f'{verb} %(action)s: {", ".join(names_to_overwrite)}')
         failed_overwrites = []
         LOGGER.info(msg_template, {'action': 'overwritten'})
-        for existing_input_image in existing_input_images:
+        for existing_input_image in existing_images_to_overwrite:
             try:
                 existing_input_image.add_images_to_delete(ims_images_by_name[existing_input_image.name])
             except ImageCreateError as err:
@@ -205,12 +222,14 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
             raise ImageCreateError(f'Failed to set up overwrite of {len(failed_overwrites)} '
                                    f'input image(s).')
 
-        return input_images
-    elif skip:
+    if skip:
+        names_to_skip = [image.name for image in existing_images_to_skip]
+        msg_template = (f'Images with the following names already exist in IMS and '
+                        f'{verb} %(action)s: {", ".join(names_to_skip)}')
         LOGGER.info(msg_template, {'action': 'skipped'})
 
         # Remove already existing images as dependencies of other images. They can be built right away
-        for existing_image in existing_input_images:
+        for existing_image in existing_images_to_skip:
             existing_image.skip = True
             for image in input_images:
                 if existing_image in image.dependencies:
@@ -219,7 +238,9 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
                     image.remove_dependency(existing_image)
 
         # Create all images that do not already exist
-        return [image for image in input_images if image.name not in existing_input_names]
+
+    names_to_skip = [image.name for image in existing_images_to_skip]
+    return [image for image in input_images if image.name not in names_to_skip]
 
 
 def find_image_dependencies(input_images):
