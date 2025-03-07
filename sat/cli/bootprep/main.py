@@ -283,6 +283,8 @@ def do_bootprep_run(schema_validator, args):
             LOGGER.error(str(err))
             raise SystemExit(1)
 
+    # TODO (CRAYSAT-1950): Check if images are used in CPS before overwriting them
+
     created_images = []
     if IMAGES_KEY in args.limit:
         try:

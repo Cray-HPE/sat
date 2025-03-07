@@ -458,6 +458,8 @@ def validate_images(instance, args, cfs_client):
     # Images must use image_ref to reference other images from input file
     validate_no_overwritten_ims_bases(input_images)
 
+    validate_image_not_in_cps(input_images)
+
 
 def create_images(instance, args, ims_client):
     """Create and customize IMS images defined in the given instance
