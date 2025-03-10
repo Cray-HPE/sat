@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021, 2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2021, 2024-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -214,6 +214,8 @@ class TestDoMgmtShutdownPower(unittest.TestCase):
             'sat.cli.bootsys.mgmt_power.do_ceph_unmounts').start()
         self.mock_IPMIConsoleLogger = mock.patch(
             'sat.cli.bootsys.mgmt_power.IPMIConsoleLogger').start()
+        self.mock_unmount_volumes = patch(
+            'sat.cli.bootsys.mgmt_power.unmount_volumes').start()
 
         self.mock_ssh_client = mock.Mock()
         self.mock_get_ssh_client.return_value = self.mock_ssh_client
@@ -247,6 +249,7 @@ class TestDoMgmtShutdownPower(unittest.TestCase):
                                    self.ncn_shutdown_timeout, self.ipmi_timeout)
 
         # Assert calls for worker NCNs
+        self.mock_unmount_volumes.assert_any_call(self.mock_ssh_client, ['ncn-w001', 'ncn-w002'])
         self.mock_set_next_boot_device_to_disk.assert_any_call(self.mock_ssh_client, ['ncn-w001', 'ncn-w002'])
         self.mock_start_shutdown.assert_any_call(['ncn-w001', 'ncn-w002'], self.mock_ssh_client)
         self.mock_finish_shutdown.assert_any_call(['ncn-w001', 'ncn-w002'], self.username, self.password,
