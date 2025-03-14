@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -170,6 +170,12 @@ class BaseInputImage(DependencyGroupMember, ABC):
         """str: the name of the final resulting image"""
         # 'name' is a required property in the bootprep schema
         return self.image_data['name']
+
+    @property
+    def if_exists(self):
+        """str or None: the value of the 'if_exists' key in the input data,
+        or None if not specified"""
+        return self.image_data.get('if_exists')
 
     @property
     def ref_name(self):
