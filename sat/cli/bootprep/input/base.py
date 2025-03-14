@@ -253,6 +253,11 @@ class BaseInputItem(Validatable, ABC):
         # items that inherit from BaseInputItem.
         return self.data['name']
 
+    @property
+    def if_exists(self):
+        """str or None: the value of the 'if_exists' key in the input data, or None if not specified"""
+        return self.data.get('if_exists')
+
     def __str__(self):
         # Since the name can be rendered, and when unrendered, it does not need
         # to be unique, just refer to this item by its index in the instance.
@@ -473,8 +478,10 @@ class BaseInputItemCollection(ABC, Validatable):
             conflict_msg = (f'{count} {inflector.plural(self.item_class.description, count)} '
                             f'already {inflector.plural_verb("exists", count)} with the name {item.name}')
 
-            overwrite = overwrite_all
-            skip = skip_all
+            overwrite = overwrite_all or item.if_exists == 'overwrite'
+            skip = skip_all or item.if_exists == 'skip'
+            if item.if_exists == 'abort':
+                raise UserAbortException()
 
             if not overwrite and not skip:
                 choices = ('skip', 'overwrite', 'abort')

@@ -172,6 +172,11 @@ class BaseInputImage(DependencyGroupMember, ABC):
         return self.image_data['name']
 
     @property
+    def if_exists(self):
+        """str or None: the value of the 'if_exists' key in the input data, or None if not specified"""
+        return self.image_data.get('if_exists')
+
+    @property
     def ref_name(self):
         """str or None: the ref_name given to this image for reference by other images"""
         # 'ref_name' is an optional property in the bootprep schema

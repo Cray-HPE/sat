@@ -41,7 +41,7 @@ $schema: "https://json-schema.org/draft/2020-12/schema"
 # ... patch component when all input files that were valid under the old schema
 #     are still valid under the new schema
 #
-version: '1.0.7'
+version: '1.0.8'
 title: Bootprep Input File
 description: >
   A description of the set of CFS configurations to create, the set of IMS
@@ -240,6 +240,8 @@ properties:
               commit:
                 description: The commit of the given repository to use.
                 type: string
+        if_exists:
+          $ref: '#/$defs/IfExists'
 
 
   images:
@@ -368,6 +370,8 @@ properties:
             $ref: '#/$defs/ImageConfiguration'
           configuration_group_names:
             $ref: '#/$defs/ImageConfigurationGroupNames'
+          if_exists:
+            $ref: '#/$defs/IfExists'
       # Once json-schema-for-humans supports `deprecated`, remove HTML from `description`
       - description: >
           <h3>Deprecation Notice</h3>
@@ -423,6 +427,8 @@ properties:
             $ref: '#/$defs/ImageConfiguration'
           configuration_group_names:
             $ref: '#/$defs/ImageConfigurationGroupNames'
+          if_exists:
+            $ref: '#/$defs/IfExists'
 
   session_templates:
     description: The BOS session templates to create.
@@ -583,6 +589,8 @@ properties:
                       Additional parameters that will be appended to the
                       'rootfs=<protocol>' kernel parameter.
                     type: string
+        if_exists:
+          $ref: '#/$defs/IfExists'
 
 # Definitions that are used elsewhere in this schema.
 $defs:
@@ -714,3 +722,11 @@ $defs:
       then the given image will be used as a base for configuration.
     type: string
     enum: ["recipe", "image"]
+  IfExists:
+    description: >
+      If an item with the same name already exists, this field determines
+      what action to take. If "skip", the item will not be created. If "overwrite",
+      the item will overwritten with the new definition. If "abort", the command
+      will terminate.
+    type: string
+    enum: ['skip', 'overwrite', 'abort']
