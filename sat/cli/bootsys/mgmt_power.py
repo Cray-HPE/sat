@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2021, 2023-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2021, 2023-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -311,6 +311,38 @@ def set_next_boot_device_to_disk(ssh_client, ncns):
             ssh_client.close()
 
 
+def unmount_volumes(ssh_client, ncns):
+    """Unmount Ceph, s3fs, and RBD volumes on the given NCNs.
+
+    Args:
+        ssh_client (paramiko.SSHClient): a paramiko client object.
+        ncns (list): A list of NCN hostnames to unmount volumes from.
+    """
+    commands = {
+        'ceph': 'umount -a -t ceph',
+        's3fs': 'umount -a -t fuse.s3fs',
+        'rbd': 'rbdmap unmap-all'
+    }
+
+    for ncn in ncns:
+        try:
+            ssh_client.connect(ncn)
+        except (SSHException, socket.error) as err:
+            LOGGER.warning(f'Unable to connect to node {ncn}: {err}')
+            continue
+
+        for fs_type, command in commands.items():
+            try:
+                _, stdout, stderr = ssh_client.exec_command(command)
+                exit_code = stdout.channel.recv_exit_status()
+                if exit_code != 0:
+                    LOGGER.warning(f'Failed to unmount {fs_type} volumes on {ncn}: {stderr.read().decode()}')
+                else:
+                    LOGGER.info(f'Successfully unmounted {fs_type} volumes on {ncn}')
+            except SSHException as err:
+                LOGGER.warning(f'Failed to execute {command} on {ncn}: {err}')
+
+
 def do_mgmt_shutdown_power(username, password, excluded_ncns, ncn_shutdown_timeout, ipmi_timeout):
     """Power off NCNs.
 
@@ -334,6 +366,7 @@ def do_mgmt_shutdown_power(username, password, excluded_ncns, ncn_shutdown_timeo
     # Shutdown workers
     worker_ncns = other_ncns_by_role.get('workers', [])
     if worker_ncns:
+        unmount_volumes(ssh_client, worker_ncns)
         set_next_boot_device_to_disk(ssh_client, worker_ncns)
         try:
             with IPMIConsoleLogger(worker_ncns, username, password):
