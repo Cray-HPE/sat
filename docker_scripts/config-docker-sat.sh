@@ -2,7 +2,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -81,6 +81,6 @@ if [ -z "$KUBERNETES_PULL_VERSION" ]; then
     exit 1
 fi
 
-curl -fLO "https://storage.googleapis.com/kubernetes-release/release/v${KUBERNETES_PULL_VERSION#v}/bin/linux/amd64/kubectl"
+curl -fLO "https://dl.k8s.io/release/v${KUBERNETES_PULL_VERSION#v}/bin/linux/amd64/kubectl"
 chmod +x ./kubectl
 mv ./kubectl /usr/bin
