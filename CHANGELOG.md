@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Skip unparsable known_hosts entries in `get_ssh_client` to prevent a traceback
   with message "AttributeError: `NoneType` object has no attribute `hostnames`"
+- Fixed build failure due to change in location of `kubectl` version file.
 
 ## [3.33.10] - 2025-01-09
 
