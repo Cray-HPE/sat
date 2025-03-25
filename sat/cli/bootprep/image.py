@@ -185,6 +185,7 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
 
     existing_images_to_overwrite = []
     existing_images_to_skip = []
+
     if skip_all:
         existing_images_to_skip = existing_input_images
     elif overwrite_all:
