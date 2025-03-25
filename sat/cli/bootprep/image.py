@@ -192,16 +192,20 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
         existing_images_to_overwrite = existing_input_images
     else:
         for existing_input_image in existing_input_images:
-            answer = pester_choices(f'An image already exists in IMS with the following '
+            if existing_input_image.if_exists:
+                answer = existing_input_image.if_exists
+            else:
+                answer = pester_choices(f'An image already exists in IMS with the following '
                                     f'name: {existing_input_image.name}. Would you like to skip, '
                                     f'overwrite, or abort?', ('skip', 'overwrite', 'abort'))
+
             if answer == 'abort':
                 raise ImageCreateError('User chose to abort')
-            if answer == 'skip':
+            elif answer == 'skip':
                 skip = True
                 # append to skip list
                 existing_images_to_skip.append(existing_input_image)
-            if answer == 'overwrite':
+            elif answer == 'overwrite':
                 overwrite = True
                 # append to overwrite list
                 existing_images_to_overwrite.append(existing_input_image)
