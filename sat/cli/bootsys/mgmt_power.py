@@ -486,7 +486,7 @@ def wait_for_osds_up_and_in(ssh_client, ncn_groups, timeout=600, poll_interval=1
                 _, stdout, stderr = ssh_client.exec_command(command)
                 exit_code = stdout.channel.recv_exit_status()
                 if exit_code != 0:
-                    LOGGER.warning(f"Failed to get OSD status on {ncn}: {stderr.read().decode()}")
+                    LOGGER.warning(f"Failed to get OSD status: {stderr.read().decode()}")
                     time.sleep(poll_interval)
                     continue
 
@@ -495,21 +495,21 @@ def wait_for_osds_up_and_in(ssh_client, ncn_groups, timeout=600, poll_interval=1
                 if match:
                     total_osds, up_osds, in_osds = map(int, match.groups())
                     if up_osds == in_osds == total_osds:
-                        LOGGER.info(f'All Ceph OSDs are up and in on {ncn}. '
+                        LOGGER.info(f'All Ceph OSDs are up and in on ceph cluster. '
                                     f'(up: {up_osds}, in: {in_osds}, total: {total_osds})')
-                        break
+                        return
                     else:
-                        LOGGER.info(f'Waiting for all Ceph OSDs to be up and in on {ncn}... '
+                        LOGGER.info(f'Waiting for all Ceph OSDs to be up and in. '
                                     f'(up: {up_osds}, in: {in_osds}, total: {total_osds})')
                 else:
-                    LOGGER.warning(f'Failed to parse OSD status on {ncn}: {osd_status}')
+                    LOGGER.warning(f'Failed to parse OSD status: {osd_status}')
 
                 time.sleep(poll_interval)
             except SSHException as err:
                 LOGGER.warning(f'Failed to execute {command} on {ncn}: {err}')
                 time.sleep(poll_interval)
         else:
-            raise TimeoutError(f'Timed out waiting for all Ceph OSDs to be up and in on {ncn}.')
+            raise TimeoutError(f'Timed out waiting for all Ceph OSDs to be up and in.')
 
 
 def do_power_on_ncns(args):
