@@ -192,11 +192,8 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
         existing_images_to_overwrite = existing_input_images
     else:
         for existing_input_image in existing_input_images:
-            print("DEBUG=======")
-            print(f"if_exists val: {existing_input_image.if_exists}")
-            if existing_input_image.if_exists == "":
-                print("equal to quotes")
             if existing_input_image.if_exists:
+                LOGGER.info(f"if_exists has been set to {existing_input_image.if_exists} for {existing_input_image.name}")
                 answer = existing_input_image.if_exists
             else:
                 answer = pester_choices(f'An image already exists in IMS with the following '
@@ -216,7 +213,7 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
 
     if overwrite:
         names_to_overwrite = [image.name for image in existing_images_to_overwrite]
-        msg_template = (f'Images with the following names already exist in IMS and '
+        msg_template = (f'An Image with the following name already exists in IMS and '
                         f'{verb} %(action)s: {", ".join(names_to_overwrite)}')
         failed_overwrites = []
         LOGGER.info(msg_template, {'action': 'overwritten'})
@@ -233,7 +230,7 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
 
     if skip:
         names_to_skip = [image.name for image in existing_images_to_skip]
-        msg_template = (f'Images with the following names already exist in IMS and '
+        msg_template = (f'An Image with the following name already exists in IMS and '
                         f'{verb} %(action)s: {", ".join(names_to_skip)}')
         LOGGER.info(msg_template, {'action': 'skipped'})
 
