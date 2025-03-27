@@ -32,6 +32,7 @@ import socket
 import subprocess
 import sys
 import re
+import time
 
 import inflect
 from paramiko.ssh_exception import SSHException
@@ -458,6 +459,59 @@ def do_power_off_ncns(args):
     LOGGER.info('Succeeded with {}.'.format(action_msg))
 
 
+def wait_for_osds_up_and_in(ssh_client, ncn_groups, timeout=600, poll_interval=10):
+    """Wait for all Ceph OSDs to be up and in for all nodes in the given NCN groups.
+
+    Args:
+        ssh_client (paramiko.SSHClient): a paramiko client object.
+        ncn_groups (list): A list of NCN hostnames where the Ceph command will be executed.
+        timeout (int): Timeout in seconds to wait for OSDs to be up and in.
+        poll_interval (int): Interval in seconds between status checks.
+
+    Raises:
+        TimeoutError: If the OSDs do not become up and in within the timeout period.
+    """
+    command = "ceph osd stat"
+    start_time = time.time()
+
+    for ncn in ncn_groups:
+        try:
+            ssh_client.connect(ncn)
+        except (SSHException, socket.error) as err:
+            LOGGER.warning(f'Failed to connect to {ncn}: {err}')
+            continue
+
+        while time.time() - start_time < timeout:
+            try:
+                _, stdout, stderr = ssh_client.exec_command(command)
+                exit_code = stdout.channel.recv_exit_status()
+                if exit_code != 0:
+                    LOGGER.warning(f"Failed to get OSD status: {stderr.read().decode()}")
+                    time.sleep(poll_interval)
+                    continue
+
+                osd_status = stdout.read().decode()
+                match = re.search(r'(\d+) osds: (\d+) up .* (\d+) in', osd_status)
+                if match:
+                    total_osds, up_osds, in_osds = map(int, match.groups())
+                    if up_osds == in_osds == total_osds:
+                        LOGGER.info(f'All Ceph OSDs are up and in on ceph cluster. '
+                                    f'(up: {up_osds}, in: {in_osds}, total: {total_osds})')
+                        return
+                    else:
+                        LOGGER.info(f'Waiting for all Ceph OSDs to be up and in. '
+                                    f'(up: {up_osds}, in: {in_osds}, total: {total_osds})')
+                else:
+                    LOGGER.warning(f'Failed to parse OSD status: {osd_status}')
+
+                time.sleep(poll_interval)
+            except SSHException as err:
+                LOGGER.warning(f'Failed to execute {command} on {ncn}: {err}')
+                time.sleep(poll_interval)
+        else:
+            raise TimeoutError(f'Timed out waiting for all Ceph OSDs to be up and in.')
+
+
 def do_power_on_ncns(args):
     """Power on NCNs while monitoring consoles with ipmitool.
 
@@ -509,10 +563,15 @@ def do_power_on_ncns(args):
                     # Unfreeze Ceph and wait for Ceph health after powering on the storage nodes
                     if ncn_group == included_ncn_groups['storage']:
                         try:
+                            # Wait for all OSDs to be up and in
+                            host_keys = FilteredHostKeys(hostnames=ncn_group)
+                            ssh_client = get_ssh_client(host_keys=host_keys)
+                            wait_for_osds_up_and_in(ssh_client, ncn_group)
+
                             do_ceph_unfreeze(included_ncn_groups)
                             LOGGER.info('Ceph unfreeze completed successfully on storage NCNs.')
 
-                        except FatalPlatformError as err:
+                        except (FatalPlatformError, TimeoutError) as err:
                             LOGGER.error(f'Failed to unfreeze Ceph on storage NCNs: {err}')
                             # Use pester_choices to prompt the user
                             user_choice = pester_choices('Ceph is not healthy. Do you want to continue anyway?',
