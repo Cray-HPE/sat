@@ -213,11 +213,12 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
                 existing_images_to_overwrite.append(existing_input_image)
 
     if overwrite:
-        names_to_overwrite = [image.name for image in existing_images_to_overwrite]
-        msg_template = (f'An Image with the following name already exists in IMS and '
-                        f'{verb} %(action)s: {", ".join(names_to_overwrite)}')
+        for image_name in existing_images_to_overwrite:
+            msg_template = (f'An Image with the following name already exists in IMS and '
+                            f'{verb} %(action)s: {image_name}')
+            LOGGER.info(msg_template, {'action': 'overwritten'})
+
         failed_overwrites = []
-        LOGGER.info(msg_template, {'action': 'overwritten'})
         for existing_input_image in existing_images_to_overwrite:
             try:
                 existing_input_image.add_images_to_delete(ims_images_by_name[existing_input_image.name])
@@ -230,10 +231,10 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
                                    f'input image(s).')
 
     if skip:
-        names_to_skip = [image.name for image in existing_images_to_skip]
-        msg_template = (f'An Image with the following name already exists in IMS and '
-                        f'{verb} %(action)s: {", ".join(names_to_skip)}')
-        LOGGER.info(msg_template, {'action': 'skipped'})
+        for image_name in existing_images_to_skip:
+            msg_template = (f'An Image with the following name already exists in IMS and '
+                            f'{verb} %(action)s: {image_name}')
+            LOGGER.info(msg_template, {'action': 'skipped'})
 
         # Remove already existing images as dependencies of other images. They can be built right away
         for existing_image in existing_images_to_skip:
