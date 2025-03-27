@@ -192,6 +192,10 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
         existing_images_to_overwrite = existing_input_images
     else:
         for existing_input_image in existing_input_images:
+            print("DEBUG=======")
+            print(f"if_exists val: {existing_input_image.if_exists}")
+            if existing_input_image.if_exists == "":
+                print("equal to quotes")
             if existing_input_image.if_exists:
                 answer = existing_input_image.if_exists
             else:
