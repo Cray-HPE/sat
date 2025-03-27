@@ -193,7 +193,8 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
     else:
         for existing_input_image in existing_input_images:
             if existing_input_image.if_exists:
-                LOGGER.info(f"if_exists has been set to {existing_input_image.if_exists} for {existing_input_image.name}")
+                LOGGER.info(f"if_exists has been set to {existing_input_image.if_exists} "
+                            f"for {existing_input_image.name}")
                 answer = existing_input_image.if_exists
             else:
                 answer = pester_choices(f'An image already exists in IMS with the following '
