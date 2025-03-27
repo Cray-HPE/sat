@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021, 2023, 2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2023-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -872,6 +872,12 @@ class TestDoCephUnfreeze(unittest.TestCase):
         self.get_config_value = mock.patch('sat.cli.bootsys.platform.get_config_value').start()
         self.ceph_waiter_cls = mock.patch('sat.cli.bootsys.platform.CephHealthWaiter').start()
         self.ceph_waiter = self.ceph_waiter_cls.return_value
+
+        # Set a specific return value for the mocked get_config_value
+        self.get_config_value.return_value = 5  # Example timeout value in seconds
+
+    def tearDown(self):
+        mock.patch.stopall()
 
     def test_do_ceph_unfreeze_success(self):
         """Test do_ceph_unfreeze in the successful case."""

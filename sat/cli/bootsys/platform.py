@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021, 2023, 2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2023-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -555,6 +555,20 @@ def do_ceph_unfreeze(ncn_groups):
         ceph_timeout = get_config_value('bootsys.ceph_timeout')
         LOGGER.info(f'Waiting up to {ceph_timeout} seconds for Ceph to become healthy after unfreeze')
         ceph_waiter = CephHealthWaiter(ceph_timeout, storage_hosts, retries=1)
+
+        start_time = time.time()
+        while time.time() - start_time < ceph_timeout:
+            try:
+                # Print the output of `ceph -s` to show the current Ceph status
+                ssh_client = get_ssh_client()
+                ssh_client.connect(storage_hosts[0])  # Connect to the first storage host
+                _, stdout, stderr = ssh_client.exec_command("ceph -s")
+                ceph_status = stdout.read().decode()
+                LOGGER.info(f"Current Ceph status:\n{ceph_status}")
+                ssh_client.close()
+            except Exception as err:
+                LOGGER.warning(f"Failed to retrieve Ceph status: {err}")
+
         if not ceph_waiter.wait_for_completion():
             raise FatalPlatformError(f'Ceph is not healthy. Please correct Ceph health and try again.')
         else:
