@@ -17,7 +17,7 @@ google-auth==2.6.0
 htmlmin==0.1.12
 idna==3.7
 inflect==2.1.0
-Jinja2==3.1.5
+Jinja2==3.1.6
 jmespath==0.10.0
 json-schema-for-humans==0.40
 jsonschema==4.4.0
