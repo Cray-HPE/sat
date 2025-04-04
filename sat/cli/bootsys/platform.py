@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021, 2023, 2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2023-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,8 @@ Start and stop platform services to boot and shut down a Shasta system.
 import logging
 import socket
 import time
+import json
+import subprocess
 import urllib3.exceptions
 from collections import namedtuple
 from multiprocessing import Process, Queue
@@ -555,10 +557,76 @@ def do_ceph_unfreeze(ncn_groups):
         ceph_timeout = get_config_value('bootsys.ceph_timeout')
         LOGGER.info(f'Waiting up to {ceph_timeout} seconds for Ceph to become healthy after unfreeze')
         ceph_waiter = CephHealthWaiter(ceph_timeout, storage_hosts, retries=1)
-        if not ceph_waiter.wait_for_completion():
-            raise FatalPlatformError(f'Ceph is not healthy. Please correct Ceph health and try again.')
-        else:
-            LOGGER.info('Ceph is healthy.')
+
+        start_time = time.time()
+        corrective_action_performed = False  # Ensure corrective actions are only performed once
+
+        while time.time() - start_time < ceph_timeout:
+            try:
+                # Print the output of `ceph -s` to show the current Ceph status
+                ssh_client = get_ssh_client()
+                ssh_client.connect(storage_hosts[0])  # Connect to the first storage host
+                _, stdout, stderr = ssh_client.exec_command("ceph -s --format=json")
+                ceph_status = stdout.read().decode()
+                LOGGER.info(f"Current Ceph status:\n{ceph_status}")
+                ssh_client.close()
+
+                # Parse the Ceph status JSON to check for MON_CLOCK_SKEW
+                ceph_status_data = json.loads(ceph_status)
+                health_checks = ceph_status_data.get('health', {}).get('checks', {})
+
+                # Check if MON_CLOCK_SKEW is the only warning
+                if len(health_checks) == 1 and 'MON_CLOCK_SKEW' in health_checks and not corrective_action_performed:
+                    LOGGER.info("Detected MON_CLOCK_SKEW as the only warning. Attempting to resolve it.")
+                    summary_message = health_checks['MON_CLOCK_SKEW']['summary']['message']
+                    affected_monitors = [
+                        word.strip(',') for word in summary_message.split() if word.startswith('mon.')
+                    ]
+
+                    if affected_monitors:
+                        LOGGER.info(f"Affected monitors: {', '.join(affected_monitors)}")
+                        for monitor in affected_monitors:
+                            node = monitor.split('.')[1]  # Extract the node name (e.g., ncn-s002)
+                            try:
+                                # Restart the time synchronization service on the affected node
+                                restart_time_sync_command = ['ssh', node, 'systemctl', 'restart', 'chronyd.service']
+                                LOGGER.info(f"Restarting time synchronization service on {node}")
+                                subprocess.check_call(restart_time_sync_command)
+                                LOGGER.info(f"Successfully restarted time synchronization service on {node}")
+                            except subprocess.CalledProcessError as err:
+                                LOGGER.warning(f"Failed to restart time synchronization service on {node}: {err}")
+
+                        # Wait 60 seconds for clocks to synchronize
+                        LOGGER.info("Waiting 60 seconds for clocks to synchronize...")
+                        time.sleep(60)
+
+                        # Restart monitor daemons if necessary
+                        for monitor in affected_monitors:
+                            try:
+                                restart_command = ['ceph', 'orch', 'daemon', 'restart', monitor]
+                                LOGGER.info(f"Restarting monitor daemon: {monitor}")
+                                subprocess.check_call(restart_command)
+                                LOGGER.info(f"Successfully restarted monitor daemon: {monitor}")
+                            except subprocess.CalledProcessError as err:
+                                LOGGER.warning(f"Failed to restart monitor daemon {monitor}: {err}")
+
+                        # Wait another 60 seconds after restarting monitor daemons
+                        LOGGER.info("Waiting 60 seconds after restarting monitor daemons...")
+                        time.sleep(60)
+
+                    corrective_action_performed = True  # Mark corrective actions as performed
+                else:
+                    LOGGER.debug("MON_CLOCK_SKEW is not the only warning or no MON_CLOCK_SKEW detected.")
+
+            except Exception as err:
+                LOGGER.warning(f"Failed to retrieve Ceph status: {err}")
+
+            # Check if Ceph is healthy
+            if ceph_waiter.wait_for_completion():
+                LOGGER.info('Ceph is healthy.')
+                return
+
+        raise FatalPlatformError(f'Ceph is not healthy. Please correct Ceph health and try again.')
 
 
 def do_etcd_snapshot(ncn_groups):
