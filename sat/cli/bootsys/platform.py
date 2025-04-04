@@ -28,6 +28,7 @@ Start and stop platform services to boot and shut down a Shasta system.
 import logging
 import socket
 import time
+import json
 import subprocess
 import urllib3.exceptions
 from collections import namedtuple
@@ -558,6 +559,8 @@ def do_ceph_unfreeze(ncn_groups):
         ceph_waiter = CephHealthWaiter(ceph_timeout, storage_hosts, retries=1)
 
         start_time = time.time()
+        corrective_action_performed = False  # Ensure corrective actions are only performed once
+
         while time.time() - start_time < ceph_timeout:
             try:
                 # Print the output of `ceph -s` to show the current Ceph status
@@ -573,7 +576,7 @@ def do_ceph_unfreeze(ncn_groups):
                 health_checks = ceph_status_data.get('health', {}).get('checks', {})
 
                 # Check if MON_CLOCK_SKEW is the only warning
-                if len(health_checks) == 1 and 'MON_CLOCK_SKEW' in health_checks:
+                if len(health_checks) == 1 and 'MON_CLOCK_SKEW' in health_checks and not corrective_action_performed:
                     LOGGER.info("Detected MON_CLOCK_SKEW as the only warning. Attempting to resolve it.")
                     summary_message = health_checks['MON_CLOCK_SKEW']['summary']['message']
                     affected_monitors = [
@@ -610,16 +613,20 @@ def do_ceph_unfreeze(ncn_groups):
                         # Wait another 60 seconds after restarting monitor daemons
                         LOGGER.info("Waiting 60 seconds after restarting monitor daemons...")
                         time.sleep(60)
+
+                    corrective_action_performed = True  # Mark corrective actions as performed
                 else:
                     LOGGER.debug("MON_CLOCK_SKEW is not the only warning or no MON_CLOCK_SKEW detected.")
 
             except Exception as err:
                 LOGGER.warning(f"Failed to retrieve Ceph status: {err}")
 
-        if not ceph_waiter.wait_for_completion():
-            raise FatalPlatformError(f'Ceph is not healthy. Please correct Ceph health and try again.')
-        else:
-            LOGGER.info('Ceph is healthy.')
+            # Check if Ceph is healthy
+            if ceph_waiter.wait_for_completion():
+                LOGGER.info('Ceph is healthy.')
+                return
+
+        raise FatalPlatformError(f'Ceph is not healthy. Please correct Ceph health and try again.')
 
 
 def do_etcd_snapshot(ncn_groups):

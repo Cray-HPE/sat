@@ -898,7 +898,8 @@ class TestDoCephUnfreeze(unittest.TestCase):
         self.get_config_value.assert_called_once_with('bootsys.ceph_timeout')
         self.ceph_waiter_cls.assert_called_once_with(self.get_config_value.return_value,
                                                      self.ncn_groups['storage'], retries=1)
-        self.ceph_waiter.wait_for_completion.assert_called_once_with()
+        # Ensure wait_for_completion is called at least once
+        self.assertGreaterEqual(self.ceph_waiter.wait_for_completion.call_count, 1)
 
 
 class TestDoServiceActionOnHosts(unittest.TestCase):
