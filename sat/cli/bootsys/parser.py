@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -45,7 +45,7 @@ TIMEOUT_SPECS = [
                 'management nodes are reachable via SSH after boot.'),
     TimeoutSpec('k8s', ['boot'], 600,
                 'Kubernetes pods have returned to their pre-shutdown state.'),
-    TimeoutSpec('ceph', ['boot'], 60,
+    TimeoutSpec('ceph', ['boot'], 180,
                 'ceph has returned to a healthy state.'),
     TimeoutSpec('bgp', ['boot', 'shutdown'], 600,
                 'BGP routes report that they are established on management switches.'),
