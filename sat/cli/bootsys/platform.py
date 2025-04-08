@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021, 2023, 2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2023-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,8 @@ Start and stop platform services to boot and shut down a Shasta system.
 import logging
 import socket
 import time
+import json
+import subprocess
 import urllib3.exceptions
 from collections import namedtuple
 from multiprocessing import Process, Queue
@@ -539,6 +541,86 @@ def do_ceph_freeze():
         raise FatalPlatformError(str(err))
 
 
+def detect_mon_clock_skew(storage_hosts):
+    """Detect MON_CLOCK_SKEW in Ceph health checks.
+
+    Args:
+        storage_hosts (list): List of storage hosts.
+
+    Returns:
+        list: A list of affected monitors if MON_CLOCK_SKEW is detected, otherwise an empty list.
+    """
+    try:
+        ssh_client = get_ssh_client()
+        ssh_client.connect(storage_hosts[0])  # Connect to the first storage host
+        _, stdout, stderr = ssh_client.exec_command("ceph -s --format=json")
+        ceph_status = stdout.read().decode()
+        ssh_client.close()
+
+        # Parse the Ceph status JSON to check for MON_CLOCK_SKEW
+        ceph_status_data = json.loads(ceph_status)
+        health_checks = ceph_status_data.get('health', {}).get('checks', {})
+
+        if 'MON_CLOCK_SKEW' in health_checks:
+            LOGGER.info("Detected MON_CLOCK_SKEW warning.")
+            summary_message = health_checks['MON_CLOCK_SKEW']['summary']['message']
+            affected_monitors = [
+                word.strip(',') for word in summary_message.split() if word.startswith('mon.')
+            ]
+            return affected_monitors
+        else:
+            LOGGER.debug("MON_CLOCK_SKEW is not present in health checks.")
+            return []
+
+    except Exception as err:
+        LOGGER.warning(f"Failed to retrieve Ceph status or detect MON_CLOCK_SKEW: {err}")
+        return []
+
+
+def restart_affected_monitors(affected_monitors):
+    """Restart time synchronization and monitor daemons for affected monitors.
+
+    Args:
+        affected_monitors (list): List of affected monitors.
+
+    Returns:
+        None
+    """
+    if not affected_monitors:
+        LOGGER.info("No affected monitors to restart.")
+        return
+
+    LOGGER.info(f"Affected monitors: {', '.join(affected_monitors)}")
+    for monitor in affected_monitors:
+        node = monitor.split('.')[1]  # Extract the node name (e.g., ncn-s002)
+        try:
+            # Restart the time synchronization service on the affected node
+            restart_time_sync_command = ['ssh', node, 'systemctl', 'restart', 'chronyd.service']
+            LOGGER.info(f"Restarting time synchronization service on {node}")
+            subprocess.check_call(restart_time_sync_command)
+            LOGGER.info(f"Successfully restarted time synchronization service on {node}")
+        except subprocess.CalledProcessError as err:
+            LOGGER.warning(f"Failed to restart time synchronization service on {node}: {err}")
+
+    # Wait 60 seconds for clocks to synchronize
+    LOGGER.info("Waiting 60 seconds for clocks to synchronize...")
+    time.sleep(60)
+
+    # Restart monitor daemons if necessary
+    for monitor in affected_monitors:
+        try:
+            restart_command = ['ceph', 'orch', 'daemon', 'restart', monitor]
+            LOGGER.info(f"Restarting monitor daemon: {monitor}")
+            subprocess.check_call(restart_command)
+            LOGGER.info(f"Successfully restarted monitor daemon: {monitor}")
+        except subprocess.CalledProcessError as err:
+            LOGGER.warning(f"Failed to restart monitor daemon {monitor}: {err}")
+
+    # Wait another 60 seconds after restarting monitor daemons
+    LOGGER.info("Waiting 60 seconds after restarting monitor daemons...")
+    time.sleep(60)
+
+
 def do_ceph_unfreeze(ncn_groups):
     """Start inactive Ceph services, unfreeze Ceph and wait for it to be healthy.
 
@@ -555,6 +637,16 @@ def do_ceph_unfreeze(ncn_groups):
         ceph_timeout = get_config_value('bootsys.ceph_timeout')
         LOGGER.info(f'Waiting up to {ceph_timeout} seconds for Ceph to become healthy after unfreeze')
         ceph_waiter = CephHealthWaiter(ceph_timeout, storage_hosts, retries=1)
+
+        def pre_wait_action():
+            """Perform pre-wait actions like resolving MON_CLOCK_SKEW."""
+            affected_monitors = detect_mon_clock_skew(storage_hosts)
+            if affected_monitors:
+                restart_affected_monitors(affected_monitors)
+
+        # Set the pre-wait action for the CephHealthWaiter
+        ceph_waiter.pre_wait_action = pre_wait_action
+        # Check if Ceph is healthy
         if not ceph_waiter.wait_for_completion():
             raise FatalPlatformError(f'Ceph is not healthy. Please correct Ceph health and try again.')
         else:
