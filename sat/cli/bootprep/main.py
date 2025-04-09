@@ -361,6 +361,7 @@ def print_report(args, instance, created_images):
         report_title = inf.plural_noun(item_class.description) if args.format == 'pretty' else item_type_name
         current_report = bootprep_report.add_report(report_title, item_class.report_attrs)
         for item in created:
+            print(item.name())
             current_report.add_row(item.report_row())
 
     print(bootprep_report)
