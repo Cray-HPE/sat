@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -153,6 +153,9 @@ class TestDoBootprepRun(unittest.TestCase):
 
     def test_do_bootprep_run_success(self):
         """Test do_bootprep_run in the successful case"""
+        created_images = [MagicMock()]
+        failed_images = []
+        self.mock_create_images.return_value = created_images, failed_images
         with self.assertLogs(level=logging.INFO) as cm:
             do_bootprep_run(self.mock_validator_cls, self.args)
 
@@ -245,15 +248,15 @@ class TestDoBootprepRun(unittest.TestCase):
 
     def test_do_bootprep_run_image_create_error(self):
         """Test do_bootprep_run when an error occurs creating an image"""
-        create_err_msg = 'Failed to create an image'
-        self.mock_create_images.side_effect = ImageCreateError(create_err_msg)
+        created_images = []
+        failed_images = [MagicMock()]
+        self.mock_create_images.return_value = created_images, failed_images
+
         with self.assertRaises(SystemExit) as raises_cm:
             with self.assertLogs(level=logging.ERROR) as logs_cm:
                 do_bootprep_run(self.mock_validator_cls, self.args)
 
         self.assertEqual(1, raises_cm.exception.code)
-        self.assertEqual(1, len(logs_cm.records))
-        self.assertEqual(create_err_msg, logs_cm.records[0].msg)
         self.mock_load_and_validate_instance.assert_called_once_with(
             self.input_file, self.mock_validator_cls)
         self.mock_input_instance_cls.assert_called_once_with(
@@ -271,8 +274,6 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_session_templates.handle_existing_items.assert_not_called()
         self.mock_session_templates.validate.assert_not_called()
         self.mock_session_templates.create_items.assert_not_called()
-
-        self.mock_multireport_cls.assert_not_called()
 
 
 class TestDoBootprep(unittest.TestCase):
