@@ -356,6 +356,7 @@ def print_report(args, instance, created_images):
             item_class = items.item_class
 
         if not created:
+            print("DEBUG=====")
             print(item_type_name)
             print(items)
             continue
