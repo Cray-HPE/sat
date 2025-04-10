@@ -321,6 +321,7 @@ def do_bootprep_run(schema_validator, args):
             instance.input_session_templates.create_items()
         except InputItemCreateError as err:
             LOGGER.error(str(err))
+            print_report(args, instance, created_images)
             raise SystemExit(1)
     else:
         LOGGER.info('Skipping creation of BOS session templates based on value of --limit option.')
@@ -356,16 +357,11 @@ def print_report(args, instance, created_images):
             item_class = items.item_class
 
         if not created:
-            print("DEBUG=====")
-            print(item_type_name)
-            print(items)
             continue
 
         report_title = inf.plural_noun(item_class.description) if args.format == 'pretty' else item_type_name
         current_report = bootprep_report.add_report(report_title, item_class.report_attrs)
         for item in created:
-            print("DEBUG=====")
-            print(item.name)
             current_report.add_row(item.report_row())
 
     print(bootprep_report)
