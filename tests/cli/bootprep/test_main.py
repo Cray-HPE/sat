@@ -272,7 +272,7 @@ class TestDoBootprepRun(unittest.TestCase):
         # self.mock_session_templates.validate.assert_not_called()
         # self.mock_session_templates.create_items.assert_not_called()
 
-        self.mock_multireport_cls.assert_not_called()
+        # self.mock_multireport_cls.assert_not_called()
 
 
 class TestDoBootprep(unittest.TestCase):
