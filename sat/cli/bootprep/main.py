@@ -286,12 +286,7 @@ def do_bootprep_run(schema_validator, args):
     created_images = []
     image_create_err = False
     if IMAGES_KEY in args.limit:
-        try:
-            created_images = create_images(instance, args, ims_client)
-        except ImageCreateError as err:
-            LOGGER.error(str(err))
-            image_create_err = True
-            # raise SystemExit(1)
+        created_images, failed_images = create_images(instance, args, ims_client)
     else:
         LOGGER.info('Skipping creation of IMS images based on value of --limit option.')
 
@@ -328,7 +323,7 @@ def do_bootprep_run(schema_validator, args):
         LOGGER.info('Skipping creation of BOS session templates based on value of --limit option.')
 
     print_report(args, instance, created_images)
-    if image_create_err:
+    if failed_images:
         raise SystemExit(1)
 
 
