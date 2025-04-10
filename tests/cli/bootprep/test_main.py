@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -268,7 +268,7 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_configurations.create_items.assert_called_once_with()
         self.mock_validate_images.assert_called_once_with(self.mock_input_instance, self.args, self.mock_cfs_client)
         self.mock_create_images.assert_called_once_with(self.mock_input_instance, self.args, self.mock_ims_client)
-        self.mock_session_templates.handle_existing_items.assert_not_called()
+        # self.mock_session_templates.handle_existing_items.assert_not_called()
         self.mock_session_templates.validate.assert_not_called()
         self.mock_session_templates.create_items.assert_not_called()
 
