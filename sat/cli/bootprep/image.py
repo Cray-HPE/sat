@@ -555,8 +555,6 @@ def create_images(instance, args, ims_client):
 
     # TODO: This is pretty ugly, and would probably be better for it to go in
     #  the GroupWaiter class or the future InputImageCollection class.
-    created_images = set(waiter.members) - set(waiter.pending | waiter.failed)
-    failed_images = set(waiter.pending | waiter.failed) - set(waiter.members)
-    print(created_images)
-    print(failed_images)
+    created_images = (set(waiter.members) - set(waiter.pending | waiter.failed))
+    failed_images = (set(waiter.pending | waiter.failed) - set(waiter.members))
     return (created_images, failed_images)
