@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023, 2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -1149,6 +1149,61 @@ class TestValidateInstance(ExtendedTestCase):
 
         with self.assertRaisesRegex(BootPrepValidationError, err_msg):
             validate_instance({}, self.schema_validator)
+
+    def test_valid_if_exists_values(self):
+        """Test that valid if_exists values are accepted."""
+        valid_if_exists_values = ['skip', 'overwrite', 'abort']
+        for value in valid_if_exists_values:
+            with self.subTest(if_exists=value):
+                instance = {
+                    'configurations': [
+                        {
+                            'name': 'test-config',
+                            'if_exists': value,
+                            'layers': []
+                        }
+                    ]
+                }
+                self.assert_valid_instance(instance)
+
+    def test_invalid_if_exists_values(self):
+        """Test that invalid if_exists values are rejected."""
+        invalid_if_exists_values = ['some', 'invalid', '', None]
+        for value in invalid_if_exists_values:
+            with self.subTest(if_exists=value):
+                instance = {
+                    'configurations': [
+                        {
+                            'name': 'test-config',
+                            'if_exists': value,
+                            'layers': []
+                        }
+                    ]
+                }
+                if value is None:
+                    # Expect two errors for None: type and valid values
+                    expected_errs = [
+                        (('configurations', 0, 'if_exists'), "None is not of type 'string'", 1),
+                        (('configurations', 0, 'if_exists'), "None is not one of \\['skip', 'overwrite', 'abort'\\]", 1)
+                    ]
+                else:
+                    # Expect one error for invalid values
+                    expected_errs = [
+                        (('configurations', 0, 'if_exists'), f"'{value}' is not one of", 1)
+                    ]
+                self.assert_invalid_instance(instance, expected_errs)
+
+    def test_missing_if_exists(self):
+        """Test that missing if_exists is allowed."""
+        instance = {
+            'configurations': [
+                {
+                    'name': 'test-config',
+                    'layers': []
+                }
+            ]
+        }
+        self.assert_valid_instance(instance)
 
 
 class TestLoadBootprepSchema(unittest.TestCase):
