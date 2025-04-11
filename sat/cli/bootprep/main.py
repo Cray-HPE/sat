@@ -284,6 +284,7 @@ def do_bootprep_run(schema_validator, args):
             raise SystemExit(1)
 
     created_images = []
+    failed_images = []
     image_create_err = False
     if IMAGES_KEY in args.limit:
         created_images, failed_images = create_images(instance, args, ims_client)
