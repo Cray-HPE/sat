@@ -506,7 +506,7 @@ def create_images(instance, args, ims_client):
     input_images = instance.input_images
     if not input_images:
         LOGGER.info('Given input did not define any IMS images')
-        return []
+        return [], []
 
     images_to_create = handle_existing_images(ims_client, input_images, args.overwrite_images,
                                               args.skip_existing_images, args.dry_run)
@@ -525,7 +525,7 @@ def create_images(instance, args, ims_client):
 
     if args.dry_run:
         LOGGER.info("Dry run, not creating images.")
-        return []
+        return [], []
 
     ims_public_key_id = get_ims_public_key_id(ims_client, public_key_id=args.public_key_id,
                                               public_key_file_path=args.public_key_file_path,
