@@ -7,7 +7,7 @@ The System Admin Toolkit
 ------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2019-2023 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2019-2023, 2025 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -64,6 +64,17 @@ These global options must be specified before the subcommand.
         The amount of time, in seconds, allowed to wait for calls to any HTTP API
         to return before considering them failed. Overrides value set in config file.
 
+**--api-retries** *retries*
+        The number of times to retry calls to any HTTP API after encountering
+        network errors or internal server errors before considering them failed.
+        Overrides value set in config file.
+
+**--api-backoff** *backoff-factor*
+        The backoff factor controlling the time interval between retries. The time
+        between retries is calculated as BACKOFF_FACTOR * (2^(numRetries-1)),
+        per the documentation on urllib3.util.Retry. Overrides value set in config
+        file.
+
 **-h, --help**
         Print the help message for sat.
 
@@ -114,8 +125,18 @@ API_GATEWAY
 **api_timeout**
         This is the timeout for all calls to HTTP REST APIs, in seconds. This
         is the amount of time allowed to wait for calls to any HTTP API to
-        return before considering them failed. Overrides value set in config
-        file.
+        return before considering them failed. Defaults to 60 seconds.
+
+**retries**
+        The number of times to retry calls to any HTTP API after encountering
+        network errors or internal server errors before considering them failed.
+        Defaults to 5 retries.
+
+**backoff**
+        The backoff factor controlling the time interval between retries. The time
+        between retries is calculated as BACKOFF_FACTOR * (2^(numRetries-1)),
+        per the documentation on urllib3.util.Retry. Defaults to a backoff factor
+        of 0.2.
 
 
 BOOTSYS

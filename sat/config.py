@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -120,6 +120,8 @@ SAT_CONFIG_SPEC = {
         'token_file': OptionSpec(str, '', None, 'token_file'),
         'api_timeout': OptionSpec(int, 60, None, 'api_timeout'),
         'tenant_name': OptionSpec(str, '', None, 'tenant_name'),
+        'retries': OptionSpec(int, 5, None, 'api_retries'),
+        'backoff': OptionSpec(float, 0.2, None, 'api_backoff'),
     },
     'bos': {
         'api_version': OptionSpec(str, 'v2', validate_bos_api_version, 'bos_version')
@@ -406,7 +408,7 @@ def process_toml_output(toml_str):
     """
     copyright_stmt = """\
         Default configuration file for SAT.
-        (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
+        (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP.
 
         Permission is hereby granted, free of charge, to any person obtaining a
         copy of this software and associated documentation files (the "Software"),
