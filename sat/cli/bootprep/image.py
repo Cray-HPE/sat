@@ -497,15 +497,16 @@ def create_images(instance, args, ims_client):
             requests to the IMS API
 
     Returns:
-        Iterable[IMSInputImage]: images which were created or overwritten
+        created_images: Iterable[IMSInputImage]:
+            images which were created or overwritten
+        failed_images: Iterable[IMSInputImage]:
+            images which failed to be created or overwritten
 
-    Raises:
-        ImageCreateError: if there is a failure to create images
     """
     input_images = instance.input_images
     if not input_images:
         LOGGER.info('Given input did not define any IMS images')
-        return []
+        return [], []
 
     images_to_create = handle_existing_images(ims_client, input_images, args.overwrite_images,
                                               args.skip_existing_images, args.dry_run)
@@ -524,7 +525,7 @@ def create_images(instance, args, ims_client):
 
     if args.dry_run:
         LOGGER.info("Dry run, not creating images.")
-        return []
+        return [], []
 
     ims_public_key_id = get_ims_public_key_id(ims_client, public_key_id=args.public_key_id,
                                               public_key_file_path=args.public_key_file_path,
@@ -544,7 +545,7 @@ def create_images(instance, args, ims_client):
     LOGGER.info('Creating images')
     waiter.wait_for_completion()
     if waiter.failed:
-        raise ImageCreateError(f'Creation of {len(waiter.failed)} images failed')
+        LOGGER.error(f'Creation of {len(waiter.failed)} images failed')
     else:
         LOGGER.info('Image creation completed successfully')
 
@@ -554,4 +555,6 @@ def create_images(instance, args, ims_client):
 
     # TODO: This is pretty ugly, and would probably be better for it to go in
     #  the GroupWaiter class or the future InputImageCollection class.
-    return set(waiter.members) - set(waiter.pending | waiter.failed)
+    created_images = (set(waiter.members) - set(waiter.pending | waiter.failed))
+    failed_images = set(waiter.failed)
+    return created_images, failed_images

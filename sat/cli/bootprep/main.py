@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -284,12 +284,9 @@ def do_bootprep_run(schema_validator, args):
             raise SystemExit(1)
 
     created_images = []
+    failed_images = []
     if IMAGES_KEY in args.limit:
-        try:
-            created_images = create_images(instance, args, ims_client)
-        except ImageCreateError as err:
-            LOGGER.error(str(err))
-            raise SystemExit(1)
+        created_images, failed_images = create_images(instance, args, ims_client)
     else:
         LOGGER.info('Skipping creation of IMS images based on value of --limit option.')
 
@@ -326,6 +323,8 @@ def do_bootprep_run(schema_validator, args):
         LOGGER.info('Skipping creation of BOS session templates based on value of --limit option.')
 
     print_report(args, instance, created_images)
+    if failed_images:
+        raise SystemExit(1)
 
 
 def print_report(args, instance, created_images):
