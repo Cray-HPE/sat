@@ -163,7 +163,10 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
         dry_run (bool): whether this is a dry-run or not
 
     Returns:
-        list of IMSImage: the list of images that should be created
+        images_to_create: list of IMSImage:
+            the list of images that should be created
+        images_to_skip: list of IMSImage:
+            the list of images that are skipped
 
     Raises:
         ImageCreateError: if unable to query IMS for existing images, or if
@@ -179,7 +182,7 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
     skip_all = skip
 
     if not existing_input_images:
-        return input_images
+        return input_images, []
 
     verb = ('will be', 'would be')[dry_run]
 
@@ -244,7 +247,9 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
         # Create all images that do not already exist
 
     names_to_skip = [image.name for image in existing_images_to_skip]
-    return [image for image in input_images if image.name not in names_to_skip]
+    images_to_create = [image for image in input_images if image.name not in names_to_skip]
+    images_to_skip = [image for image in existing_images_to_skip]
+    return images_to_create, images_to_skip
 
 
 def find_image_dependencies(input_images):
@@ -499,6 +504,8 @@ def create_images(instance, args, ims_client):
     Returns:
         created_images: Iterable[IMSInputImage]:
             images which were created or overwritten
+        skipped_images: Iterable[IMSInputImage]:
+            images which were skipped
         failed_images: Iterable[IMSInputImage]:
             images which failed to be created or overwritten
 
@@ -506,10 +513,13 @@ def create_images(instance, args, ims_client):
     input_images = instance.input_images
     if not input_images:
         LOGGER.info('Given input did not define any IMS images')
-        return [], []
+        return [], [], []
 
-    images_to_create = handle_existing_images(ims_client, input_images, args.overwrite_images,
-                                              args.skip_existing_images, args.dry_run)
+    images_to_create, skipped_images = handle_existing_images(ims_client,
+                                                              input_images,
+                                                              args.overwrite_images,
+                                                              args.skip_existing_images,
+                                                              args.dry_run)
 
     # TODO (CRAYSAT-1277): This part appears redundant with logic in DependencyGroupWaiter.__init__
     images_without_dependencies = [image for image in images_to_create
@@ -525,7 +535,7 @@ def create_images(instance, args, ims_client):
 
     if args.dry_run:
         LOGGER.info("Dry run, not creating images.")
-        return [], []
+        return [], [], []
 
     ims_public_key_id = get_ims_public_key_id(ims_client, public_key_id=args.public_key_id,
                                               public_key_file_path=args.public_key_file_path,
@@ -557,4 +567,4 @@ def create_images(instance, args, ims_client):
     #  the GroupWaiter class or the future InputImageCollection class.
     created_images = (set(waiter.members) - set(waiter.pending | waiter.failed))
     failed_images = set(waiter.failed)
-    return created_images, failed_images
+    return created_images, skipped_images, failed_images
