@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2023, 2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -173,6 +173,21 @@ def create_parent_parser():
         help='The name of the tenant against which to run administrative commands.',
         metavar='NAME',
     )
+
+    parser.add_argument(
+        '--api-retries',
+        help='The number of times to retry calls to any HTTP API after encountering '
+             'network errors or internal server errors before considering them failed.',
+        metavar='RETRIES',
+        type=int)
+
+    parser.add_argument(
+        '--api-backoff',
+        help='The backoff factor controlling the time interval between retries. The time '
+             'between retries is calculated as BACKOFF_FACTOR * (2^(numRetries-1)), '
+             'per the documentation on urllib3.util.Retry.',
+        metavar='BACKOFF_FACTOR',
+        type=float)
 
     subparsers = parser.add_subparsers(metavar='command', dest='command')
     sat.cli.build_out_subparsers(subparsers)
