@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -413,6 +413,10 @@ def do_slscheck(args):
         hsm_components,
         hsm_redfish_endpoints
     )
+
+    # Log an info message if no inconsistencies are found
+    if not crosscheck_results:
+        LOGGER.info('No inconsistencies found between SLS and HSM.')
 
     report = Report(
         HEADERS, None,
