@@ -79,7 +79,8 @@ class BaseInputImage(DependencyGroupMember, ABC):
     template_render_err = ImageCreateError
     report_attrs = ['name', 'preconfigured_image_id', 'final_image_id', 'configuration', 'configuration_group_names']
 
-    def __init__(self, image_data, index, instance, jinja_env, product_catalog, ims_client, cfs_client):
+    def __init__(self, image_data, index, instance, jinja_env, product_catalog, ims_client, cfs_client,
+                 debug_on_failure=False):
         """Create a new InputImage
 
         Args:
@@ -96,6 +97,7 @@ class BaseInputImage(DependencyGroupMember, ABC):
                 requests to the IMS API
             cfs_client (csm_api_client.service.cfs.CFSClientBase): the CFS API client to make
                 requests to the CFS API
+            debug_on_failure (bool): Whether to enable debug-on-failure for CFS sessions.
         """
         super().__init__()
 
@@ -106,6 +108,7 @@ class BaseInputImage(DependencyGroupMember, ABC):
         self.product_catalog = product_catalog
         self.ims_client = ims_client
         self.cfs_client = cfs_client
+        self.debug_on_failure = debug_on_failure
 
         # TODO: Fix up this error-prone way of requiring that we set public_key_id later
         self.public_key_id = None
@@ -389,11 +392,15 @@ class BaseInputImage(DependencyGroupMember, ABC):
         else:
             LOGGER.info(f'Not deleting failed {ims_job_description} to allow debugging')
 
-    def begin_image_configure(self):
+    def begin_image_configure(self, debug_on_failure: bool = False):
         """Launch the CFS session to configure the image
 
+        Args:
+            debug_on_failure (bool): Whether to enable debug-on-failure to keep the IMS
+                job running for debugging purposes.
+
         Returns:
-            None. Sets `self.image_configure_session` for querying status of session.
+            None. Sets `self.image_configure_session` for querying the status of the session.
 
         Raises:
             ImageCreateError: if there is a failure to create the CFS session
@@ -409,7 +416,9 @@ class BaseInputImage(DependencyGroupMember, ABC):
 
         try:
             self.image_configure_session = self.cfs_client.create_image_customization_session(
-                session_name, self.configuration, self.image_id_to_configure, self.configuration_group_names, self.name)
+                session_name, self.configuration, self.image_id_to_configure,
+                self.configuration_group_names, self.name, debug_on_failure=self.debug_on_failure
+            )
         except APIError as err:
             raise ImageCreateError(f'Failed to launch image customization CFS session: {err}')
 
@@ -524,7 +533,7 @@ class BaseInputImage(DependencyGroupMember, ABC):
 
             if not self.image_configure_session:
                 # This properly handles whether configuration is needed or not
-                self.begin_image_configure()
+                self.begin_image_configure(debug_on_failure=self.debug_on_failure)
 
             if self.image_configure_complete:
                 if self.image_configure_success:
