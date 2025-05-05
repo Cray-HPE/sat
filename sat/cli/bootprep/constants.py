@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2023, 2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -47,6 +47,9 @@ DEFAULT_INPUT_SCHEMA_VERSION = '1.0.0'
 
 # Top-level keys in the bootprep input file
 CONFIGURATIONS_KEY = 'configurations'
+SKIPPED_CONFIGURATIONS_KEY = 'skipped_configurations'
 IMAGES_KEY = 'images'
+SKIPPED_IMAGES_KEY = 'skipped_images'
 SESSION_TEMPLATES_KEY = 'session_templates'
+SKIPPED_SESSION_TEMPLATES_KEY = 'skipped_session_templates'
 ALL_KEYS = [CONFIGURATIONS_KEY, IMAGES_KEY, SESSION_TEMPLATES_KEY]

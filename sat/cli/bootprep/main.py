@@ -43,6 +43,7 @@ from sat.cli.bootprep.errors import (
     InputItemValidateError,
     UserAbortException
 )
+from sat.cli.bootprep.input.configuration import InputConfiguration
 from sat.cli.bootprep.input.image import IMSInputImage
 from sat.cli.bootprep.input.instance import InputInstance
 from sat.cli.bootprep.input.configuration import InputConfigurationLayerBase
@@ -51,7 +52,7 @@ from sat.cli.bootprep.constants import (
     CONFIGURATIONS_KEY,
     EXAMPLE_FILE_NAME,
     IMAGES_KEY,
-    SESSION_TEMPLATES_KEY
+    SESSION_TEMPLATES_KEY, SKIPPED_CONFIGURATIONS_KEY, SKIPPED_IMAGES_KEY, SKIPPED_SESSION_TEMPLATES_KEY
 )
 from sat.cli.bootprep.documentation import (
     display_schema,
@@ -60,6 +61,7 @@ from sat.cli.bootprep.documentation import (
 )
 from sat.cli.bootprep.example import BootprepExampleError, get_example_cos_and_uan_data
 from sat.cli.bootprep.image import create_images, validate_images
+from sat.cli.bootprep.input.session_template import InputSessionTemplate
 from sat.cli.bootprep.output import ensure_output_directory, RequestDumper
 from sat.cli.bootprep.validate import (
     load_and_validate_instance,
@@ -286,12 +288,12 @@ def do_bootprep_run(schema_validator, args):
     created_images = []
     failed_images = []
     if IMAGES_KEY in args.limit:
-        created_images, failed_images = create_images(instance, args, ims_client)
+        created_images, skipped_images, failed_images = create_images(instance, args, ims_client)
     else:
         LOGGER.info('Skipping creation of IMS images based on value of --limit option.')
 
     if failed_images:
-        print_report(args, instance, created_images)
+        print_report(args, instance, created_images, skipped_images)
         raise SystemExit(1)
 
     # The IMSClient caches the list of images. Clear the cache so that we can find
@@ -326,10 +328,10 @@ def do_bootprep_run(schema_validator, args):
     else:
         LOGGER.info('Skipping creation of BOS session templates based on value of --limit option.')
 
-    print_report(args, instance, created_images)
+    print_report(args, instance, created_images, skipped_images)
 
 
-def print_report(args, instance, created_images):
+def print_report(args, instance, created_images, skipped_images):
     """Print a report about created items to stdout.
 
     Args:
@@ -343,15 +345,24 @@ def print_report(args, instance, created_images):
 
     created_types_items = [
         (CONFIGURATIONS_KEY, instance.input_configurations),
+        (SKIPPED_CONFIGURATIONS_KEY, instance.input_configurations.skipped_items),
         (IMAGES_KEY, created_images),
+        (SKIPPED_IMAGES_KEY, skipped_images),
         (SESSION_TEMPLATES_KEY, instance.input_session_templates),
+        (SKIPPED_SESSION_TEMPLATES_KEY, instance.input_session_templates.skipped_items),
     ]
     bootprep_report = MultiReport(print_format=args.format)
     for item_type_name, items in created_types_items:
-        if item_type_name == IMAGES_KEY:
+        if item_type_name == IMAGES_KEY or item_type_name == SKIPPED_IMAGES_KEY:
             # Special case for images since they are not BaseInputItems
             created = items
             item_class = IMSInputImage
+        elif item_type_name == SKIPPED_CONFIGURATIONS_KEY:
+            created = items
+            item_class = InputConfiguration
+        elif item_type_name == SKIPPED_SESSION_TEMPLATES_KEY:
+            created = items
+            item_class = InputSessionTemplate
         else:
             created = items.created
             item_class = items.item_class

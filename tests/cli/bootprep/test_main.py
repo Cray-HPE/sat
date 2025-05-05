@@ -154,8 +154,45 @@ class TestDoBootprepRun(unittest.TestCase):
     def test_do_bootprep_run_success(self):
         """Test do_bootprep_run in the successful case"""
         created_images = [MagicMock()]
+        skipped_images = []
         failed_images = []
-        self.mock_create_images.return_value = created_images, failed_images
+        self.mock_create_images.return_value = created_images, skipped_images, failed_images
+        with self.assertLogs(level=logging.INFO) as cm:
+            do_bootprep_run(self.mock_validator_cls, self.args)
+
+        self.mock_load_and_validate_instance.assert_called_once_with(
+            self.input_file, self.mock_validator_cls)
+        self.mock_input_instance_cls.assert_called_once_with(
+            self.validated_data, self.mock_request_dumper, self.mock_cfs_client, self.mock_ims_client,
+            self.mock_bos_client, self.mock_sandboxed_environment, self.mock_product_catalog,
+            self.dry_run, ALL_KEYS
+        )
+        self.mock_configurations.handle_existing_items.assert_called_once_with(
+            self.overwrite_configs, self.skip_existing_configs
+        )
+        self.mock_configurations.validate.assert_called_once_with()
+        self.mock_configurations.create_items.assert_called_once_with()
+        self.mock_validate_images.assert_called_once_with(self.mock_input_instance, self.args, self.mock_cfs_client)
+        self.mock_create_images.assert_called_once_with(self.mock_input_instance, self.args, self.mock_ims_client)
+        self.mock_session_templates.handle_existing_items.assert_called_once_with(
+            self.overwrite_templates, self.skip_existing_templates
+        )
+        self.mock_session_templates.validate.assert_called_once_with()
+        self.mock_session_templates.create_items.assert_called_once_with()
+        info_msgs = [r.msg for r in cm.records]
+        expected_msgs = [
+            f'Validating given input file {self.input_file}',
+            'Input file successfully validated against schema'
+        ]
+        self.assertEqual(expected_msgs, info_msgs)
+        self.mock_multireport_cls.assert_called_once()
+
+    def test_do_bootprep_run_skip_success(self):
+        """Test do_bootprep_run in the successful case with skippeded images"""
+        created_images = []
+        skipped_images = [MagicMock()]
+        failed_images = []
+        self.mock_create_images.return_value = created_images, skipped_images, failed_images
         with self.assertLogs(level=logging.INFO) as cm:
             do_bootprep_run(self.mock_validator_cls, self.args)
 
@@ -249,8 +286,9 @@ class TestDoBootprepRun(unittest.TestCase):
     def test_do_bootprep_run_image_create_error(self):
         """Test do_bootprep_run when an error occurs creating an image"""
         created_images = []
+        skipped_images = []
         failed_images = [MagicMock()]
-        self.mock_create_images.return_value = created_images, failed_images
+        self.mock_create_images.return_value = created_images, skipped_images, failed_images
 
         with self.assertRaises(SystemExit) as raises_cm:
             with self.assertLogs(level=logging.ERROR) as logs_cm:
