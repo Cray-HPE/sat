@@ -122,7 +122,7 @@ class TestDoBootprepRun(unittest.TestCase):
                               dry_run=self.dry_run, view_input_schema=False, generate_schema_docs=False,
                               bos_version='v1', recipe_version=None, vars_file=None, vars=None,
                               output_dir='.', save_files=True, resolve_branches=True,
-                              format='json', limit=None)
+                              debug_on_failure=False, format='json', limit=None)
         self.schema_file = 'schema.yaml'
         self.mock_multireport_cls = patch('sat.cli.bootprep.main.MultiReport').start()
         self.mock_validator_cls = MagicMock()
@@ -165,7 +165,7 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_input_instance_cls.assert_called_once_with(
             self.validated_data, self.mock_request_dumper, self.mock_cfs_client, self.mock_ims_client,
             self.mock_bos_client, self.mock_sandboxed_environment, self.mock_product_catalog,
-            self.dry_run, ALL_KEYS
+            self.dry_run, ALL_KEYS, self.args.debug_on_failure
         )
         self.mock_configurations.handle_existing_items.assert_called_once_with(
             self.overwrite_configs, self.skip_existing_configs
@@ -201,7 +201,7 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_input_instance_cls.assert_called_once_with(
             self.validated_data, self.mock_request_dumper, self.mock_cfs_client, self.mock_ims_client,
             self.mock_bos_client, self.mock_sandboxed_environment, self.mock_product_catalog,
-            self.dry_run, ALL_KEYS
+            self.dry_run, ALL_KEYS, self.args.debug_on_failure
         )
         self.mock_configurations.handle_existing_items.assert_called_once_with(
             self.overwrite_configs, self.skip_existing_configs
@@ -269,7 +269,7 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_input_instance_cls.assert_called_once_with(
             self.validated_data, self.mock_request_dumper, self.mock_cfs_client, self.mock_ims_client,
             self.mock_bos_client, self.mock_sandboxed_environment, self.mock_product_catalog,
-            self.dry_run, ALL_KEYS
+            self.dry_run, ALL_KEYS, self.args.debug_on_failure
         )
         self.mock_configurations.handle_existing_items.assert_called_once_with(
             self.overwrite_configs, self.skip_existing_configs
@@ -300,7 +300,7 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_input_instance_cls.assert_called_once_with(
             self.validated_data, self.mock_request_dumper, self.mock_cfs_client, self.mock_ims_client,
             self.mock_bos_client, self.mock_sandboxed_environment, self.mock_product_catalog,
-            self.dry_run, ALL_KEYS
+            self.dry_run, ALL_KEYS, self.args.debug_on_failure
         )
         self.mock_configurations.handle_existing_items.assert_called_once_with(
             self.overwrite_configs, self.skip_existing_configs
