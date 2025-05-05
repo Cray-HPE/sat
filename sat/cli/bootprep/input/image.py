@@ -79,7 +79,8 @@ class BaseInputImage(DependencyGroupMember, ABC):
     template_render_err = ImageCreateError
     report_attrs = ['name', 'preconfigured_image_id', 'final_image_id', 'configuration', 'configuration_group_names']
 
-    def __init__(self, image_data, index, instance, jinja_env, product_catalog, ims_client, cfs_client, debug_on_failure=False):
+    def __init__(self, image_data, index, instance, jinja_env, product_catalog, ims_client, cfs_client,
+                 debug_on_failure=False):
         """Create a new InputImage
 
         Args:

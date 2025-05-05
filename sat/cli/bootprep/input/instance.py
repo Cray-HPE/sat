@@ -86,7 +86,7 @@ class InputInstance:
     def input_images(self):
         """list of InputImages: the images in the input instance"""
         return [BaseInputImage.get_image(image, index, self, self.jinja_env, self.product_catalog,
-                                         self.ims_client, self.cfs_client)
+                                         self.ims_client, self.cfs_client, debug_on_failure=self.debug_on_failure)
                 for index, image in enumerate(self.instance_dict.get(IMAGES_KEY, []))]
 
     @cached_property
