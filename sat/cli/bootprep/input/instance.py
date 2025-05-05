@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -37,7 +37,7 @@ class InputInstance:
 
     def __init__(self, instance_dict, request_dumper,
                  cfs_client, ims_client, bos_client,
-                 jinja_env, product_catalog, dry_run, limit):
+                 jinja_env, product_catalog, dry_run, limit, debug_on_failure=False):
         """Create a new InputInstance from the validated contents of an input file.
 
         Args:
@@ -68,6 +68,7 @@ class InputInstance:
         self.product_catalog = product_catalog
         self.dry_run = dry_run
         self.limit = limit
+        self.debug_on_failure = debug_on_failure  # Store the debug_on_failure flag
 
     @cached_property
     def input_configurations(self):
