@@ -68,7 +68,7 @@ class InputInstance:
         self.product_catalog = product_catalog
         self.dry_run = dry_run
         self.limit = limit
-        self.debug_on_failure = debug_on_failure  # Store the debug_on_failure flag
+        self.debug_on_failure = debug_on_failure
 
     @cached_property
     def input_configurations(self):
