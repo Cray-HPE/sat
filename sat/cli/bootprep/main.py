@@ -287,6 +287,7 @@ def do_bootprep_run(schema_validator, args):
 
     created_images = []
     failed_images = []
+    skipped_images = []
     if IMAGES_KEY in args.limit:
         created_images, skipped_images, failed_images = create_images(instance, args, ims_client)
     else:
