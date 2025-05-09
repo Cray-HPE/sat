@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -55,7 +55,8 @@ RUN apk update && \
     python3 -m venv $VIRTUAL_ENV
 
 COPY requirements.lock.txt requirements.txt
-ARG PIP_EXTRA_INDEX_URL="https://artifactory.algol60.net/artifactory/csm-python-modules/simple"
+ARG PIP_EXTRA_INDEX_URL="https://artifactory.algol60.net/artifactory/csm-python-modules/simple https://artifactory.algol60.net/artifactory/csm-python-modules/unstable"
+
 RUN --mount=type=secret,id=netrc,target=/root/.netrc \
     pip3 install --no-cache-dir -U pip && \
     pip3 install -r requirements.txt
