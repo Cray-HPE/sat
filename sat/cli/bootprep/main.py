@@ -241,7 +241,7 @@ def do_bootprep_run(schema_validator, args):
     jinja_env.globals = var_context.vars
 
     instance = InputInstance(instance_data, request_dumper, cfs_client, ims_client, bos_client,
-                             jinja_env, product_catalog, args.dry_run, args.limit)
+                             jinja_env, product_catalog, args.dry_run, args.limit, args.debug_on_failure)
 
     # This is kind of an odd way to pass this through, but it works
     InputConfigurationLayerBase.resolve_branches = args.resolve_branches
