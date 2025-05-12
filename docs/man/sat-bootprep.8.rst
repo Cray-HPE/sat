@@ -7,7 +7,7 @@ Prepare to boot nodes with images and configurations
 ----------------------------------------------------
 
 :Author: Hewlett Packard Enterprise Development LP.
-:Copyright: Copyright 2021-2024 Hewlett Packard Enterprise Development LP.
+:Copyright: Copyright 2021-2025 Hewlett Packard Enterprise Development LP.
 :Manual section: 8
 
 SYNOPSIS
@@ -129,6 +129,15 @@ These options only apply to the ``run`` action.
         name and commit hash in the layer of the configuration. CFS can use the
         branch name to update the commit hash to the latest HEAD of the branch
         if requested.
+
+**--debug-on-failure**
+        Enable debug-on-failure to keep the IMS job running for debugging purposes
+        if the CFS session fails. When something goes wrong during execution of
+        Ansible code run by Image Customization, any state kept in the file system
+        of the image being created gets deleted immediately when the container is
+        torn down. By default, if ``--debug-on-failure`` is not specified the logs
+        get destroyed when container is torn down.
+        Note that this parameter is supported only with CFS V3.
 
 **--delete-ims-jobs**
         Delete IMS jobs after creating images. Note that deleting IMS jobs makes
