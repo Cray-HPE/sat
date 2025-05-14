@@ -353,7 +353,8 @@ class HSMStatusModule(StatusModule):
     This is the primary status module since it retrieves the list of xnames on the system.
     """
 
-    headings = ['xname', 'Type', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Class', 'Role', 'SubRole', 'Net Type']
+    headings = ['xname', 'Type', 'NID', 'State', 'Flag', 'Enabled', 'Arch', 'Class', 'Role', 'SubRole', 'Net Type',
+                'Locked']
     source_name = 'HSM'
     primary = True
 
