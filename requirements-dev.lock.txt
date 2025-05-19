@@ -14,7 +14,7 @@ coverage==6.3.2
 cray-product-catalog==2.4.1
 croniter==0.3.37
 cryptography==44.0.1
-csm-api-client==2.3.5
+csm-api-client==2.3.6
 dataclasses-json==0.5.6
 docutils==0.17.1
 google-auth==2.6.0
