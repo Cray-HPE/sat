@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -404,6 +404,11 @@ def get_resource_section_path(section):
             created
     """
     resource_path = os.path.join(os.environ['HOME'], '.config', 'sat', section)
+
+    sat_file = os.getenv("SAT_CONFIG_FILE")
+    if sat_file:
+        resource_path = os.path.join(os.path.dirname(sat_file), section)
+
     try:
         os.makedirs(resource_path, exist_ok=True)
     except OSError as err:
