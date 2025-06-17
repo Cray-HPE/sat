@@ -32,6 +32,7 @@ from cray_product_catalog.query import ProductCatalogError
 from csm_api_client.k8s import load_kube_api
 from inflect import engine
 from kubernetes.config import ConfigException
+from csm_api_client.service.cfs import CFSV3Client
 
 from sat.apiclient import APIError
 from sat.cached_property import cached_property
@@ -415,10 +416,21 @@ class BaseInputImage(DependencyGroupMember, ABC):
         LOGGER.info(f'Creating CFS session {session_name} to configure image {self.name}')
 
         try:
-            self.image_configure_session = self.cfs_client.create_image_customization_session(
-                session_name, self.configuration, self.image_id_to_configure,
-                self.configuration_group_names, self.name, debug_on_failure=self.debug_on_failure
-            )
+            if isinstance(self.cfs_client, CFSV3Client):
+                self.image_configure_session = self.cfs_client.create_image_customization_session(
+                    session_name, self.configuration, self.image_id_to_configure,
+                    self.configuration_group_names, self.name, debug_on_failure=self.debug_on_failure
+                )
+            else:
+                if debug_on_failure:
+                    raise ImageCreateError(
+                        "The --debug-on-failure option is only supported with CFS v3. "
+                        "You are using CFS v2."
+                    )
+                self.image_configure_session = self.cfs_client.create_image_customization_session(
+                    session_name, self.configuration, self.image_id_to_configure,
+                    self.configuration_group_names, self.name
+                )
         except APIError as err:
             raise ImageCreateError(f'Failed to launch image customization CFS session: {err}')
 
