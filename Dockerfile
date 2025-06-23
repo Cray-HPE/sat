@@ -31,7 +31,7 @@
 # The venv_base sets up the environment variables for the virtualenv which are
 # used by every other stage. Anything that uses the SAT venv should derive from
 # this stage.
-FROM artifactory.algol60.net/csm-docker/stable/docker.io/library/alpine:3.15 AS venv_base
+FROM artifactory.algol60.net/csm-docker/stable/docker.io/library/alpine:3.16 AS venv_base
 ENV VIRTUAL_ENV="/sat/venv"
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
