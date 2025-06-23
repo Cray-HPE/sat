@@ -44,7 +44,7 @@ PyYAML==6.0.1
 requests==2.32.4
 requests-oauthlib==1.3.1
 rsa==4.8
-s3transfer==0.5.2
+s3transfer==0.10.0
 semver==3.0.2
 six==1.16.0
 sseclient-py==1.7.2
