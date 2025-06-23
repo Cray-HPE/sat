@@ -344,15 +344,11 @@ class SourceInputConfigurationLayer(InputConfigurationLayer):
         """
         # Check if the CFS client supports the get_source_details method
         if hasattr(self.cfs_client, 'get_source_details'):
-            # Retrieve the source details using the source name
-            source_details = self.cfs_client.get_source_details(self.source_name)
-            credentials = source_details['credentials']
-
             layer_cls = self.cfs_client.configuration_cls.cfs_config_layer_cls
             try:
                 layer = layer_cls.from_source(
                     source=self.source_name, name=self.name, playbook=self.playbook,
-                    ims_require_dkms=self.ims_require_dkms, credentials=credentials,
+                    ims_require_dkms=self.ims_require_dkms,
                     branch=self.branch, commit=self.commit
                 )
             except ValueError as err:
