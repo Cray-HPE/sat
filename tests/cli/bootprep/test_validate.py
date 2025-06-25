@@ -1032,8 +1032,8 @@ class TestValidateInstance(ExtendedTestCase):
         }
         instance = self.get_instance_with_config_layer(layer)
         expected_errs = [
-            (('configurations', 0, 'layers', 0), "Not valid under any of the given schemas", 1),
-            (('configurations', 0, 'layers', 0), "Not valid under any of the given schemas", 2),
+            (('configurations', 0, 'layers', 0), NOT_VALID_ANY_OF_MESSAGE, 1),
+            (('configurations', 0, 'layers', 0), NOT_VALID_ANY_OF_MESSAGE, 2),
             (('configurations', 0, 'layers', 0), "'branch' is a required property", 3)
         ]
         self.assert_invalid_instance(instance, expected_errs)
@@ -1049,9 +1049,8 @@ class TestValidateInstance(ExtendedTestCase):
         }
         instance = self.get_instance_with_config_layer(layer)
         expected_errs = [
-            (('configurations', 0, 'layers', 0), "Not valid under any of the given schemas", 1),
-            (('configurations', 0, 'layers', 0), "Not valid under any of the given schemas", 2),
-            (('configurations', 0, 'layers', 0), r"should not be valid under \{'required': \['commit'\]\}", 3)
+            (('configurations', 0, 'layers', 0), NOT_VALID_ANY_OF_MESSAGE, 1),
+            (('configurations', 0, 'layers', 0), 'Valid under more than one of the given schemas', 2),
         ]
         self.assert_invalid_instance(instance, expected_errs)
 

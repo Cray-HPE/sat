@@ -220,11 +220,7 @@ properties:
                   type: string
               oneOf:
                 - required: ['branch']
-                  not:
-                    required: ['commit']
                 - required: ['commit']
-                  not:
-                    required: ['branch']
 
         additional_inventory:
           oneOf:
