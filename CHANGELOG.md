@@ -25,6 +25,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.35.16] - 2025-06-23
+
+### Added
+- Add support to `sat bootprep` for specifying the commit hash in a
+  source-based CFS configuration layer
+
+### Fixed
+- Fixed `sat bootprep` schema validation error handling to correctly handle
+  the case when an input matches more than one subschema in a `oneOf`.
+
 ## [3.35.15] - 2025-06-16
 
 ### Fixed
