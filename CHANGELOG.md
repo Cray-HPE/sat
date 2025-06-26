@@ -25,6 +25,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.35.16] - 2025-06-26
+
+### Security
+- Update urllib3 from 1.26.19 to 2.5.0 to address CVE-2025-50181 and CVE-2025-50182.
+- update alpine 3.15 to alpine 3.16 to facilitate urllib3 upgrade
+- update botocore 1.27.74 to 1.34.63 to facilitate urllib3 upgrade
+- update boto3 from 1.24.74 to 1.34.63 to facilitate urllib3 upgrade
+
 ## [3.35.15] - 2025-06-16
 
 ### Fixed
