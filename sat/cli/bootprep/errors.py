@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021, 2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2023, 2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -86,12 +86,12 @@ class EnhancedValidationError(Exception):
     def best_context(self):
         """list of EnhancedValidationError: list of most relevant contextual errors"""
         # If this is not an error validating against 'oneOf' or 'anyOf' keywords,
-        # there are no additional relevant contextual errors.
-        if self.base_error.schema_path[-1] not in ('oneOf', 'anyOf'):
+        # there are no additional relevant contextual errors. Even for 'oneOf', there
+        # may not be additional context if it matches all subschemas.
+        if self.base_error.schema_path[-1] not in ('oneOf', 'anyOf') or not self.base_error.context:
             return []
 
         errors_by_subschema_idx = defaultdict(list)
-
         for context_err in self.base_error.context:
             # This is relative to the parent oneOf or anyOf schema, so it
             # tells us which alternative we are looking at.
@@ -108,9 +108,15 @@ class EnhancedValidationError(Exception):
     def __str__(self):
         """str: A description of the error with location and context"""
         path_description = ''.join(f'[{repr(p)}]' for p in self.base_error.absolute_path)
-        if self.base_error.schema_path[-1] in ('oneOf', 'anyOf'):
-            # Shorten this error message to not include full instance
-            err_msg = "Not valid under any of the given schemas"
+        final_schema_idx = self.base_error.schema_path[-1]
+        # Shorten the error message to not include the full instance for oneOf or anyOf
+        if final_schema_idx == 'oneOf':
+            if 'is valid under each' in self.base_error.message:
+                err_msg = 'Valid under more than one of the given schemas'
+            else:
+                err_msg = 'Not valid under any of the given schemas'
+        elif final_schema_idx == 'anyOf':
+            err_msg = 'Not valid under any of the given schemas'
         else:
             err_msg = self.base_error.message
 

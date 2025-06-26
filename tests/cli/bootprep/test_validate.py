@@ -83,6 +83,20 @@ VALID_CONFIG_LAYER_GIT_COMMIT = {
     }
 }
 
+VALID_CONFIG_LAYER_SOURCE_BRANCH = {
+    'name': 'csm-packages',
+    'playbook': 'csm_packages.yml',
+    'source': 'SAT-Testing-Source',
+    'branch': 'master'
+}
+
+VALID_CONFIG_LAYER_SOURCE_COMMIT = {
+    'name': 'csm-packages',
+    'playbook': 'csm_packages.yml',
+    'source': 'SAT-Testing-Source',
+    'commit': 'cd42a7464eed9c3ac6e77a2f4f8380237fe69944'
+}
+
 VALID_IMAGE_IMS_NAME_WITH_CONFIG_V1 = {
     'name': 'compute-shasta-sles15sp1-1.4.2',
     'ims': {
@@ -504,6 +518,26 @@ class TestValidateInstance(ExtendedTestCase):
         """Valid configuration with additional inventory that uses a branch"""
         instance = {
             'configurations': [VALID_CONFIG_ADDITIONAL_INV_BRANCH]
+        }
+        self.assert_valid_instance(instance)
+
+    def test_valid_config_source_branch_layer(self):
+        """Valid configuration with a source-based layer using branch"""
+        instance = {
+            'configurations': [{
+                'name': 'valid-config-source-branch-layer',
+                'layers': [VALID_CONFIG_LAYER_SOURCE_BRANCH]
+            }]
+        }
+        self.assert_valid_instance(instance)
+
+    def test_valid_config_source_commit_layer(self):
+        """Valid configuration with a source-based layer using commit"""
+        instance = {
+            'configurations': [{
+                'name': 'valid-config-source-commit-layer',
+                'layers': [VALID_CONFIG_LAYER_SOURCE_COMMIT]
+            }]
         }
         self.assert_valid_instance(instance)
 
@@ -987,6 +1021,38 @@ class TestValidateInstance(ExtendedTestCase):
                     (('configurations', 0, 'layers', 0, 'git'), "'good_news' was unexpected", 3)
                 ]
                 self.assert_invalid_instance(instance, expected_errs)
+
+    def test_invalid_config_source_layer_missing_branch_and_commit(self):
+        """Invalid source-based layer missing both branch and commit"""
+        layer = {
+            'name': 'csm-packages',
+            'playbook': 'csm_packages.yml',
+            'source': 'SAT-Testing-Source'
+            # missing both 'branch' and 'commit'
+        }
+        instance = self.get_instance_with_config_layer(layer)
+        expected_errs = [
+            (('configurations', 0, 'layers', 0), NOT_VALID_ANY_OF_MESSAGE, 1),
+            (('configurations', 0, 'layers', 0), NOT_VALID_ANY_OF_MESSAGE, 2),
+            (('configurations', 0, 'layers', 0), "'branch' is a required property", 3)
+        ]
+        self.assert_invalid_instance(instance, expected_errs)
+
+    def test_invalid_config_source_layer_both_branch_and_commit(self):
+        """Invalid source-based layer with both branch and commit specified"""
+        layer = {
+            'name': 'csm-packages',
+            'playbook': 'csm_packages.yml',
+            'source': 'SAT-Testing-Source',
+            'branch': 'master',
+            'commit': 'cd42a7464eed9c3ac6e77a2f4f8380237fe69944'
+        }
+        instance = self.get_instance_with_config_layer(layer)
+        expected_errs = [
+            (('configurations', 0, 'layers', 0), NOT_VALID_ANY_OF_MESSAGE, 1),
+            (('configurations', 0, 'layers', 0), 'Valid under more than one of the given schemas', 2),
+        ]
+        self.assert_invalid_instance(instance, expected_errs)
 
     def test_invalid_ims_image_missing_name(self):
         """Invalid image missing properties"""
