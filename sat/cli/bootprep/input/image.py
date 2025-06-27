@@ -176,6 +176,7 @@ class BaseInputImage(DependencyGroupMember, ABC):
         return self.image_data['name']
 
     @property
+    @jinja_rendered
     def if_exists(self):
         """str or None: the value of the 'if_exists' key in the input data,
         or None if not specified"""

@@ -53,3 +53,6 @@ SKIPPED_IMAGES_KEY = 'skipped_images'
 SESSION_TEMPLATES_KEY = 'session_templates'
 SKIPPED_SESSION_TEMPLATES_KEY = 'skipped_session_templates'
 ALL_KEYS = [CONFIGURATIONS_KEY, IMAGES_KEY, SESSION_TEMPLATES_KEY]
+
+# Valid values for the if_exists property
+VALID_IF_EXISTS_VALUES = ('skip', 'overwrite', 'abort')

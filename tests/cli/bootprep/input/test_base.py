@@ -30,7 +30,7 @@ from unittest.mock import MagicMock
 
 from jinja2.sandbox import SandboxedEnvironment
 
-from sat.cli.bootprep.input.base import BaseInputItem, jinja_rendered
+from sat.cli.bootprep.input.base import BaseInputItem, InputItemValidateError, jinja_rendered
 from sat.cli.bootprep.input.instance import InputInstance
 from sat.constants import MISSING_VALUE
 
@@ -82,7 +82,6 @@ class TestBaseInputItem(unittest.TestCase):
         self.mock_data = {
             "name": "test-item",
             "type": "test-type",
-            "if_exists": None,  # Default value for if_exists
         }
 
         # Create a concrete subclass of BaseInputItem for testing
@@ -229,8 +228,36 @@ class TestBaseInputItem(unittest.TestCase):
 
     def test_if_exists_default(self):
         """Test BaseInputItem behavior when if_exists is not set."""
-        del self.mock_data["if_exists"]  # Remove the if_exists key
         item = self.ConcreteBaseInputItem(self.mock_data, self.mock_instance, 0, self.jinja_env)
 
         # Ensure the if_exists attribute defaults to None
         self.assertIsNone(item.if_exists)
+
+    def test_if_exists_jinja_rendered(self):
+        """Test that if_exists can be a Jinja2 rendered value."""
+        self.jinja_env.globals['if_exists'] = 'skip'
+        self.mock_data["if_exists"] = "{{if_exists}}"
+        item = self.ConcreteBaseInputItem(self.mock_data, self.mock_instance, 0, self.jinja_env)
+
+        # Ensure the if_exists attribute is set to the rendered value
+        self.assertEqual(item.if_exists, "skip")
+
+    def test_validate_if_exists(self):
+        """Test the validate_if_exists validation method with valid values."""
+        for if_exists in ['skip', 'overwrite', 'abort', None]:
+            with self.subTest(value=if_exists):
+                if if_exists is not None:
+                    self.mock_data["if_exists"] = if_exists
+                item = self.ConcreteBaseInputItem(self.mock_data, self.mock_instance, 0, self.jinja_env)
+                item.validate_if_exists()
+
+    def test_validate_if_exists_invalid(self):
+        """Test the validate_if_exists validation method with invalid values."""
+        self.jinja_env.globals['if_exists'] = 'invalid'
+        for if_exists in ['invalid', 1, True, "{{if_exists}}"]:
+            with self.subTest(value=if_exists):
+                self.mock_data["if_exists"] = if_exists
+                item = self.ConcreteBaseInputItem(self.mock_data, self.mock_instance, 0, self.jinja_env)
+                with self.assertRaises(InputItemValidateError) as context:
+                    item.validate_if_exists()
+                self.assertIn('Invalid value for "if_exists"', str(context.exception))

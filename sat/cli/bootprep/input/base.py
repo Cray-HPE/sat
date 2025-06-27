@@ -34,6 +34,7 @@ from jinja2 import TemplateError
 from jinja2.sandbox import SecurityError
 
 from sat.cached_property import cached_property
+from sat.cli.bootprep.constants import VALID_IF_EXISTS_VALUES
 from sat.cli.bootprep.errors import InputItemCreateError, InputItemValidateError, UserAbortException
 from sat.constants import MISSING_VALUE
 from sat.util import pester_choices
@@ -254,10 +255,27 @@ class BaseInputItem(Validatable, ABC):
         return self.data['name']
 
     @property
+    @jinja_rendered
     def if_exists(self):
         """str or None: the value of the 'if_exists' key in the input data,
         or None if not specified"""
         return self.data.get('if_exists')
+
+    @Validatable.validation_method(ordinal=0)
+    def validate_if_exists(self):
+        """Validate the rendered value of the 'if_exists' attribute.
+
+        If specified, it must be either 'skip', 'overwrite', or 'abort'.
+
+        Raises:
+            InputItemValidateError: if the 'if_exists' value is specified and
+                not one of 'skip', 'overwrite', or 'abort'
+        """
+        if self.if_exists not in (None, ) + VALID_IF_EXISTS_VALUES:
+            raise InputItemValidateError(
+                f'Invalid value for "if_exists" in {self}: {self.if_exists}. '
+                f'Valid values are {", ".join(VALID_IF_EXISTS_VALUES)}.'
+            )
 
     def __str__(self):
         # Since the name can be rendered, and when unrendered, it does not need

@@ -541,6 +541,20 @@ class TestValidateInstance(ExtendedTestCase):
         }
         self.assert_valid_instance(instance)
 
+    def test_valid_config_if_exists(self):
+        """Valid configuration with all possible if_exists values"""
+        valid_if_exists = ['skip', 'overwrite', 'abort']
+        for if_exists in valid_if_exists:
+            with self.subTest(if_exists=if_exists):
+                instance = {
+                    'configurations': [{
+                        'name': 'valid-config-if-exists',
+                        'if_exists': if_exists,
+                        'layers': [VALID_CONFIG_LAYER_PRODUCT_VERSION]
+                    }]
+                }
+                self.assert_valid_instance(instance)
+
     def test_valid_image_ims_name_with_config_v1(self):
         """Valid image from IMS by name with config specified (deprecated schema)"""
         instance = {
@@ -624,6 +638,16 @@ class TestValidateInstance(ExtendedTestCase):
         }
         self.assert_valid_instance(instance)
 
+    def test_valid_image_if_exists(self):
+        """Valid image with all possible if_exists values"""
+        valid_if_exists = ['skip', 'overwrite', 'abort']
+        for if_exists in valid_if_exists:
+            with self.subTest(if_exists=if_exists):
+                image_data = deepcopy(VALID_IMAGE_PRODUCT_WITH_CONFIG)
+                image_data['if_exists'] = if_exists
+                instance = {'images': [image_data]}
+                self.assert_valid_instance(instance)
+
     def test_valid_session_template_v1(self):
         """Valid session template using the deprecated image schema"""
         instance = {
@@ -677,6 +701,18 @@ class TestValidateInstance(ExtendedTestCase):
                 'session_templates': [session_template]
             }
             self.assert_valid_instance(instance)
+
+    def test_valid_session_template_if_exists(self):
+        """Valid session template with all possible if_exists values"""
+        valid_if_exists = ['skip', 'overwrite', 'abort']
+        for if_exists in valid_if_exists:
+            with self.subTest(if_exists=if_exists):
+                session_template = deepcopy(VALID_SESSION_TEMPLATE_COMPUTE_V2)
+                session_template['if_exists'] = if_exists
+                instance = {
+                    'session_templates': [session_template]
+                }
+                self.assert_valid_instance(instance)
 
     def test_invalid_session_template_boot_set_arch(self):
         """Invalid session template with an invalid arch specified for a boot set"""
@@ -1215,61 +1251,6 @@ class TestValidateInstance(ExtendedTestCase):
 
         with self.assertRaisesRegex(BootPrepValidationError, err_msg):
             validate_instance({}, self.schema_validator)
-
-    def test_valid_if_exists_values(self):
-        """Test that valid if_exists values are accepted."""
-        valid_if_exists_values = ['skip', 'overwrite', 'abort']
-        for value in valid_if_exists_values:
-            with self.subTest(if_exists=value):
-                instance = {
-                    'configurations': [
-                        {
-                            'name': 'test-config',
-                            'if_exists': value,
-                            'layers': []
-                        }
-                    ]
-                }
-                self.assert_valid_instance(instance)
-
-    def test_invalid_if_exists_values(self):
-        """Test that invalid if_exists values are rejected."""
-        invalid_if_exists_values = ['some', 'invalid', '', None]
-        for value in invalid_if_exists_values:
-            with self.subTest(if_exists=value):
-                instance = {
-                    'configurations': [
-                        {
-                            'name': 'test-config',
-                            'if_exists': value,
-                            'layers': []
-                        }
-                    ]
-                }
-                if value is None:
-                    # Expect two errors for None: type and valid values
-                    expected_errs = [
-                        (('configurations', 0, 'if_exists'), "None is not of type 'string'", 1),
-                        (('configurations', 0, 'if_exists'), "None is not one of \\['skip', 'overwrite', 'abort'\\]", 1)
-                    ]
-                else:
-                    # Expect one error for invalid values
-                    expected_errs = [
-                        (('configurations', 0, 'if_exists'), f"'{value}' is not one of", 1)
-                    ]
-                self.assert_invalid_instance(instance, expected_errs)
-
-    def test_missing_if_exists(self):
-        """Test that missing if_exists is allowed."""
-        instance = {
-            'configurations': [
-                {
-                    'name': 'test-config',
-                    'layers': []
-                }
-            ]
-        }
-        self.assert_valid_instance(instance)
 
 
 class TestLoadBootprepSchema(unittest.TestCase):

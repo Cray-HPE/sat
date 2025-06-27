@@ -29,7 +29,7 @@ import logging
 import math
 
 from sat.apiclient import APIError
-from sat.cli.bootprep.constants import CONFIGURATIONS_KEY, IMAGES_KEY
+from sat.cli.bootprep.constants import CONFIGURATIONS_KEY, IMAGES_KEY, VALID_IF_EXISTS_VALUES
 from sat.cli.bootprep.errors import ImageCreateError
 from sat.cli.bootprep.input.image import DependentInputImage, IMSInputImage
 from sat.cli.bootprep.public_key import get_ims_public_key_id
@@ -156,8 +156,8 @@ def handle_existing_images(ims_client, input_images, overwrite, skip, dry_run):
     Args:
         ims_client (sat.apiclient.IMSClient): the IMS API client to use to get
             info about existing public keys or to create new ones
-        input_images (list of sat.cli.bootprep.input.image.InputImage): the input
-            images in the bootprep input instance
+        input_images (list of sat.cli.bootprep.input.image.BaseInputImage): the
+            input images in the bootprep input instance
         overwrite (bool): if True, existing images should be overwritten
         skip (bool): if True, existing images should be overwritten
         dry_run (bool): whether this is a dry-run or not
@@ -283,8 +283,8 @@ def find_image_dependencies(input_images):
     before the second and third images customize it with different configurations.
 
     Args:
-        input_images (list of sat.cli.bootprep.input.image.InputImage): the list
-            of images from the bootprep input file that are to be built.
+        input_images (list of sat.cli.bootprep.input.image.BaseInputImage): the
+            images from the bootprep input file that are to be built.
 
     Returns:
         None. The input_images will have their dependency_images and
@@ -327,7 +327,7 @@ def validate_image_ims_bases(input_images):
 
     Args:
         input_images (list of sat.cli.bootprep.input.image.BaseInputImage): the
-            IMSImages which should have their IMS base validated. These images
+            images which should have their IMS base validated. These images
             should be just the images without dependencies on other images from
             the input, since an image with dependencies depends on images that
             are not yet in IMS and will be created by other images in the input
@@ -358,8 +358,8 @@ def validate_image_configurations(input_images, cfs_client, input_config_names, 
     """Validate that the images refer to valid existing configurations.
 
     Args:
-        input_images (list of sat.cli.bootprep.input.image.InputImage): the
-            IMSImages which should have their configurations validated.
+        input_images (list of sat.cli.bootprep.input.image.BaseInputImage): the
+            images which should have their configurations validated.
         cfs_client (csm_api_client.service.cfs.CFSClientBase): the CFS client to query to
             determine whether the configuration for the image exists.
         input_config_names (list of str): the list of configuration names that
@@ -393,6 +393,27 @@ def validate_image_configurations(input_images, cfs_client, input_config_names, 
     if failed_images:
         raise ImageCreateError(f'Failed to validate CFS configuration for {len(failed_images)} '
                                f'input images')
+
+
+def validate_image_if_exists_property(input_images):
+    """Validate that the if_exists property of images is valid.
+
+    Args:
+        input_images (list of sat.cli.bootprep.input.image.BaseInputImage): the
+            images which should have their if_exists properties validated.
+
+    Raises:
+        ImageCreateError: if any images have an invalid if_exists value
+    """
+    invalid_images = []
+    for image in input_images:
+        if image.if_exists not in (None, ) + VALID_IF_EXISTS_VALUES:
+            invalid_images.append(image)
+            LOGGER.error(f'{image} has an invalid value for "if_exists": {image.if_exists}.')
+
+    if invalid_images:
+        raise ImageCreateError(f'Failed to validate "if_exists" property for {len(invalid_images)} image(s). '
+                               f'Valid values are: {", ".join(VALID_IF_EXISTS_VALUES)}')
 
 
 class ImageCreationGroupWaiter(DependencyGroupWaiter):
@@ -466,6 +487,7 @@ def validate_images(instance, args, cfs_client):
         LOGGER.debug('Given input file did not define any images, so skipping validation.')
         return
 
+    validate_image_if_exists_property(input_images)
     validate_unique_image_ref_names(input_images)
     # Validate dependencies on the full set of input images
     find_image_dependencies(input_images)
