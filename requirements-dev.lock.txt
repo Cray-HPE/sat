@@ -11,7 +11,7 @@ cffi==1.15.0
 charset-normalizer==2.0.12
 click==8.0.4
 coverage==6.3.2
-cray-product-catalog==2.4.1
+cray-product-catalog==2.8.0
 croniter==0.3.37
 cryptography==44.0.1
 csm-api-client==2.3.6
