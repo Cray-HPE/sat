@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2020-2023, 2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -58,6 +58,8 @@ def get_product_versions():
     headers = [product_key, version_key, image_key, recipe_key]
 
     try:
+        # We do not use any of the component_versions data in the separate ConfigMaps, but do not
+        # do a shallow load because some product versions may exist only in the separate ConfigMaps.
         product_catalog = ProductCatalog()
     except ProductCatalogError as err:
         LOGGER.error(f'Unable to obtain product version information from product catalog: {err}')

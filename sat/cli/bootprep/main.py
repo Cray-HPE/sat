@@ -222,7 +222,8 @@ def do_bootprep_run(schema_validator, args):
 
     LOGGER.debug("Loading product catalog data")
     try:
-        product_catalog = ProductCatalog()
+        # Only the data from the main config map is needed, so do a shallow load to improve performance
+        product_catalog = ProductCatalog(shallow=True)
     except ProductCatalogError as err:
         LOGGER.warning(f'Failed to load product catalog data. Creation of any input items '
                        f'that require data from the product catalog will fail. ({err})')
