@@ -25,6 +25,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.36.0] - 2025-08-13
+
+### Fixed
+- Stop doing the resolution of branch name to commit hash in `sat` when using
+  CFS v3 API and let CFS to handle it. This allows the use of external repositories
+  and branch names for CFS layers created by `sat bootprep`.
+
 ## [3.35.18] - 2025-07-28
 
 ### Changed

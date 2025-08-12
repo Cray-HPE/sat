@@ -222,14 +222,15 @@ class GitInputConfigurationLayer(InputConfigurationLayer):
                 clone_url=self.clone_url, branch=self.branch, commit=self.commit,
                 name=self.name, playbook=self.playbook, ims_require_dkms=self.ims_require_dkms
             )
-        except ValueError as err:
-            raise InputItemCreateError(str(err))
 
-        if self.resolve_branches:
-            try:
-                layer.resolve_branch_to_commit_hash()
-            except CFSConfigurationError as err:
-                raise InputItemCreateError(str(err))
+            if self.resolve_branches:
+                if isinstance(self.cfs_client, CFSV3Client):
+                    LOGGER.debug("Allowing CFS v3 to resolve branch to commit hash and drop branch.")
+                else:
+                    LOGGER.debug("Resolving branch to commit hash in sat bootprep for CFS v2.")
+                    layer.resolve_branch_to_commit_hash()
+        except (ValueError, CFSConfigurationError) as err:
+            raise InputItemCreateError(str(err))
 
         return layer.req_payload
 
@@ -304,7 +305,11 @@ class ProductInputConfigurationLayer(InputConfigurationLayer):
                 product_catalog=self.product_catalog
             )
             if self.resolve_branches:
-                layer.resolve_branch_to_commit_hash()
+                if isinstance(self.cfs_client, CFSV3Client):
+                    LOGGER.debug("Allowing CFS v3 to resolve branch to commit hash and drop branch.")
+                else:
+                    LOGGER.debug("Resolving branch to commit hash in sat bootprep for CFS v2.")
+                    layer.resolve_branch_to_commit_hash()
         except (ValueError, CFSConfigurationError) as err:
             raise InputItemCreateError(str(err))
 
@@ -402,12 +407,14 @@ class AdditionalInventory(InputConfigurationLayerBase):
         try:
             layer = layer_cls.from_clone_url(clone_url=self.clone_url, name=self.name,
                                              branch=self.branch, commit=self.commit)
-        except ValueError as err:
-            raise InputItemCreateError(str(err))
-        try:
+
             if self.resolve_branches:
-                layer.resolve_branch_to_commit_hash()
-        except CFSConfigurationError as err:
+                if isinstance(self.cfs_client, CFSV3Client):
+                    LOGGER.debug("Allowing CFS v3 to resolve branch to commit hash and drop branch.")
+                else:
+                    LOGGER.debug("Resolving branch to commit hash in sat bootprep for CFS v2.")
+                    layer.resolve_branch_to_commit_hash()
+        except (ValueError, CFSConfigurationError) as err:
             raise InputItemCreateError(str(err))
 
         return layer.req_payload
