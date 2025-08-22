@@ -196,6 +196,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update the version of jinja2 from 3.1.4 to 3.1.5 to resolve
   CVE-2024-56201, and CVE-2024-56326
 
+### Added
+- USS-2886: Add 'wlmaudit' subcommand to validate WLM configurations
+
 ## [3.34.0] - 2025-01-08
 
 ### Changed
