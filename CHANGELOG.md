@@ -25,6 +25,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.36.2] - 2025-09-03
+
+### Fixed
+- Ensure that the values of multi-value fields in the output of `sat hwinv` are
+  printed in sorted order, so that they do not change from one execution to the
+  next.
+
 ## [3.36.1] - 2025-09-02
 
 ### Fixed
