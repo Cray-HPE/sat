@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2023 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2023, 2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -65,6 +65,9 @@ class FilteredHostKeys(HostKeys):
                 tempfile.NamedTemporaryFile(mode='w+') as tmp_known_hosts:
             for line in known_hosts:
                 entry = HostKeyEntry.from_line(line)
+                # skip any unparsable or empty entries
+                if entry is None:
+                    continue
                 if any(hn in entry.hostnames for hn in self.hostnames):
                     tmp_known_hosts.write(entry.to_line())
             tmp_known_hosts.flush()
