@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2020, 2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -378,25 +378,46 @@ class TestBaseComponentChildren(ExtendedTestCase):
     def test_get_unique_child_vals_str_unique(self):
         actual_str = self.component.get_unique_child_vals_str(ChildComponent,
                                                               'serial_number')
-        self.assertEqual(sorted(actual_str.split(', ')), self.children_ser_nums)
+        self.assertEqual(self.children_ser_nums, sorted(actual_str.split(', ')))
 
     def test_get_unique_child_vals_str_all_same(self):
         expected_str = self.children_model
         actual_str = self.component.get_unique_child_vals_str(ChildComponent,
                                                               'model')
-        self.assertEqual(actual_str, expected_str)
+        self.assertEqual(expected_str, actual_str)
 
     def test_get_unique_child_vals_str_int_val(self):
         expected_str = str(self.children_sku)
         actual_str = self.component.get_unique_child_vals_str(ChildComponent,
                                                               'sku')
-        self.assertEqual(actual_str, expected_str)
+        self.assertEqual(expected_str, actual_str)
 
     def test_get_unique_child_vals_str_unknown(self):
         """Test get_child_vals on an unknown child type."""
         # The SampleComponent type does not have any children of type SampleComponent
         actual_vals = self.component.get_unique_child_vals_str(SampleComponent, 'xname')
-        self.assertEqual(actual_vals, EMPTY_VALUE)
+        self.assertEqual(EMPTY_VALUE, actual_vals)
+
+    def test_get_unique_child_vals_str_sorted_order(self):
+        """Test that get_unique_child_vals_str returns sorted values for multiple children."""
+        # Manufacturers in non-sorted order
+        manufacturers = ['Samsung', 'SK Hynix', 'HPE']
+        # Create children with manufacturers in the given non-sorted order
+        children = [
+            ChildComponent(get_component_raw_data(
+                hsm_type=ChildComponent.hsm_type,
+                manufacturer=manu,
+                xname=f"x1000c0s0b0d{idx}",
+                serial_number=str(1000 + idx),
+                sku=12345
+            )) for idx, manu in enumerate(manufacturers)
+        ]
+        component = SampleComponent(get_component_raw_data())
+        for child in children:
+            component.add_child_object(child)
+        # The string should always be in deterministic sorted order
+        actual_str = component.get_unique_child_vals_str(ChildComponent, 'manufacturer')
+        self.assertEqual(', '.join(sorted(manufacturers)), actual_str)
 
 
 if __name__ == '__main__':
