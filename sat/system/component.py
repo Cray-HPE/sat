@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2019-2021, 2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2019-2021, 2024, 2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -177,8 +177,9 @@ class BaseComponent:
             or the EMPTY_VALUE string if there are no children of this type.
         """
         unique_child_vals = self.get_unique_child_vals(child_type, field_name)
+        # Ensure deterministic ordering by sorting the values
         return (EMPTY_VALUE if not unique_child_vals
-                else ', '.join(str(val) for val in unique_child_vals))
+                else ', '.join(str(val) for val in sorted(unique_child_vals)))
 
     @cached_property
     def type(self):
