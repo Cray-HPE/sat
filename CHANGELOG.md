@@ -25,6 +25,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.36.3] - 2025-09-16
+
+### Changed
+- Added logic to `sat bmccreds` to warn and prompt if the provided password is
+  longer than 20 characters. This is the maximum password length supported by
+  `ipmitool`, which is required to control management nodes during system boot
+  and shutdown procedures. A warning will be emitted in all cases when the
+  password exceeds 20 characters, and the user must answer a prompt to continue
+  if management nodes are included or if that can't be determined.
+
 ## [3.36.2] - 2025-09-03
 
 ### Fixed
