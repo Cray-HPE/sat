@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021, 2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2024-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -45,3 +45,6 @@ VALID_CHAR_SETS = {
 }
 
 VALID_CHAR_SETS_STRING = ''.join(VALID_CHAR_SETS.values())
+
+# The maximum password length supported by IPMI v2.0
+IPMI_V2_MAX_PASSWORD_LENGTH = 20
