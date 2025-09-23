@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021, 2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2024-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -138,6 +138,7 @@ def do_bmccreds(args):
             LOGGER.error('Failed to contact HSM to check BMC eligibility: %s', err)
             raise SystemExit(1)
     else:
+        hsm_client = None
         xnames = set(args.xnames)
 
     if not xnames:
@@ -166,4 +167,5 @@ def do_bmccreds(args):
         length=args.password_length or RANDOM_PASSWORD_LENGTH,
         allowed_chars=args.password_chars or args.password_char_sets or VALID_CHAR_SETS_STRING
     )
+    credentials_manager.validate_password_length(hsm_client)
     set_creds_with_retry(credentials_manager, args.retries, session)
