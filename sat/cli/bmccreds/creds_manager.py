@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021, 2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2024-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -33,9 +33,11 @@ from sat.apiclient import APIError, SCSDClient
 from sat.cli.bmccreds.constants import (
     BMC_USERNAME,
     RANDOM_PASSWORD_LENGTH,
+    IPMI_V2_MAX_PASSWORD_LENGTH,
     VALID_CHAR_SETS_STRING
 )
 from sat.report import Report
+from sat.util import prompt_continue
 from sat.xname import XName
 
 
@@ -220,6 +222,78 @@ class BMCCredsManager:
                 LOGGER.error('Missing expected key from target (%s): %s', target, err)
 
         print(report)
+
+    def _handle_long_password(self, hsm_client=None):
+        """Internal method to handle a long password
+
+        See validate_password_length for details on Args, Returns, and Raises.
+        """
+        # This is true regardless of whether management node BMCs are included or not
+        warning_msg = (
+            f'Password exceeds {IPMI_V2_MAX_PASSWORD_LENGTH}-character limit imposed by ipmitool, '
+            f'which is used to control management nodes during system shutdown and boot procedures.'
+        )
+
+        if hsm_client:
+            # Query for management nodes and then strip down to the NodeBMC to work around an
+            # issue where HSM does not return the NodeBMC for ncn-m001 if we query for NodeBMCs
+            # with the Management role directly.
+            try:
+                mgmt_nodes = [XName(xname_str) for xname_str in
+                              hsm_client.get_component_xnames({'type': 'Node', 'role': 'Management'})]
+            except APIError as err:
+                LOGGER.warning('Failed to query HSM to check whether any management node BMCs are '
+                               f'included in the xnames having their credentials updated: {err}')
+                # If we fail to query whether management nodes are included, prompt to be safe
+                require_prompt = True
+            else:
+                mgmt_node_bmcs = set(xname.get_direct_parent() for xname in mgmt_nodes)
+                if any(xname in mgmt_node_bmcs for xname in self.xnames):
+                    warning_msg += (' Management node BMCs are included in the xnames having their '
+                                    'credentials updated.')
+                    require_prompt = True
+                else:
+                    warning_msg += (f' Management node BMCs are not included in the xnames having their '
+                                    f'credentials updated.')
+                    require_prompt = False
+        else:
+            warning_msg += (' The "--no-hsm-check" option was specified, so we cannot detect whether '
+                            'any management node BMCs are having their credentials updated.')
+            require_prompt = True
+
+        LOGGER.warning(warning_msg)
+
+        if require_prompt:
+            prompt_continue('setting credentials')
+
+    def validate_password_length(self, hsm_client=None):
+        """Validate the length of the password(s) to be set.
+
+        The ipmitool utility has a hard limit on password length when using IPMI
+        v2.0. See the IPMI_V2_MAX_PASSWORD_LENGTH constant. This utility is used
+        during the system shutdown and boot procedures to query, monitor, and
+        control management nodes. If the user attempts to set a password longer
+        than the limit, and if any management nodes' BMCs are included in the
+        set of xnames, log a warning and prompt the user whether they really
+        want to continue with that password.
+
+        Args:
+            hsm_client (HSMClient or NoneType): An HSMClient object, which is
+                used to determine whether any management nodes' BMCs are having
+                their credentials set. If None, the HSM check is skipped, a
+                warning is logged, and the user is prompted.
+
+        Returns:
+            None
+
+        Raises:
+            SystemExit: if the password is too long, and the user decides not to continue.
+        """
+        # The user either specifies a password or we generate one of a given length
+        length = len(self.password) if self.password else self.length
+
+        if length > IPMI_V2_MAX_PASSWORD_LENGTH:
+            self._handle_long_password(hsm_client)
 
     def set_bmc_passwords(self, session):
         """Send a request to the SCSD API to set BMC passwords.

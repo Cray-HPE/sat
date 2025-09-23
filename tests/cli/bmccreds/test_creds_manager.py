@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021, 2024 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021, 2024-2025 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -374,6 +374,203 @@ class TestBMCCredsManagerPrintReport(ExtendedTestCase):
         expected_error = 'Missing expected key from API response: \'Targets\''
         with self.assertRaisesRegex(BMCCredsException, expected_error):
             BMCCredsManager.print_report(self.mock_response, 'User', 'system', 'pretty')
+
+
+class TestCredsManagerValidatePasswordLength(unittest.TestCase):
+    """Tests for BMCCredsManager.validate_password_length"""
+
+    def setUp(self):
+
+        self.mgmt_node_xnames = ['x3000c0s1b0n0', 'x3000c0s3b0n0', 'x3000c0s5b0n0']
+        self.mgmt_bmc_xnames = [xname[:-2] for xname in self.mgmt_node_xnames]
+        self.compute_node_xnames = ['x1000c0s1b0n0', 'x1000c0s2b0n0', 'x1000c0s3b0n0']
+        self.compute_bmc_xnames = [xname[:-2] for xname in self.compute_node_xnames]
+
+        self.all_node_xnames = self.mgmt_node_xnames + self.compute_node_xnames
+        self.all_bmc_xnames = [xname[:-2] for xname in self.all_node_xnames]
+        self.domain = None
+        self.force = False
+        self.report_format = 'pretty'
+
+        self.short_password = 'sWoRdp45'
+        self.long_password = 'password-that-is-longer-than-20-characters'
+
+        self.base_warning = r'Password exceeds 20-character limit imposed by ipmitool.*'
+
+        def mock_get_component_xnames(params):
+            if params.get('type') == 'Node':
+                if params.get('role') == 'Management':
+                    return self.mgmt_node_xnames
+                elif params.get('role') == 'Compute':
+                    return self.compute_node_xnames
+                else:
+                    return self.all_node_xnames
+            elif params.get('type') == 'NodeBMC':
+                if params.get('role') == 'Management':
+                    return self.mgmt_bmc_xnames
+                elif params.get('role') == 'Compute':
+                    return self.compute_bmc_xnames
+                else:
+                    return self.all_bmc_xnames
+            else:
+                return []
+
+        self.mock_hsm_client = Mock()
+        self.mock_hsm_client.get_component_xnames.side_effect = mock_get_component_xnames
+
+        self.mock_prompt_continue = patch('sat.cli.bmccreds.creds_manager.prompt_continue',
+                                          return_value=True).start()
+
+    def tearDown(self):
+        patch.stopall()
+
+    @patch('sat.cli.bmccreds.creds_manager.BMCCredsManager._handle_long_password')
+    def test_user_password_length_valid(self, mock_handle_long_password):
+        """Test that a short user-supplied password does not trigger long password handling."""
+        creds_manager = BMCCredsManager(
+            password=self.short_password,
+            xnames=self.all_bmc_xnames,
+            domain=self.domain,
+            force=self.force,
+            report_format=self.report_format,
+        )
+        creds_manager.validate_password_length(self.mock_hsm_client)
+        mock_handle_long_password.assert_not_called()
+
+    @patch('sat.cli.bmccreds.creds_manager.BMCCredsManager._handle_long_password')
+    def test_generated_password_length_valid(self, mock_handle_long_password):
+        """Test that a short generated password does not trigger long password handling."""
+        length = 12
+        creds_manager = BMCCredsManager(
+            password=None,
+            xnames=self.all_bmc_xnames,
+            domain=self.domain,
+            force=self.force,
+            report_format=self.report_format,
+            length=length,
+        )
+        creds_manager.validate_password_length(self.mock_hsm_client)
+        mock_handle_long_password.assert_not_called()
+
+    @patch('sat.cli.bmccreds.creds_manager.BMCCredsManager._handle_long_password')
+    def test_user_password_too_long(self, mock_handle_long_password):
+        """Test that a long user-supplied password triggers long password handling."""
+        creds_manager = BMCCredsManager(
+            password=self.long_password,
+            xnames=self.all_bmc_xnames,
+            domain=self.domain,
+            force=self.force,
+            report_format=self.report_format,
+        )
+        creds_manager.validate_password_length(self.mock_hsm_client)
+        mock_handle_long_password.assert_called_once_with(self.mock_hsm_client)
+
+    @patch('sat.cli.bmccreds.creds_manager.BMCCredsManager._handle_long_password')
+    def test_generated_password_too_long(self, mock_handle_long_password):
+        """Test that a long generated password triggers long password handling."""
+        length = 25
+        creds_manager = BMCCredsManager(
+            password=None,
+            xnames=self.all_bmc_xnames,
+            domain=self.domain,
+            force=self.force,
+            report_format=self.report_format,
+            length=length,
+        )
+        creds_manager.validate_password_length(self.mock_hsm_client)
+        mock_handle_long_password.assert_called_once_with(self.mock_hsm_client)
+
+    def test_long_password_no_mgmt_nodes(self):
+        """Test a long password with no management nodes present in given list of xnames"""
+        creds_manager = BMCCredsManager(
+            password=self.long_password,
+            xnames=self.compute_bmc_xnames,
+            domain=self.domain,
+            force=self.force,
+            report_format=self.report_format,
+        )
+
+        with self.assertLogs(level='WARNING') as logs_cm:
+            creds_manager.validate_password_length(self.mock_hsm_client)
+
+        self.assertRegex(logs_cm.records[0].message,
+                         self.base_warning + r'Management node BMCs are not included')
+
+        self.mock_prompt_continue.assert_not_called()
+
+    def test_long_password_with_mgmt_nodes(self):
+        """Test a long password with management nodes present in given list of xnames"""
+        creds_manager = BMCCredsManager(
+            password=self.long_password,
+            xnames=self.all_bmc_xnames,
+            domain=self.domain,
+            force=self.force,
+            report_format=self.report_format,
+        )
+
+        with self.assertLogs(level='WARNING') as logs_cm:
+            creds_manager.validate_password_length(self.mock_hsm_client)
+
+        self.assertRegex(logs_cm.records[0].message,
+                         self.base_warning + 'Management node BMCs are included ')
+        self.mock_prompt_continue.assert_called_once_with('setting credentials')
+
+    def test_long_password_hsm_error(self):
+        """Test a long password with an HSM error when querying for management nodes"""
+        self.mock_hsm_client.get_component_xnames.side_effect = APIError('HSM error')
+        creds_manager = BMCCredsManager(
+            password=self.long_password,
+            xnames=self.all_bmc_xnames,
+            domain=self.domain,
+            force=self.force,
+            report_format=self.report_format,
+        )
+
+        with self.assertLogs(level='WARNING') as logs_cm:
+            creds_manager.validate_password_length(self.mock_hsm_client)
+
+        self.assertRegex(logs_cm.records[0].message,
+                         'Failed to query HSM to check whether any management node BMCs are included')
+        self.assertRegex(logs_cm.records[1].message,
+                         self.base_warning)
+        self.mock_prompt_continue.assert_called_once_with('setting credentials')
+
+    def test_long_password_no_hsm_check(self):
+        """Test a long password with no hsm client provided"""
+        creds_manager = BMCCredsManager(
+            password=self.long_password,
+            xnames=self.all_bmc_xnames,
+            domain=self.domain,
+            force=True,
+            report_format=self.report_format,
+        )
+
+        with self.assertLogs(level='WARNING') as logs_cm:
+            creds_manager.validate_password_length()
+
+        self.assertRegex(logs_cm.records[0].message,
+                         self.base_warning + '"--no-hsm-check" option was specified, .* cannot detect')
+        self.mock_prompt_continue.assert_called_once_with('setting credentials')
+
+    def test_long_password_user_aborts(self):
+        """Test user aborting when prompted to continue with long password"""
+        exit_msg = 'Will not proceed with setting credentials'
+        self.mock_prompt_continue.side_effect = SystemExit(exit_msg)
+        creds_manager = BMCCredsManager(
+            password=self.long_password,
+            xnames=self.all_bmc_xnames,
+            domain=self.domain,
+            force=self.force,
+            report_format=self.report_format,
+        )
+
+        with self.assertLogs(level='WARNING') as logs_cm:
+            with self.assertRaisesRegex(SystemExit, exit_msg):
+                creds_manager.validate_password_length(self.mock_hsm_client)
+
+        self.assertRegex(logs_cm.records[0].message,
+                         self.base_warning + 'Management node BMCs are included ')
+        self.mock_prompt_continue.assert_called_once_with('setting credentials')
 
 
 if __name__ == '__main__':
