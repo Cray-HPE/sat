@@ -1,6 +1,6 @@
 # Changelog
 
-(C) Copyright 2020-2025 Hewlett Packard Enterprise Development LP
+(C) Copyright 2020-2026 Hewlett Packard Enterprise Development LP
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -25,10 +25,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.36.5] - 2026-01-08
+
+### Security
+- Update the version of `marshmallow` from 3.14.1 to 3.26.2 address CVE-2025-68480
+- Update the version of `pynacl` from 1.5.0 to 1.6.2 to address CVE-2025-69277
+- Update the version of `urllib3` from 2.6.0 to 2.6.3 to address CVE-2026-21441
+
 ## [3.36.4] - 2025-12-09
 
 ### Security
-- Update the version of urllib3 from 2.5.0 to 2.6.0 to address CVE-2025-66471
+- Update the version of `urllib3` from 2.5.0 to 2.6.0 to address CVE-2025-66471
 
 ## [3.36.3] - 2025-09-16
 
