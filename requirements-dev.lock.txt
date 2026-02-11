@@ -13,7 +13,7 @@ click==8.0.4
 coverage==6.3.2
 cray-product-catalog==2.8.0
 croniter==0.3.37
-cryptography==44.0.1
+cryptography==46.0.5
 csm-api-client==2.3.6
 dataclasses-json==0.5.6
 docutils==0.17.1
