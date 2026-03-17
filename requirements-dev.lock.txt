@@ -39,7 +39,7 @@ packaging==21.3
 paramiko==3.4.1
 parsec==3.5
 prettytable==0.7.2
-pyasn1==0.4.8
+pyasn1==0.6.3
 pyasn1-modules==0.2.8
 pycodestyle==2.8.0
 pycparser==2.21

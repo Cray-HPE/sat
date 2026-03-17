@@ -32,7 +32,7 @@ oauthlib==3.2.2
 paramiko==3.4.1
 parsec==3.5
 prettytable==0.7.2
-pyasn1==0.4.8
+pyasn1==0.6.3
 pyasn1-modules==0.2.8
 pycparser==2.21
 Pygments==2.15.0
