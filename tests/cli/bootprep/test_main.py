@@ -1,7 +1,7 @@
 #
 # MIT License
 #
-# (C) Copyright 2021-2025 Hewlett Packard Enterprise Development LP
+# (C) Copyright 2021-2026 Hewlett Packard Enterprise Development LP
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -147,6 +147,7 @@ class TestDoBootprepRun(unittest.TestCase):
         self.mock_sandboxed_environment = self.mock_sandboxed_environment_cls.return_value
         self.mock_request_dumper_cls = patch('sat.cli.bootprep.main.RequestDumper').start()
         self.mock_request_dumper = self.mock_request_dumper_cls.return_value
+        self.mock_get_config_value = patch('sat.cli.bootprep.main.get_config_value').start()
 
     def tearDown(self):
         patch.stopall()
