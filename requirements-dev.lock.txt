@@ -13,7 +13,7 @@ click==8.0.4
 coverage==6.3.2
 cray-product-catalog==2.8.0
 croniter==0.3.37
-cryptography==46.0.5
+cryptography==46.0.6
 csm-api-client==2.3.6
 dataclasses-json==0.5.6
 docutils==0.17.1
@@ -43,7 +43,7 @@ pyasn1==0.6.3
 pyasn1-modules==0.4.1
 pycodestyle==2.8.0
 pycparser==2.21
-Pygments==2.15.0
+Pygments==2.20.0
 PyNaCl==1.6.2
 pyparsing==3.0.9
 pyrsistent==0.18.1
